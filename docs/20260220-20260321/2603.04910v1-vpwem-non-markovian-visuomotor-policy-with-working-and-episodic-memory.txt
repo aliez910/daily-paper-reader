@@ -1,0 +1,302 @@
+Title: VPWEM: Non-Markovian Visuomotor Policy with Working and Episodic Memory
+
+URL Source: https://arxiv.org/pdf/2603.04910v1
+
+Published Time: Fri, 06 Mar 2026 01:39:42 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# VPWEM: Non-Markovian Visuomotor Policy with Working and Episodic Memory 
+
+Yuheng Lei, Zhixuan Liang, Hongyuan Zhang, Ping Luo 
+
+Abstract — Imitation learning from human demonstrations has achieved significant success in robotic control, yet most visuomotor policies still condition on single-step observations or short-context histories, making them struggle with non-Markovian tasks that require long-term memory. Simply enlarging the context window incurs substantial computational and memory costs and encourages overfitting to spurious correlations, leading to catastrophic failures under distribution shift and violating real-time constraints in robotic systems. By contrast, humans can compress important past experiences into long-term memories and exploit them to solve tasks throughout their lifetime. In this paper, we propose VPWEM, a non-Markovian visuomotor policy equipped with working and episodic memories. VPWEM retains a sliding window of recent observation tokens as short-term working memory, and introduces a Transformer-based contextual memory compressor that recursively converts out-of-window observations into a fixed number of episodic memory tokens. The compressor uses self-attention over a cache of past summary tokens and cross-attention over a cache of historical observations, and is trained jointly with the policy. We instantiate VPWEM on diffusion policies to exploit both short-term and episode-wide information for action generation with nearly constant memory and computation per step. Experiments demonstrate that VPWEM outperforms state-of-the-art baselines including diffusion policies and vision-language-action (VLA) models by more than 20% on the memory-intensive manipulation tasks in MIKASA and achieves an average 5% improvement on the mobile manipulation benchmark MoMaRT. Code is available at https://github.com/HarryLui98/code_vpwem .
+
+I. I NTRODUCTION 
+
+Imitation learning from demonstrations has achieved significant success in learning high-performing robot policies [1], [2]. While model architectures and training datasets have been scaled up to the level of several millions or even billions, existing policies typically predict actions based on single-step observations [3]–[8] or utilize observation histories with short context lengths, such as 2 [9]–[12], 6 [13], and 10 [14], as shown in Figure 1 (a). However, robotic tasks in realistic scenarios are often non-Markovian due to factors such as sensor limitations, environmental stochasticity, and complex long-horizon tasks involving multiple subgoals. Similarly, humans make decisions not only based on the current observation but also on some latent variables, such as personal preferences or past experiences in mind [15]. Policies that lack memory or rely on short-term contexts may struggle to capture these long-term temporal dependencies, leading to execution failures.  
+
+> All authors are affiliated to School of Computing and Data Science, University of Hong Kong. Correspondence should be sent to Yuheng Lei and Ping Luo with email:
+
+leiyh@connect.hku.hk;pluo@hku.hk Fixed -size 
+
+> Context Window
+> (a) Existing Methods
+
+…    
+
+> Action
+> Generation
+> (b) VPWE M(Ours)
+> Contextual
+> Memory
+> Compressor
+> Episodic Memory
+> Workin g
+> Memory
+> Action
+> Generation
+> Out -of -window
+> Tokens
+> Fig. 1. Comparison between VPWEM and existing methods: (a) Policies typically predict actions based on observations within a fixed-size context window. Historical observations that move out of the window are typically discarded and will not be used during action generation. (b) VPWEM augments diffusion-based policies with working and episodic memories, where the contextual memory compressor recursively consolidates historical observation tokens into fixed-size memory tokens.
+
+Despite the conceptual importance of long-term memories for robot policies, existing approaches limit history length in practice due to two key challenges: (1) Computational complexity and memory requirement grows rapidly as history length L increases, e.g. , the O(L2) complexity of self-attention mechanism [16], which makes training prohibitively expensive and leads to significant inference latency. Although some recent work [17] has preliminarily explored the potential of model with O(L) complexity [18]– [20] in robot learning, they mainly focus on increasing efficiency within short context length (e.g., 5 in MaIL [21]) and thus still lack the capability for long-term memory. (2) Naively conditioning on a longer history without careful consideration often lead to performance degradation rather than improvement. [22] frame this issue as a causal confusion problem arising from nuisance correlations. [23] further highlight a manifestation known as the copycat problem, where the agent tends to directly replicate the previous action. When the agent develops an incorrect dependence on nuisance variables hidden in the history, it may achieve low training error but suffer from catastrophic failures even under minor distributional shifts. Various solutions have been proposed to resolve this issue, including adversarial training [23], utilizing auxiliary priming information [24], and adding past action leakage regularization [25]. Hence, naively conditioning on an ever-growing observation history during task execution is impractical. Instead, neuroscience reveals that the hippocampus in human brain continually converts working memories into long-term storage in the cortex, enabling lifelong retention of knowledge and experience despite the brain’s limited volume [26]. Inspired by this mechanism, similar ideas have been adopted in long document understanding [27]–[29] 
+
+> arXiv:2603.04910v1 [cs.RO] 5 Mar 2026
+
+and long video understanding [30], [31]. In this paper, we propose VPWEM, which augments diffusion policies with working and episodic memory. As illustrated in Figure 1 (b), the key idea is to employ a contextual memory compressor that recursively consolidates out-of-window observation tokens into memory tokens with a fixed size, analogous to the role of the hippocampus in the human brain. With this compressor, the policy maintains a fixed-size episodic memory with bounded computational and memory costs. Additionally, the compressor learns to filter out irrelevant information from the observation history through end-to-end optimization, thereby mitigating overfitting to nuisance correlations. We conduct extensive experiments across three benchmarks. Our method particularly excels on memory-intensive manipulation tasks in MIKASA [32], outperforming state-of-the-art baselines by more than 20%. It also yields an average 5% gain over baselines on the mobile manipulation benchmark MoMaRT [33], and performs on par with baselines on the (almost) Markovian benchmark Robomimic [34]. In summary, our main contributions are three-fold: (1) We propose a novel framework that employs a Transformer-based contextual memory compressor to recursively condense historical tokens into fixed-size memory tokens, which serve as a dynamic summary of the full trajectory history; (2) We instantiate this idea on two diffusion policy baselines, DP [10] and MaIL [21], redesigning their training and inference pipelines so that action generation is conditioned on both long- and short-term contextual memory; (3) We conduct extensive experiments showing that our framework substantially improves performance in memory-intensive tasks, while achieving performance that is on par with baselines in Markovian tasks. II. R ELATED WORK 
+
+Long-context Models. Effectively handling long contexts has been a long-standing challenge, motivating a range of techniques to address this issue [35], [36]. Extrapolation methods, such as RoPE [37], modify positional embeddings to extend the context window of pre-trained models. Sparse attention approaches [38] design or learn sparse masks to discard irrelevant attention computation and alleviate the quadratic complexity of vanilla attention. Memory-augmentation methods introduce explicit external memory with caching, compression, and retrieval: Transformer-XL [39] reuses cached activations in a streaming fashion, Memorizing Transformer [40] employ k-nearest neighbor to retrieve semantically related content from a key-value database, while RMT [41] integrates multiple tunable memory tokens before and after each segment to facilitate information transfer across segments. Other lines of work adopt architectures with linear complexity, such as recurrent neural networks (RNNs) [42] and state space models (SSMs) [19]. Beyond language modeling, similar techniques have shown considerable promise in long-context video understanding and generation [30], [31], [43]. Despite these advancements, the integration of long-term contextual memories into robot policies remains largely unexplored, and is the primary focus of this work. 
+
+Imitation Learning. Imitation learning from human demonstrations is a simple yet effective approach for robot learning [1], [2]. Early work typically used MLP policies that map current states to optimal actions under a Markov Decision Process (MDP) formulation, while more recent works stacked limited past frames as observation history and utilized sequence models such as Transformers [16] to address partial observability. Numerous contemporary works have achieved notable success in developing generalist policies (a.k.a., Vision-Language-Action (VLA) models) within this Markovian or short-history setting, such as RT-1/2 [5], [13], Otter [14], OpenVLA [7], π0 [8], and RDT [12]. However, these methods can struggle in tasks that involve long-range complex temporal dependencies. One research direction maintains internal states as compressed belief-like representations of history, typically using RNNs [34] or SSMs [44]; however, performance is often limited by the capacity of these states. Another line directly utilizes the full history of interleaved observation and action tokens to predict the next action token in an autoregressive manner. While this method captures extensive context, it suffers from slow processing speed as sequence length increases and is constrained by the design of action tokenizer [45], [46]. DP-PTP [47] show that diffusion policies depend weakly on past actions and that adding past-action prediction to the behavior loss can improve performance. Some recent work in VLA has also addressed the long-term memory issue. For example, CronusVLA [48] extends single-frame VLA to a multi-frame paradigm via post-training; ContextVLA [49] compresses multi-frame intermediate features from the VLM backbone via average pooling; and MemoryVLA [50] constructs a perceptual-cognitive memory bank that retrieves and fuses decision-relevant entries for action generation. Our method differs from these work by learning an external contextual memory compressor that aims to encode the full trajectory history and provide complementary short-term working memory and long-term episodic memory to condition the action generation. 
+
+Diffusion Policies. Previous research has explored various representations of robot policies, including explicit policies using mixtures of Gaussians [34] and quantized actions [7], as well as implicit policies that learn an energy function [51]. Notably, diffusion policies, which progressively refine random noise into desired actions based on current observations, have recently gained significant attention for their impressive ability to model multi-modal distributions in high-dimensional action spaces [10]. A diffusion policy generally contains two parts [52]: (i) the condition backbone that encodes multi-modal perception, e.g. , proprioceptive states, language instructions [53], 2D RGB images [10], and 3D point clouds [11], into low-dimensional condition embeddings and (ii) the diffusion backbone that iteratively predict the noise from noisy actions given conditional embeddings, with optional architecture including MLP [54], U-Net [10], [11], and Transformer [6], [12]. Prior work mainly focuses on strengthening the conditioning backbone by using more advanced pretrained vision-language models (VLMs) to extract more informative latent features, or on improving the efficiency of the diffusion backbone for action generation via rectified flow [55] or discrete diffusion [56]. In contrast, our method is orthogonal to these efforts: we explicitly insert a memory module to enhance temporal understanding in non-Markovian tasks. III. P ROBLEM FORMULATION 
+
+Following standard imitation learning settings, we formulate a robotic task as a Partially Observable Markov Decision Process (POMDP) M = ( S, A, P, R, Ω, O), where 
+
+S and A is the state space and action space for tasks, Ω is the observation space of the robots, such as RGB images and proprioceptive states, P : S × A → S is the transition dynamics, O : Ω → S is the observation emission function, and R is the reward function of the task. The optimal policy πθ (at|ht) necessitates conditioning on the full history 
+
+ht = o≤t = ( o0, · · · , o t) to predict actions, while in practice existing methods often limit the context window to L and use the policy with form of πθ (at|ot−L:t). We consider to learn the robot policy πθ from an expert demonstration dataset 
+
+D = {τn}Nn=1 , where each expert trajectory τ contains a sequence of observation-action pairs (o0, a 0, · · · , o T ). The goal is to mimic the expert behaviors closely by optimizing policy parameters θ.IV. M ETHOD 
+
+The overview of our VPWEM framework is illustrated in Figure 2. In addition to using observations within the context window as working meory (Section IV-A), we leverage a contextual memory compressor to distill essential information from observation tokens that have fallen outside this window into fixed-size summary tokens (Section IV-B). The resulting short-term working memory and long-term episodic memory provide complementary conditioning signals that jointly guide the action generation process (Section IV-C). 
+
+A. Working Memory 
+
+Following the problem formulation in Section III, we employ a multi-modal encoder to extract features from the various types of observations. Specifically, given Nc
+
+cameras, we use Nc image encoders to process the raw RGBD observations Inc,t ∈ RH×W ×C , for nc ≤ Nc,producing visual features oI,t ∈ RDI . In parallel, we encode the low-dimensional proprioceptive states into oP,t ∈ RDP .These features are then concatenated and passed through an MLP to obtain a joint feature vector ot ∈ RD that captures the essential information of a single frame at time step t.We define the working memory as the observation tokens within a predefined sliding window, wt ≜
+
+ot−L:t = concat (ot−L+1 , · · · , o t−1, o t) ∈ RL×D , which is maintained using a first-in-first-out (FIFO) scheme. This design alleviates the quadratic computational cost and mitigates overfitting, and is therefore widely adopted in prior work. However, discarding earlier historical information makes it insufficient for non-Markovian tasks that require dependencies extending beyond the fixed context window L,thereby motivating the need for complementary long-term episodic information. 
+
+B. Episodic Memory 
+
+While long-term information resides in the observation history o≤t−L = concat (o0, o 1, · · · , o t−L), naively conditioning on this ever-growing observation history is impractical. Hence, we employ a Transformer-based compressor that recursively consolidates out-of-window observations into long-term contextual memory tokens. Formally, given a single-frame observation token oτ that has just exited the short-term context window, we further incorporate temporal information by adding a positional embedding (PE) fτ = oτ + PE (τ ) ∈ RD , where τ denotes the timestep of the frame within the episode. The token is then pushed into the out-of-window observation cache 
+
+Cf ← M (Cf ∪ fτ ) for future retrieval, where M is a cache management method that maintains a maximum cache size 
+
+S, such as FIFO. To extract essential information from long observation histories, we employ a contextual memory compressor that follows the standard Transformer encoder architecture [16]. Each block within this compressor comprises a self-attention layer for interactions with past summary tokens, a cross-attention layer for interactions with observation tokens, and a feed-forward network. Layer normalization and residual connections are applied before or after each of these sub-modules. The contextual memory compression process can be formally presented as: 
+
+q1,τ = q, (1) 
+
+x1,n = qn,τ + attn (qn,τ Qs, ¯Cq,n Ks, ¯Cq,n Vs), (2) 
+
+x2,n = x1,n + attn (x1Qc, ¯Cf Kc, ¯Cf Vc), (3) 
+
+qn+1 ,τ = x2,n + MLP (x2,n ), (4) 
+
+eτ = MLP (qN,τ ). (5) Specifically, each transformer block, indexed by n ≤ N ,operates on M querying tokens, qn,τ ∈ RM ×D . The initial querying tokens for the first layer q1,τ are trainable model parameters q. Similar to the observation cache, a summary cache Cq, n is maintained per block, storing querying tokens from previous timesteps and updated at each step as Cq,n ←M(Cq,n ∪ qn,τ ). We concatenate the observation cache into 
+
+¯Cf = concat (Cf ) ∈ RS×D and the summary cache into ¯Cq = concat (Cq ) ∈ RS×M ×D. The self-attention mechanism in Eq. (2) uses qn,τ to query ¯Cq , producing an output x1,n that compactly summarizes past memories up to the current timestep. x1,n then serves as queries for a cross-attention mechanism in Eq. (3), which attends to multi-frame observation features from ¯Cf , thereby capturing long-term dependencies across frames. The block’s output then becomes the input queries for the subsequent block. Finally, the output of the final layer, qN,τ , is projected to yield the episodic memory eτ ∈ RM ×D .Compressor Compressor 
+
+> Episodi c
+> Memory Tokens
+> Working
+> Memory Tokens
+> 𝑜 !𝑜 !"#
+> Multi -view RGBD Images,
+> Proprioceptive States,
+> …
+> Time
+> Multi -modal
+> Encoder
+
+…       
+
+> …
+> …
+> 𝐾 ,𝑉
+> 𝑄
+> Summary
+> Tokens 𝑄
+> 𝐾 ,𝑉
+> Contextual Memory
+> Compressor
+> Diffusion/Flow
+> Policy for 𝐾
+> Denoising Steps
+> Context
+> Window
+> ×𝑁
+> Observation Cache
+> Summary
+> Cache
+> 𝑎 !𝑎 !$#𝑎 !$%
+> 𝑡
+> Evicted
+> Token
+> Layers 1~𝑁
+> Action Chunk
+> Feed Forward
+> Cross -Attention
+> Self -Attention
+
+(b) Training 
+
+(a) Architecture 
+
+(c) Inference              
+
+> Noise
+> Predictor
+> Short Context Long History
+> Random Subsampling
+> and Compressing
+> Noising
+> 𝝐
+> 𝒂 "
+> 𝑡 𝑡 +4
+> Episode
+> Start
+> 𝑜 !"&
+> 𝑎 #$%:#$'⋯
+> 𝑡 +1𝑡 +2𝑡 +3
+> 1. Update Cache
+> Noise
+> Predictor
+> 𝑡 −1
+> Compressor
+> 2. Compress out -of -window tokens
+> 3. Predict Next
+> Action Chunk
+> Compressor Compressor Compressor
+
+Fig. 2. Overview of the VPWEM framework. (a) Policy architecture. Modules in green are learnable components, including the multi-modal encoder, contextual memory compressor, summary tokens, and the Transformer-based noise predictor in the diffusion policy. These components are optimized end-to-end with a behavior cloning loss. (b) Training process. Each training sample contains the complete trajectory from the beginning of the episode. The short-term memory component follows the standard diffusion policy baselines. Observations outside the context window are subsampled with a fixed ratio and passed to the contextual memory compressor, which outputs a fixed number of memory tokens. The combined long- and short-term memory tokens are used to condition the noise prediction network. (c) Inference process. Each decision step consists of three steps: encoding new frames and updating the observation and summary caches; compressing out-of-window tokens to obtain long-term memory tokens; and predicting the action chunk. 
+
+C. Action Generation with Working and Episodic Memory 
+
+The core idea behind diffusion models [57] is to iteratively transform a simple noise distribution into a complex target distribution through a sequence of denoising steps, optionally conditioned on contextual information. When applied tn robotic tasks [10], the conditioning context in existing methods [10], [47] is typically the robot’s observation history. In VPWEM, at each timestep t, action generation is conditioned by both working memory wt (Section IV-A) and episodic memory eτ (Section IV-B). Starting from an initial Gaussian noise sample aK ∼ N (0, I), the diffusion backbone progressively denoises the sequences over K
+
+timesteps, ultimately producing the final output a0, which is used as the robot’s action chunk at:t+H . Note that L is the observation horizon and H is the action prediction horizon. We illustrate the training and inference process of VPWEM in Figure 2. 
+
+Training. The training of diffusion policies involves two main processes: the forward (noising) process and the reverse (denoising) process. In the forward process, we randomly sample examples (o≤t, at:t+H ), abbreviated as (o, a0), from the demonstration dataset. Since our framework leverages the full trajectory history for action generation, resulting in observation inputs of varying lengths, unlike methods that use a fixed context window. To handle this, we first sort samples by their positions within an episode and group them by similar sequence lengths, so that samples within a mini-batch have comparable input sizes. Although slight mismatches still remain, we pad the beginning of each episode with its first frame to enable parallel batch training of the policy. To increase robustness, we divide each trajectory into segments with a specified subsample ratio and randomly select one frame from each segment to construct the input to the contextual memory compressor. In addition, we detach fτ
+
+and qn,τ from the computational graph before storing them in the observation and summary caches. This prevents gradients from backpropagating through time, ensuring that historical information is propagated solely via the summary tokens, substantially reducing memory consumption and mitigating overfitting issue. For each sampled (o, a0), we can generate noisy action sequences ak = √¯αka0 + √1 − ¯αkϵ at any denoising timestep k ∈ [1 , K ], where ¯αk and αk are functions of k
+
+that depend on the noise scheduler and ϵ ∼ N (0, I). In the reverse process, a neural network ϵθ is trained to predict the noise ϵ from the noisy input ak, conditioned on the working memory wt, episodic memory eτ , and timestep k.The network employs a transformer decoder architecture and applies a cross-attention mask to condition the action chunk generation [10], [52]. The training objective is: 
+
+L = E(o,a0),ϵ ϵ−ϵθ (√¯αka0 +√1 − ¯αkϵ, w t, e τ , k ) 22 . (6) Note that eτ is the output of the contextual memory compressor, as defined in Eqs. (1)-(5). Consequently, the compressor is optimized jointly with the behavior cloning loss to extract task-related information from the history. 
+
+Inference. During inference, we maintain a queue of observation tokens that provides contextual information from previously observed data, enabling the multi-modal encoder to focus exclusively on unseen frames. Tokens within the context window serve as working memory, while those that move beyond the window are compressed into episodic memory by the well-trained contextual memory compressor. The resulting long-term episodic memory and short-term working memory are then used to predict the action chunk. The denoising network can iteratively transforms the noise sequence aK into aK−1, aK−2, · · · , a2, a1, and finally the robot action a0, through K steps of denoising: 
+
+ak−1 = 1
+
+√αk
+
+
+
+ak − 1 − αk
+
+√1 − ¯αk
+
+ϵθ (ak, w t, e τ , k )
+
+
+
++ σkz. (7) where z ∼ N (0, I), and σk is also a function of k derived from the noise scheduler. V. E XPERIMENTS 
+
+A. Experimental Setup (a) MIKASA -Robo (b) MoMaR T (c) Robomimic  
+
+> Fig. 3. Three benchmarks in our experiments.
+
+Benchmark. We evaluate our method across three benchmarks, as shown in Figure 3:  
+
+> •
+
+MIKASA (Memory-Intensive Skills Assessment Suite for Agents) [32]. We use two memory-intensive tabletop manipulation tasks, ShellGameTouch-v0 and 
+
+RememberColor3-v0 . The former requires the policy to memorize the position of the ball after some time being covered by the cups and then interact with the cup the ball is under, whereas the latter requires it to remember the color of the cube and select it among other colors.  
+
+> •
+
+MoMaRT (Mobile Manipulation RoboTurk) [33]. We use five long-horizon mobile manipulation tasks in a mobile simulated kitchen, which are inherently non-Markovian: Table Setup from Dishwasher / Dresser 
+
+(dwsetup/dssetup), Table Cleanup to Dishwasher /Sink (dwclean/skclean), Unload Dishwasher to Dresser 
+
+(unload), with expert or suboptimal demonstrations.  
+
+> •
+
+Robomimic [34]. We use two tabletop manipulation tasks, Square and Transport , with proficient-human (ph) or multi-human demonstration (mh) demonstrations, which can be roughly regarded as Markovian. We also include a non-Markovian Long-Horizon Square 
+
+task from [47], where the robot must place a block onto the farthest peg from its initial location. The noisy scripted demonstrations prevent the policy from inferring the goal using current pose information alone, thus requiring memory of the initial state. 
+
+Baselines. We compare our method with the following four representative baselines:  
+
+> •
+
+Recurrent Neural Network Policy (RNN) [34] uses a long short-term memory (LSTM) network as backbone, where the final layer hidden states are passed to a Gaussian Mixture Model (GMM) to predict action.  
+
+> •
+
+Diffusion Policy (DP) [10] employs a Transformer-based denoising network conditioned only on observations within a fixed-size context window.  
+
+> •
+
+Diffusion Policy with Past Token Prediction (DP-PTP) [47] shares the same architecture as DP but introduces Past-Token Prediction (PTP) as an auxiliary objective alongside predicting future action tokens.  
+
+> •
+
+Mamba Imitation Learning (MaIL) with Diffusion Policy [21] improves over DP by uses a Mamba-based denoising network, whose recurrent nature helps better extract important information from the history. In the MIKASA benchmark, we also report the performance of Octo-small [9], OpenVLA [7], π0 [8], SpatialVLA [58], CronusVLA [48], and MemoryVLA [50], using the results directly taken from [32], [50]. 
+
+Implementation Details. We implement our baselines and proposed method using the open-source CleanDiffuser framework [52]. We follow the multi-stage training in [47] to use the frozen vision encoder from short-context policies when training long-context policies. We run all experiments on a single NVIDIA RTX 4090 GPU. To ensure reproducibility and statistical significance, we use three random seeds (100, 200, 300) and report the mean and standard deviation of final performance across these runs. We follow the hyperparameter settings recommended for baselines [10], [21], [52], and perform ablation studies on the hyperparameters of our method, as described in Section V-C. Hyperparameter details are summarized in Table I. 
+
+B. Main Results 
+
+Figure 5 shows results on two memory-intensive tasks in the MIKASA [32] benchmark. Our method not only significantly outperforms its fixed-context-window counterparts, but also surpasses state-of-the-art VLA baselines by more than 20% on average. The key to this high success rate is that the compressed episodic memory provides sufficient information to the denoising network;                                                                               
+
+> TABLE I HYPERPARAMETERS OF DP-VPWEM
+> Hyperparameter Value
+> Diffusion Policy
+> Diffusion Model DDPM [57] Sampling steps 50 Action chunk length H8Temperature 1.0 Number of layers 8Embedding dimension D256
+> Contextual Memory Compressor
+> Number of layers N2Number of short-term tokens L2Number of long-term tokens M2Maximum cache size 8Dropout ratio of memory tokens 0.3 Subsample ratio 5 (MIKASA) / 20 (otherwise)
+> Training
+> Batch size 64 Learning rate 1e-4 EMA rate 0.999 Gradient steps 6e5 (MIKASA) / 1e6 (otherwise) Optimizer AdamW( β1= 0.9, β2= 0.999) Fig. 4. Performance on MoMaRT benchmark. TABLE II COMPARISON OF COMPUTATIONAL AND STORAGE COSTS ON THE UNLOAD -SUBOPTIMAL TASK IN THE MOMART BENCHMARK
+> Methods DP-PTP DP-VPWEM
+> Context Length 4816 32 64 128 L2S2 Model Size (M) 50.67 50.67 50.68 50.69 50.70 50.73 52.98 GPU Memory (MB) 656 684 794 942 1258 1792 734 Training Time (s/step) 0.02 0.02 0.08 0.08 0.17 0.18 0.09 Inference Time (s) 0.17 0.18 0.27 0.35 0.44 0.72 0.22 Success Rate (%) 46.1 45.0 49.1 49.6 49.6 40.4 58.3
+> Fig. 5. Performance on MIKASA benchmark.
+
+merely scaling the policy while conditioning on a single frame is insufficient to solve such non-Markovian tasks. Figure 4 shows results on the MoMaRT [33] benchmark, where our proposed method achieves an average 5% improvement over the baselines. Note that we instantiate the proposed working and episodic memory mechanism in both baselines, DP and MaIL, and it consistently improves their performance. Figure 6 demonstrates that our method performs on par with baselines on the (almost) Markovian Robomimic benchmark [34]. Collectively, these results show that our proposed method effectively addresses the long-term memory challenge, particularly in non-Markovian tasks. Table II compares the computational and storage costs of DP-PTP across different context lengths with those of DP-VPWEM on the unload-suboptimal task in the  
+
+> Fig. 6. Performance on Robomimic benchmark.
+
+MoMaRT benchmark. While the DP-PTP model size remains nearly constant, both training and inference time increase substantially as the context length grows, whereas the success rate improves only marginally and even degrades at the context length of 128. In contrast, the additional memory module in DP-VPWEM is lightweight (around 2.24M parameters) and introduces only modest computational and storage overhead, yet achieves a higher success rate (58.3%) than all DP-PTP variants evaluated. 
+
+C. Ablation Studies 
+
+We perform ablation studies on the memory-intensive 
+
+Long-Horizon Square task to investigate how different design choices in our proposed framework affect the performance, as shown in Figure 7. 
+
+Context Length (Observation Horizon). From the results of baselines, we observe that the performance of DP degrades as the observation horizon increases, whereas DP-PTP achieves better performance with longer contexts. MaIL outperforms DP, largely due to the recurrent nature of state-space models (SSMs) in the denoising network. All of these methods struggle on this task because they rely on truncated observation histories. On the contrary, the Fig. 7. Ablation studies on Long-Horizon Square task. 
+
+L1S1 (i.e., one long-term episodic token and one short-term working memory token) variant of our proposed method already achieves 65% success rate, surpassing all previous baselines. Performance generally improves as the number of long-term or short-term memory tokens increases, but may eventually degrade when too many tokens are used. Hence, we use the L2S2 variant in our main experiments. 
+
+Number of Layers in Compressor. We investigate the influence of the number of layers in the compressor using the L1S1 variant. The results show a clear trend: performance improves with a larger compressor network, which produces more informative summary tokens and provides better conditioning for the action generation process. 
+
+Maximum Cache Size. We observe that performance improves as the maximum cache size increases, since more historical information is retained. However, the gains begin to saturate when the size exceeds 8. This suggests redundancy in the long observation history and indicates that the memory compressor can distill the necessary information into a small number of tokens without sacrificing performance. 
+
+Cache Management Method. Besides the simplest first-in-first-out (FIFO) strategy, we also investigate several cache management methods: Random evicts a randomly selected token when the cache exceeds its maximum length; K-Means partitions tokens into clusters by iteratively assigning tokens to the nearest cluster center and updating the centers; and AdjSim [50] computes cosine similarities between adjacent cache entries and merges the pair with the highest similarity. Results show that all methods except for Random show similar performance, hence we use the simplest FIFO in our main experiments. VI. C ONCLUSION 
+
+We presented VPWEM, a non-Markovian visuomotor policy learning framework that leverages complementary working and episodic memory. By employing a learnable compressor that distills historical observations into a compact episodic memory, our approach efficiently exploits temporal information without incurring prohibitive computational or storage costs. Extensive evaluations demonstrate that VPWEM substantially improves performance on memory-demanding robotic tasks. Future work includes extending our framework to a broader range of base policies, incorporating auxiliary objectives such as reconstruction, and deploying it on real-world robotic systems. REFERENCES [1] H. Ravichandar, A. S. Polydoros, S. Chernova, and A. Billard, “Recent advances in robot learning from demonstration,” Annual review of control, robotics, and autonomous systems , vol. 3, no. 1, pp. 297– 330, 2020. [2] O. Kroemer, S. Niekum, and G. Konidaris, “A review of robot learning for manipulation: Challenges, representations, and algorithms,” 
+
+Journal of machine learning research , vol. 22, no. 30, pp. 1–82, 2021. [3] S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta, “R3M: A universal visual representation for robot manipulation,” in Conference on Robot Learning , pp. 892–909, PMLR, 2023. [4] I. Radosavovic, T. Xiao, S. James, P. Abbeel, J. Malik, and T. Darrell, “Real-world robot learning with masked visual pre-training,” in 
+
+Conference on Robot Learning , pp. 416–426, PMLR, 2023. [5] B. Zitkovich, T. Yu, S. Xu, P. Xu, T. Xiao, F. Xia, J. Wu, P. Wohlhart, S. Welker, A. Wahid, et al. , “RT-2: Vision-language-action models transfer web knowledge to robotic control,” in Conference on Robot Learning , pp. 2165–2183, PMLR, 2023. [6] M. Reuss, Ö. E. Ya˘ gmurlu, F. Wenzel, and R. Lioutikov, “Multimodal diffusion transformer: Learning versatile behavior from multimodal goals,” arXiv preprint arXiv:2407.05996 , 2024. [7] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. P. Foster, P. R. Sanketi, Q. Vuong, et al. , “Openvla: An open-source vision-language-action model,” in 8th Annual Conference on Robot Learning , 2024. [8] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. , “ π0: A vision-language-action flow model for general robot control,” Robotics: Science and Systems , 2025. [9] D. Ghosh, H. R. Walke, K. Pertsch, K. Black, O. Mees, S. Dasari, J. Hejna, T. Kreiman, C. Xu, J. Luo, et al. , “Octo: An open-source generalist robot policy,” in Robotics: Science and Systems , 2024. [10] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , 2024. [11] Y. Ze, G. Zhang, K. Zhang, C. Hu, M. Wang, and H. Xu, “3d diffusion policy: Generalizable visuomotor policy learning via simple 3d representations,” Robotics: Science and Systems , 2024. [12] S. Liu, L. Wu, B. Li, H. Tan, H. Chen, Z. Wang, K. Xu, H. Su, and J. Zhu, “RDT-1B: a diffusion foundation model for bimanual manipulation,” in The Thirteenth International Conference on Learning Representations , 2025. [13] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn, K. Gopalakrishnan, K. Hausman, A. Herzog, J. Hsu, et al. , “RT-1: Robotics transformer for real-world control at scale,” Robotics: Science and Systems , 2023. [14] H. Huang, F. Liu, L. Fu, T. Wu, M. Mukadam, J. Malik, K. Goldberg, and P. Abbeel, “Otter: A vision-language-action model with text-aware visual feature extraction,” in Forty-second International Conference on Machine Learning , 2025. [15] Y. Liu, J. I. Hamid, A. Xie, Y. Lee, M. Du, and C. Finn, “Bidirectional decoding: Improving action chunking via guided test-time sampling,” in The Thirteenth International Conference on Learning Representations , 2025. [16] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin, “Attention is all you need,” 
+
+Advances in neural information processing systems , vol. 30, 2017. [17] X. Jia, A. Donat, X. Huang, X. Zhao, D. Blessing, H. Zhou, H. A. Wang, H. Zhang, Q. Wang, R. Lioutikov, et al. , “X-il: Exploring the design space of imitation learning policies,” arXiv preprint arXiv:2502.12330 , 2025. [18] A. Katharopoulos, A. Vyas, N. Pappas, and F. Fleuret, “Transformers are rnns: Fast autoregressive transformers with linear attention,” in 
+
+International conference on machine learning , pp. 5156–5165, PMLR, 2020. [19] A. Gu and T. Dao, “Mamba: Linear-time sequence modeling with selective state spaces,” in First Conference on Language Modeling ,2023. [20] T. Dao and A. Gu, “Transformers are ssms: Generalized models and efficient algorithms through structured state space duality,” in 
+
+International Conference on Machine Learning , pp. 10041–10071, PMLR, 2024. [21] X. Jia, Q. Wang, A. Donat, B. Xing, G. Li, H. Zhou, O. Celik, D. Blessing, R. Lioutikov, and G. Neumann, “Mail: Improving imitation learning with selective state space models,” in 8th Annual Conference on Robot Learning , 2024. [22] P. De Haan, D. Jayaraman, and S. Levine, “Causal confusion in imitation learning,” Advances in neural information processing systems , vol. 32, 2019. [23] C. Wen, J. Lin, T. Darrell, D. Jayaraman, and Y. Gao, “Fighting copycat agents in behavioral cloning from observation histories,” 
+
+Advances in Neural Information Processing Systems , vol. 33, pp. 2564–2575, 2020. [24] C. Wen, J. Qian, J. Lin, J. Teng, D. Jayaraman, and Y. Gao, “Fighting fire with fire: Avoiding dnn shortcuts through priming,” in International Conference on Machine Learning , pp. 23723–23750, PMLR, 2022. [25] S. Seo, H. Hwang, H. Yang, and K.-E. Kim, “Regularized behavior cloning for blocking the leakage of past action information,” Advances in Neural Information Processing Systems , vol. 36, pp. 2128–2153, 2023. [26] J. L. McClelland, B. L. McNaughton, and R. C. O’Reilly, “Why there are complementary learning systems in the hippocampus and neocortex: insights from the successes and failures of connectionist models of learning and memory.,” Psychological review , vol. 102, no. 3, p. 419, 1995. [27] A. Chevalier, A. Wettig, A. Ajith, and D. Chen, “Adapting language models to compress contexts,” in 2023 Conference on Empirical Methods in Natural Language Processing, EMNLP 2023 , pp. 3829– 3846, Association for Computational Linguistics (ACL), 2023. [28] Y. Fang, W. Yu, et al. , “Artificial hippocampus networks for efficient long-context modeling,” arXiv preprint arXiv:2510.07318 , 2025. [29] H. Yu, T. Chen, J. Feng, et al. , “Memagent: Reshaping long-context llm with multi-conv rl-based memory agent,” arXiv preprint arXiv:2507.02259 , 2025. [30] B. He, H. Li, Y. K. Jang, M. Jia, X. Cao, A. Shah, A. Shrivastava, and S.-N. Lim, “Ma-lmm: Memory-augmented large multimodal model for long-term video understanding,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 13504– 13514, 2024. [31] I. Balazevic, Y. Shi, P. Papalampidi, R. Chaabouni, S. Koppula, and O. J. Henaff, “Memory consolidation enables long-context video understanding,” in International Conference on Machine Learning ,pp. 2527–2542, PMLR, 2024. [32] E. Cherepanov, N. Kachaev, A. K. Kovalev, and A. I. Panov, “Memory, benchmark & robots: A benchmark for solving complex tasks with reinforcement learning,” arXiv preprint arXiv:2502.10550 , 2025. [33] J. Wong, A. Tung, A. Kurenkov, A. Mandlekar, L. Fei-Fei, S. Savarese, and R. Martín-Martín, “Error-aware imitation learning from teleoperation data for mobile manipulation,” in Conference on Robot Learning , pp. 1367–1378, PMLR, 2022. [34] A. Mandlekar, D. Xu, J. Wong, S. Nasiriany, C. Wang, R. Kulkarni, L. Fei-Fei, S. Savarese, Y. Zhu, and R. Martín-Martín, “What matters in learning from offline human demonstrations for robot manipulation,” in Conference on Robot Learning , pp. 1678–1690, PMLR, 2022. [35] Y. Huang, J. Xu, J. Lai, Z. Jiang, T. Chen, Z. Li, Y. Yao, X. Ma, L. Yang, H. Chen, et al. , “Advancing transformer architecture in long-context large language models: A comprehensive survey,” arXiv preprint arXiv:2311.12351 , 2023. [36] J. Liu, D. Zhu, Z. Bai, Y. He, H. Liao, H. Que, Z. Wang, C. Zhang, G. Zhang, J. Zhang, et al. , “A comprehensive survey on long context language modeling,” arXiv preprint arXiv:2503.17407 , 2025. [37] J. Su, M. Ahmed, Y. Lu, S. Pan, W. Bo, and Y. Liu, “Roformer: Enhanced transformer with rotary position embedding,” 
+
+Neurocomputing , vol. 568, p. 127063, 2024. [38] I. Beltagy, M. E. Peters, and A. Cohan, “Longformer: The long-document transformer,” arXiv preprint arXiv:2004.05150 , 2020. [39] Z. Dai, Z. Yang, Y. Yang, J. Carbonell, Q. V. Le, and R. Salakhutdinov, “Transformer-XL: Attentive language models beyond a fixed-length context,” arXiv preprint arXiv:1901.02860 , 2019. [40] Y. Wu, M. N. Rabe, D. Hutchins, and C. Szegedy, “Memorizing transformers,” in International Conference on Learning Representations , 2022. [41] A. Bulatov, Y. Kuratov, and M. Burtsev, “Recurrent memory transformer,” Advances in Neural Information Processing Systems ,vol. 35, pp. 11079–11091, 2022. [42] M. Beck, K. Pöppel, M. Spanring, A. Auer, O. Prudnikova, M. Kopp, G. Klambauer, J. Brandstetter, and S. Hochreiter, “xlstm: Extended long short-term memory,” Advances in Neural Information Processing Systems , vol. 37, pp. 107547–107603, 2024. [43] L. Zhang and M. Agrawala, “Packing input frame context in next-frame prediction models for video generation,” arXiv preprint arXiv:2504.12626 , 2025. [44] Y. Zhou, Y. Lin, F. Peng, et al. , “Mtil: Encoding full history with mamba for temporal imitation learning,” IEEE Robotics and Automation Letters , 2025. [45] L. Fu, H. Huang, G. Datta, L. Y. Chen, W. C.-H. Panitch, F. Liu, H. Li, and K. Goldberg, “In-context imitation learning via next-token prediction,” arXiv preprint arXiv:2408.15980 , 2024. [46] A. D. Vuong, M. N. Vu, D. An, and I. Reid, “Action tokenizer matters in in-context imitation learning,” arXiv preprint arXiv:2503.01206 ,2025. [47] M. Torne, A. Tang, Y. Liu, and C. Finn, “Learning long-context diffusion policies via past-token prediction,” in 9th Annual Conference on Robot Learning , 2025. [48] H. Li, S. Yang, Y. Chen, Y. Tian, et al. , “Cronusvla: Transferring latent motion across time for multi-frame prediction in manipulation,” arXiv preprint arXiv:2506.19816 , 2025. [49] H. Jang, S. Yu, H. Kwon, H. Jeon, Y. Seo, and J. Shin, “Contextvla: Vision-language-action model with amortized multi-frame context,” 
+
+arXiv preprint arXiv:2510.04246 , 2025. [50] H. Shi, B. Xie, Y. Liu, L. Sun, F. Liu, et al. , “Memoryvla: Perceptual-cognitive memory in vision-language-action models for robotic manipulation,” arXiv preprint arXiv:2508.19236 , 2025. [51] P. Florence, C. Lynch, A. Zeng, O. A. Ramirez, A. Wahid, L. Downs, A. Wong, J. Lee, I. Mordatch, and J. Tompson, “Implicit behavioral cloning,” in Conference on robot learning , pp. 158–168, PMLR, 2022. [52] Z. Dong, Y. Yuan, J. Hao, F. Ni, Y. Ma, P. Li, and Y. Zheng, “Cleandiffuser: An easy-to-use modularized library for diffusion models in decision making,” Advances in Neural Information Processing Systems , vol. 37, pp. 86899–86926, 2024. [53] E. Zhang, Y. Lu, S. Huang, W. Y. Wang, and A. Zhang, “Language control diffusion: Efficiently scaling through space, time, and tasks,” in The Twelfth International Conference on Learning Representations ,2024. [54] T. Pearce, T. Rashid, A. Kanervisto, D. Bignell, M. Sun, R. Georgescu, S. V. Macua, S. Z. Tan, I. Momennejad, K. Hofmann, et al. , “Imitating human behaviour with diffusion models,” in International Conference on Learning Representations , 2023. [55] Q. Zhang, Z. Liu, H. Fan, G. Liu, B. Zeng, and S. Liu, “Flowpolicy: Enabling fast and robust 3d flow-based policy via consistency flow matching for robot manipulation,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 39, pp. 14754–14762, 2025. [56] Z. Liang, Y. Li, T. Yang, C. Wu, et al. , “Discrete diffusion vla: Bringing discrete diffusion to action decoding in vision-language-action policies,” arXiv preprint arXiv:2508.20072 , 2025. [57] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” Advances in neural information processing systems , vol. 33, pp. 6840–6851, 2020. [58] D. Qu, H. Song, Q. Chen, Y. Yao, X. Ye, et al. , “Spatialvla: Exploring spatial representations for visual-language-action model,” 
+
+arXiv preprint arXiv:2501.15830 , 2025.

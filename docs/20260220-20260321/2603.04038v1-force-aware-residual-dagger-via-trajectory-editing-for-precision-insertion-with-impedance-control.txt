@@ -1,0 +1,558 @@
+Title: Force-Aware Residual DAgger via Trajectory Editing for Precision Insertion with Impedance Control
+
+URL Source: https://arxiv.org/pdf/2603.04038v1
+
+Published Time: Thu, 05 Mar 2026 02:01:48 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Force-Aware Residual DAgger via Trajectory Editing for Precision Insertion with Impedance Control 
+
+Yiou Huang †, Ma Ning †, Weichu Zhao, Zinuo Liu, Jun Sun, Qiufeng Wang ∗, Yaran Chen ∗
+
+Abstract — Imitation learning (IL) has shown strong potential for contact-rich precision insertion tasks. However, its practical deployment is often hindered by covariate shift and the need for continuous expert monitoring to recover from failures during execution. In this paper, we propose Trajectory Editing Residual Dataset Aggregation (TER-DAgger), a scalable and force-aware human-in-the-loop imitation learning framework that mitigates covariate shift by learning residual policies through optimization-based trajectory editing. This approach smoothly fuses policy rollouts with human corrective trajecto-ries, providing consistent and stable supervision. Second, we introduce a force-aware failure anticipation mechanism that triggers human intervention only when discrepancies arise be-tween predicted and measured end-effector forces, significantly reducing the requirement for continuous expert monitoring. Third, all learned policies are executed within a Cartesian impedance control framework, ensuring compliant and safe behavior during contact-rich interactions. Extensive experi-ments in both simulation and real-world precision insertion tasks show that TER-DAgger improves the average success rate by over 37% compared to behavior cloning, human-guided correction, retraining, and fine-tuning baselines, demonstrating its effectiveness in mitigating covariate shift and enabling scalable deployment in contact-rich manipulation. 
+
+I. INTRODUCTION Precision insertion tasks, such as electronic component assembly and tight-tolerance part mating, are a cornerstone of modern industrial automation. These tasks are contact-rich and highly sensitive to geometric misalignment and environmental uncertainty, where small deviations can cause excessive contact forces, jamming, or damage. Imitation Learning (IL) enables robots to acquire complex manipulation skills from human demonstrations, as demon-strated by Action Chunking with Transformers (ACT) [1], Diffusion Policy (DP) [2], and Vision-Language-Action (VLA) models [3], [4]. However, most IL approaches rely on vision and proprioception and execute policies via position-based control, limiting compliance during physical contact. Recent works incorporate force, torque, or tactile sensing into learning-based manipulation [5], [6], [7], [8], [9], and some integrate IL policies with impedance control to improve safety [10], [11]. However, they do not explicitly address distribution shift during real-world deployment. In practice, learned policies inevitably encounter out-of-distribution states due to perception noise, modeling error, or contact uncertainty, which in contact-rich manipulation often manifest as abnormal interaction forces and can quickly lead to unsafe behavior.          
+
+> Xi’an Jiaotong-Liverpool University, Suzhou, China. †Equal con-tribution. ∗Corresponding authors: qiufeng.wang@xjtlu.edu.cn ,
+> Yaran.Chen@xjtlu.edu.cn .
+
+Human-in-the-loop approaches, such as DAgger [12] and HG-DAgger [13], address this issue by incorporating expert feedback during execution, but they require continuous hu-man supervision and scale poorly. Subsequent methods [14], [15], [16] reduce expert burden by predicting when inter-vention is needed, at the cost of additional models and training complexity. Moreover, abrupt switching between autonomous execution and human control often introduces significant distribution shift. Recent work [17] mitigates this issue by learning residual corrections, but still relies on continuous expert monitoring. We propose Trajectory Editing Residual Dataset Aggre-gation (TER-DAgger), a scalable and force-aware imita-tion learning framework for contact-rich precision inser-tion. TER-DAgger uses optimization-based trajectory editing to smoothly fuse policy rollouts with human corrective trajectories, providing consistent residual supervision and mitigating covariate shift. Human intervention is triggered only by discrepancies between predicted and measured end-effector forces, and execution is performed within a Carte-sian impedance control framework for compliant and safe interaction. Our contributions are summarized as follows:  
+
+> •
+
+We introduce TER-DAgger , a force-aware human-in-the-loop imitation learning framework designed to mit-igate covariate shift in contact-rich precision insertion tasks through optimization-based trajectory editing and residual policy learning.  
+
+> •
+
+We propose a force-aware error detection mechanism 
+
+that enables scalable human supervision without auxil-iary learned intervention models.  
+
+> •
+
+We integrate the proposed framework with Cartesian impedance control to achieve compliant and robust precision insertion. II. RELATED WORK 
+
+A. Imitation Learning for Robotic Manipulation 
+
+IL has become a central paradigm for robotic manip-ulation, enabling robots to acquire complex skills from demonstrations. Early approaches such as Action Chunking with Transformers (ACT) [1] model manipulation as autore-gressive action sequence generation. Other diffusion-based methods, e.g., Diffusion Policy (DP) [2], generate actions via conditional denoising, improving multimodal trajectory mod-eling. Vision-Language-Action (VLA) models [3], [4] fur-ther enhance generalization by leveraging large-scale vision-language pretraining.         
+
+> arXiv:2603.04038v1 [cs.RO] 4 Mar 2026 1 Implementing Base Policy
+> 2 Error Detection
+> 3 Human Demonstration
+> 4 Creating Residual Data
+> Base Policy Trajectory
+> Human Demonstration
+> Transition Segment
+> Start Editing Point
+> End Editing Point
+> Residual Action
+> Pre-editing
+> Editing
+> Post-editing
+> Base Policy
+> Transformer
+> Encoder
+> Z𝐀 𝐀
+> ntt:F
+> ntt:A
+> Transformer
+> Encoder 𝐀 𝐀
+> Transformer
+> De coder
+> 𝐀 𝐀
+> CVAE Encoder CVAE De coder
+> Residual Policy
+> CNN  CNN
+> Transformer
+> Encoder 1At
+> 𝐀 𝐀
+> Environment
+
++ Cartesian 
+
+> Impedence
+> Controller
+> Error Detector
+> t
+
+F    
+
+> ntt:1Fˆ
+> ntt:1Aˆ
+> Style
+> Variable
+
+ˆ  
+
+> tFˆ
+> 1Aˆt
+> ..  ..
+> ..
+> ..  ..
+> f
+> tI
+> w
+> tI
+> exec
+> 1tA
+
+Fig. 1. (Left) TER-DAgger pipeline. The robot first executes the task using the base policy. When the error detector identifies a failure, execution is paused and a human provides a corrective insertion demonstration. To generate residual training data, we locate the nearest point on the base-policy trajectory to the start of the human demonstration as the editing endpoint. Together with its preceding N − 1 points, this forms an editing segment, which is optimized to produce a smooth transition toward the human-corrected trajectory. Based on the optimized trajectory, we construct training data for the residual policy. (Right) Framework overview. The base policy (1 Hz) predicts future end-effector poses and forces from image observations, the current end-effector pose and force. The error detector (50 Hz) compares predicted and measured end-effector forces to detect failures. The residual policy (50 Hz) takes image observations, the current end-effector pose, and the next action predicted by the base policy as inputs, and predicts pose corrections. The corrected actions are executed via a Cartesian impedance controller (1 kHz). 
+
+However, most IL and VLA-based methods primarily rely on visual and proprioceptive inputs, overlooking force feedback critical for contact-rich manipulation. Recent mul-timodal approaches incorporate tactile and Force/Torque sensing [5], [6], [7], [8], [9], yet typically execute policies with position-based control, limiting compliance and safety. Some works combine IL with impedance control [10], [11]. Building on this line, we employ a Cartesian impedance controller and additionally predict future interaction forces to enable force-aware manipulation and support downstream error detection. 
+
+B. Human-in-the-Loop Corrections for Imitation Learning 
+
+The DAgger algorithm [12] requires experts to label actions generated by the learner’s policy without full control authority, which can pose safety risks in real-world robotic systems. HG-DAgger [13] improves safety by allowing di-rect human intervention during hazardous situations, but it requires continuous expert monitoring for each robot, limiting scalability. To reduce expert burden, subsequent methods [14], [15], [16] introduce auxiliary models to predict when human takeover is necessary. While effective, these approaches increase model complexity and training over-head. Moreover, both reactive and predicted interventions often introduce abrupt state transitions, leading to significant distribution shift from the policy’s on-policy data. Recent work explores on-policy correction strategies to address this issue. Notably, a recent study [17] learns a resid-ual policy from human corrective demonstrations, enabling smoother adaptation and reduced distribution shift. However, continuous human monitoring is still required, effectively restricting one expert to supervising a single robot. In contrast, our approach also learns a residual policy but eliminates the need for continuous human attention. We automatically trigger human intervention based on the discrepancy between predicted and measured interaction forces, enabling one expert to supervise multiple robots. Ad-ditionally, an optimization-based trajectory blending scheme smoothly fuses nominal and corrective trajectories, avoiding abrupt control switching. 
+
+C. Out-of-Distribution Detection 
+
+Out-of-distribution (OOD) detection is critical to ensuring the reliability and safety of robotic systems, aiming to identify inputs that deviate from the training data distribu-tion. Numerous approaches have been proposed to detect OOD states using deep neural network–based architectures. One line of research formulates error detection as a su-pervised learning problem by directly training a failure or error prediction model [18]. Another widely studied direc-tion leverages uncertainty estimation techniques—such as Bayesian neural networks [19], ensemble methods [20], or distributional representations [21]—to flag potential OOD states when predictive uncertainty is high. Alternatively, reconstruction-based methods employ reconstruction loss or Kullback–Leibler (KL) divergence of Conditional Variational AutoEncoder (CVAE) [22] to identify anomalies that deviate from in-distribution patterns. In this work, we propose a straightforward yet effective indicator for OOD detection: the discrepancy between the predicted end-effector force from the base policy and the real end-effector force measured during execution. III. METHOD The overall framework is shown in Fig. 1 (Right). The sys-tem consists of a force-aware base policy, an error detector, a residual policy, and a Cartesian impedance controller. During execution, the base policy (1 Hz) predicts receding-horizon end-effector poses and interaction forces from visual observations and current states. An error detector (50 Hz) compares predicted and measured forces to detect out-of-distribution contact states and trigger human intervention. The residual policy (50 Hz) takes the same inputs along with the next base action and outputs a pose residual. The executed command is the sum of the base action and residual correction, tracked by a Cartesian impedance controller (1 kHz) for compliant interaction. The following subsections describe each component in detail. 
+
+A. Force-Aware Base Policy 
+
+We adopt a Transformer-based architecture as the base policy. Following ACT [1], both the encoder and decoder are implemented using CVAE Transformers. To improve performance in contact-rich manipulation and enhance interaction awareness, we explicitly incorporate the external end-effector wrench into the policy. The external end-effector force is defined as 
+
+Ft = [ fx,t , fy,t , fz,t , τx,t , τy,t , τz,t ]⊤. (1) It is estimated from measured joint torques using the pseu-doinverse of the Jacobian transpose: 
+
+Ft = J(θt )T +τt , (2) where J(θt ) denotes the manipulator Jacobian at configura-tion θt , (·)T + represents the pseudoinverse of the Jacobian transpose, and τt is the vector of external joint torques. 
+
+a) Encoder.: The encoder takes as input the current Cartesian end-effector pose xt , the action sequence At:t+n,and the end-effector force sequence Ft:t+n. The Cartesian pose is defined as xt = [ pt , qt ], where pt ∈ R3 denotes the position and qt ∈ S3 is a unit quaternion representing orientation. The encoder outputs the mean and variance of a latent style variable z, which captures task-specific motion patterns and contact dynamics. 
+
+b) Decoder.: The decoder conditions on the latent variable z, the current pose xt , the current end-effector force 
+
+Ft , and two RGB images I ft , Iwt of size 480 ×640 ×3 captured from the front and wrist camera. Each image is encoded using a ResNet-18 backbone to extract visual features. Unlike conventional action-only policies, the decoder jointly predicts the future action sequence ˆAt+1: t+n and the future end-effector force sequence ˆFt+1: t+n. By explicitly modeling future interaction forces, the policy learns a force-consistent latent representation, improving stability and ro-bustness in contact-rich scenarios. 
+
+c) Execution Strategy.: The base policy operates at 1 Hz. At each inference step, it predicts a horizon of n = 100 steps (corresponding to 2 s), while the manipulator executes only the first ne = 50 steps before replanning. This receding-horizon execution scheme enhances robustness against mod-eling errors and external disturbances while maintaining long-horizon consistency. 
+
+B. Error Detection 
+
+To detect OOD states during the insertion process, we exploit the discrepancy between the predicted and measured end-effector forces. At each timestep, the force prediction ˆ Ft
+
+produced by the base policy, which is compared against the actual measured force Ft .We quantify the force prediction error using the ℓ1 norm: 
+
+et = ˆFt − Ft 1 . (3) An error is triggered when the prediction error exceeds a predefined threshold c:
+
+et > c. (4) If this condition holds, the current state is classified as out-of-distribution. Intuitively, large force prediction errors indicate that the current contact dynamics deviate from the training distribution, which typically corresponds to unex-pected collisions, misalignment, or task failure. Thus, the force prediction discrepancy serves as an implicit uncertainty estimator for reliable error detection in contact-rich manip-ulation. 
+
+C. Trajectory Editing Residual DAgger 
+
+To incorporate human corrections after OOD detection, we propose a trajectory editing residual DAgger framework (Fig. 1, Left). When a failure is detected, execution is paused and a short corrective demonstration is collected. Rather than re-demonstrating the full task, we align the demonstration to the nearest point on the base trajectory and locally optimize a preceding segment to form a smooth transition. The resulting corrected trajectory is then used to construct supervised residual training data. The framework comprises three components: (1) a residual correction policy, (2) local corrected trajectory construction, and (3) residual training data generation. 
+
+1) Residual Policy: The residual policy adopts alightweight two-layer Transformer encoder (hidden dimen-sion hr = 256, nr = 8 attention heads). At time step t, it takes the following inputs:  
+
+> •
+
+the current Cartesian end-effector pose xt , 
+
+> •
+
+the next action predicted by the base policy ˆ At+1, 
+
+> •
+
+two RGB images I ft , Iwt of resolution 480 × 640 × 3. Each image is encoded using a shared ResNet-18 back-bone. The residual policy outputs a corrective action 
+
+∆At+1 = [ ∆pt+1, ∆qt+1], (5) and the executed action becomes 
+
+Aexec  
+
+> t+1
+
+= ˆAt+1 + ∆At+1. (6) 
+
+2) Corrected Trajectory Construction: Let the base policy predict a trajectory 
+
+Xb = [ xb
+
+> 0
+
+, xb
+
+> 1
+
+, . . . , xbnb−1]. (7) When an OOD state is detected, we temporarily set the Cartesian impedance stiffness to zero and collect a short corrective human demonstration 
+
+Xh = [ xh
+
+> 0
+
+, xh
+
+> 1
+
+, . . . , xhnh−1]. (8) Instead of re-demonstrating the full task, we locally edit the base trajectory near the intervention point. 
+
+a) Nearest-Point Alignment: We first find the closest point on Xb to the initial human pose xh
+
+> 0
+
+:
+
+k∗ = arg min  
+
+> k
+
+D(k),
+
+D(k) = ωpdp(xbk , xh
+
+> 0
+
+) + ωqdq(xbk , xh
+
+> 0
+
+). (9) The position and orientation distances are defined as 
+
+dp(xbk , xh
+
+> 0
+
+) = ∥pbk − ph
+
+> 0
+
+∥2, (10) 
+
+dq(xbk , xh
+
+> 0
+
+) = 1 − |⟨ qbk , qh
+
+> 0
+
+⟩| . (11) We use ωp = 1.0 and ωq = 0.5. 
+
+b) Local Trajectory Optimization: We extract a local segment of length N:
+
+Xseg  
+
+> b
+
+= {xbk∗−N , . . . , xbk∗ }. (12) We optimize this segment to generate a smooth transition ˜X = { ˜xk∗−N , . . . , ˜xk∗ }, (13) by solving min 
+
+> ˜X
+
+Lfid + λsLsmooth + λeLend 
+
+s.t. ˜xk∗ = xh
+
+> 0
+
+.
+
+(14) The objective consists of three terms: 
+
+Fidelity term 
+
+Lfid =
+
+> k∗
+
+# ∑
+
+> i=k∗−N
+
+
+
+∥pi − pbi ∥22 + λ fq
+
+
+
+1 − |⟨ qi, qbi ⟩| 
+
+ 
+
+, (15) which preserves similarity to the original base trajectory. 
+
+Smoothness term 
+
+Lsmooth =
+
+> k∗
+
+# ∑
+
+> i=k∗−N+1
+
+ ∥pi − pi−1∥22 + λ sq (1 − |⟨ qi, qi−1⟩| ) ,
+
+(16) which enforces local motion continuity. 
+
+Endpoint consistency term 
+
+Lend = ∥pk∗ − ph
+
+> 0
+
+∥22 + λ eq
+
+
+
+1 − |⟨ qk∗ , qh
+
+> 0
+
+⟩| 
+
+
+
+, (17) which ensures alignment with the human corrective pose. We use 
+
+λs = 1.0, λe = 1000 .0, λ fq = λ sq = λ eq = 0.5.
+
+The final corrected trajectory is 
+
+Xcorrect = {xb
+
+> 0
+
+, . . . , xbk∗−N−1, ˜X, xh
+
+> 1
+
+, . . . , xhnh−1}. (18) 
+
+3) Residual Training Data Generation: Given the cor-rected trajectory Xcorrect , we construct supervised tuples 
+
+(xt , I ft , Iwt , ˆAt+1, ∆At+1) (19) The dataset is divided into four regions according to the trajectory structure. 
+
+a) Pre-editing residual samples: For 
+
+t ∈ [0, . . . , k∗ − N − 1], xt = xbt ,
+
+the corrected trajectory coincides with the original base trajectory. Therefore, no correction is required: 
+
+∆At+1 = 0. (20) This teaches the residual policy to remain inactive under nominal in-distribution states. 
+
+b) Transition residual samples: For 
+
+t ∈ [k∗ − N, . . . , k∗ − 1], xt = xbt ,
+
+the target next pose is given by the optimized transition trajectory ˜ xt+1. The residual label is defined as 
+
+∆At+1 = ˜xt+1 − ˆAt+1. (21) This segment enables the residual policy to smoothly deform the base trajectory toward the human corrective pose. 
+
+c) Human demonstration residual samples: For 
+
+t ∈ [0, . . . , nh − 1], xt = xht ,
+
+we evaluate the base policy prediction ˆ Abase  
+
+> t+1
+
+under the same receding-horizon execution scheme. The residual label is 
+
+∆At+1 = xht+1 − ˆAbase  
+
+> t+1
+
+. (22) This teaches the residual policy to reproduce the human corrective behavior relative to the base prediction. 
+
+d) Post-editing residual samples: For 
+
+t ∈ [k∗, . . . , nb − 1], xt = xbt ,
+
+we associate each base action ˆ At+1 with the nearest pose in the human demonstration trajectory: ˜At+1 = arg min 
+
+> xhi
+
+
+
+dp(xhi , ˆAt+1) + 0.5dq(xhi , ˆAt+1)
+
+
+
+. (23) The residual label becomes 
+
+∆At+1 = ˜At+1 − ˆAt+1. (24) This encourages consistency with the corrective intent. 
+
+D. Cartesian Impedance Controller 
+
+To ensure compliant and safe manipulation during physi-cal contact, we adopt a Cartesian impedance controller as the low-level controller to track the predicted trajectory. Cartesian impedance control regulates the dynamic inter-action between motion and external forces by shaping the apparent mechanical behavior of the end-effector as a virtual mass–spring–damper system in Cartesian space. Specifically, the desired interaction behavior is defined as 
+
+Fimp = K(xd − x) + D( ˙xd − ˙x), (25) USB  Two-pin Plug      
+
+> (a) Initial (b) Approaching (c) Inserting Fig. 2. Simulation scene setup and insertion task process. Front Camera
+> Plug
+> Socket
+> USB  Two-pin Plug  Three-pin Plug
+> (a) Real World Setup (b) Task Process
+> Fig. 3. Real scene setup and insertion task process.
+
+where Fimp = [ fx, fy, fz, τx, τy, τz]⊤ denotes the desired Carte-sian interaction wrench generated by the impedance con-troller, xd and ˙ xd denote the desired Cartesian pose and ve-locity of the end-effector, and x and ˙ x represent the measured pose and velocity, respectively. K and D are positive-definite stiffness and damping matrices, respectively. To achieve real-time control at 1 kHz with improved numerical robustness, we employ a simplified torque-level implementation that avoids explicit operational-space inertia matrix computation. The commanded joint torque is given by ˆτ = J(θ )T (K(xd − x) + D( ˙xd − ˙x)) + g(θ ), (26) where J(θ ) is the manipulator Jacobian matrix, J(θ )T maps Cartesian wrenches to joint torques, and g(θ ) denotes the gravity compensation term. This impedance formulation enables the manipulator to re-main compliant under unexpected contacts while accurately tracking the high-level trajectory predicted by the policy. IV. EXPERIMENTS Our approach is validated through experiments in simu-lation and on real robotic systems. We begin by outlining the experimental setups, data-collection procedures, and then present a comparative analysis. 
+
+A. Simulation Setup 
+
+Experiments are conducted in MuJoCo with a Franka Research 3 manipulator equipped with wrist and front-view RGB cameras (Fig. 2). 
+
+Tasks. We evaluate two insertion tasks: (1) USB insertion 
+
+and (2) two-pin plug insertion . In both tasks, the plug is mounted on the end-effector, initialized 30 cm above the socket. The socket position is uniformly sampled along the y-axis within [−5 cm , 5 cm ]. The insertion tolerance is 0.1 mm. 
+
+Data Collection. For base policy learning, training trajec-tories are generated using a rule-based method. From a fixed initial pose with randomized socket positions, an approach pose 8 cm above the target is defined, and linear interpolation generates the full trajectory. For each task, 100 trajectories are collected, including synchronized RGB images, Cartesian poses, joint torques, and end-effector forces. For residual policy learning, 50 corrective demonstrations per task are collected. Each trajectory interpolates from 8 cm above the correct target to the final pose and includes synchronized RGB images and Cartesian poses. 
+
+B. Real-World Setup 
+
+Real-world experiments use the same Franka robot with a wrist-mounted Intel RealSense D415 and a fixed front-view RGB camera (Fig. 3). 
+
+Tasks. We evaluate USB, two-pin plug, and three-pin plug insertion. The plug is initialized 30 cm above the socket, whose position is randomly varied along a white tape to introduce spatial diversity. 
+
+Data Collection. For base policy learning, training tra-jectories are recorded in teach mode with zero Cartesian impedance stiffness, then replayed to log joint torques and end-effector forces. For each task, 100 trajectories are col-lected with synchronized RGB images, Cartesian poses, joint torques, and end-effector forces. For residual policy learning, 50 corrective demonstrations per task are recorded. After failure, the end-effector is moved approximately 8 cm above the correct target, from which a corrective trajectory is demonstrated, containing synchronized RGB images and Cartesian poses. 
+
+C. Experiment Results 1) Baseline Methods for TER-DAgger: To rigorously evaluate the effectiveness of the proposed TER-DAgger framework, we compare it against several representative baselines in two simulated environments and three real-world precision insertion tasks. The evaluated methods are summarized as follows:  
+
+> •
+
+ACT [1]: The original Action Chunk Transformer serves as the foundational policy architecture of our method. It is trained using the 100 base trajectories for 2000 epochs.  
+
+> •
+
+FILIC [11]: A multimodal imitation learning frame-work that incorporates visual observations, end-effector poses, and force measurements. Given its architectural similarity to our base policy, FILIC provides a strong multimodal baseline. It is trained using the same 100 base trajectories for 2000 epochs.  
+
+> •
+
+HG-DAgger [13]: A human-guided DAgger variant in which an expert monitors policy rollouts and intervenes when failure is anticipated. In our implementation, Cartesian impedance stiffness is set to zero during in-tervention to allow compliant correction. We collect 50 corrective demonstrations and finetune the pre-trained base policy for 200 epochs.  
+
+> •
+
+Retrain: The base policy is retrained from scratch using a combined dataset consisting of the original 100 base trajectories and 50 corrective demonstrations (recorded following Eq. 18). Training is performed for 2000 epochs.  
+
+> •
+
+Finetune: The pre-trained base policy is finetuned using only the 50 corrective demonstrations (recorded follow-ing Eq. 18) for 200 epochs.  
+
+> •
+
+TER-DAgger (Ours): Our proposed two-stage frame-work first trains a base policy using 100 trajectories for 2000 epochs. Subsequently, 50 corrective demon-strations are collected to train a residual policy for 200 epochs, as detailed in Sec. III. For each task, all methods are evaluated over 50 indepen-dent trials under identical testing conditions. 
+
+2) Experiment Results for TER-DAgger: As shown in Ta-ble I, TER-DAgger consistently outperforms all baseline methods across both simulation and real-world precision insertion tasks, achieving an average success rate of 77.2% ,which exceeds the strongest baseline (Finetune, 40.0%) by over 37% .Standard imitation learning methods exhibit severe per-formance degradation during deployment. The base ACT [1] policy performs poorly in both simulated and real environ-ments, particularly in tasks with tight contact tolerances, confirming that covariate shift leads to rapid failure accu-mulation in contact-rich manipulation. Although FILIC [11] incorporates force feedback, its limited improvement indi-cates that augmenting observations alone is insufficient to resolve distribution mismatch. Human-guided approaches such as HG-DAgger [13] im-prove performance in simulation but generalize poorly to real-world tasks, suggesting that direct human takeover in-troduces additional distribution discontinuities that misalign correction data with the policy’s execution distribution. Retrain and Finetune benefit from additional correction data but show inconsistent gains across tasks. Their inferior performance relative to TER-DAgger indicates that naively aggregating or fine-tuning on correction trajectories does not adequately address the state-action distribution mismatch encountered during execution. In contrast, TER-DAgger achieves near-perfect perfor-mance in simulation (90% and 96%) and substantial gains in real-world experiments, reaching 96% success in two-pin plug insertion and maintaining strong performance on the more challenging three-pin plug task (82%). These results demonstrate that TER-DAgger effectively mitigates covariate shift by aligning training data with on-policy execution , resulting in robust and scalable performance for contact-rich precision insertion. 
+
+3) Baseline Methods for Error Detection: To evaluate the effectiveness of the proposed force-aware failure detection mechanism, we compare it against several baseline error detection strategies derived from the base policy architecture and commonly used uncertainty or prediction-based metrics.  
+
+> •
+
+KL Loss: The KL divergence between the output of the CVAE encoder z of the base policy and the standard normal distribution N (0, I) is used as an uncertainty-based error indicator.  
+
+> •
+
+Reconstruction Loss: The reconstruction error of the base policy is employed as a baseline metric, reflecting the discrepancy between predicted and reconstructed actions under the learned latent representation.  
+
+> •
+
+Position Prediction Error: This baseline measures the Euclidean error between the Cartesian action pose predicted by the base policy and the current end-effector pose, capturing deviations in the predicted motion com-mand.  
+
+> •
+
+Force Prediction Error (Ours): The details are de-scribed in III-B For all methods, task-specific thresholds are selected as reported in Table III. The threshold for each metric is chosen to guarantee 100% recall of failure cases while maximizing precision, ensuring fair comparison under the same safety constraint. For each task, 50 test samples are used for evaluation. 
+
+4) Experiment Results for Error Detection: As shown in Table II, the proposed force prediction error consistently achieves the highest precision across all tasks while main-taining 100% recall . In contrast, KL loss, reconstruction loss, and position prediction error exhibit substantially lower precision despite achieving full recall, leading to a higher rate of false positives. This gap is particularly pronounced in real-world tasks, where uncertainty-based metrics such as KL loss and recon-struction error suffer from significant precision degradation. Position prediction error also performs inconsistently, as pose deviations do not reliably correlate with contact failures in contact-rich insertion scenarios. In contrast, force prediction error remains highly discrimi-native across both simulation and real-world settings, achiev-ing an average precision of 98.8% while preserving complete recall. These results demonstrate that the proposed method can reliably detect all failure cases with minimal false alarms , enabling human intervention only when necessary. By maximizing precision under the constraint of full recall, the proposed force-aware error detection mechanism ensures the lowest possible human monitoring cost while maintaining safety during contact-rich manipulation. TABLE I SUCCESS RATES (%) OF DIFFERENT METHODS 
+
+Method Simulation Real Average USB Two-pin Plug USB Two-pin Plug Three-pin Plug 
+
+ACT [1] 26% 22% 2% 64% 24% 27.6% FILIC [11] 20% 30% 10% 44% 24% 25.6% HG-DAgger [13] 50% 44% 16% 36% 12% 31.6% Retrain 48% 56% 0% 36% 22% 32.4% Finetune 68% 54% 10% 28% 40% 40.0% 
+
+TER-DAgger (Ours) 90% 96% 22% 96% 82% 77.2% 
+
+> TABLE II COMPARISON OF ERROR DETECTION METHODS
+
+Task Metric KL Loss Reconstruction Loss Position Prediction Error Force Prediction Error (Ours) 
+
+Two-pin Plug Precision ↑
+
+Recall ↑
+
+90 100 98 100 76 100 
+
+100 100 
+
+USB Precision ↑
+
+Recall ↑
+
+74 100 78 100 78 100 
+
+100 100 
+
+Two-pin Plug (Real) Precision ↑
+
+Recall ↑
+
+50 100 40 100 36 100 
+
+100 100 
+
+USB (Real) Precision ↑
+
+Recall ↑
+
+100 100 96 100 100 100 
+
+100 100 
+
+Three-pin Plug (Real) Precision ↑
+
+Recall ↑
+
+64 100 64 100 76 100 
+
+94 100 
+
+Average Precision ↑
+
+Recall ↑
+
+75.6 100.0 75.2 100.0 73.2 100.0 
+
+98.8 100.0                               
+
+> TABLE III THRESHOLDS OF ERROR DETECTION METHODS
+> Task KL Recon. Pos. Force (Ours) Loss Loss Err. Err.
+> USB 0.00056 0.00162 0.012 11.0 Two-pin Plug 0.0011 0.00086 0.012 13.0 USB (Real) 0.014 0.00078 0.018 16.0 Two-pin Plug (Real) 0.00109 0.005 0.024 15.0 Three-pin Plug (Real) 0.0015 0.0006 0.025 14.0
+
+D. Ablation Studies 
+
+We conduct ablation studies on the two-pin plug insertion task in simulation to analyze three key design choices of the proposed framework. 
+
+a) Adding End-effector Force as Input for Base Policy: 
+
+We first evaluate the effect of incorporating end-effector force into the base policy, as described in Section III-A. As shown in Table IV, augmenting the ACT [1] architecture with force input consistently improves performance across all tasks, increasing the average success rate from 27.6% to 32.4%. This improvement indicates that explicit force information provides valuable interaction cues that are not fully observable from vision and pose alone, enabling the policy to better reason about contact states in precision insertion. 
+
+b) Training Samples for Residual Policy: We next ana-lyze the contribution of different components of the residual training data described in Section III-C.3. The pre-editing residual samples are always included to enforce zero residual under nominal in-distribution states. We selectively ablate the remaining three components—transition samples, human demonstration samples, and post-editing samples—and re-port the results in Table V. Using only individual components yields limited improve-ment over the base policy, with post-editing samples provid-ing the most significant single contribution. Combining dif-ferent components leads to progressively better performance, and the best result is achieved when all components are used jointly, reaching a success rate of 96%. These results demon-strate that the proposed residual data construction strategy is complementary: transition samples enable smooth correction onset, demonstration samples capture corrective intent, and post-editing samples enforce long-horizon consistency. 
+
+c) Number of Points for Optimization: Finally, we study the effect of the number of optimization points N
+
+used in local trajectory editing, as introduced in Section III-C.2. As shown in Table VI, performance is robust within a moderate range of N, peaking at N = 20. Using too few points limits the smoothness of the transition, while overly long segments degrade performance by over-constraining the trajectory. This result suggests that local trajectory edit-ing benefits from a balanced optimization horizon that is sufficiently long to ensure smoothness without sacrificing flexibility. V. CONCLUSIONS We presented TER-DAgger, a force-aware human-in-the-loop imitation learning framework designed to mitigate co-variate shift in contact-rich precision insertion tasks. By aligning supervision with on-policy execution, TER-DAgger TABLE IV ABLATION STUDIES OF ADDING END -EFFECTOR FORCE 
+
+Method Simulation Real Average USB Two-pin Plug USB Two-pin Plug Three-pin Plug 
+
+ACT [1] 26% 22% 2% 64% 24% 27.6% 
+
+Base Policy (Ours) 34% 28% 4% 68% 28% 32.4% 
+
+TABLE V ABLATION STUDIES OF THREE PARTS OF RESIDUAL SAMPLES 
+
+Residual Training Samples Success Rate 
+
+Base Policy (Ours) 28% Transition 32% Demonstration 34% Post-editing 66% Transition + Demonstration 42% Transition + Post-editing 56% Demonstration + Post-editing 92% 
+
+TER-DAgger (Ours) 96 %TABLE VI ABLATION STUDIES OF NUMBER OF POINTS FOR OPTIMIZATION 
+
+Number of Points Success Rate 
+
+10 94% 20 96% 
+
+30 88% 40 80% 
+
+prevents the performance degradation typical of standard imitation learning in real-world deployment. The framework detects out-of-distribution contact states via force prediction discrepancies and triggers human inter-vention only when necessary, reducing monitoring cost. Lo-cal trajectory editing incorporates corrective demonstrations as residual supervision, ensuring smooth integration without distribution discontinuities. Experiments in both simulation and real-world settings show that TER-DAgger consistently outperforms behavior cloning, human-guided correction, retraining, and fine-tuning baselines. Ablation studies confirm the critical role of force modeling, residual data construction, and local trajectory optimization in reducing compounding errors. Future work will extend TER-DAgger to more complex precision assembly tasks and explore its scalability in broader robotic manipulation scenarios. REFERENCES [1] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning fine-grained bimanual manipulation with low-cost hardware,” arXiv preprint arXiv:2304.13705 , 2023. [2] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , vol. 44, no. 10-11, pp. 1684–1704, 2025. [3] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi et al. , “Openvla: An open-source vision-language-action model, 2024,” URL https://arxiv. org/abs/2406.09246 , 2024. [4] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter et al. , “ π0: A visionlanguage-action flow model for general robot control, 2024a,” URL https://arxiv. org/abs/2410.24164 , 2024. [5] J. Yu, H. Liu, Q. Yu, J. Ren, C. Hao, H. Ding, G. Huang, G. Huang, Y. Song, P. Cai et al. , “Forcevla: Enhancing vla models with a force-aware moe for contact-rich manipulation,” arXiv preprint arXiv:2505.22159 , 2025. [6] P. Hao, C. Zhang, D. Li, X. Cao, X. Hao, S. Cui, and S. Wang, “Tla: Tactile-language-action model for contact-rich manipulation,” arXiv preprint arXiv:2503.08548 , 2025. [7] C. Zhang, P. Hao, X. Cao, X. Hao, S. Cui, and S. Wang, “Vtla: Vision-tactile-language-action model with preference learning for insertion manipulation,” arXiv preprint arXiv:2505.09577 , 2025. [8] Z. Cheng, Y. Zhang, W. Zhang, H. Li, K. Wang, L. Song, and H. Zhang, “Omnivtla: Vision-tactile-language-action model with semantic-aligned tactile sensing,” arXiv preprint arXiv:2508.08706 ,2025. [9] Y. Huang, P. Lin, W. Li, D. Li, J. Li, J. Jiang, C. Xiao, and Z. Jiao, “Tactile-force alignment in vision-language-action models for force-aware manipulation,” arXiv preprint arXiv:2601.20321 , 2026. [10] T. Kamijo, C. C. Beltran-Hernandez, and M. Hamaya, “Learning variable compliance control from a few demonstrations for bimanual robot with haptic feedback teleoperation system,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) .IEEE, 2024, pp. 12 663–12 670. [11] H. Ge, Y. Jia, Z. Li, Y. Li, Z. Chen, R. Huang, and G. Zhou, “Filic: Dual-loop force-guided imitation learning with impedance torque control for contact-rich manipulation tasks,” arXiv preprint arXiv:2509.17053 , 2025. [12] S. Ross, G. Gordon, and D. Bagnell, “A reduction of imitation learning and structured prediction to no-regret online learning,” in Proceedings of the fourteenth international conference on artificial intelligence and statistics . JMLR Workshop and Conference Proceedings, 2011, pp. 627–635. [13] M. Kelly, C. Sidrane, K. Driggs-Campbell, and M. J. Kochenderfer, “Hg-dagger: Interactive imitation learning with human experts,” in 
+
+2019 International Conference on Robotics and Automation (ICRA) .IEEE, 2019, pp. 8077–8083. [14] J. Zhang and K. Cho, “Query-efficient imitation learning for end-to-end autonomous driving,” arXiv preprint arXiv:1605.06450 , 2016. [15] R. Hoque, A. Balakrishna, C. Putterman, M. Luo, D. S. Brown, D. Seita, B. Thananjeyan, E. Novoseller, and K. Goldberg, “Lazydag-ger: Reducing context switching in interactive imitation learning,” in 
+
+2021 IEEE 17th international conference on automation science and engineering (case) . IEEE, 2021, pp. 502–509. [16] R. Hoque, A. Balakrishna, E. Novoseller, A. Wilcox, D. S. Brown, and K. Goldberg, “Thriftydagger: Budget-aware novelty and risk gating for interactive imitation learning,” arXiv preprint arXiv:2109.08273 , 2021. [17] X. Xu, Y. Hou, Z. Liu, and S. Song, “Compliant residual dagger: Im-proving real-world contact-rich manipulation with human corrections,” 
+
+arXiv preprint arXiv:2506.16685 , 2025. [18] D. Hendrycks, M. Mazeika, and T. Dietterich, “Deep anomaly detec-tion with outlier exposure,” arXiv preprint arXiv:1812.04606 , 2018. [19] Y. Gal and Z. Ghahramani, “Dropout as a bayesian approximation: Representing model uncertainty in deep learning,” in international conference on machine learning . PMLR, 2016, pp. 1050–1059. [20] B. Lakshminarayanan, A. Pritzel, and C. Blundell, “Simple and scalable predictive uncertainty estimation using deep ensembles,” 
+
+Advances in neural information processing systems , vol. 30, 2017. [21] K. Lee, H. Lee, K. Lee, and J. Shin, “Training confidence-calibrated classifiers for detecting out-of-distribution samples,” arXiv preprint arXiv:1711.09325 , 2017. [22] J. Wong, A. Tung, A. Kurenkov, A. Mandlekar, L. Fei-Fei, S. Savarese, and R. Mart´ ın-Mart´ ın, “Error-aware imitation learning from teleopera-tion data for mobile manipulation,” in Conference on Robot Learning .PMLR, 2022, pp. 1367–1378.

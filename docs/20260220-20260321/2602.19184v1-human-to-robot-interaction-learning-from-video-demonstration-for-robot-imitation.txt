@@ -1,0 +1,676 @@
+Title: Human-to-Robot Interaction: Learning from Video Demonstration for Robot Imitation
+
+URL Source: https://arxiv.org/pdf/2602.19184v1
+
+Published Time: Tue, 24 Feb 2026 02:12:32 GMT
+
+Number of Pages: 35
+
+Markdown Content:
+# Human-to-Robot Interaction: Learning from Video Demonstration for Robot Imitation 
+
+## Thanh Nguyen Canh 1†, Thanh-Tuan Tran 2†,Haolan Zhang 1, Ziyan Gao 1, Nak Young Chong 1, 3 ,Xiem HoangVan 2* 
+
+> 1
+
+School of Information Science, Japan Advanced Institute of Science and Technology, Nomi, 923-1211, Ishikawa, Japan. 
+
+> 2
+
+University of Engineering and Technology, Vietnam National University, 10000, Hanoi, Vietnam. 
+
+> 3
+
+Department of Robotics, Hanyang University, Ansan, 15588, Gyeonggi, Korea. *Corresponding author(s). E-mail(s): xiemhoang@vnu.edu.vn; 
+
+> †
+
+These authors contributed equally to this work. 
+
+Abstract 
+
+Learning from Demonstration (LfD) offers a promising paradigm for robot skill acquisition. Recent approaches attempt to extract manipulation commands directly from video demonstrations, yet face two critical challenges: (1) gen-eral video captioning models prioritize global scene features over task-relevant objects, producing descriptions unsuitable for precise robotic execution, and (2) end-to-end architectures coupling visual understanding with policy learning require extensive paired datasets and struggle to generalize across objects and scenarios. To address these limitations, we propose a novel “Human-to-Robot” imitation learning pipeline that enables robots to acquire manipulation skills directly from unstructured video demonstrations, inspired by the human abil-ity to learn by “ watching ” and “ imitating ”. Our key innovation is a modular framework that decouples the learning process into two distinct stages: (1) Video Understanding, which combines Temporal Shift Modules (TSM) with Vision-Language Models (VLMs) to extract actions and identify interacted objects, and (2) Robot Imitation, which employs TD3-based deep reinforcement learn-ing to execute the demonstrated manipulations. We validated our approach in PyBullet simulation environments with a UR5e manipulator and in a real-world experiment with a UF850 manipulator across four fundamental actions: reach, pick, move, and put. For video understanding, our method achieves 
+
+1              
+
+> arXiv:2602.19184v1 [cs.RO] 22 Feb 2026 89 .97% action classification accuracy and BLEU-4 scores of 0.351 on stan-dard objects and 0.265 on novel objects, representing improvements of 76 .4%
+> and 128 .4% over the best baseline, respectively. For robot manipulation, our framework achieves an average success rate of 87 .5% across all actions, with
+> 100% success on reaching tasks and up to 90% on complex pick-and-place operations. These results demonstrate strong generalization capability, particu-larly for previously unseen object categories. The project website is available at https://thanhnguyencanh.github.io/LfD4hri.
+> Keywords: Imitation Learning, Learning from Demonstration, Human-Robot Interaction (HRI), Video Understanding, Reinforcement Learning.
+
+# 1 Introduction 
+
+The rapidly expanding application of robotics in modern industry and domestic set-tings necessitates alternative, efficient methods for skill acquisition, moving beyond time-consuming procedural coding. However, robotic skill acquisition has tradition-ally relied on meticulous programming or complex mathematical modeling of domain dynamics [1]. Learning from Demonstration (LfD), also referred to as Imitation Learning (IL), offers a promising alternative, enabling robots to acquire new policies simply by observing examples provided by human teachers without tedious program-ming [2, 3]. LfD frameworks typically decouple the learning process into two essential phases: gathering demonstration examples and deriving an executable policy. Early LfD approaches, such as Kinesthetic Teaching (KT) [4–6], involve the teacher physi-cally guiding the robot. While KT provides dense, high-precision trajectory data, often eliminating the need for mapping between teacher and robot bodies [4, 7], it is inher-ently non-scalable, labor-intensive, and limits data to the robot’s existing kinematics. Consequently, modern efforts prioritize observational learning from unstructured real-world videos to unlock scalable, versatile skill transfer, including teleoperation [8, 9] and passive observation [10–12]. While teleoperation widely uses demonstration input for trajectory or pose learning, it typically requires external input for the robot through joysticks, handlers, or pose tracking tools; passive observation uses a bodysuit or sen-sor device to capture human motions, which generally requires constant time steps to acquire sequential data ( e.g. , end-effector position, orientation, and gripper signals). Although effective, these traditional LfD methods face practical limitations, including dependence on specialized hardware ( e.g. , motion capture suits or haptic devices) and difficulty scaling to diverse tasks [13]. Humans, in contrast, possess the remarkable ability to learn new skills from diverse, non-egocentric visual observations, such as simply watching a video clip. Critically, humans tend to extract the goal from a demonstration first, then use mastered skills to achieve it. This suggests that decoupling demonstration understanding from skill learn-ing may be a more effective and robust approach than attempting to map visual data directly to manipulation policies in a single, unified framework. Inspired by the human ability to learn behaviors simply by “watching and imitating”, which is illustrated 2Inputs   
+
+> Video
+> Imitation Learning Architecture Robot Execution
+> Robot Video Understanding Robot Learning Policy Learning Motion Planning Visual encoder CNN/ViT Action Recognition Pose estimation & Tracking VLMs/LLMs
+
+Fig. 1 : An illustration of Robot Imitation Learning from Human Demonstration. in Fig. 1, recent research [13, 14] has pivoted towards leveraging easily obtainable visual demonstrations for robot skill transfers. This approach transforms unstructured visual data into actionable instructions, often framed as the video-to-command prob-lem [15]. However, video-to-command for robot manipulation introduces two distinct, difficult challenges that must be overcome for successful development: (1) Demonstra-tion Understanding (The “What”), and (2) Execution and Embodiment (The “How”). In the first stage, the robot must accurately interpret the video content to generate a correct, executable command [16]. General video captioning approaches [17, 18], which typically rely on uniformly sampled frames, often fail in complex scenarios involving changeable illumination, varied backgrounds, and diverse objects. Crucially, these gen-eral models lack the precision needed for robotic applications because they focus on global scene features rather than specific manipulated objects [9, 19]. Furthermore, early video-to-command models relying on LSTM-based architectures tend to overfit due to the repetitiveness in video descriptions, limiting generalization [13, 20]. Even with an accurate command, the robot must robustly translate semantic concepts like “scoop” or “fold” grounded in the human’s environment into precise, sub-centimeter spatial actions appropriate for its own body - the embodiment mapping problem [21]. This process requires converting high-level text commands into reliable low-level manipulation frames or accurate affordance predictions [22], a challenging step that requires sophisticated spatial reasoning. To bridge the gap between flexible visual demonstrations and robust execution, we propose a novel and modular “Human-to-Robot” imitation learning pipeline. This pipeline explicitly decouples the learning process into two specialized stages: (1) 
+
+Video Understanding —accurately interpreting the video V content to identify actions, objects, and interactions (the “what”), and (2) Robot Imitation —effectively trans-lating this interpretation into executable manipulation policies that adapt to various scenarios (the “how”). Unlike prior studies [13, 15, 17], which rely heavily on exten-sive data preparation and end-to-end architectures, our approach decomposes complex movements into fundamental action primitives and explicitly handles scene distrac-tions involving multiple objects. This modular structure enables robots to acquire diverse manipulation skills solely from visual demonstrations while achieving strong 3generalization across scenarios. The main contributions of this work are summarized as follows: 1. A Decoupled Human-to-Robot Imitation Learning Pipeline. We pro-pose a novel two-stage architecture that separates demonstration understanding from policy learning. This decoupling eliminates the need for paired human-robot data or explicit kinematic correspondence, enabling scalable skill transfer from unstructured videos to robotic manipulation. 2. Object-Centric Video Understanding with Temporal Modeling. We intro-duce a captioning framework that generates concise, grammar-free command sentences ( e.g. , “place apple on plate”) instead of complex natural language descrip-tions. The framework comprises: (a) an Action Understanding Module integrating Temporal Shift Modules (TSM) with ResNet backbones to capture fine-grained motion dynamics across ten fundamental actions, and (b) an Interacted-Objects Understanding Module employing a specialized Object Selection algorithm with blur detection and overlap minimization to identify target objects, followed by Vision-Language Model (VLM) integration for robust object recognition and zero-shot generalization. 3. Hierarchical Reward Design for Precise Manipulation. We develop a TD3-based deep reinforcement learning framework with a carefully structured reward function that decomposes complex manipulation into learnable sub-goals. The hierarchical design incorporates approach rewards, interaction rewards, and align-ment rewards, along with safety penalties for collisions, workspace violations, and motion smoothness, enabling sub-centimeter positioning accuracy in cluttered environments. The remainder of this paper is organized as follows. Section 2 reviews related work in demonstration understanding, video-to-language models, and robotic affor-dance learning. Section 3.1 details our proposed modular pipeline, including the algorithms for both Video Understanding and Robot Imitation stages. Section 4 presents experimental setup, comparative evaluations, and ablation studies. Finally, Section 5 concludes the paper with a discussion of limitations and future research directions. 
+
+# 2 Related Work 
+
+## 2.1 Learning from Demonstration Paradigms 
+
+LfD approaches are typically categorized by how demonstration data is collected, involving two phases: gathering examples and deriving an executable policy. Tradi-tional methods rely on physical interfaces for collecting precise trajectories. Kinesthetic teaching [4–7] involves the human teacher directly guiding the robot through desired movements. While this approach provides dense, high-precision trajectory data, it is laborious and time-consuming, often requiring prior training for effective demonstra-tions. Recent work [7] explores kinesthetic teaching in Mixed Reality environments to improve robot intent communication. Teleoperation [8, 9] employs external devices such as haptic interfaces, joysticks, or pose-tracking tools for remote robot control. 4These methods often incorporate wave variables and neural networks to handle system complexities including time-varying delays. Passive observation or Motion Capture (MoCap) [10–12] records human actions through vision systems, external sensors, or dedicated motion capture suits. Racinskis et al. [12] explore affordance-based learning from video data using Cartesian space representations, while Peters et al. [11] evaluate the feasibility of training robots purely through passive observation. A fundamental challenge in LfD is the correspondence problem , which addresses the mismatch between teacher and learner domains [23]. This includes embodiment mapping —whether states and actions from human demonstrators match those the robot would observe or execute. This challenge is particularly acute when learning from human video, as simple imitation fails due to significant visual and kinematic domain shifts [24, 25]. Prior work [19] addresses this through image-to-image trans-lation methods such as CycleGANs [26]. In contrast, our work resolves this challenge through linguistic and geometric decoupling, making visual input executable regardless of domain gaps. 
+
+## 2.2 Video-to-Command and Demonstration Understanding 
+
+Moving beyond specialized hardware, the field has increasingly adopted unstructured visual demonstrations, leading to the video-to-command problem [15, 17, 27, 28]. Early approaches utilized two-stage pipelines: identifying semantic content (sub-ject, verb, object) followed by template-based sentence generation [14]. However, template-based methods inadequately capture the complexity of natural language. Sequence-to-Sequence models [14], particularly LSTM-based architectures, enabled direct mapping from video features to sentences. For robotic manipulation, previous video-to-command models demonstrated lim-ited performance due to their focus on full-frame understanding rather than task-relevant objects and fine-grained actions [17]. Nguyen et al. [15] proposed an additional action classification branch operating concurrently with feature extraction. Based on this insight, Yang et al. [13] introduced Visual Change Maps (VCM) to isolate inter-acted objects by computing frame differences, leveraging Mask R-CNN [29] for object segmentation. The VCM is designed to isolate interacted objects by computing the difference between consecutive frames ( i.e. , subtracting the next frame from the cur-rent frame), thereby capturing only changes related to interactions while mitigating noise and irrelevant objects. While achieving state-of-the-art performance, this method faces challenges, including data collection difficulty, LSTM overfitting due to repet-itive annotations, heavy reliance on large-scale annotated datasets, and the limited number of input frames per video. To address these limitations, we leverage the Temporal Shift Module (TSM) [30], which provides computationally efficient spatio-temporal modeling through chan-nel shifting, achieving strong performance on fine-grained human-object interaction datasets. Furthermore, we propose a modular approach that decouples action under-standing from object recognition, utilizing blur detection and overlap minimization to identify task-relevant objects. 52.3 Deep Reinforcement Learning for Robot Execution 
+
+The challenge of “Robot Imitation” -how to translate commands into action- requires effective policy learning and spatial reasoning. The execution phase depends heavily on affordance detection, which is the understanding of an object’s functional prop-erties [31]. Deep learning approaches using CNNs for grasp detection [32, 33] and end-to-end affordance detection methods such as AffordanceNet [22] have proven effec-tive but require substantial human-annotated training data. However, their approach requires substantial training data preparation, which is both time-consuming and challenging due to its reliance on human-annotated datasets. Prior affordance-detection methods predominantly assign single affordance labels to object regions, overlooking multifunctionality. For instance, a block may possess both grasp and place affordances simultaneously. To reduce dependency on manual annotations, reinforcement learning has emerged as a viable alternative [34]. Recent methods [13, 35] introduce RL-based frameworks for learning grasp and place affor-dances, while some works [35, 36] demonstrate the effectiveness of deep RL for vision-based manipulation. However, its limited generalization capability to novel tasks renders it ineffective and unsuitable for real-world applications. 
+
+## 2.4 Integrated Vision-Language/Large-Language Architectures 
+
+To link semantic understanding to physical execution, recent work [37–41] moves toward integrated Vision-Language Models (VLMs) or Large-Language Mod-els (LLMs). Inspired by biological principles of visual processing—the ventral stream (what/semantic recognition) and the dorsal stream (where/spatial process-ing)—architectures have emerged. Jang et al. [29] use a two-stream model in which one stream focuses on grasping (dorsal) and the other on object classification (ventral). This architecture is designed to manage the trade-off between grasp-ing accuracy and semantic understanding, sometimes leveraging auxiliary large-scale datasets like ImageNet [42] for generalization. In addition, Socratic Models [43] pro-pose integrating multiple pretrained models via language-based exchange, whereas Inner Monologue [44] focuses on incorporating environmental feedback to support adaptive behavior and scene understanding. The contemporary CLIPORT [21] archi-tecture successfully applies this two-stream decomposition for language-conditioned robotic tasks. It leverages the contrastive pre-training of CLIP to align vision and language features, using the element-wise product of visual and language encodings to maintain spatial dimensions for precise action grounding. It leverages a pre-trained vision–language model to provide semantic grounding that maps high-level language instructions to low-level, action-relevant representations, and uses CLIP-based con-trastive pre-training to align visual and linguistic features via element-wise fusion, preserving spatial structure for precise action grounding. Unlike these methods, we develop our system based on VLMs’ [45] ability to under-stand and generate object categories by removing noise and irrelevant objects. Our proposed pipeline directly builds on the success of the VLM approach by employ-ing a similar decoupled structure—Video Understanding feeds semantic commands to the Robot Imitation stage, which employs a DRL architecture for robust spatial and 6semantic control, further enhancing generalization capability beyond single-stream or general video-to-command systems. 
+
+# 3 Proposed Method 
+
+## 3.1 System Architecture 
+
+The proposed architecture is a modular “Human-to-Robot” pipeline, which explicitly designed to enable robust skill acquisition from visual demonstration by separating the complexity into two specialized stages: (1) Video Understanding - determining what the human is doing, and (2) Robot Imitation - determining how the robot should exe-cute the action. This decoupled approach is intended to overcome the heavy reliance on extensive data preparation seen in prior studies and enhance generalization across diverse scenarios. We formally define the overall task by decomposing each step into two subtasks: understanding the demonstration video (solved by Action Understand-ing, Interacted-Objects Understanding, and VLM), and learning the demonstrated manipulation via DRL. Firstly, the task of demonstration understanding is formulated as a video-to-command translation problem, where the objective is to map an unstructured demonstration video V to a structured execution command. As illustrated in Fig. 2, our framework decomposes this task into two parallel branches: Actions ( Ai) Under-standing and Interacted-Objects ( Ii) Understanding. The first branch, Action Under-standing Module, processes the visual data to identify the manipulation primitive. Let the raw input video be presented by a sequence of frames F = {f1, f2, . . . , fn}. To optimize computational efficiency, we first downsample this sequence to a reduced set ˜F = {˜f1, ˜f2, . . . , ˜fm} (where m < n ). From ˜F, we extract a sequence of feature vec-tors X = {x1, x2, . . . , xm}, where each xi corresponds to the feature representation of the ith frame. To capture fine-grained motion dynamics and temporal dependencies, we introduce a shifted feature sequence ˜X = {˜x1, ˜x2, . . . , ˜xm}, where ˜ xi represents the temporally shifted feature of the ith frame. This is achieved by applying random channel shifts along the temporal dimension. This mechanism enables the model to effectively encode the human-object interactions required to distinguish between the ten fundamental manipulation actions: pick , move , and put .The second branch, Interacted-Objects Understanding module, focuses on isolating the objects involved in the interaction. Before passing frames to the Human-Object Interaction (HOI) algorithm [46], the reduced sequence ˜F undergoes a keyframe extraction process defined as: ˜Fk = TG(fs(ft( ˜F))) , (1) where TG represents grayscale transformation, fs denotes a subtraction function applied between consecutive frames (assuming that the change in brightness does not substantially impact the process ( i.e. , ˜fi − ˜fi−1), and ft is a threshold filter applied to retain only significant visual changes. The processed keyframes are subsequently fed into an Human-Object Interaction (HOI) algorithm to detect objects interacting 7with human hands. The detected objects are then ranked based on their relevance and interaction characteristics. The final output is a sequence of words S = {s1, s 2, . . . , s m}, representing the gen-erated command. We integrate the outputs from both branches to convert the video into an actionable instruction. Following standard video captioning approaches [14], the optimal command for a given video V is determined by maximizing the log-likelihood of the action-object pair P, conditioned on the video and model parameters 
+
+θ:
+
+θ = arg max 
+
+> θ
+
+X
+
+> (V,P)
+
+log p(P | V , θ ). (2) To ensure the system is robust for robotic control, we enforce a grammar-free out-put format rather than natural language sentences. Instead of generating complex descriptions like “A man is picking the blue block up on the table,” our system pro-duces concise, execution-focused commands such as “Picking the blue block up”. This format explicitly emphasizes the essential components—the action and the target object—ensuring clarity and direct applicability for downstream robotic manipulation tasks. Secondly, humans naturally abstract manipulation commands such as “get a scoop of coffee” or visual demonstrations like “fold the cloth” by leveraging intuitive under-standing of object properties and spatial relationships. In contrast, human-like robotic systems lack this innate grounding capability and must explicitly learn geometric representations, spatial awareness, and motion dynamics to perform manipulation tasks correctly. To address this challenge, we formulate robot control directly in joint space rather than Cartesian space. This design choice offers several advantages: (1) it captures the underlying motion dynamics more naturally, (2) it avoids kinematic sin-gularities inherent in end-effector control, and (3) it reduces the gap between semantic commands and low-level motor control. For tasks requiring explicit geometric reason-ing, model-based approaches can complement our learned policy. We employ a Deep Reinforcement Learning (DRL) strategy based on Twin Delayed Deep Determinis-tic Policy Gradients (TD3) [48], where the objective is to maximize the accumulated discounted reward: 
+
+J(πθ) = E
+
+" ∞X
+
+> t=0
+
+γtr(st, at)
+
+#
+
+, (3) We chose TD3 over alternative methods for three key reasons. First, TD3 addresses the overestimation bias prevalent in Q-learning methods by employing a twin-critic architecture, resulting in more stable value estimates. Second, its deterministic policy formulation is well-suited for continuous control tasks with high-dimensional action spaces fully randomized environment. Third, the delayed policy updates reduce vari-ance during training, which is particularly important given our extensive domain randomization strategy. 8Input video Reduced FPS video Keyframe extraction       
+
+> Interacted-Objects Understanding
+> Frame 1 Frame k
+> 2D conv ROI pooling
+> Cropped 1 Cropped n
+> Object Selection
+> Tracker Blur detection Overlap c-omputation
+> Vision language model
+> Fixed prompt Projection Vision encoder
+> The green block Language model
+> [SOS ]The green Put the green block into yellow bowl
+> Actions Understanding
+> Frame 1 Frame m
+> 2D conv 2D conv Channel C Channel C Temporal T temporal shift T4T3T2T1Residual network
+
+Fig. 2: The proposed Video Understanding architecture consists of two parallel branches: (a) Interacted Object Understanding Module and (b) Action Understand-ing Module. Initially, the raw input frames F = {f1, f2, . . . , fn} are downsampled to ˜F = {˜f1, ˜f2, . . . , ˜fm} (where n > m ) to optimize runtime and match the training data frame rate in Action Understanding Module. (a) The Interacted Object Understand-ing Module processes ˜F to extract a subset of keyframes ˆF = {ˆf1, ˆf2, . . . , ˆfk}, (where 
+
+m > k ). These frames are analyzed by our Object Selection algorithm and Vision-Language Models (VLMs) to identify the specific objects involved in the interaction accurately. (b) The Action Understanding Module is implemented based on a CNN architecture with a ResNet-50 [47] backbone with Temporal Shift Modules (TSM) that shift feature channels along the temporal dimension to capture fine-grained motion dynamics for action classification. 
+
+## 3.2 Video Understanding 
+
+3.2.1 Interacted-Objects Understanding Module (IOUM) 
+
+The Interacted-Objects Understanding Module (IOUM) constitutes the one special-ized branch of our Video Understanding framework, running in parallel with the Action Understanding Module. Its fundamental purpose is to accurately identify and classify the functional roles of the objects involved in the human manipulation demonstration, providing the interacted-object category vectors ( Ij ) necessary for command gener-ation. This object-centric focus is crucial because general captioning models often prioritize global scene features, lacking the precision needed for robotic execution. The filtered keyframes ( ˆF) are first passed through a CNN backbone to extract dense, high-dimensional visual feature maps. This process involves a series of 2D conv that learn hierarchical representations from the visual data. This initial convolutional step transforms the raw pixel data into a spatial feature map suitable for detecting regions of interest. Following the initial feature extraction, the network must localize objects 9and extract fixed-size feature vectors from their bounding boxes (Regions of Interest, RoIs). The bounding boxes are typically determined by an object detection or Human-Object Interaction algorithm. These features are standardized using ROI pooling, which extracts and pools the features corresponding to each detected bounding box from the feature map into a smaller, standardized representation. This step is critical because it ensures that features for objects of varying scales and positions are repre-sented consistently, preparing them for subsequent classification and selection tasks. The output of this pooling step results in the feature set I = {i1, i2, . . . , ih}, where h
+
+represents the number of high-confidence objects, eliminates surrounding noise, and contains high-confidence object features. 
+
+> Cropped object set Tracker Trajectory Pickable-object set Placeable-object set Blur detection Overlap detection Acceptable objects
+
+Fig. 3 : Pipeline of the proposed Object Selection algorithm. Cropped object regions are tracked across frames to generate trajectory data, which is used to classify objects into Pickable-object and Placeable-object sets based on motion patterns. Each can-didate object then undergoes Blur Detection and Overlap Detection to select the highest-quality object instances for subsequent Vision-Language Model processing. The standardized, cropped object features ( I) are then analyzed to classify their functional role based on the manipulation’s context. We define two temporary storage sets to categorize objects by functional role: Pickable Objects ( P1) and Placeable Objects ( P2), as shown in Fig. 3. This categorization relies on analyzing the most critical state of the demonstration video, often identifying objects by their motion trajectories, as shown in Fig. 4. Based on these characteristics, we classify objects with a pickable functionality into the P1 group, while objects with a placable functionality are assigned to the P2 group. For refinement, the algorithm applies two primary filters to the object candidates: Blurriness Detection and Overlap Minimization. Blurriness detection leverages the Laplacian filter matrix applied L =
+
+0 1 01 −4 1 0 1 0
+
+!
+
+via the Window Sliding [49] principle to compute the blurriness of objects: 
+
+B(i, j ) = 
+
+> 1
+
+X
+
+> k=−11
+
+X
+
+> l=−1
+
+it(i + k, j + l) · L(k + 1 , l + 1) , (4) where it(i, j ) represents the pixel intensity of a cropped image within the set I, and the window size is 3 × 3. Objects with the lowest blurriness are retained, as higher 10 Fig. 4 : Visualization of Interacted object trajectory tracking across three intersection scenarios. Left: RGB frames showing human hand-object interactions with objects. Right: Corresponding 2D trajectory plots of the tracked objects’ centroid positions over time, where the characteristic parabolic or oscillatory patterns indicate pickable objects, enabling automatic classification of object functional roles (pickable or place-able). blurriness indicates a loss of key features. The second sub-function computes the degree of overlap between the human hand and the interacting object. The objective is to ensure that the selected remains clearly visible in the video without being occluded by other elements. By selecting objects that exhibit both minimal blur and minimal overlap, the system ensures clear, high-quality visual features necessary for accurate grounding of manipulation tasks. These top-ranked object features are then input into VLMs [45] to enhance object understanding and improve generalization across diverse scenarios by integrating textual and visual information. 11 3.2.2 Action Understanding Module (AUM) 
+
+The AUM focuses on identifying the fundamental manipulation primitive performed by the human demonstrator, which corresponds to the “action” component ( Ai of the executable command Si. This module is explicitly designed to learn the spatial-temporal dynamics necessary to classify ten fundamental manipulation actions. In video captioning tasks generally, visual features are extracted offline from video frames using a pre-trained CNN. To prepare the data efficiently for the AUM, the origi-nal high frame-rate video sequence F is first processed into a smaller subset ˜F. This reduction minimizes computational impact by removing duplicate or minimally altered frames, which significantly decreases processing time while maintaining sufficient per-formance for action classification. Furthermore, it minimizes the gap between training and testing video frame rates, ensuring better consistency. To accurately capture the temporal properties and fine-grained motion dynam-ics necessary to distinguish between subtle manipulation actions ( e.g. , distinguishing “opening” from “closing”), the AUM integrates a Temporal Shift Module (TSM) within its underlying CNN architecture. TSM is a novel and effective mechanism that achieves strong spatio-temporal modeling by sequentially applying random shifts to the channels of the feature sequences. This shift operation facilitates information exchange among neighboring frames along the temporal dimension, allowing the model to fuse temporal information without incurring additional computation or parame-ters, effectively operating as a pseudo-3D model while maintaining the efficiency of 2D CNNs. Crucially, TSM is implemented using a residual shift strategy, inserting the module inside the residual branch of the network. This structural choice is necessary to prevent performance degradation and preserve the spatial feature learning capacity of the original 2D CNN backbone, which is otherwise harmed by naive ”in-place” shift implementations. By leveraging TSM, the AUM efficiently models the complex tem-poral dependencies crucial for fine-grained human-object interaction tasks, leading to improved performance compared to purely 2D CNN baselines. 
+
+3.2.3 Captioning Scheme 
+
+The final step in the Video Understanding pipeline is the Captioning Scheme, which generates the precise, executable command sentence ( Si) by leveraging the outputs from the AUM and IOUM. This process is vital for providing explicit, structured instructions that directly inform the subsequent Robot Understanding stage. The generated command is produced using a fusion architecture that combines the highest-probability action vectors ( Ak) from the action understanding phase and the object category vectors ( Ij ) from the interacted-objects understanding phase. By applying a softmax layer to the fused inputs from Ak and Ij , the final predicted sentence ( Si)is obtained. The structured output command is defined by the concatenation of these two semantic components, emphasizing the action and the target objects: 
+
+Si = Ai + Ii, i = 1 , . . . , m (5) The resulting command sentence Si is explicitly enforced to be in a grammar-free format ( e.g. , “place orange in bowl” instead of complex natural language descriptions) 12 for the convenience of robot execution. This concise format emphasizes the essential components—the action and the target object—ensuring clarity and direct applicabil-ity for downstream robotic manipulation tasks. In experiments, the number of output words can reach up to 8, and is typically set to a maximum length by padding the remaining list with empty words, as generated command sentences generally consist of less than this limit 
+
+## 3.3 Robot Imitation    
+
+> Critic TD3 algorithm PD controller update update Uniform noise Actor
+> at
+> jt
+> R
+> Relay Buffer
+> st, a t,st+1 , r t
+> pepo
+> pg
+> goal
+
+Fig. 5 : The architecture of our DRL system for robot imitation. processes the environ-ment observation O that consists of agent’s proprioceptive, exteroceptive, relational, and historical data such as: joint angle jt, joint velocity j′
+
+> t
+
+, object orientation Ro,object coordination and target po, pg , end effector status pe, we also provide relative observations ¯ peo , ¯ pog with past joint angle at−1, provided by the Video Understand-ing framework and outputs the location of the object referenced by it.
+
+3.3.1 State and Action Representation 
+
+Effective decision-making requires a comprehensive state embedding that captures both robot kinematics and task-relevant environmental cues. To enhance sample efficiency and generalization, we adopt domain randomization on both state represen-tation (Table 1) and environment configuration, maintaining 100% randomness while ensuring reproducibility. Table 1 also summarizes each component of the state vector 
+
+st, which includes: 
+
+• Proprioceptive information: Joint angles jt and joint velocities j′ 
+
+> t
+
+provide essential feedback for accurate motion control and trajectory planning. 13 • Spatial Relationships: Relative position vectors ¯ peo (end-effector to object) and ¯ pog 
+
+(object to goal) encode the spatial relationships critical for approach and manip-ulation phases. Object position po, goal position pg , and object orientation Ro
+
+complete the spatial description. 
+
+• Interaction State: Suction values pe comprise two binary indicators: one reflecting the activation/release state and another representing the predicted value from the policy, enabling the agent to reason about grasp success. 
+
+• Temporal Context: Including the previous actions at−1 helps the agent learn smooth motion trajectories by mitigating discontinuities in control signals. 
+
+Table 1 : State representation for the DRL agent.                                 
+
+> Component Description Dimension Noise jtjoint positions at time t6D U(±0.005)
+> j′
+> tjoint velocities at time t6D U(±0.05)
+> Roobject orientation 4D U(±0.005) ¯peo end-effector to object vector 3D U(±0.005) ¯pog object to goal vector 3D U(±0.005)
+> poobject coordination 3D U(±0.005)
+> pgtarget coordination 3D U(±0.005)
+> petsuction sensor readings 2D U(±0.005)
+> at−1previous joint command 7D —
+
+To ensure stable training, we normalize observations Ot ∈ O using Welford’s online algorithm, which maintains running estimates of mean ˆ μ and variance σ2:
+
+M2,t = M2,t −1 + ( Ot − ˆμt−1) ⊙ (Ot − ˆμt), σ2 
+
+> t
+
+= M2,t 
+
+nt
+
+(6) where nt = nt−1 + 1 is the number of samples seen, and M 2 
+
+> t
+
+accumulates the sum of squared deviations. The normalized observation (standardization) is computed as: ˆO = O − ˆμt
+
+σt + ϵ , ϵ = 1 e − 7 (7) The action at specifies two components: continuous joint velocities for all robot joints and a discretized suction signal modeled via a Bernoulli distribution. Joint positions are obtained by integrating predicted velocities: 
+
+jt =
+
+Z
+
+j′ 
+
+> t
+
+dt = jt−1 + j′ 
+
+> t
+
+· dt (8) These commanded positions are then regulated by a low-level PD controller that enforces velocity and joint-limit constraints. This control scheme extends beyond the standard Markov Decision Process (MDP) assumption, as the state transition depends on both current and previous actions: P (st+1 /at, st, at−1). 14 3.3.2 Reward & Penalty Function 
+
+Table 2 : Rewards and penalties formula used for training, along with the initial and final weights. ∗Notation: pe is end-effector position; λ is scale factor; θe, θ o, ψ e, ψ o are roll and pitch of end-effector and object respectively; px, p y , p z are position in x, y, z-axis respectively; θco is a constraint; wc, w cx, w cy are position constraint of workspace in xyz coordinate, only x-axis, and only y-axis respectively. 
+
+Rewards/Penalties Description Weight 
+
+ret = w0 exp 
+
+
+
+− ∥pe − po∥
+
+λ0
+
+
+
++ w1 exp 
+
+
+
+− |ψe − π| + |θe|
+
+λ1
+
+
+
++ w2 exp 
+
+
+
+− ∥pze − pzo ∥
+
+λ2
+
+
+
+safe end-effector approach to the object (1 .3, 0.2, 0.15) →
+
+(0 .325 , 0.2, 0.15) 
+
+rit =δc
+
+
+
+w3 exp 
+
+
+
+− ∥po − pg ∥
+
+λ3
+
+
+
++ w4 exp 
+
+
+
+− ∥po − pg ∥
+
+λ4
+
+ 
+
+,δc = 1 if contact is established , λ3 >> λ 4
+
+object movement toward the target (2 .0, 3.0) 
+
+rat = w5 exp 
+
+ ¯p′ 
+
+> o·¯pog λ5
+
+− 1
+
+  
+
+¯p′ 
+
+> o
+
+· ¯pog > 0
+
+ object motion aligned with goal direction 0.8 
+
+cc =
+
+
+
+3, if colliding with ground or itself 1.5, if colliding with objects 0, otherwise. undesired collisions 1.0 
+
+cs = 2 reaching the max step limit 1.0 
+
+ce = w6 (|ψe − π| − | θe|)end-effector pose inclination limita-tion 1.0 
+
+ca = w7 (∥at − 2at−1 + at−2∥) jerky or unsmooth actions limitation 0.05 
+
+co =
+
+(
+
+(|ψo − ψco| − | θo − θco|) , if ψo or θo > ϵ t,
+
+0, otherwise. excessive object inclination limita-tion 1.0 
+
+cw =
+
+ 
+
+> ∥po−wc∥+∥pe−wc∥
+> σ1
+
+, if (( pxo ∪ pxe ) /∈ wcx)) ∪
+
+(( pyo ∪ pye ) /∈ wcy )0, otherwise. movement outside workspace limita-tion 1.0 
+
+The primary objective of reinforcement learning is to maximize the cumulative discounted reward, which guides the agent toward optimal behavior. Designing an effective reward function is critical for aligning the agent’s actions with task require-ments. In this work, the reward function is formulated as a weighted combination of multiple components, each targeting specific aspects of manipulation to encourage desired behaviors while penalizing errors. The total reward at timestep t is computed as: 
+
+rt(st, at) = 
+
+2X
+
+i=0 
+
+wi · rit(st, at) −
+
+6X
+
+j=1 
+
+wj · cjt (st, at), (9) where rit denotes reward terms promoting task progress, cjt denotes penalty terms discouraging unsafe behaviors, and wi, wj are their respective weights. To ensure gradient stability during critic training, we normalize the total reward rt by a scale factor of 10. 15 Reward Components: 
+
+We employ a hierarchical reward structure that provides clear feedback based on observable action outcomes, guiding the agent through sequential sub-goals to reach or interact with the objects. The reward terms are defined as follows: 
+
+• Approach Reward ( ret ): Encourages the end-effector to safely approach the target object with proper positioning and orientation. This term uses exponential distance-based shaping to provide smooth gradients throughout the approach phase. 
+
+• Interaction Reward ( rit): Activated upon contact with the target object, this term incentivizes transporting the grasped object toward the goal location. The reward is conditioned on successful grasp detection via the has contact indicator. 
+
+• Alignment Reward ( rat ): Rewards object motion that is aligned with the goal direc-tion, computed as the dot product between the object velocity vector ¯ p′ 
+
+> o
+
+and the object-to-goal unit vector ¯ pog . This term is only activated when the object is moved (¯ p′ 
+
+> o
+
+· ¯pog > 0). Upon successful task completion, we set rit = rit−1 (indicating no further movement is required), ret = 0, and award a triple maximum score for rat to reinforce successful completion. This hierarchical structure ensures that the policy learns to execute each manipulation phase precisely before progressing to the next. 
+
+Penalty Components: 
+
+In contrast to rewards that promote goal-directed behavior, penalties ensure safe exe-cution by discouraging undesirable actions such as collisions, joint limit violations, and workspace boundary crossings. The penalty terms are defined as follows: 
+
+• Collision Penalty (cc): Penalizes undesired collisions with graduated sever-ity—ground or self-collisions receive the highest penalty (3.0), while collisions with scene objects receive a moderate penalty (1.5). 
+
+• Step Limit Penalty ( cs): Applied when the episode reaches the maximum allowed timesteps, encouraging efficient task completion. 
+
+• End-Effector Inclination Penalty ( ce): Discourages excessive tilting of the end-effector, maintaining proper orientation for stable manipulation. 
+
+• Action Smoothness Penalty ( ca): Penalizes jerky or discontinuous motions by mini-mizing the second derivative of the action sequence ( ∥at −2at−1 +at−2∥), promoting smooth trajectories. 
+
+• Object Inclination Penalty ( co): Activated when the manipulated object tilts beyond a predefined threshold ϵt, preventing unstable grasps that could lead to drops. 
+
+• Workspace Penalty ( cw): Penalizes movements that would place the end-effector or object outside the defined workspace boundaries, ensuring safe operation within the robot’s operational envelope. The complete mathematical formulations for all reward and penalty terms, along with their associated weights, are provided in Table 2. The inclusion of adaptive penalties, particularly for critical failures, helps balance exploration with task-focused exploitation during training. 16 3.3.3 Training Procedure 
+
+We utilize a deep reinforcement learning (DRL) framework based on the TD3 algo-rithm [48], illustrated in Fig. 5. We employ deterministic policies rather than stochastic alternatives because, in highly randomized environments, stochastic policies tend to inefficiently adjust their mean and variance parameters, leading to increased gradient variance and unstable learning dynamics. The critic networks are trained by minimiz-ing the temporal difference (TD) error between the estimated Q-values and the target values. For the i-th critic network ( i ∈ { 1, 2}), the loss function is defined as: 
+
+Lϕi = E(st,at,r t,st+1 )∼B 
+
+h
+
+(Qϕi (st, at) − yt)2i
+
+, i = 1 , 2 (10) where B denotes the replay buffer, and the target value yt is computed using the minimum of the two target critic networks to prevent overestimation: 
+
+yt = rt + γ · min  
+
+> i=1 ,2
+
+Qϕ′ 
+
+> i
+
+(st+1 , π θ′ (st+1 ) + ϵ) , ϵ ∼ clip ( N (0 , ˜σ), −c, c ) (11) where, γ is the discount factor, ϕ′ 
+
+> i
+
+and θ′ denote the target network parameters, and 
+
+ϵ is clipped noise added for target policy smoothing. The actor network is updated by maximizing the expected Q-value through gra-dient ascent. Following the deterministic policy gradient theorem, the actor loss is: 
+
+Lθ = −Est∼B [Qϕ1 (st, π θ(st))] (12) The actor is updated at a lower frequency than the critics (every d iterations) to ensure stable Q-value estimates before policy improvement. During training, each episode begins by randomly generating a scene containing 19 different objects sampled from the training object set. For the reach action, the agent must navigate its end-effector to the target object position. For pick , move , and put actions, the agent must accomplish two sequential sub-goals: (1) reaching and grasping the correct target object, and (2) transporting it to the designated goal location. In addition, an episode terminates when any of the following conditions is satisfied: 
+
+• Success: The agent successfully completes the required action with the target object within the specified tolerance ( ∥po − pg ∥ ≤ τd). 
+
+• Collision: The end-effector collides with the ground plane or the robot’s own body. 
+
+• Joint limit violation: Any joint angle exceeds its permissible range. 
+
+• Workspace violation: The object or end-effector moves outside the defined workspace boundaries. 
+
+• Timeout: The episode exceeds the maximum allowed timesteps ( Tmax = 100). The complete training pipeline, integrating video understanding with reinforce-ment learning, is summarized in Algorithm 1. 17 Algorithm 1 Human-to-Robot Imitation Learning Pipeline 
+
+Require: Video demonstrations D, robot environment E
+
+Ensure: Learned policy πθ 
+
+> 1:
+
+Initialize modules: I, A, πθ , Qϕ1 , Qϕ2 
+
+> 2:
+
+Initialize targets: θ′ ← θ, ϕ′ 
+
+> i
+
+← ϕi 
+
+> 3:
+
+Initialize replay buffer: B ← ∅ 
+
+▷ Phase 1: Video Understanding  
+
+> 4:
+
+for each V ∈ D do  
+
+> 5:
+
+˜F ← Downsample( V) ▷ Reduce frame rate  
+
+> 6:
+
+A ← A ( ˜F ) ▷ Action classification  
+
+> 7:
+
+ˆF ← KeyframeExtract( ˜F) ▷ Select keyframes  
+
+> 8:
+
+O ← O ( ˆF ) ▷ Object identification  
+
+> 9:
+
+S ← Concat( A, O ) ▷ Generate command  
+
+> 10:
+
+end for 
+
+▷ Phase 2: Reinforcement Learning  
+
+> 11:
+
+for episode = 1 to M do  
+
+> 12:
+
+s0 ← E .reset( S) 
+
+> 13:
+
+for t = 0 to Tmax do  
+
+> 14:
+
+at ← πθ (st) + ϵ, ϵ ∼ N (0 , σ ) ▷ Exploration  
+
+> 15:
+
+(st+1 , r t, done ) ← E .step( at) 
+
+> 16:
+
+B ← B ∪ { (st, a t, r t, s t+1 )} 
+
+> 17:
+
+Update Qϕ1 , Q ϕ2 via Eq. (10) ▷ Critic update  
+
+> 18:
+
+if t mod d = 0 then  
+
+> 19:
+
+Update πθ via Eq. (12) ▷ Delayed actor update  
+
+> 20:
+
+θ′ ← ρθ + (1 − ρ)θ′ ▷ Soft update  
+
+> 21:
+
+ϕ′ 
+
+> i
+
+← ρϕ i + (1 − ρ)ϕ′ 
+
+> i
+> 22:
+
+end if  
+
+> 23:
+
+if done then  
+
+> 24:
+
+break  
+
+> 25:
+
+end if  
+
+> 26:
+
+end for  
+
+> 27:
+
+end for  
+
+> 28:
+
+Return: πθ
+
+# 4 Results and Discussion 
+
+## 4.1 Experimental Setup 
+
+We evaluate the proposed framework through comprehensive simulation experiments, measuring task success rates across diverse manipulation scenarios with varying object shapes, colors, and spatial configurations. All experiments are conducted in PyBul-let [50] using a Universal Robot UR5e manipulator equipped with a suction gripper. This configuration provides a controlled and reproducible platform for evaluating manipulation performance, particularly for tasks requiring semantic grounding of high-level cues such as object color and category. The robot operates within a fixed 60 × 60 cm tabletop workspace, with RGB images captured by an onboard cam-era at 640 × 480 resolution without sensor noise. The policy networks are trained on NVIDIA Tesla V100-SXM2-32GB and GeForce RTX 5080-16GB GPUs. Training 18 (a) Original dataset 
+
+> (b) Our dataset
+
+Fig. 6 : Distribution of training videos across action categories in the test set 
+
+Fig. 7 : Object categories used for evaluating video understanding generalization. (Left) Standard object set: 12 object categories present in the training dataset, includ-ing common household items. (Right) Novel object set: 9 previously unseen object categories used exclusively for testing 19 Fig. 8 : Qualitative results of reach action. Left: Human demonstration videos showing reaching motion toward various objects. Right: Corresponding simulated UR5 robot executions, where the robot successfully navigates its end-effector to the target object position across diverse scene configurations with multiple distractor objects. consists of 35 , 000 episodes across randomized environments, totaling ∼ 3, 500 , 000 environment steps. Each iteration requires approximately 2 seconds in simulation, resulting in a total training time of approximately 24 hours. Table 3 summarizes the key hyperparameters used for TD3 training. 
+
+Evaluation Metrics: 
+
+To assess task performance, we define success rate as the percentage of episodes in which the robot completes all required sub-goals within a positional error threshold 
+
+τd. We report success rates under varying thresholds ( τd ∈ { 1, 2, 3, 4} cm) to evaluate precision-performance trade-offs. Additionally, we measure the average reward , defined as the cumulative discounted reward R = PTt=0 γtrt accumulated during an episode, which reflects both task completion and motion quality. For the Video Understanding module, we use BLEU scores (BLEU-1 through BLEU-4) to evaluate the accuracy of generated commands against ground-truth annotations. 20 Fig. 9 : Qualitative results of the pick action. Left: Human demonstration videos show-ing grasping motions for objects of varying colors and shapes. Right: Corresponding simulated executions using the suction gripper, with the robot correctly identifying and picking the target object among multiple distractors. 
+
+Baseline Methods: 
+
+We compare our approach against several state-of-the-art methods spanning video-to-command generation and robotic manipulation. For video understanding, we evaluate against Video2Command [17], a deep recurrent neural network approach using sequence-to-sequence learning; V2CNet [15], which incorporates an additional action classification branch; and Watch-and-Act [13], which utilizes Visual Change Maps with Mask R-CNN for object-centric action recognition. For DRL algorithm comparison, we additionally evaluate against SAC [51], DDPG [52], PPO [53], and Asym-PPO [54]. 
+
+Dataset: 
+
+We train the Temporal Shift Module on a modified Something-Something V2 dataset, comprising videos across 10 action categories. The training set contains 118 , 562 videos, while the test set includes 12 , 480 videos. Additionally, we collect 135 self-recorded 21 Fig. 10 : Qualitative results of the move action. Left: Human demonstration videos showing object transportation from one location to another. Right: Corresponding simulated executions, where the robot successfully transports grasped objects along trajectories toward the designated goal positions while maintaining a stable grasp throughout the motion. videos to evaluate real-world generalization (see Fig. 6). On the other hand, we eval-uate object recognition on two sets: (1) a standard set containing 12 object categories present during training (apple, pan, bottle, orange, kettle, egg, plate, box, spoon, spatula, knife, cup), and (2) a novel set containing 9 previously unseen categories (car-rot, block, grape, chilly, banana, pressure, lemon, pot, strawberry) to assess zero-shot generalization capability (Fig 7). 
+
+## 4.2 Experimental Results 
+
+We present comprehensive experimental results evaluating both the Video Under-standing and Robot Imitation components of our framework. All experiments are conducted over 10 independent trials to ensure statistical reliability. 22 Fig. 11 : Qualitative results of the put action. Left: Human demonstration videos show-ing object placement into containers (bowls, plates). Right: Corresponding simulated execution demonstrating precise placement of objects at target locations, completing the full pick-and-place manipulation sequence learned from video demonstration. 
+
+4.2.1 Video Understanding Performance 
+
+Fig. 8–11 present qualitative comparisons between human demonstration videos (left panels) and corresponding simulated robot executions (right panels) across four manip-ulation primitives. Fig. 8 illustrates the reach action across six diverse scenarios involving spherical, cylindrical, and irregular objects. The UR5e successfully navigates to target positions despite cluttered scenes with 5–8 distractors, correctly identify-ing targets even among visually similar objects and maintaining smooth, collision-free trajectories. Fig. 9 demonstrates the pick action, where the robot must establish stable contact for grasping. The suction gripper successfully identifies and picks tar-gets among distractors, consistently approaching from above with proper orientation as encouraged by ret . Failed cases primarily occur near workspace boundaries or when objects are in close proximity. Fig. 10 showcases the move action for object transportation. The robot exhibits smooth trajectories, lifting objects to safe heights before horizontal translation. The alignment reward rat guides efficient near-linear 23 Table 3 : DRL training hyperparameters.                     
+
+> Hyperparameter Value
+> Learning rate (actor) 4×10 −4
+> Learning rate (critic) 4×10 −4
+> Discount factor γ0.99 Soft update rate ρ0.005 Replay buffer size 10 6
+> Batch size 256 Policy delay d2Exploration noise σ0.2 Target noise ˜ σ0.2 Noise clip c0.5
+
+paths, while penalties ce and co maintain end-effector orientation and object stabil-ity throughout transportation. Fig. 11 presents the complete pick-and-place sequence through the put action. The robot achieves precise placement into containers, with the interaction reward rit guiding the final approach phase. The consistently high success rates (90% at 1 cm threshold) on this most challenging action validate that our hier-archical reward structure effectively decomposes complex manipulation into learnable sub-goals. Table 4 presents the action classification accuracy of the Temporal Shift Module (TSM) with varying backbone depths. On the standard benchmark split (Test Set 1), our model achieves 89 .97% Top-1 accuracy with ResNet-101, demonstrating strong performance on fine-grained action recognition. On self-recorded clips (Test Set 2), the accuracy decreases to 71 .11%, reflecting the domain shift between benchmark videos and real-world recordings. Notably, the Top-5 accuracy remains consistently high (above 94%) across both test sets, indicating that the correct action is typically among the model’s top predictions even when the Top-1 prediction is incorrect. The performance gap between Test Set 1 and Test Set 2 (approximately 19% for Top-1) highlights the challenge of generalizing from curated datasets to unconstrained real-world videos, motivating our object-centric approach. Tables 5 and 6 compare video-to-command generation performance using BLEU scores. On standard object sets (Table 5), our method with ResNet-101 backbone achieves BLEU-4 of 0.351, substantially outperforming the previous state-of-the-art Watch-and-Act (0.199 with InceptionV3). This represents a relative improvement of 76.4% in BLEU-4 score. The ablation variants demonstrate the importance of each component: removing keyframe extraction reduces BLEU-4 to 0.298 ( −15.1%), while removing object selection reduces it to 0.237 ( −32.5%). On novel object sets (Table 6), our method demonstrates strong zero-shot generalization, achieving BLEU-4 of 0.265 compared to 0.116 for Watch-and-Act—an improvement of 128.4%. The smaller performance degradation between standard and novel sets (24.5% vs. 41.7% for Watch-and-Act) indicates that our Vision-Language Model integration effectively leverages semantic knowledge for unseen object categories. These results validate 24 our hypothesis that decoupling action understanding from object recognition, com-bined with VLM-based object identification, yields superior generalization compared to end-to-end approaches. 
+
+Table 4 : Action classification accuracy (%) of the Temporal Shift Module (TSM) with varying backbone depths. Test Set 1: standard benchmark split; Test Set 2: self-recorded clips for real-world evaluation. All models use 8-frame sampling with 8-clips 
+
+× 3-crops augmentation using Modified Something-Something V2 during inference.                
+
+> Test Set Backbone Top-1 Acc. Top-5 Acc. Test set 1 ResNet-34 82.79 93.50 ResNet-50 86.79 94.55 ResNet-101 89.97 96.82
+> Test set 2 ResNet-34 63.70 94.81 ResNet-50 68.15 94.81 ResNet-101 71.11 95.56
+
+Table 5 : Video-to-command generation performance (BLEU scores) on stan-dard object sets ( bold and underline are best and second best, respectively).                                                                  
+
+> Backbone Method BLEU-1 BLEU-2 BLEU-3 BLEU-4
+> InceptionV3 Video2Command [17] 0.323 0.196 0.162 0.154 V2C [15] 0.355 0.227 0.201 0.164 Watch-and-Act [13] 0.399 0.287 0.263 0.199 ResNet-50 Video2Command [17] 0.312 0.196 0.173 0.150 V2C [15] 0.357 0.231 0.201 0.153 Watch-and-Act [13] 0.394 0.271 0.248 0.187 Ours w/o key frame 0.562 0.464 0.361 0.297 Ours w/o object sel. 0.521 0.407 0.300 0.237 Ours 0.607 0.506 0.397 0.337 ResNet-101 Video2Command [17] 0.319 0.183 0.175 0.148 V2C [15] 0.324 0.163 0.153 0.131 Watch-and-Act [13] 0.339 0.171 0.155 0.134 Ours w/o key frame 0.577 0.465 0.363 0.298 Ours w/o object sel. 0.524 0.411 0.303 0.237 Ours 0.618 0.511 0.403 0.351
+
+4.2.2 Robot Manipulation Performance 
+
+Table 7 reports task success rates under varying positional error thresholds. Our method achieves a 100% success rate on the reach action across all thresholds, demon-strating robust end-effector positioning. For more complex actions requiring object 25 Table 6 : Video-to-command generation performance (BLEU scores) on novel object sets not seen during training ( bold and underline are best and second best, respectively).                                                                  
+
+> Backbone Method BLEU-1 BLEU-2 BLEU-3 BLEU-4
+> InceptionV3 Video2Command [17] 0.244 0.132 0.075 0.062 V2C [15] 0.279 0.117 0.093 0.087 Watch-and-Act [13] 0.293 0.141 0.133 0.116 ResNet-50 Video2Command [17] 0.305 0.150 0.090 0.082 V2C [15] 0.259 0.119 0.092 0.087 Watch-and-Act [13] 0.310 0.157 0.134 0.107 Ours w/o key frame 0.535 0.431 0.295 0.217 Ours w/o object sel. 0.474 0.361 0.251 0.191 Ours 0.577 0.471 0.356 0.261 ResNet-101 Video2Command [17] 0.226 0.107 0.094 0.081 V2C [15] 0.222 0.102 0.095 0.086 Watch-and-Act [13] 0.233 0.113 0.109 0.094 Ours w/o key frame 0.539 0.435 0.298 0.218 Ours w/o object sel. 0.478 0.362 0.258 0.193 Ours 0.572 0.481 0.361 0.265
+
+interaction, we observe strong performance: pick achieves 70–100% success depend-ing on the threshold with an average of 87 .5%, while move and put maintain 70–90% success rates. The consistently high performance across thresholds from 1 cm to 4 cm indicates that our policy learns precise manipulation rather than relying on loose suc-cess criteria. Fig. 12 compares training convergence across five DRL algorithms: TD3 (ours), SAC, DDPG, PPO, and Asym-PPO. TD3 consistently achieves higher aver-age returns and faster convergence across all four manipulation actions. For the reach 
+
+action, TD3 converges to positive returns within approximately 500 episodes, while PPO and Asym-PPO require over 1,500 episodes. The advantage of TD3 becomes more pronounced for complex actions: on put , TD3 achieves stable positive returns around episode 2,000, whereas DDPG and SAC exhibit high variance throughout training. Fig. 13 presents box plots comparing final performance across algorithms. TD3 demonstrates superior median performance and lower variance compared to all base-lines, particularly for pick , move , and put actions. SAC achieves the second-best performance but exhibits notably higher variance, especially on move actions. The on-policy methods (PPO, Asym-PPO) consistently underperform off-policy approaches, likely due to sample inefficiency in our highly randomized environment. Fig. 14 ana-lyzes the relationship between positional error threshold and average reward. As expected, relaxing the success threshold from 1 cm to 4 cm generally improves average rewards across all actions. However, our method maintains positive average returns even at the strictest 1 cm threshold for reach and put actions, demonstrating that the learned policies achieve sub-centimeter precision. The pick and move actions show more sensitivity to the threshold, reflecting the additional complexity of maintaining stable grasps during object manipulation. 26 0 10000 20000 30000 Training episodes (a) Reach action -40 -20 020 40 0 10000 20000 30000 Training episodes (c) Move action -40 -20 020 40 0 10000 20000 30000 Training episodes (b) Pick action -40 -20 020 40 0 10000 20000 30000 Training episodes (d) Put action -40 -20 020 40 Average Reward     
+
+> TD3 SAC DDPG PPO APPO
+
+Fig. 12 : Comparison of DRL algorithm performance across four manipulation actions. 
+
+Table 7 : Task success rates (%) of our method under varying positional error thresh-olds. 
+
+Action 1 cm 2 cm 3 cm 4 cm 
+
+Reach 100 100 100 100 Pick 70 80 100 90 Move 90 80 70 90 Put 90 90 70 90 
+
+4.2.3 Real-World Environment 
+
+To validate the practical applicability of our video understanding framework, we con-ducted preliminary experiments with a UF850 robotic manipulator in a real-world tabletop setting. The experimental setup consists of the 6-DoF UF850 arm equipped with a vacuum gripper, positioned in front of a wooden table with a manipulation object. We evaluated two fundamental actions: reach and pick , as illustrated in Fig. 15. 27 TD3 SAC DDPG PPO APPO Models (a) Reach action -0.2 -0.0 0.2 0.4 TD3 SAC DDPG PPO APPO Models (b) Pick action -0.2 -0.0 0.2 0.4 TD3 SAC DDPG PPO APPO Models (c) Move action -0.2 -0.0 0.2 0.4 TD3 SAC DDPG PPO APPO Models (d) Put action -0.2 -0.0 0.2 0.4 Average Reward 
+
+Fig. 13 : Box plots comparing average rewards for four manipulation actions. For each action, human demonstration videos were first collected in different environ-ments and processed by our video understanding pipeline to generate manipulation commands. These commands, such as “Touch the white trapezoid” and ”Pick the brown box up, were then executed by the robot through a simple motion planning interface. In the reach task (Fig. 15a), the robot successfully navigates its end-effector to the target object position based on the generated command. In the pick task (Fig. 15b), the robot approaches the target object (a cardboard box), establishes contact with the vacuum gripper, and lifts it from the table surface. Table 8 summarizes the quantitative results over 10 trials per action. The system achieves success rates of 100% for reach and 80% for pick actions. Average execution times are 30s and 33s, respectively, with position accuracies of 25mm and 20mm. These results demonstrate that our framework effectively generalizes from training data to real-world scenarios with different backgrounds and lighting conditions. 
+
+Table 8 : Real-world experiments over 10 trials per action.                  
+
+> Action Success rate Execution time (s) Position accuracy (mm)
+> Reach 100 30 ±3.8 25 ±6Pick 80 33 ±5.4 20 ±4
+
+28 1cm 2cm 3cm 4cm Posision error (a) Reach action -0.25 -0.00 0.25 0.50 1cm 2cm 3cm 4cm Posision error (b) Pick action -0.25 -0.00 0.25 0.50 1cm 2cm 3cm 4cm Posision error (c) Move action -0.25 -0.00 0.25 0.50 1cm 2cm 3cm 4cm Posision error (d) Put action -0.25 -0.00 0.25 0.50 Average Reward 
+
+Fig. 14 : Box plots comparing average rewards under 4 different positional errors as the success threshold for four manipulation actions. 
+
+# 5 Conclusion 
+
+This paper presented a novel ”Human-to-Robot” imitation learning framework that enables robots to acquire manipulation skills directly from unstructured video demon-strations. Our key contribution lies in the modular architecture that decouples the learning process into two specialized stages: Video Understanding for interpreting human demonstrations, and Robot Imitation for translating semantic commands into executable manipulation policies. The Video Understanding module integrates a Tem-poral Shift Module (TSM) for action classification with a Vision-Language Model (VLM) for object identification, achieving state-of-the-art performance on video-to-command generation with BLEU-4 scores of 0 .351 on standard objects and 0 .265 on novel objects, representing improvements of 76 .4% and 128 .4% over the best baseline, respectively. The Robot Imitation module employs TD3-based deep reinforcement learning with a carefully designed hierarchical reward structure, achieving an average success rate of 87 .5% across four fundamental manipulation actions: reach, pick, move, and put. Our experimental results demonstrate three key advantages of the proposed approach. First, the decoupled architecture enables effective generalization to novel objects without requiring retraining, as the VLM leverages pretrained semantic knowl-edge. Second, the grammar-free command format provides a robust interface between video understanding and robot execution, eliminating ambiguities inherent in natural language descriptions. Third, the hierarchical reward design successfully decomposes complex manipulation into learnable sub-goals, enabling sub-centimeter precision even in cluttered environments with multiple distractors. 29 y
+
+‘‘Touch the white trapezoid’’ 
+
+> (a) Reach action
+
+y
+
+‘‘Pick the brown box up’’ 
+
+> (b) Pick Action
+
+Fig. 15 : Real experiment with UF850 manipulator 30 Despite these promising results, several limitations remain. The current framework is restricted to four fundamental manipulation primitives and single-arm operations, limiting applicability to more complex bimanual or tool-use tasks. The reliance on simulation for policy training introduces a sim-to-real gap that requires further inves-tigation. Additionally, the object selection algorithm assumes clear visual separation between objects, which may fail in highly occluded scenarios. Several directions merit further exploration. Extending the action vocabulary to include more com-plex primitives such as pouring, stirring, and folding would broaden the framework’s applicability. Incorporating tactile feedback and force control could improve manipula-tion robustness for deformable or fragile objects. Real-world deployment with domain adaptation techniques would validate the practical utility of our approach. Finally, integrating large language models (LLMs) for task planning could enable multi-step manipulation sequences from high-level natural language instructions. 
+
+# References 
+
+[1] Eze, C., Crick, C.: Learning by watching: A review of video-based learning approaches for robot manipulation. IEEE Access (2025) [2] Calinon, S.: Learning from demonstration (programming by demonstration). In: Encyclopedia of Robotics, pp. 1–8. Springer, ??? (2018) [3] Argall, B.D., Chernova, S., Veloso, M., Browning, B.: A survey of robot learning from demonstration. Robotics and autonomous systems 57 (5), 469–483 (2009) [4] Akgun, B., Cakmak, M., Yoo, J.W., Thomaz, A.L.: Trajectories and keyframes for kinesthetic teaching: A human-robot interaction perspective. In: Proceedings of the Seventh Annual ACM/IEEE International Conference on Human-Robot Interaction, pp. 391–398 (2012) [5] Sakr, M., Freeman, M., Loos, H.M., Croft, E.: Training human teacher to improve robot learning from demonstration: A pilot study on kinesthetic teaching. In: 2020 29th IEEE International Conference on Robot and Human Interactive Communication (RO-MAN), pp. 800–806 (2020). IEEE [6] G´ omez, J.V., Alvarez, D., Garrido, S., Moreno, L.: Kinesthetic teaching via fast marching square. In: 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 1305–1310 (2012). IEEE [7] Macci` o, S., Shaaban, M., Carf` ı, A., Mastrogiovanni, F.: Kinesthetic teaching in robotics: a mixed reality approach. In: 2024 33rd IEEE International Confer-ence on Robot and Human Interactive Communication (ROMAN), pp. 1610–1617 (2024). IEEE [8] Fu, R., Li, Q., Wang, S., Sun, G.: Teleoperation method for controlling robotic arm based on multi-channel emg signals. In: 2023 38th Youth Academic Annual 31 Conference of Chinese Association of Automation (YAC), pp. 1264–1268 (2023). IEEE [9] Yang, C., Wang, X., Li, Z., Li, Y., Su, C.-Y.: Teleoperation control based on com-bination of wave variable and neural networks. IEEE Transactions on Systems, Man, and Cybernetics: Systems 47 (8), 2125–2136 (2016) [10] Koenemann, J., Burget, F., Bennewitz, M.: Real-time imitation of human whole-body motions by humanoids. In: 2014 IEEE International Conference on Robotics and Automation (ICRA), pp. 2806–2812 (2014). IEEE [11] Peters, K., Unterbrunner, A., Martinek, D., Hofmann, A., Hlavacs, H.: Feasibility of physiotherapy exercise capturing using a low-cost motion capture system. In: International Conference on Computer Games, Multimedia & Allied Technology (CGAT). Proceedings, p. 47 (2016). Global Science and Technology Forum [12] Racinskis, P., Arents, J., Greitans, M.: A motion capture and imitation learning based approach to robot control. Applied Sciences 12 (14), 7186 (2022) [13] Yang, S., Zhang, W., Song, R., Cheng, J., Wang, H., Li, Y.: Watch and act: Learning robotic manipulation from visual demonstration. IEEE Transactions on Systems, Man, and Cybernetics: Systems 53 (7), 4404–4416 (2023) [14] Venugopalan, S., Rohrbach, M., Donahue, J., Mooney, R., Darrell, T., Saenko, K.: Sequence to sequence-video to text. In: Proceedings of the IEEE International Conference on Computer Vision, pp. 4534–4542 (2015) [15] Nguyen, A., Do, T.-T., Reid, I., Caldwell, D.G., Tsagarakis, N.G.: V2cnet: A deep learning framework to translate videos to commands for robotic manipulation. arXiv preprint arXiv:1903.10869 (2019) [16] Karpathy, A., Toderici, G., Shetty, S., Leung, T., Sukthankar, R., Fei-Fei, L.: Large-scale video classification with convolutional neural networks. In: Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition, pp. 1725–1732 (2014) [17] Nguyen, A., Kanoulas, D., Muratore, L., Caldwell, D.G., Tsagarakis, N.G.: Trans-lating videos to commands for robotic manipulation with deep recurrent neural networks. In: 2018 IEEE International Conference on Robotics and Automation (ICRA), pp. 3782–3788 (2018). IEEE [18] Yu, T., Finn, C., Xie, A., Dasari, S., Zhang, T., Abbeel, P., Levine, S.: One-shot imitation from observing humans via domain-adaptive meta-learning. arXiv preprint arXiv:1802.01557 (2018) [19] Smith, L., Dhawan, N., Zhang, M., Abbeel, P., Levine, S.: Avid: Learning multi-stage tasks via pixel-level translation of human videos. arXiv preprint 32 arXiv:1912.04443 (2019) [20] Zhang, W., Wang, B., Ma, L., Liu, W.: Reconstruct and represent video contents for captioning via reinforcement learning. IEEE transactions on pattern analysis and machine intelligence 42 (12), 3088–3101 (2019) [21] Shridhar, M., Manuelli, L., Fox, D.: Cliport: What and where pathways for robotic manipulation. In: Conference on Robot Learning, pp. 894–906 (2022). PMLR [22] Do, T.-T., Nguyen, A., Reid, I.: Affordancenet: An end-to-end deep learning approach for object affordance detection. In: 2018 IEEE International Conference on Robotics and Automation (ICRA), pp. 5882–5889 (2018). IEEE [23] Correia, A., Alexandre, L.A.: A survey of demonstration learning. Robotics and Autonomous Systems 182 , 104812 (2024) [24] Hwang, C.-L., Liao, G.-H.: Real-time pose imitation by mid-size humanoid robot with servo-cradle-head rgb-d vision system. IEEE Transactions on Systems, Man, and Cybernetics: Systems 49 (1), 181–191 (2018) [25] Liu, Y., Gupta, A., Abbeel, P., Levine, S.: Imitation from observation: Learning to imitate behaviors from raw video via context translation. In: 2018 IEEE Inter-national Conference on Robotics and Automation (ICRA), pp. 1118–1125 (2018). IEEE [26] Zhu, J.-Y., Park, T., Isola, P., Efros, A.A.: Unpaired image-to-image transla-tion using cycle-consistent adversarial networks. In: Proceedings of the IEEE International Conference on Computer Vision, pp. 2223–2232 (2017) [27] Zhao, H., Liu, X., Xu, M., Hao, Y., Chen, W., Han, X.: Taste-rob: Advancing video generation of task-oriented hand-object interaction for generalizable robotic manipulation. In: Proceedings of the Computer Vision and Pattern Recognition Conference, pp. 27683–27693 (2025) [28] Mao, J., He, S., Wu, H.-N., You, Y., Sun, S., Wang, Z., Bao, Y., Chen, H., Guibas, L., Guizilini, V., et al.: Robot learning from a physical world model. arXiv preprint arXiv:2511.07416 (2025) [29] Jang, E., Vijayanarasimhan, S., Pastor, P., Ibarz, J., Levine, S.: End-to-end learning of semantic grasping. arXiv preprint arXiv:1707.01932 (2017) [30] Lin, J., Gan, C., Han, S.: Tsm: Temporal shift module for efficient video understanding. In: Proceedings of the IEEE/CVF International Conference on Computer Vision, pp. 7083–7093 (2019) [31] Zhai, W., Luo, H., Zhang, J., Cao, Y., Tao, D.: One-shot object affordance detection in the wild. arXiv preprint arXiv:2108.03658 (2021) 33 [32] Lenz, I., Lee, H., Saxena, A.: Deep learning for detecting robotic grasps. The International Journal of Robotics Research 34 (4-5), 705–724 (2015) [33] Zeng, A., Song, S., Yu, K.-T., Donlon, E., Hogan, F.R., Bauza, M., Ma, D., Taylor, O., Liu, M., Romo, E., et al. : Robotic pick-and-place of novel objects in clutter with multi-affordance grasping and cross-domain image matching. The International Journal of Robotics Research 41 (7), 690–705 (2022) [34] Zeng, A., Song, S., Welker, S., Lee, J., Rodriguez, A., Funkhouser, T.: Learning synergies between pushing and grasping with self-supervised deep reinforcement learning. In: 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pp. 4238–4245 (2018). IEEE [35] Zhang, J., Zhang, W., Song, R., Ma, L., Li, Y.: Grasp for stacking via deep reinforcement learning. In: 2020 IEEE International Conference on Robotics and Automation (ICRA), pp. 2543–2549 (2020). IEEE [36] Kalashnikov, D., Irpan, A., Pastor, P., Ibarz, J., Herzog, A., Jang, E., Quillen, D., Holly, E., Kalakrishnan, M., Vanhoucke, V., et al. : Scalable deep reinforcement learning for vision-based robotic manipulation. In: Conference on Robot Learning, pp. 651–673 (2018). PMLR [37] Zitkovich, B., Yu, T., Xu, S., Xu, P., Xiao, T., Xia, F., Wu, J., Wohlhart, P., Welker, S., Wahid, A., et al. : Rt-2: Vision-language-action models transfer web knowledge to robotic control. In: Conference on Robot Learning, pp. 2165–2183 (2023). PMLR [38] Driess, D., Xia, F., Sajjadi, M.S., Lynch, C., Chowdhery, A., Wahid, A., Tomp-son, J., Vuong, Q., Yu, T., Huang, W., et al.: Palm-e: An embodied multimodal language model (2023) [39] Zhou, Y., Li, X., Wang, Q., Shen, J.: Visual in-context learning for large vision-language models. arXiv preprint arXiv:2402.11574 (2024) [40] Jin, Y., Li, D., Shi, J., Hao, P., Sun, F., Zhang, J., Fang, B., et al. : Robot-gpt: Robot manipulation learning from chatgpt. IEEE Robotics and Automation Letters 9(3), 2543–2550 (2024) [41] Qu, D., Song, H., Chen, Q., Yao, Y., Ye, X., Ding, Y., Wang, Z., Gu, J., Zhao, B., Wang, D., et al.: Spatialvla: Exploring spatial representations for visual-language-action model. arXiv preprint arXiv:2501.15830 (2025) [42] Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., Fei-Fei, L.: Imagenet: A large-scale hierarchical image database. In: 2009 IEEE Conference on Computer Vision and Pattern Recognition, pp. 248–255 (2009). Ieee [43] Zeng, A., Attarian, M., Ichter, B., Choromanski, K., Wong, A., Welker, S., 34 Tombari, F., Purohit, A., Ryoo, M., Sindhwani, V., et al.: Socratic mod-els: Composing zero-shot multimodal reasoning with language. arXiv preprint arXiv:2204.00598 (2022) [44] Huang, W., Xia, F., Xiao, T., Chan, H., Liang, J., Florence, P., Zeng, A., Tomp-son, J., Mordatch, I., Chebotar, Y., et al.: Inner monologue: Embodied reasoning through planning with language models. arXiv preprint arXiv:2207.05608 (2022) [45] Liu, H., Li, C., Wu, Q., Lee, Y.J.: Visual instruction tuning. Advances in neural information processing systems 36 , 34892–34916 (2023) [46] Shan, D., Geng, J., Shu, M., Fouhey, D.F.: Understanding human hands in contact at internet scale. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 9869–9878 (2020) [47] He, K., Zhang, X., Ren, S., Sun, J.: Deep residual learning for image recogni-tion. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pp. 770–778 (2016) [48] Fujimoto, S., Hoof, H., Meger, D.: Addressing function approximation error in actor-critic methods. In: International Conference on Machine Learning, pp. 1587–1596 (2018). PMLR [49] Bansal, R., Raj, G., Choudhury, T.: Blur image detection using laplacian operator and open-cv. In: 2016 International Conference System Modeling & Advancement in Research Trends (SMART), pp. 63–67 (2016). IEEE [50] Coumans, E., Bai, Y.: PyBullet, a Python module for physics simulation for games, robotics and machine learning (2016) [51] Haarnoja, T., Zhou, A., Abbeel, P., Levine, S.: Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor. In: International Conference on Machine Learning, pp. 1861–1870 (2018). Pmlr [52] Lillicrap, T.P., Hunt, J.J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., Silver, D., Wierstra, D.: Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971 (2015) [53] Schulman, J., Wolski, F., Dhariwal, P., Radford, A., Klimov, O.: Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 (2017) [54] Jeon, S., Jung, M., Choi, S., Kim, B., Hwangbo, J.: Learning whole-body manip-ulation for quadrupedal robot. IEEE Robotics and Automation Letters 9(1), 699–706 (2023) 35

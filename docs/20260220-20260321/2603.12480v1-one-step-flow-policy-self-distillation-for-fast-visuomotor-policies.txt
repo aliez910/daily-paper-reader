@@ -1,0 +1,1151 @@
+Title: One-Step Flow Policy: Self-Distillation for Fast Visuomotor Policies
+
+URL Source: https://arxiv.org/pdf/2603.12480v1
+
+Published Time: Mon, 16 Mar 2026 00:19:22 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+# One-Step Flow Policy: Self-Distillation for Fast Visuomotor Policies 
+
+Shaolong Li 
+
+CSE Department, University of Michigan 
+
+shaolonl@umich.edu 
+
+Lichao Sun †
+
+Lehigh University 
+
+lis221@lehigh.edu 
+
+Yongchao Chen †
+
+College of AI, Tsinghua University 
+
+yongchaochen12@gmail.com 
+
+# Abstract 
+
+Generative flow and diffusion models provide the continuous, multimodal action distributions needed for high-precision robotic policies. However, their reliance on iterative sampling introduces severe inference latency, degrading control frequency and harming performance in time-sensitive manipulation. To address this problem, we propose the One-Step Flow Policy (OFP), a from-scratch self-distillation frame-work for high-fidelity, single-step action generation without a pre-trained teacher. OFP unifies a self-consistency loss to enforce coherent transport across time inter-vals, and a self-guided regularization to sharpen predictions toward high-density expert modes. In addition, a warm-start mechanism leverages temporal action correlations to minimize the generative transport distance. Evaluations across 56 diverse simulated manipulation tasks demonstrate that a one-step OFP achieves state-of-the-art results, outperforming 100-step diffusion and flow policies while accelerating action generation by over 100 ×. We further integrate OFP into the 
+
+π0.5 model on RoboTwin 2.0, where one-step OFP surpasses the original 10-step policy. These results establish OFP as a practical, scalable solution for highly accurate and low-latency robot control. 
+
+# 1 Introduction 
+
+Vision-Language-Action (VLA) models are progressing quickly in robot manipulation [ 1 – 4], au-tonomous driving [ 5 , 6], and long-horizon task execution [ 7 –9 ]. Within this high-dimensional control setting, flow and diffusion models have emerged as a dominant paradigm for parameterizing conditional policies [ 10 – 12 , 4 ]. These generative models offer two distinct advantages over dis-crete tokenization: they naturally represent the multimodal action distributions inherent in human demonstrations, and they output continuous control signals. This continuous output is essential for high-precision manipulation tasks where subtle action granularity determines success. Despite these benefits, the current paradigm suffers from a critical inference latency bottleneck. Sampling from a flow or diffusion policy typically requires iteratively solving an Ordinary Differential Equation (ODE) or a Stochastic Differential Equation (SDE), transporting samples from a noise prior to the target action distribution. This process requires tens to hundreds of forward passes through a large neural network for a single action [ 13 , 14 ]. In time-sensitive robotics applications such as high-speed grasping or dynamic interaction, this latency is prohibitive. Action generation delays directly reduce control frequency and exacerbate compounding errors, frequently resulting in task failure. As VLA architectures scale in size and complexity, a central challenge arises: 
+
+> †
+
+Corresponding authors. Preprint. 
+
+> arXiv:2603.12480v1 [cs.RO] 12 Mar 2026
+
+How can we accelerate generative policies to output high-fidelity actions in a few steps, or even a single step, without compromising control precision? 20 50 100 200 500 1000 2000 
+
+> Inference Time (ms)
+> 50
+> 55
+> 60
+> 65
+> 70
+> 75
+> Success Rate (%)
+> DP3
+> FM Policy
+> CP
+> OneDP
+> MP1
+> OFP
+> (ours)
+
+Figure 1: Averaged across 56 tasks. Eval-uated at NFE=1, OFP outperforms all other single-step baselines and accelerates genera-tion by over 100 × compared to DP3 and FM Policy (NFE=100). A large body of work in image and video generation studies how to accelerate flow and diffusion sam-pling [ 15 – 18 ], aiming to produce high-fidelity out-puts with a minimal Number of Function Evaluations (NFE). We focus on flow-based models due to their widespread industrial deployment [ 19 , 10 , 11 ]. Dif-fusion models can be viewed as a specific instance of the flow framework, allowing acceleration techniques to transfer across parameterizations. One common approach employs higher-order numerical solvers to reduce steps [ 20 , 21 ]. However, in the extreme few-step regime, discretization errors become unmanage-able and severely degrade generation quality. Another line of work uses distillation [ 22 ], typically by training a student to compress the trajectory of a pre-trained teacher into fewer steps. Two primary families exist: Consistency Distillation (CD) [ 15 , 16 ]and Score Distillation (SD) [ 18 , 23 , 24 ]. CD enforces a self-consistency constraint where points along a trajectory map to the same endpoint, enabling one-step generation. SD instead treats the teacher score as a differentiable prior to optimize the generator. Recently, MeanFlow [ 17 , 25 ] attempted one-step generation by modeling an average velocity field, but it introduces Jacobian-vector products (JVPs) during training, which significantly increase memory costs and destabilizes optimization. Prior works have directly adapted these vision acceleration ideas into robot policy learning to reduce inference latency, but their impact on control tasks has not been sufficiently analyzed. As a result, existing methods often struggle to achieve both low latency and high action precision. Consistency Policy (CP) [ 26 ] follows the consistency-distillation paradigm. However, due to the mode-covering nature of its trajectory-matching objectives [ 27 ], the policy tends to average over multimodal action distributions. While this aids few-step inference, the resulting one-step actions often lack the sharpness required for precise manipulation. In contrast, One-Step Diffusion Policy (OneDP) [ 28 ] employs a score-distillation approach. These objectives are typically mode-seeking [ 29 , 30 ], causing the policy to collapse toward a single high-probability mode. While this produces high-quality one-step samples, it drastically reduces diversity. Due to their design, OneDP-like methods only support single-step inference, preventing them from trading computation time for higher control accuracy. Motivated by these observations, we propose One-Step Flow Policy (OFP) , which combines the strengths of both directions without requiring an auxiliary network or a pre-trained teacher. OFP is a from-scratch self-distillation framework that unifies two complementary signals: self-consistency, which enforces cross-time coherence of the transport dynamics, and self-guidance, which injects a distribution-level correction that sharpens one-step predictions toward high-density expert behaviors. This combination enables high-fidelity one-step inference without performance degradation. Addi-tionally, we introduce a warm-start action reuse mechanism that provides a strong prior for one-step generation, improving both temporal smoothness and control precision. Our contributions are summarized as follows: • We present a unified self-distillation approach for flow-based policies that resolves the trade-off between inference speed and action precision without relying on teacher models. • We repurpose a warm-start action initialization strategy as a highly effective, training-free mecha-nism to reduce the transport distance in few-step inference. • We achieve state-of-the-art success rates across 56 simulated tasks spanning Adroit [ 31 ], DexArt [ 32 ], and MetaWorld [ 33 ]. A 1-NFE OFP outperforms 100-NFE diffusion and flow baselines, delivering over a 100 × acceleration. • We validate the scalability of OFP by integrating it into the π0.5 model [ 11 ]. On RoboTwin 2.0 [ 34 ], our 1-step integration exceeds the baseline 10-step policy, proving its robustness for large-capacity systems and complex semantics. 22 Preliminaries 
+
+2.1 Flow Matching 
+
+Let the data space be Rd. We aim to learn a time-dependent velocity field vθ : [0 , 1] × Rd → Rd
+
+defining an Ordinary Differential Equation (ODE). The flow {ξ(t)}t∈[0 ,1] induced by this ODE transports a base distribution p0 to a target data distribution p1:
+
+ddt ξ(t) = vθ
+
+ ξ(t), t , ξ(0) ∼ p0. (1) Consider a probability path {pt}t∈[0 ,1] interpolating between the boundary conditions p0 and p1. If 
+
+vθ matches the vector field generating this path, the solution ξ(1) will follow the target distribution 
+
+p1. Flow Matching trains vθ by regressing a target velocity field. However, the marginal velocity field is typically intractable. To make training tractable, Conditional Flow Matching (CFM) [ 14 ] introduces a conditional prob-ability path. Given a data sample x1 ∼ p1 and noise ϵ ∼ p0, we define a conditional path 
+
+zt = a(t)x1 + b(t)ϵ, t ∈ [0 , 1] , where a(0) = 0 , b (0) = 1 and a(1) = 1 , b (1) = 0 . The time derivative is given by: ˙zt(x1, ϵ ) = a′(t) x1 + b′(t) ϵ. The marginal velocity field corresponds to the expectation: ¯v(x, t ) = E[ ˙ zt(x1, ϵ ) | zt = x] . CFM learns vθ by directly regressing the derivative of the conditional path: 
+
+LCFM (θ) = Et,x 1,ϵ vθ (zt, t ) − ˙zt(x1, ϵ ) 22. (2) Minimizing Eq. (2) yields the same optimal solution as regressing the intractable marginal velocity field ¯v(x, t ).Sampling involves integrating Eq. (1) from z0 ∼ p0 using the learned field vθ . In practice, this requires time discretization (e.g., Euler or RK4 solvers), resulting in multiple network forward passes. This iterative process is the main inference bottleneck. Since the marginal velocity field exhibits high curvature due to the averaging of overlapping trajectories, standard solvers incur large truncation errors in low-NFE regimes, leading to poor sample quality. 
+
+2.2 Flow-Based Generative Policy 
+
+We consider a visuomotor imitation learning setting. Let D = {(o(i), a (i))}Ni=1 denote a dataset of expert demonstrations. The observation o ∈ O may include proprioception, multi-view RGB images, pointclouds, and language instructions. The action a ∈ RdaH represents a trajectory chunk of horizon 
+
+H, parameterized typically as end-effector SE(3) poses or joint angles. The objective is to learn a conditional generative policy πθ (a | o) that samples actions consistent with the expert distribution. We extend the framework in Section 2.1 to the conditional setting by defining an observation-conditioned velocity field vθ (x, t | o). At deployment, the policy generates an action ˆa by integrating the conditional ODE from a noise prior z0 ∼ p0 to the terminal state z1. The inference cost scales linearly with NFE. During training, we employ an Optimal Transport (OT) [ 35 , 36 ] formulation to construct a straight-line conditional path interpolating between noise and data: zt = (1 −t) ϵ+t a, ϵ ∼ p0. The derivative is constant: ˙zt = a − ϵ. We train the conditional velocity field via the following regression objective: 
+
+Lpolicy (θ) = E(o,a )∼D Et∼pT ,ϵ ∼p0 vθ (zt, t | o) − (a − ϵ) 22. (3) Here pT is a chosen sampling distribution over t ∈ [0 , 1] .
+
+# 3 One-Step Flow Policy 
+
+In this section, we introduce the One-Step Flow Policy (OFP), a from-scratch self-distillation frame-work designed for fast and high-precision visuomotor control. Section 3.1 details Self-Consistency Training, which learns an interval-averaged velocity field to enforce temporal coherence across trajectories. Section 3.2 proposes Self-Guided Regularization, a mechanism that explicitly sharpens single-step action predictions toward high-density expert modes. Section 3.3 introduces a Warm-Start mechanism leveraging the temporal correlation of consecutive action chunks to provide a strong initialization prior. 3Noise Target Actions      
+
+> Contraction
+> Marginal flow trajectory
+> OT interpolation path
+> Predicted velocity
+> (a) Self -Consistency Training (b) Self -Guided Training
+
+Figure 2: Self-Distillation of One-Step Flow Policies. (a) Self-Consistency Training: The model learns an interval-averaged velocity field by matching predictions across nested sub-intervals, enforc-ing temporal coherence along the marginal flow trajectory. (b) Self-Guided Training: By leveraging Classifier-Free Guidance on the model’s own predictions, we extract a distribution-level correction signal. The regularization repels single-step predictions from the unconditional prior and sharpens the generated actions toward the high-density modes of the expert data. 
+
+3.1 Self-Consistency Training 
+
+To eliminate the reliance on iterative ODE integration during inference, we learn an interval-averaged velocity field rather than the instantaneous velocity used in standard Flow Matching [ 14 , 35 ]. Con-cretely, we parameterize uθ (zt, t, r | o) for 0 ≤ t ≤ r ≤ 1, representing the average velocity along the trajectory from t to r. For brevity, we omit the condition o when the context is clear. Given u, the update rule for any interval is defined as: zr = zt + ( r − t)u(zt, t, r ). When r → t+,
+
+u(zt, t, r ) reduces to the instantaneous velocity, maintaining theoretical consistency with Flow Matching on the diagonal. Given a data-noise pair (( o, a ), ϵ ) ∼ D × p0, we sample two times (t, r ) ∼ pT,R subject to t < r ,and draw an intermediate time m ∈ [t, r ]. Using the OT straight-line interpolation, we obtain 
+
+zm = (1 − m)ϵ + ma . An Exponential Moving Average (EMA) copy of the model, denoted uθ− ,serves as the teacher to predict the trajectory endpoint ˆzr = zm + ( r − m)uθ− (zm, m, r ). Based on the definition of average velocity over the interval [t, r ], we define the training target: 
+
+utarget = ˆzr − zt
+
+r − t . (4) We train uθ by minimizing the self-consistency loss: 
+
+Lself-consistency (θ) = E(o,a )∼D E(t,r,m )∼pT ,R,M , ϵ ∼p0 uθ (zt, t, r | o) − utarget 
+
+> 22
+
+. (5) This objective functions as a self-distillation mechanism where the teacher is the slowly evolving EMA copy θ−.
+
+Time-Contracting Schedule . We sample m from a range that gradually contracts toward t as training proceeds: 
+
+m ∼ U 
+
+h
+
+t, t + ( r − t)ρ(s)
+
+i
+
+. (6) Here, ρ(s) is a monotonically decreasing function of the training step s. In the early stages of training (ρ(s) ≈ 1), m is sampled across the entire interval [t, r ]. This allows the target utarget to rely more heavily on the interpolated state zm, rather than an untrained teacher uθ− . This effectively reduces bootstrapping error caused by an untrained teacher. As training progresses ( ρ(s) → 0), the sampling range collapses such that m → t. This shifts the objective to enforce strict local self-consistency along the true trajectory. 4Proposition 1. Under the assumption that the interval-velocity field is continuously differentiable and globally Lipschitz continuous in state, when the contracting factor ρ(s) → 0 and the EMA teacher uθ− is accurate, utarget becomes a consistent supervision signal for the ground truth average velocity u(zt, t, r ), and minimizing Lself-consistency satisfies uθ ≈ u.
+
+A detailed derivation is provided in Appendix A.1. Proposition 1 establishes that the time-contracting schedule provides a smooth curriculum: it transitions from stabilizing initialization to refining trajectory precision. 
+
+Comparison with MeanFlow . Crucially, constructing the target utarget circumvents the costly Jacobian-Vector Product (JVP) computations required by MeanFlow [ 17 , 25 ]. MeanFlow relies on a differential objective, which significantly increases memory overhead and wall-clock training time. In contrast, our approach relies solely on forward passes. We provide a formal proof in Appendix A.2 demonstrating that as the interval (m − t) → 0, our consistency target converges to a finite-difference approximation of the derivative term in the MeanFlow objective. 
+
+Boundary Anchoring . To constrain the solution space and ensure the policy remains grounded in the expert data distribution, we introduce a boundary anchoring loss. This term applies standard Flow Matching supervision on the instantaneous velocity: 
+
+Lflow (θ) = E(o,a )∼D Et∼U [0 ,1] ,ϵ ∼p0 uθ (zt, t, t | o) − (a − ϵ) 22. (7) This anchoring term ensures that OFP retains the capability for high-quality multi-step generation. The self-consistency objective functions as a trajectory-matching mechanism. This formulation yields strong performance in few-step regimes (e.g., 2 to 4 steps) and preserves the diversity of the action distribution. However, we find that self-consistency alone often yields insufficient precision for complex manipulation in the single-step regime. To address this limitation, we introduce self-guided regularization in Section 3.2. 
+
+3.2 Self-Guided Regularization 
+
+While self-consistency (Section 3.1) constrains trajectory coherence across time intervals, it does not explicitly enforce that single-step predictions align with the high-density modes of the expert distribution. To impose the distribution-level constraint, we introduce a score-based regularizer. The score function 
+
+∇x log p(x) points toward higher-density regions. We use it as a guidance signal to steer generated actions toward the expert data manifold. 
+
+One-step Sample and Re-noising . Let ϵ0, ϵ 1 ∼ N (0 , I ) be independent noise, and (o, a ) ∼ D .For a time t ∈ [0 , 1] , define the linear mixture zt = (1 − t)ϵ0 + ta. The policy generates a one-step prediction by a single interval jump: ˆa ≜ ˆz1 = zt + (1 − t)uθ (zt, t, 1 | o). To compare the marginal distribution of the policy with the expert, we re-noise ˆa at a new time t′ ∼ U [0 , 1] :
+
+˜zt′ = (1 − t′)ϵ1 + t′ˆa. 
+
+Let πθ (˜ zt′ | o) denote the policy-induced marginal distribution of ˜zt′ conditioned on o, and let 
+
+π⋆(˜ zt′ | o) denote the corresponding expert distribution. We aim to minimize the reverse Kullback-Leibler (KL) divergence between πθ (· | o) and π⋆(· | o) :
+
+DKL 
+
+ πθ (˜ zt′ | o) ∥ π⋆(˜ zt′ | o) = E˜zt′ ∼πθ (·| o)
+
+ log πθ (˜ zt′ | o) − log π⋆(˜ zt′ | o). (8) The gradient of Eq. (8) with respect to θ can be written as a score-difference term: 
+
+∇θ DKL (πθ ∥ π⋆)= E
+
+h ∇˜zt′ log πθ (˜ zt′ | o) − ∇ ˜zt′ log π⋆(˜ zt′ | o) ∂˜zt′
+
+∂θ 
+
+i
+
+= E
+
+h sθ (˜ zt′ | o) − s⋆(˜ zt′ | o) ∂˜zt′
+
+∂θ 
+
+i
+
+,
+
+(9) where s(·) = ∇˜zt′ log p(·) denotes the score function. 
+
+Self-Guidance via CFG . To amplify the conditional signal, we incorporate Classifier-Free Guidance (CFG) [ 37 ]. Given a guidance scale α ≥ 1 and a null condition ϕ, the CFG-adjusted expert score is 5defined as: sCFG  
+
+> ⋆
+
+(˜ z | o) = s⋆(˜ z | o) + ( α − 1)  s⋆(˜ z | o) − s⋆(˜ z | ϕ). Substituting this form into Eq. (9) reveals a decomposition into two components: 
+
+sθ (˜ zt′ | o) − sCFG  
+
+> ⋆
+
+(˜ zt′ | o) = (α−1) 
+
+
+
+s⋆(˜ zt′ | ϕ)−s⋆(˜ zt′ | o)
+
+| {z }
+
+> CFG Augmentation
+
++
+
+
+
+sθ (˜ zt′ | o) − s⋆(˜ zt′ | o)
+
+| {z }
+
+> Distribution Matching
+
+. (10) Recent analyses [ 38 , 39 ] of DMD-style training suggest that the CFG-Augmentation (CA) term is the primary driver of sample quality. Motivated by this, we use only the CA term as our guidance signal. Intuitively, the CA term steers the model toward the conditional distribution. Unlike prior works [ 40 , 28 ] that rely on a pre-trained teacher to compute s⋆, we estimate the score using the EMA teacher uθ− , which yields a self-guided training signal. For the OT probability path ˜zt = (1 − t)ϵ + ta , the marginal score at time t is analytically related to the instantaneous velocity by: 
+
+s(˜ zt | o) = tu(˜ zt, t, t | o) − ˜zt
+
+1 − t . (11) We then construct the self-guidance target: 
+
+starget =sg 
+
+h
+
+uθ (zt, t, 1 | o) −  uθ− (˜ zt′ , t ′, t ′ | ϕ) − uθ− (˜ zt′ , t ′, t ′ | o)i
+
+, (12) where sg[ ·] denotes the stop-gradient operator. We formulate the self-guidance loss as the squared error between the one-step prediction and the guided target: 
+
+Lself-guidance (θ) = E(o,a )∼D Et,t ′∼U [0 ,1] , ϵ ∼p0
+
+h
+
+uθ (zt, t, 1 | o) − starget 
+
+> 2
+
+i
+
+. (13) Minimizing Eq. (13) yields a gradient for uθ that aligns the update direction with the CA term (proof provided in Appendix A.3), which effectively repels the generation from the unconditional mode. Since the guidance signal is induced by the model itself, this objective can also be viewed as a form of self-distillation. The self-guidance term requires an unconditional branch. We implement this using condition dropout: during training, we randomly replace the observation o with a null token ϕ with probability pdrop ,enabling a single network to capture both conditional and unconditional dynamics. 
+
+Unified Objective . We combine the flow anchoring loss (Eq. (7)), self-consistency loss (Eq. (5)), and self-guidance loss (Eq. (13)) into a unified training objective: 
+
+Lself-distill (θ) = Lflow (θ) + λcLself-consistency (θ) + λg Lself-guidance (θ). (14) Empirically, adding self-guidance significantly sharpens the precision of one-step outputs. The combination of these signals enables OFP to achieve state-of-the-art performance in both few-step and one-step generation. The complete training procedure is outlined in Algorithm 1. 
+
+Inference. OFP supports flexible sampling strategies. For minimal latency, we generate a one-step action prediction ˆa via a single global jump from noise: ˆa = ϵ + uθ (ϵ, 0, 1 | o), ϵ ∼ N (0 , I ).
+
+Alternatively, to achieve higher precision, the model can function as a multi-step solver by chaining interval predictions. Given a time discretization schedule 0 = τ0 < τ 1 < · · · < τ K = 1 , we recursively update the state by querying the average velocity over each sub-interval [τk, τ k+1 ]:
+
+ˆzτk+1 = ˆ zτk + ( τk+1 − τk)uθ (ˆ zτk , τ k, τ k+1 | o). This allows the policy to trade increased inference time for finer control. 6One -Step Flow Policy 
+
+> shift
+> pad
+> add noise
+
+Observation 
+
+Generated Action Chunk 
+
+Warm -Start Input 
+
+> Executed
+> Cond.
+
+Figure 3: Warm-Start Action Prior for One-Step Inference. The unexecuted suffix of the previously generated action chunk is shifted and padded with the terminal action to form a full-length temporal prior. By starting closer to the target data manifold rather than from pure Gaussian noise, this initialization reduces the required transport distance. 
+
+3.3 Warm-Start for One-Step Inference Algorithm 1 OFP Training  
+
+> 1:
+
+Inputs: expert dataset D, model uθ ,condition dropout pdrop . 
+
+> 2:
+
+Initialization: EMA teacher θ− ← θ. 
+
+> 3:
+
+while not converged do  
+
+> 4:
+
+Sample batch (o, a ) ∼ D , time variables, and noise.  
+
+> 5:
+
+Apply condition dropout: o ← ϕ with probability pdrop . 
+
+> 6:
+
+Compute Lflow via Eq. (7)  
+
+> 7:
+
+Compute Lself-consistency via Eq. (5)  
+
+> 8:
+
+Compute Lself-guidance via Eq. (13)  
+
+> 9:
+
+Update θ via Eq. (14)  
+
+> 10:
+
+Update EMA teacher.  
+
+> 11:
+
+end 
+
+Warm-start is widely used [ 41 , 42 ] in action-chunking generative policies to im-prove smoothness and execution efficiency in receding-horizon rollouts. Here, we repurpose warm-start for reducing the generative burden of single-step inference. By leveraging the high temporal correlation between consecutive chunks, we construct a strong prior that lowers the transport cost required to reach the target action distribution. In a receding-horizon control loop with exe-cution horizon h < H, the robot executes the first h actions. The unexecuted suffix represents a valid plan for the current step, 
+
+aleft = [ ah+1 , . . . , a H ] ∈ Rda(H−h). We construct a full-length warm-start prior awarm by shift-ing the unexecuted suffix and padding the terminal action: 
+
+awarm = ah+1 , . . . , a H , a H , . . . , a H
+
+| {z } 
+
+> htimes
+
+ ∈ RdaH . (15) 
+
+Warm-Started Generation . Rather than sampling from non-informative Gaussian noise, we initialize the generator from a noised projection of the warm-start prior. We select a noise level tw ∈ (0 , 1] 
+
+and sample ϵ ∼ N (0 , I ) to construct the initial state: ztw = (1 − tw)ϵ + twawarm . The policy can then generate the next action chunk ˆa via a single interval update: ˆa = ztw + (1 − tw)uθ (ztw , t w, 1 |
+
+o). This formulation aligns structurally with the re-noising form used in Section 3.2, making the inference-time initialization consistent with the training-time guidance construction. We illustrate the construction of this warm-start prior and its integration into the receding-horizon control loop in Fig. 3. Initializing with awarm significantly reduces the transport distance the flow must bridge in a single step. By starting closer to the data manifold, the policy yields higher precision and improved temporal smoothness without requiring additional training or computational overhead. 
+
+# 4 Experiments 
+
+To evaluate the effectiveness of OFP, we conduct extensive simulation experiments across 4 ma-nipulation benchmarks: Adroit [ 31 ], DexArt [ 32 ], MetaWorld [ 33 ], and RoboTwin 2.0 [ 34 ]. Our 7Table 1: Performance on 2D image-based manipulation. Results are averaged over 3 random seeds. The best performance in each column is highlighted in bold .Method NFE Door Hammer Pen Bucket Faucet Laptop Toilet Average DP 100 51.7 ±4.0 100.0 ±0.0 67.7 ±1.2 34.7 ±4.7 38.7 ±1.5 80.3 ±2.9 76.0 ±1.7 64.2 ±2.3 DP 10 44.7 ±1.5 100.0 ±0.0 66.7 ±1.5 32.7 ±4.0 35.0 ±2.6 81.0 ±2.6 66.0 ±3.6 60.9 ±2.3 FM Policy 100 63.7 ±2.1 100.0 ±0.0 69.7 ±2.1 31.7 ±1.2 40.7 ±2.3 84.7 ±2.5 79.7 ±1.5 67.2 ±1.7 FM Policy 10 61.3 ±3.2 97.3 ±3.1 64.7 ±3.8 27.7 ±2.3 32.7 ±3.8 87.0 ±1.7 77.3 ±1.5 64.0 ±2.8 CP 1 46.3 ±3.5 100.0 ±0.0 58.7 ±5.7 30.7 ±2.5 33.3 ±0.6 79.0 ±2.6 69.7 ±3.1 59.7 ±2.6 OneDP 1 53.3 ±5.1 100.0 ±0.0 64.7 ±1.5 32.7 ±1.2 40.0 ±1.7 76.3 ±2.9 76.3 ±2.3 63.3 ±2.1 MP1 1 49.3 ±6.0 96.3 ±3.5 57.3 ±4.9 31.7 ±6.7 33.0 ±7.5 83.7 ±1.5 72.3 ±4.6 60.5 ±5.0          
+
+> OFP (Ours) 168.3 ±3.1 100.0 ±0.0 69.3 ±1.5 33.3 ±2.5 41.0 ±1.7 85.7 ±3.5 80.7 ±2.5 68.3 ±2.1
+
+Table 2: Performance on 3D pointcloud manipulation. We assess performance on 56 challenging tasks with 3 random seeds. Method NFE Adroit (3) DexArt (4) MetaWorld Easy (28) MetaWorld Medium (11) MetaWorld Hard (5) MetaWorld Very Hard (5) Average DP3 100 79.0 ±0.6 63.7 ±0.6 82.8 ±8.0 46.5 ±3.8 38.3 ±9.6 41.0 ±0.6 66.4 ±5.7 DP3 10 76.0 ±3.3 61.5 ±0.9 80.8 ±2.1 46.2 ±1.4 36.3 ±8.2 45.3 ±5.7 65.2 ±2.8 FM Policy 100 83.3 ±0.7 61.7 ±4.2 68.9 ±5.7 42.3 ±3.8 43.6 ±3.4 47.7 ±4.5 59.8 ±4.6 FM Policy 10 80.3 ±1.8 60.5 ±4.5 66.7 ±7.7 41.3 ±7.4 40.3 ±7.2 46.7 ±7.6 57.9 ±7.0 CP 1 76.3 ±4.6 60.7 ±3.4 68.3 ±1.8 32.1 ±4.3 28.7 ±5.2 36.0 ±2.3 54.7 ±2.9 OneDP 1 77.3 ±1.8 62.5 ±4.1 77.7 ±0.5 39.6 ±9.2 38.7 ±4.4 41.7 ±1.6 62.4 ±3.0 MP1 1 82.0 ±2.1 61.0 ±2.0 70.5 ±6.1 37.9 ±5.9 34.3 ±9.5 32.3 ±5.5 57.4 ±5.8         
+
+> OFP (Ours) 185.0 ±4.5 64.3 ±2.5 87.9 ±4.6 52.4 ±5.7 43.3 ±2.4 49.2 ±0.7 71.6 ±4.1
+
+evaluation answers three core questions: 1) Can OFP match or exceed the performance of standard multi-step diffusion and flow policies while requiring only a single network evaluation? 2) How does OFP compare against existing single-step acceleration methods in terms of stability, accuracy, and scaling capability? 3) Does OFP scale effectively to modern VLA architectures without experiencing performance collapse? 
+
+4.1 Experimental Setup 
+
+We divide our evaluation into 2D image-based and 3D pointcloud-based control settings. For the 2D evaluation, we test on 3 tasks from Adroit [ 31 ] and 4 tasks from DexArt [ 32 ]. For the 3D evaluation, we test on these 7 tasks alongside 49 tasks from MetaWorld [ 33 ]. The Adroit and DexArt evaluate single-task learning, while MetaWorld evaluates large-scale multi-task learning. Following prior work [ 43 ], we group the 49 MetaWorld tasks into 4 empirical difficulty levels: Easy, Medium, Hard, and Very Hard. 
+
+Baselines. We compare OFP against five strong generative policy baselines: Diffusion Policy (DP) [ 41 ] and Flow Matching Policy (FM Policy) [ 44 ] as multi-step controls; Consistency Policy (CP) [ 26 ] and One-Step Diffusion Policy (OneDP) [ 28 ] representing distillation approaches; and MP1 [ 45 ] adapting MeanFlow [ 17 ]. For 3D settings, we utilize DP3 [ 46 ] and adapt FM Policy with an identical point encoder. CP and OneDP are distilled from a pre-trained DP3 teacher, whereas OFP and MP1 are trained from scratch. All evaluations share identical settings and are averaged over 3 random seeds (reported as mean ± standard deviation). Detailed experimental settings and evaluation metrics can be found in Appendices B and C. 
+
+4.2 Experimental Results 2D Image-Conditioned Evaluation. Table 1 reports the results on the 2D tasks. OFP achieves the best average success rate among all one-step methods. It also surpasses the strong multi-step baselines. At NFE = 1 , OFP reaches 68 .3% , which is higher than DP at NFE = 100 with 64 .2% 
+
+and FM Policy at NFE = 100 with 67 .2% . This shows that the proposed self-distillation objective does more than reduce latency. It also significantly improves final action quality. During training, MP1 showed high variance and frequent loss spikes. This is consistent with the extra numerical sensitivity introduced by the JVP operations in its objective. OFP avoids JVPs by training on an interval-averaged target, which leads to more stable optimization and better control accuracy. 
+
+3D Pointcloud-Conditioned Evaluation. Table 2 shows an even larger gain in the 3D setting. OFP achieves the highest success rates in the vast majority of tasks. At NFE = 1 , it outperforms DP3 8Table 3: Few-Step vs. One-Step Generation. OFP supports flexible sampling, maintaining high performance at 1 step while reliably improving accuracy given more generation steps.                                   
+
+> Method NFE Bucket Faucet Laptop Toilet Average OneDP 132.7 ±5.8 44.7 ±3.1 89.3 ±3.8 83.3 ±3.8 62.5 ±4.1 CP 129.3 ±3.5 44.3 ±3.8 86.7 ±2.5 82.3 ±3.8 60.7 ±3.4 438.3 ±4.2 43.7 ±1.2 90.0 ±3.5 84.7 ±2.9 64.2 ±2.9 OFP 139.3 ±0.6 45.7 ±3.8 91.7 ±3.2 81.3 ±3.2 64.5 ±2.7 442.7 ±2.1 47.0 ±1.0 92.3 ±4.2 83.0 ±1.7 66.2 ±2.2
+
+at NFE = 100 by 8% on the average, and it exceeds the 3D FM Policy at NFE = 100 by 19 .7% .The gain is especially clear in the MetaWorld multi-task setting, where OFP improves both average performance and robustness across difficulty levels. These results support the role of self-guided regularization, which sharpens the action distribution and reduces the over-smoothing often seen in standard flow objectives. Fig. 1 shows the trade-off between inference time and success rate across all 56 tasks. OFP reaches the best average success rate while staying in the one-step low-latency regime. In wall-clock time, OFP requires 17 .58 ms per action chunk, compared with 3225 .67 ms for DP3 at NFE = 100 and 
+
+1865 .72 ms for 3D FM Policy at NFE = 100 . This corresponds to about 183 × and 106 × speedups, respectively. OFP is slightly slower than OneDP and MP1 because warm-start adds a small amount of computation, but the accuracy gain is large enough to justify that cost. 20 50 100 150  
+
+> Number of Demonstrations
+> 20
+> 30
+> 40
+> 50
+> 60
+> Success Rate (%)
+> 20.3
+> 30.3
+> 42.0 39.7 32.7
+> 39.3
+> 45.7
+> 51.0
+> MP1
+> OFP
+
+Figure 4: Data Scaling Behavior. OFP ex-tracts higher utility from sparse data (20 de-mos) and continues to scale cleanly as data increases, avoiding the performance degrada-tion seen in MP1 at 150 demos. 
+
+Latency and Accuracy Trade-off. A basic limita-tion of OneDP-like methods is that they only support one-step inference. By contrast, trajectory-matching methods such as CP support multi-step generation but often suffer less precise single-step prediction. OFP combines the strengths of both. As shown in Table 3, OneDP is stronger than CP at NFE = 1 on several tasks. However, CP improves once more steps are allowed. OFP remains strong at NFE = 1 and im-proves further at NFE = 4 , which shows that the same model can provide both low-latency one-step control and better accuracy when a slightly larger compute budget is available. 
+
+Ablation Studies. To isolate the contributions of our core components, we conducted targeted ablation studies. Specifically, we independently ablate each module under fixed training conditions to evaluate its impact on single-step and few-step success rates. Our results show that self-consistency training is necessary for reliable few-step inference, while self-guided regularization drives the performance gains in the single-step regime. Empirically, self-consistency and self-guided training complement each other. Additionally, the warm-start mechanism acts as a training-free inference prior that consistently improves generation quality across any step count. Unifying these mechanisms allows OFP to deliver high accuracy in both single-step and few-step control. We report the detailed results of these ablations in Appendix D. 
+
+Data Efficiency and Scaling. We investigate how performance scales with data availability on the DexArt Faucet task (Fig. 4). Under very limited data, with only 20 demonstrations, MP1 degrades sharply. In contrast, OFP maintains a robust success rate, indicating that self-guided regularization provides stronger learning signals in the low-data regime. As the number of demonstrations increases, OFP improves steadily from 32 .7% to 51 .0% . MP1 improves at first, but then drops after 100 demonstrations. 
+
+4.3 Integration with VLA Models 
+
+Modern VLA systems often require large over-parameterized models and condition action generation on rich multi-modal semantics. However, bootstrapping-based methods may suffer from rank-collapse when model capacity increases [ 47 , 48 ]. To verify whether OFP remains effective in this 9Handover Mic Place Empty Cup Adjust Bottle Beat Block Hammer Average       
+
+> 60
+> 70
+> 80
+> 90
+> 100
+> Success Rate (%)
+> 94.3
+> 93.7
+> 99.0
+> 91.7 94.7
+> CFM Shortcut iMF OFP π0.5 (NFE=10)
+
+Figure 5: Transfer to π0.5 on RoboTwin 2.0. All acceleration methods are evaluated at NFE=1, and the π0.5 baseline operates at NFE=10. OFP achieves the best average success rate across four tasks, showing that OFP remains effective even for large-scale VLA models with richer multi-modal inputs. Handover Mic Place Empty Cup Adjust Bottle Beat Block Hammer 
+
+Figure 6: Visualization of RoboTwin 2.0 tasks. Evaluations use domain randomization to test robustness under visual variation. regime, we integrate it into the π0.5 model and evaluate it in RoboTwin 2.0. Fig. 6 visualizes the 4 RoboTwin 2.0 tasks used in our π0.5 integration study. We evaluate OFP under domain randomization (clutter/distractors, background textures, lighting, and tabletop height). We compare with three representative from-scratch acceleration methods: Consistency Flow Matching (CFM) [ 49 ], Shortcut Models [47], and Improved MeanFlow (iMF) [25]. Fig. 5 shows that OFP achieves the best average success rate, reaching 94 .7% across the four tasks. More importantly, OFP at NFE = 1 surpasses the original π0.5 policy at NFE = 10 . This result shows that OFP does not collapse in a larger VLA setting with richer semantics. Instead, it preserves the benefits of single-step generation while still improving control quality. This confirms that OFP is not tied to a narrow policy class. The self-distillation design continues to work when the backbone is larger, the conditioning is richer, and the task semantics are more complex. 
+
+# 5 Related Work 
+
+5.1 Generative Policies for Robot Control 
+
+The integration of diffusion models into robotics initially emerged through the planning-as-generation paradigm [ 42 , 50 ]. Subsequently, the focus shifted toward visuomotor imitation: Diffusion Policy [ 41 ] established a robust baseline by parameterizing conditional policies as iterative denoising processes over action chunks. While this approach excels at modeling multimodal distributions and ensures training stability, it incurs high inference latency that scales linearly with the number of denoising steps. Subsequent research focuses on stronger conditional representations [ 51 , 46 ]and more structured generation [ 52 ]. In parallel, Flow Matching policies [ 53 – 56 , 44 , 57 ] leverage an ODE-based velocity field formulation. The flow-based paradigm is gradually converging with modern Vision-Language-Action (VLA) architectures [4, 10, 58, 11, 12, 19]. 10 5.2 Distillation and Acceleration 
+
+Few-step acceleration of generative policies mainly follows two routes. 
+
+Consistency Distillation . Building on Consistency Models [ 15 ], approaches like Consistency Policy [26 ] and ManiCM [ 59 ] distill a pre-trained diffusion teacher into a student. However, they are more likely to exhibit averaging under highly multimodal action distributions, resulting in insufficient one-step action precision. 
+
+Score Distillation . Inspired by Distribution Matching Distillation (DMD) [ 18 ], methods such as One-Step Diffusion Policy [ 28 ] and SDM Policy [ 40 ] utilize score-based gradients to optimize a one-step generator. While this approach produces sharper, mode-seeking samples ideal for precision tasks, it typically sacrifices distribution diversity and relies heavily on pre-trained teacher models. Our approach unifies these two paradigms within a from-scratch self-distillation framework, achieving high-fidelity few-step and single-step generation without an external teacher. See Appendix E for a detailed version. 
+
+# 6 Conclusion & Limitation 
+
+We introduce OFP, a self-distillation framework that accelerates flow-based visuomotor policies to the one-step regime while maintaining high control precision. By unifying self-consistency and self-guided training, OFP achieves over a 100 × speedup against multi-step baselines, setting state-of-the-art success rates across diverse manipulation benchmarks and transferring effectively to larger VLA backbones like π0.5. While OFP demonstrates robust performance across diverse tasks, our current evaluations are conducted in simulation. A direct next step is to evaluate OFP on physical robot systems. OFP is orthogonal to system-level acceleration techniques. Future work can seamlessly integrate OFP with model quantization and structural pruning to further decrease inference latency. 
+
+# References 
+
+[1] Chi-Lam Cheang, Guangzeng Chen, Ya Jing, Tao Kong, Hang Li, Yifeng Li, Yuxiao Liu, Hongtao Wu, Jiafeng Xu, Yichu Yang, et al. Gr-2: A generative video-language-action model with web-scale knowledge for robot manipulation. arXiv preprint arXiv:2410.06158 , 2024. [2] Koffivi Fidèle Gbagbe, Miguel Altamirano Cabrera, Ali Alabbas, Oussama Alyunes, Artem Lykov, and Dzmitry Tsetserukou. Bi-vla: Vision-language-action model-based system for bimanual robotic dexterous manipulations. In 2024 IEEE International Conference on Systems, Man, and Cybernetics (SMC) , pages 2864–2869. IEEE, 2024. [3] Cunxin Fan, Xiaosong Jia, Yihang Sun, Yixiao Wang, Jianglan Wei, Ziyang Gong, Xiangyu Zhao, Masayoshi Tomizuka, Xue Yang, Junchi Yan, et al. Interleave-vla: Enhancing robot manipulation with interleaved image-text instructions. arXiv preprint arXiv:2505.02152 , 2025. [4] Songming Liu, Lingxuan Wu, Bangguo Li, Hengkai Tan, Huayu Chen, Zhengyi Wang, Ke Xu, Hang Su, and Jun Zhu. Rdt-1b: a diffusion foundation model for bimanual manipulation. arXiv preprint arXiv:2410.07864 , 2024. [5] Zewei Zhou, Tianhui Cai, Seth Z Zhao, Yun Zhang, Zhiyu Huang, Bolei Zhou, and Jiaqi Ma. Autovla: A vision-language-action model for end-to-end autonomous driving with adaptive reasoning and reinforcement fine-tuning. arXiv preprint arXiv:2506.13757 , 2025. [6] Zhenlong Yuan, Chengxuan Qian, Jing Tang, Rui Chen, Zijian Song, Lei Sun, Xiangxiang Chu, Yujun Cai, Dapeng Zhang, and Shuo Li. Autodrive-r 2: Incentivizing reasoning and self-reflection capacity for vla model in autonomous driving. arXiv preprint arXiv:2509.01944 ,2025. [7] Fanqi Lin, Ruiqian Nai, Yingdong Hu, Jiacheng You, Junming Zhao, and Yang Gao. Onet-wovla: A unified vision-language-action model with adaptive reasoning. arXiv preprint arXiv:2505.11917 , 2025. 11 [8] Ruijie Zheng, Yongyuan Liang, Shuaiyi Huang, Jianfeng Gao, Hal Daumé III, Andrey Kolobov, Furong Huang, and Jianwei Yang. Tracevla: Visual trace prompting enhances spatial-temporal awareness for generalist robotic policies. arXiv preprint arXiv:2412.10345 , 2024. [9] Anurag Ajay, Seungwook Han, Yilun Du, Shuang Li, Abhi Gupta, Tommi Jaakkola, Josh Tenenbaum, Leslie Kaelbling, Akash Srivastava, and Pulkit Agrawal. Compositional foundation models for hierarchical planning. Advances in Neural Information Processing Systems , 36: 22304–22325, 2023. [10] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. [11] Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π∗
+
+> 0.5
+
+: a vision-language-action model with open-world generalization. arXiv preprint arXiv:2504.16054 ,2025. [12] Physical Intelligence, Ali Amin, Raichelle Aniceto, Ashwin Balakrishna, Kevin Black, Ken Conley, Grace Connors, James Darpinian, Karan Dhabalia, Jared DiCarlo, et al. π∗
+
+> 0.6
+
+: a vla that learns from experience. arXiv preprint arXiv:2511.14759 , 2025. [13] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denoising diffusion implicit models. arXiv preprint arXiv:2010.02502 , 2020. [14] Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximilian Nickel, and Matt Le. Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 , 2022. [15] Yang Song, Prafulla Dhariwal, Mark Chen, and Ilya Sutskever. Consistency models. 2023. [16] Dongjun Kim, Chieh-Hsin Lai, Wei-Hsiang Liao, Naoki Murata, Yuhta Takida, Toshimitsu Uesaka, Yutong He, Yuki Mitsufuji, and Stefano Ermon. Consistency trajectory models: Learning probability flow ode trajectory of diffusion. arXiv preprint arXiv:2310.02279 , 2023. [17] Zhengyang Geng, Mingyang Deng, Xingjian Bai, J Zico Kolter, and Kaiming He. Mean flows for one-step generative modeling. arXiv preprint arXiv:2505.13447 , 2025. [18] Tianwei Yin, Michaël Gharbi, Richard Zhang, Eli Shechtman, Fredo Durand, William T Freeman, and Taesung Park. One-step diffusion with distribution matching distillation. In 
+
+Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 6613–6623, 2024. [19] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev, Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox, Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open foundation model for generalist humanoid robots. arXiv preprint arXiv:2503.14734 , 2025. [20] Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan Li, and Jun Zhu. Dpm-solver: A fast ode solver for diffusion probabilistic model sampling in around 10 steps. Advances in neural information processing systems , 35:5775–5787, 2022. [21] Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan Li, and Jun Zhu. Dpm-solver++: Fast solver for guided sampling of diffusion probabilistic models. Machine Intelligence Re-search , pages 1–22, 2025. [22] Tim Salimans and Jonathan Ho. Progressive distillation for fast sampling of diffusion models. 
+
+arXiv preprint arXiv:2202.00512 , 2022. [23] Tianwei Yin, Michaël Gharbi, Taesung Park, Richard Zhang, Eli Shechtman, Fredo Durand, and Bill Freeman. Improved distribution matching distillation for fast image synthesis. Advances in neural information processing systems , 37:47455–47487, 2024. [24] Artem Lukoianov, Haitz Sáez de Ocáriz Borde, Kristjan Greenewald, Vitor Guizilini, Timur Bagautdinov, Vincent Sitzmann, and Justin M Solomon. Score distillation via reparametrized ddim. Advances in Neural Information Processing Systems , 37:26011–26044, 2024. 12 [25] Zhengyang Geng, Yiyang Lu, Zongze Wu, Eli Shechtman, J Zico Kolter, and Kaiming He. Improved mean flows: On the challenges of fastforward generative models. arXiv preprint arXiv:2512.02012 , 2025. [26] Aaditya Prasad, Kevin Lin, Jimmy Wu, Linqi Zhou, and Jeannette Bohg. Consistency policy: Accelerated visuomotor policies via consistency distillation. arXiv preprint arXiv:2405.07503 ,2024. [27] Yilun Xu, Weili Nie, and Arash Vahdat. One-step diffusion models with f -divergence distribu-tion matching. arXiv preprint arXiv:2502.15681 , 2025. [28] Zhendong Wang, Zhaoshuo Li, Ajay Mandlekar, Zhenjia Xu, Jiaojiao Fan, Yashraj Narang, Linxi Fan, Yuke Zhu, Yogesh Balaji, Mingyuan Zhou, et al. One-step diffusion policy: Fast visuomotor policies via diffusion distillation. arXiv preprint arXiv:2410.21257 , 2024. [29] Yanzuo Lu, Yuxi Ren, Xin Xia, Shanchuan Lin, Xing Wang, Xuefeng Xiao, Andy J Ma, Xiaohua Xie, and Jian-Huang Lai. Adversarial distribution matching for diffusion distillation towards efficient image and video synthesis. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 16818–16829, 2025. [30] Peihao Wang, Dejia Xu, Zhiwen Fan, Dilin Wang, Sreyas Mohan, Forrest Iandola, Rakesh Ranjan, Yilei Li, Qiang Liu, Zhangyang Wang, et al. Taming mode collapse in score distillation for text-to-3d generation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9037–9047, 2024. [31] Vikash Kumar. Manipulators and Manipulation in high dimensional spaces . PhD thesis, 2016. [32] Chen Bao, Helin Xu, Yuzhe Qin, and Xiaolong Wang. Dexart: Benchmarking generalizable dexterous manipulation with articulated objects. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21190–21200, 2023. [33] Tianhe Yu, Deirdre Quillen, Zhanpeng He, Ryan Julian, Karol Hausman, Chelsea Finn, and Sergey Levine. Meta-world: A benchmark and evaluation for multi-task and meta reinforcement learning. In Conference on robot learning , pages 1094–1100. PMLR, 2020. [34] Tianxing Chen, Zanxin Chen, Baijun Chen, Zijian Cai, Yibin Liu, Zixuan Li, Qiwei Liang, Xianliang Lin, Yiheng Ge, Zhenyu Gu, et al. Robotwin 2.0: A scalable data generator and benchmark with strong domain randomization for robust bimanual robotic manipulation. arXiv preprint arXiv:2506.18088 , 2025. [35] Qiang Liu. Rectified flow: A marginal preserving approach to optimal transport. arXiv preprint arXiv:2209.14577 , 2022. [36] Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow straight and fast: Learning to generate and transfer data with rectified flow. arXiv preprint arXiv:2209.03003 , 2022. [37] Jonathan Ho and Tim Salimans. Classifier-free diffusion guidance. arXiv preprint arXiv:2207.12598 , 2022. [38] Dongyang Liu, Peng Gao, David Liu, Ruoyi Du, Zhen Li, Qilong Wu, Xin Jin, Sihan Cao, Shifeng Zhang, Hongsheng Li, et al. Decoupled dmd: Cfg augmentation as the spear, distribution matching as the shield. arXiv preprint arXiv:2511.22677 , 2025. [39] Xin Yu, Xiaojuan Qi, Zhengqi Li, Kai Zhang, Richard Zhang, Zhe Lin, Eli Shechtman, Tianyu Wang, and Yotam Nitzan. Self-evaluation unlocks any-step text-to-image generation. arXiv preprint arXiv:2512.22374 , 2025. [40] Bofang Jia, Pengxiang Ding, Can Cui, Mingyang Sun, Pengfang Qian, Siteng Huang, Zhaoxin Fan, and Donglin Wang. Score and distribution matching policy: Advanced accelerated visuomotor policies via matched distillation. arXiv preprint arXiv:2412.09265 , 2024. [41] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. 
+
+The International Journal of Robotics Research , 44(10-11):1684–1704, 2025. 13 [42] Michael Janner, Yilun Du, Joshua B Tenenbaum, and Sergey Levine. Planning with diffusion for flexible behavior synthesis. arXiv preprint arXiv:2205.09991 , 2022. [43] Younggyo Seo, Danijar Hafner, Hao Liu, Fangchen Liu, Stephen James, Kimin Lee, and Pieter Abbeel. Masked world models for visual control. In Conference on Robot Learning , pages 1332–1344. PMLR, 2023. [44] Fan Zhang and Michael Gienger. Affordance-based robot manipulation with flow matching. 
+
+arXiv preprint arXiv:2409.01083 , 2024. [45] Juyi Sheng, Ziyi Wang, Peiming Li, and Mengyuan Liu. Mp1: Meanflow tames policy learning in 1-step for robotic manipulation. arXiv preprint arXiv:2507.10543 , 2025. [46] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan Wang, and Huazhe Xu. 3d diffusion policy: Generalizable visuomotor policy learning via simple 3d representations. arXiv preprint arXiv:2403.03954 , 2024. [47] Kevin Frans, Danijar Hafner, Sergey Levine, and Pieter Abbeel. One step diffusion via shortcut models. arXiv preprint arXiv:2410.12557 , 2024. [48] Aviral Kumar, Rishabh Agarwal, Dibya Ghosh, and Sergey Levine. Implicit under-parameterization inhibits data-efficient deep reinforcement learning. arXiv preprint arXiv:2010.14498 , 2020. [49] Ling Yang, Zixiang Zhang, Zhilong Zhang, Xingchao Liu, Minkai Xu, Wentao Zhang, Chenlin Meng, Stefano Ermon, and Bin Cui. Consistency flow matching: Defining straight flows with velocity consistency. arXiv preprint arXiv:2407.02398 , 2024. [50] Anurag Ajay, Yilun Du, Abhi Gupta, Joshua Tenenbaum, Tommi Jaakkola, and Pulkit Agrawal. Is conditional generative modeling all you need for decision-making? arXiv preprint arXiv:2211.15657 , 2022. [51] Xiang Li, Varun Belagali, Jinghuan Shang, and Michael S Ryoo. Crossway diffusion: Improving diffusion-based visuomotor policy via self-supervised learning. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 16841–16849. IEEE, 2024. [52] Xiao Ma, Sumit Patidar, Iain Haughton, and Stephen James. Hierarchical diffusion policy for kinematics-aware multi-task robotic manipulation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 18081–18090, 2024. [53] Xixi Hu, Qiang Liu, Xingchao Liu, and Bo Liu. Adaflow: Imitation learning with variance-adaptive flow-based policies. Advances in Neural Information Processing Systems , 37:138836– 138858, 2024. [54] Niklas Funk, Julen Urain, Joao Carvalho, Vignesh Prasad, Georgia Chalvatzaki, and Jan Peters. Actionflow: Equivariant, accurate, and efficient policies with spatially symmetric flow matching. 
+
+arXiv preprint arXiv:2409.04576 , 2024. [55] Qinglun Zhang, Zhen Liu, Haoqiang Fan, Guanghui Liu, Bing Zeng, and Shuaicheng Liu. Flowpolicy: Enabling fast and robust 3d flow-based policy via consistency flow matching for robot manipulation. In Proceedings of the AAAI Conference on Artificial Intelligence ,volume 39, pages 14754–14762, 2025. [56] Max Braun, Noémie Jaquier, Leonel Rozo, and Tamim Asfour. Riemannian flow matching policy for robot motion learning. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 5144–5151. IEEE, 2024. [57] Eugenio Chisari, Nick Heppert, Max Argus, Tim Welschehold, Thomas Brox, and Abhinav Val-ada. Learning robotic manipulation policies from point clouds with conditional flow matching. 
+
+arXiv preprint arXiv:2409.07343 , 2024. [58] Lucy Xiaoyang Shi, Brian Ichter, Michael Equi, Liyiming Ke, Karl Pertsch, Quan Vuong, James Tanner, Anna Walling, Haohuan Wang, Niccolo Fusai, et al. Hi robot: Open-ended instruction following with hierarchical vision-language-action models. arXiv preprint arXiv:2502.19417 ,2025. 14 [59] Guanxing Lu, Zifeng Gao, Tianxing Chen, Wenxun Dai, Ziwei Wang, Wenbo Ding, and Yansong Tang. Manicm: Real-time 3d diffusion policy via consistency model for robotic manipulation. 
+
+arXiv preprint arXiv:2406.01586 , 2024. [60] William Peebles and Saining Xie. Scalable diffusion models with transformers. In Proceedings of the IEEE/CVF international conference on computer vision , pages 4195–4205, 2023. [61] Tsung-Wei Ke, Nikolaos Gkanatsios, and Katerina Fragkiadaki. 3d diffuser actor: Policy diffusion with 3d scene representations. arXiv preprint arXiv:2402.10885 , 2024. [62] Zhou Xian, Nikolaos Gkanatsios, Theophile Gervet, Tsung-Wei Ke, and Katerina Fragkiadaki. Chaineddiffuser: Unifying trajectory diffusion and keypose prediction for robotic manipulation. In 7th Annual Conference on Robot Learning , 2023. [63] Zibin Dong, Jianye Hao, Yifu Yuan, Fei Ni, Yitian Wang, Pengyi Li, and Yan Zheng. Diffuserlite: Towards real-time diffusion planning. Advances in Neural Information Processing Systems , 37: 122556–122583, 2024. [64] Quentin Rouxel, Andrea Ferrari, Serena Ivaldi, and Jean-Baptiste Mouret. Flow matching imitation learning for multi-support manipulation. In 2024 IEEE-RAS 23rd International Conference on Humanoid Robots (Humanoids) , pages 528–535. IEEE, 2024. [65] Yuhui Chen, Haoran Li, and Dongbin Zhao. Boosting continuous control with consistency policy. arXiv preprint arXiv:2310.06343 , 2023. [66] Sigmund H Høeg, Yilun Du, and Olav Egeland. Streaming diffusion policy: Fast policy synthesis with variable noise diffusion models. arXiv preprint arXiv:2406.04806 , 2024. 15 A Theoretical Supports and Proofs 
+
+A.1 Self-Consistency Training 
+
+We now provide a formal derivation for Proposition 1. The goal is to show that the target in self-consistency loss, 
+
+utarget = ˆzr − zt
+
+r − t , ˆzr = zm + ( r − m)uθ− (zm, m, r | o),
+
+is a consistent supervision signal for the ground-truth interval-velocity field u(zt, t, r | o).
+
+Definition of the ground-truth interval velocity. Let {zτ }τ ∈[0 ,1] denote the true conditional transport trajectory associated with a fixed pair (o, a, ϵ ). For any 0 ≤ t < r ≤ 1, define the interval-averaged velocity field 
+
+u(zt, t, r | o) ≜ zr − zt
+
+r − t . (16) By definition, it satisfies 
+
+zr = zt + ( r − t)u(zt, t, r | o).
+
+Likewise, for any intermediate time m ∈ [t, r ] on the same trajectory, 
+
+zr = zm + ( r − m)u(zm, m, r | o).
+
+Assumptions. We work under the following assumptions. (A1) The ground-truth interval-velocity field u(x, t, r | o) is continuously differentiable in 
+
+(x, t, r ) on the domain {(x, t, r ) : 0 ≤ t ≤ r ≤ 1}.(A2) u is globally Lipschitz continuous in state: there exists Lx > 0 such that for all x, y,
+
+∥u(x, t, r | o) − u(y, t, r | o)∥ ≤ Lx∥x − y∥.
+
+(A3) The EMA teacher is accurate. Specifically, define 
+
+εema (s) ≜ sup 
+
+> o, x,t,r
+
+∥uθ− (x, t, r | o) − u(x, t, r | o)∥,
+
+and assume εema (s) → 0 as training proceeds. (A4) The intermediate time m is sampled from 
+
+m ∼ U 
+
+h
+
+t, t + ( r − t)ρ(s)
+
+i
+
+,
+
+where ρ(s) → 0 as the training step s → ∞ .
+
+Algebraic decomposition of the target. Starting from the definition of utarget ,
+
+utarget = zm − zt
+
+r − t + r − mr − t uθ− (zm, m, r | o).
+
+On the other hand, using the exact interval update from m to r,
+
+zr − zt = ( zm − zt) + ( r − m)u(zm, m, r | o).
+
+Dividing both sides by (r − t) gives 
+
+u(zt, t, r | o) = zm − zt
+
+r − t + r − mr − t u(zm, m, r | o).
+
+Subtracting the two expressions yields 
+
+utarget − u(zt, t, r | o) = r − mr − t
+
+
+
+uθ− (zm, m, r | o) − u(zm, m, r | o)
+
+
+
+. (17) 16 Pointwise consistency of the target. Since m ∈ [t, r ], we have 0 ≤ (r − m)/(r − t) ≤ 1.Therefore, from Eq. (17), 
+
+utarget − u(zt, t, r | o) ≤ uθ− (zm, m, r | o) − u(zm, m, r | o) ≤ εema (s).
+
+Hence, 
+
+utarget −−−→ 
+
+> s→∞
+
+u(zt, t, r | o) uniformly on the training domain. (18) This proves that the teacher-generated target is a consistent supervision signal whenever the EMA teacher is accurate. 
+
+Role of the time-contracting schedule. Since m ∈ [t, t + ( r − t)ρ(s)] , we have 0 ≤ m − t ≤
+
+(r − t)ρ(s). Because the true trajectory is continuously differentiable, there exists a constant Cz > 0
+
+such that 
+
+∥zm − zt∥ ≤ Cz |m − t| ≤ Cz (r − t)ρ(s).
+
+Using continuous differentiability in (t, r ) and Lipschitz continuity in state, there exists a constant 
+
+Cu > 0 such that 
+
+∥u(zm, m, r | o) − u(zt, t, r | o)∥ ≤ Cu
+
+ ∥zm − zt∥ + |m − t| ≤ C′
+
+> u
+
+(r − t)ρ(s),
+
+for some constant C′ 
+
+> u
+
+> 0.Thus, as ρ(s) → 0, the teacher query point (zm, m, r ) approaches (zt, t, r ), and u(zm, m, r |
+
+o) → u(zt, t, r | o). This shows that the contracting schedule gradually turns the target from a coarse long-interval bootstrap signal into a local self-consistency signal centered at the student input 
+
+(zt, t, r ).
+
+Convergence of the population regression target. Let X ≜ (zt, t, r, o ), Y ≜ utarget . Write the target as 
+
+Y = u(X) + η, η ≜ utarget − u(X).
+
+By Eq. (17), ∥η∥ ≤ εema (s), and thus 
+
+E∥η∥2 ≤ εema (s)2 → 0.
+
+Consider the population self-consistency loss 
+
+Lself-consistency (θ) = E∥uθ (X) − Y ∥2.
+
+Let θ⋆ be any global minimizer of this objective. Since u is a valid comparator, 
+
+Lself-consistency (θ⋆) ≤ L self-consistency (u) = E∥η∥2.
+
+Expanding the loss at θ⋆ gives 
+
+Lself-consistency (θ⋆) = E∥uθ⋆ (X) − u(X)∥2 + 2 E⟨uθ⋆ (X) − u(X), η⟩ + E∥η∥2.
+
+Combining the two displays and applying Cauchy–Schwarz, 
+
+E∥uθ⋆ (X) − u(X)∥2 ≤ 2
+
+
+
+E∥uθ⋆ (X) − u(X)∥21/2
+
+E∥η∥21/2
+
+.
+
+Therefore, 
+
+E∥uθ⋆ (X) − u(X)∥21/2
+
+≤ 2
+
+
+
+E∥η∥21/2
+
+,
+
+which implies 
+
+E∥uθ⋆ (X) − u(X)∥2 ≤ 4 E∥η∥2 −−−→ 
+
+> s→∞
+
+0. (19) Hence, 
+
+uθ⋆ → u in L2. (20) 
+
+Conclusion. Equations Eqs. (17) to (20) prove the claim in Proposition 1: when the EMA teacher is accurate and the contracting factor satisfies ρ(s) → 0, the target utarget is a consistent supervision signal for the true interval-velocity field u(zt, t, r | o), and minimizing the self-consistency loss recovers uθ ≈ u.17 A.2 Relation to MeanFlow 
+
+In this section, we show that our consistency target admits a first-order connection to the differential term used in MeanFlow[ 17 ]. In particular, as the sub-interval length (m − t) → 0, our target induces a finite-difference approximation of the total derivative appearing in the MeanFlow identity. Unlike MeanFlow, which computes this derivative through a Jacobian-vector product (JVP), our construction uses only forward evaluations of the EMA teacher. MeanFlow explicitly derives the average-velocity identity and then expands its total derivative as a JVP term during training. 
+
+Setup. Fix a conditional sample (o, a ) and noise ϵ. Along the straight OT conditional path, 
+
+zτ = (1 − τ )ϵ + τ a, τ ∈ [0 , 1] , the instantaneous velocity is constant: ˙zτ = a − ϵ ≜ v. Define the ground-truth interval-averaged velocity field by 
+
+u(zt, t, r | o) ≜ zr − zt
+
+r − t , 0 ≤ t < r ≤ 1.
+
+MeanFlow identity. Starting from 
+
+(r − t) u(zt, t, r | o) = zr − zt,
+
+differentiate both sides with respect to t along the trajectory, while holding r fixed. Since ddt zt = v,the product rule gives 
+
+−u(zt, t, r | o) + ( r − t) ddt u(zt, t, r | o) = −v.
+
+Rearranging yields 
+
+u(zt, t, r | o) = v + ( r − t) ddt u(zt, t, r | o). (21) Equivalently, 
+
+ddt u(zt, t, r | o) = u(zt, t, r | o) − v
+
+r − t . (22) This is exactly the differential relation used by MeanFlow. In MeanFlow, the total derivative is further expanded into a partial-time term plus a state Jacobian term, which is then implemented by a JVP. 
+
+Consistency target with an exact teacher. For the purpose of analysis, first replace the EMA teacher with the exact field. Then our consistency target becomes 
+
+u⋆ 
+
+> target
+
+= zm + ( r − m)u(zm, m, r | o) − zt
+
+r − t , t < m < r. 
+
+Because the OT path is linear, zm − zt = ( m − t)v. Substituting this into the target gives 
+
+u⋆ 
+
+> target
+
+= m − tr − t v + r − mr − t u(zm, m, r | o).
+
+Subtract u(zm, m, r | o) from both sides: 
+
+u⋆ 
+
+> target
+
+− u(zm, m, r | o) = m − tr − t
+
+
+
+v − u(zm, m, r | o)
+
+
+
+.
+
+Hence, u(zm, m, r | o) − u⋆
+
+> target
+
+m − t = u(zm, m, r | o) − v
+
+r − t . (23) Applying the MeanFlow derivative identity at time m,
+
+ddm u(zm, m, r | o) = u(zm, m, r | o) − v
+
+r − m ,
+
+we can rewrite the right-hand side of (23) as 
+
+u(zm, m, r | o) − v
+
+r − t = r − mr − tddm u(zm, m, r | o).
+
+Therefore, u(zm, m, r | o) − u⋆
+
+> target
+
+m − t = r − mr − tddm u(zm, m, r | o). (24) 18 Limit as m → t+. Assume u is continuously differentiable. Taking the limit m → t+ in (24) yields 
+
+lim 
+
+> m→t+
+
+u(zm, m, r | o) − u⋆
+
+> target
+
+m − t = ddt u(zt, t, r | o). (25) Thus, the discrepancy between the exact consistency target and the field value at the later point 
+
+(zm, m, r ) is, after division by the small interval length (m − t), a finite-difference approximation of the MeanFlow derivative term. 
+
+Including the EMA teacher. Now return to the practical target 
+
+utarget = zm + ( r − m)uθ− (zm, m, r | o) − zt
+
+r − t .
+
+Let 
+
+δm ≜ uθ− (zm, m, r | o) − u(zm, m, r | o).
+
+Then 
+
+utarget = u⋆ 
+
+> target
+
++ r − mr − t δm.
+
+Therefore, 
+
+u(zm, m, r | o) − utarget 
+
+m − t = u(zm, m, r | o) − u⋆
+
+> target
+
+m − t − r − mr − t
+
+δm
+
+m − t .
+
+If the EMA teacher is accurate and its approximation error satisfies 
+
+∥δm∥ = o(m − t) as m → t+,
+
+then the second term vanishes, and (25) still holds with utarget in place of u⋆
+
+> target
+
+. Consequently, in the small-interval limit, our consistency target recovers the same first-order differential signal that MeanFlow computes through a JVP, but it does so using only forward teacher evaluations. 
+
+Conclusion. Equation (25) shows the precise relation: as (m − t) → 0, our consistency target induces a finite-difference approximation to the total derivative term in the MeanFlow identity. Hence, our method can be viewed as a forward-only discretization of the MeanFlow differential objective. This explains why the two formulations become equivalent in the local limit, while our implementation avoids the explicit JVP used in MeanFlow training. MeanFlow’s training target is built from the average-velocity identity and computes the derivative term through JVP. 
+
+A.3 Gradient Alignment of Self-Guidance with the CA Term 
+
+In this section, we prove that minimizing the self-guidance loss yields a gradient whose descent direction is aligned with the CFG Augmentation (CA) term. The result formalizes the claim that the self-guidance objective acts as a self-distilled version of the CA mechanism used in score-distillation methods. 
+
+Notation. For brevity, define the one-step predictor 
+
+fθ ≜ uθ (zt, t, 1 | o), ˆa = zt + (1 − t)fθ .
+
+The re-noised sample is ˜zt′ = (1 − t′)ϵ1 + t′ ˆa, t ′ ∼ U [0 , 1] . Let 
+
+u− 
+
+> cond
+
+≜ uθ− (˜ zt′ , t ′, t ′ | o), u− 
+
+> uncond
+
+≜ uθ− (˜ zt′ , t ′, t ′ | ϕ).
+
+Then the target used in self-guidance is 
+
+starget = sg 
+
+h
+
+fθ −
+
+
+
+u− 
+
+> uncond
+
+− u−
+
+> cond
+
+i 
+
+,
+
+where sg[ ·] denotes stop-gradient. 19 Rewrite the loss in residual form. The self-guidance loss is 
+
+Lself -guidance (θ) = E
+
+h
+
+∥fθ − starget ∥22
+
+i
+
+.
+
+Define 
+
+∆CA ≜ u− 
+
+> uncond
+
+− u−
+
+> cond
+
+.
+
+Since sg[ ·] freezes its argument in backpropagation, the forward residual is 
+
+fθ − starget = fθ − sg[ fθ − ∆CA ] .
+
+Numerically, this residual equals ∆CA , while its gradient flows only through the first fθ . Therefore, 
+
+Lself -guidance (θ) = E
+
+h
+
+∥fθ − sg[ fθ − ∆CA ]∥22
+
+i
+
+.
+
+Compute the gradient of the self-guidance loss. Let 
+
+Jθ (zt, t, o ) ≜ ∂fθ
+
+∂θ 
+
+denote the Jacobian of the one-step predictor with respect to the model parameters. Since the stop-gradient branch contributes no derivative, the chain rule gives 
+
+∇θ Lself -guidance = 2 EJθ (zt, t, o )⊤∆CA 
+
+ . (26) Hence, the gradient-descent update induced by the loss is 
+
+−∇ θ Lself -guidance = −2 EJθ (zt, t, o )⊤∆CA 
+
+ . (27) This already shows that the update direction is directly driven by the EMA-based conditional– unconditional gap. 
+
+Express the CA term in the same variables. Under the OT path ˜zt′ = (1 − t′)ϵ + t′a, the marginal score and instantaneous velocity satisfy 
+
+s(˜ zt′ | c) = t′ u(˜ zt′ , t ′, t ′ | c) − ˜zt′
+
+1 − t′ ,
+
+for condition c ∈ { o, ϕ }. Therefore, 
+
+s(˜ zt′ | ϕ) − s(˜ zt′ | o) = t′
+
+1 − t′
+
+
+
+u(˜ zt′ , t ′, t ′ | ϕ) − u(˜ zt′ , t ′, t ′ | o)
+
+
+
+.
+
+Using the EMA teacher to estimate the score, define the teacher-side CA vector 
+
+gCA ≜ s− 
+
+> uncond
+
+− s− 
+
+> cond
+
+= t′
+
+1 − t′ ∆CA , (28) where s− 
+
+> cond
+
+≜ sθ− (˜ zt′ | o), s− 
+
+> uncond
+
+≜ sθ− (˜ zt′ | ϕ). Thus, 
+
+∆CA = 1 − t′
+
+t′ gCA . (29) 
+
+Compare with the CA gradient in score-distillation. In a reverse-KL-style score-distillation objective, the practical CFG-based gradient contains a CA term of the form 
+
+∇θ JCA = E
+
+
+
+g⊤
+
+> CA
+
+∂˜zt′
+
+∂θ 
+
+
+
+.
+
+Since ˜zt′ = (1 − t′)ϵ1 + t′ ˆa, ˆa = zt + (1 − t)fθ , we have 
+
+∂˜zt′
+
+∂θ = t′(1 − t) Jθ (zt, t, o ).
+
+20 Substituting this together with (29) gives 
+
+∇θ JCA = t′(1 − t) EJθ (zt, t, o )⊤gCA 
+
+
+
+= t′(1 − t) E
+
+
+
+Jθ (zt, t, o )⊤ t′
+
+1 − t′ ∆CA 
+
+
+
+= t′2(1 − t)1 − t′ EJθ (zt, t, o )⊤∆CA 
+
+ . (30) Comparing (26) and (30), we obtain 
+
+∇θ JCA = t′2(1 − t)2(1 − t′) ∇θ Lself -guidance . (31) Therefore, the two gradients are proportional by a strictly positive scalar whenever t ∈ [0 , 1) and 
+
+t′ ∈ (0 , 1) . Equivalently, their gradient-descent directions are identical: 
+
+−∇ θ Lself -guidance ∥ −∇ θ JCA . (32) 
+
+Interpretation. Equation (32) proves that minimizing the self-guidance loss applies the same first-order update direction as the CA term, up to a positive rescaling. Since 
+
+∆CA = u− 
+
+> uncond
+
+− u−
+
+> cond
+
+,
+
+the descent update pushes the conditional one-step predictor away from the unconditional branch and toward the condition-specific direction favored by CFG. 
+
+Conclusion. The self-guidance loss yields a parameter gradient of the form 
+
+∇θ Lself -guidance = 2 E[J⊤ 
+
+> θ
+
+∆CA ],
+
+while the CA term in score-distillation gives 
+
+∇θ JCA ∝ E[J⊤ 
+
+> θ
+
+∆CA ].
+
+Hence, the two are equivalent up to a positive scalar factor. This proves that the self-guidance loss implements the CA effect in a self-distilled, forward-trainable form. 
+
+# B Policy Implementation Details 
+
+We detail the observation pipelines, network architectures, and optimization hyperparameters for evaluating OFP across the Adroit [ 31 ], DexArt [ 32 ], MetaWorld [ 33 ], and RoboTwin 2.0 [ 34 ]benchmarks. 
+
+B.1 Observation Inputs 2D setting. Image-based control relies on a two-frame history of 84x84 RGB observations, a low-dimensional proprioceptive state (e.g., 24 dimensions for Adroit Hammer, 32 for DexArt Faucet), and an 8-step action chunk target. Receding-horizon control executes the first 4 actions. Visual features are extracted using a ResNet-18 backbone, trained end-to-end with the policy. Inputs undergo standard normalization and data augmentation (random crop, rotation, color jitter). The encoded visual and state features are concatenated into a global condition vector for the flow model. 
+
+3D setting. Point-cloud control similarly uses a 2-step observation history and an 8-step action horizon. Input sizes range from 512 points (Adroit, MetaWorld) to 1024 scene points plus 96 imagined-robot points (DexArt). We process 3D observations using the DP3 encoder [ 46 ], which employs a PointNet-based extractor and an MLP state encoder. The resulting 128-dimensional point-cloud features and 64-dimensional state features are concatenated to produce a short conditioning sequence for the transformer policy. 
+
+π0.5+OFP Integration. This setup utilizes three 224 ×224 RGB views, a 32-dimensional robot state, and a PaliGemma-tokenized language prompt. Images are scaled to [−1, 1] and augmented with random crops, resizes, rotations, and color jitter. States and actions are padded to match the model dimension. 21 B.2 Model Architecture Backbone. OFP employs a Diffusion Transformer (DiT) [ 60 ] to predict an interval-averaged velocity field, conditioned on the current action, start time, target interval, and observation embedding. Both 2D and 3D variants use 12 transformer layers, 8 attention heads, and a hidden dimension of 768. Timestep and target-interval embeddings (128 dimensions each) are concatenated and projected. Observations are integrated via cross-attention, and a linear head outputs the final action. 
+
+Diffusion baselines. DP and the distilled baselines (CP, OneDP) use a U-Net denoiser with channel widths of [256 , 512 , 1024] . DP3 uses wider channels of [512 , 1024 , 2048] . All distilled baselines retain their respective teacher architectures. 
+
+π0.5+OFP architecture. The integration uses a two-expert PaliGemma architecture: a 2B-parameter vision-language prefix expert (incorporating a SigLIP encoder) and a 300M-parameter action expert. The prefix expert fuses multi-view cameras and language prompts into a shared token sequence. The action expert (depth 18, width 1024, 8 heads) maps noisy action tokens to flow updates. Time and interval conditioning are applied via adaptive RMS normalization. 
+
+B.3 Training Details OFP training. We optimize OFP using AdamW (learning rate 1e-4, beta1=0.95, beta2=0.999, weight decay 1e-6) with a cosine schedule and 500 warmup steps. The EMA teacher uses an exponential decay of 0.75 (max 0.9999). Training runs for 3000 epochs on a single NVIDIA A100 GPU with a batch size of 64. The training objective allocates 80% weight to boundary flow-matching and 20% to self-consistency. Self-consistency intervals are sampled from a logit-normal distribution, and the time-contraction schedule follows a polynomial decay. For 3D tasks, self-guidance is enabled with a weight of 0.05 and a null-condition dropout of 10%. During inference, warm-start initialization is applied at tw = 0 .15 , z tw = (1 − tw)ϵ + twawarm .π0.5+OFP training. Following the OpenPI [ 10 ] configuration, we use the AdamW optimizer with global gradient clipping at 1.0 and a cosine schedule peaking at a learning rate of 2.5e-5. The model is fine-tuned for 3000 steps from the base π0.5 checkpoint using 4 NVIDIA A100 GPUs. 
+
+# C Simulation Experiments 
+
+Figure 7: Visualizations of the simulated manipulation benchmarks. These diverse environments rigorously test the capability of OFP across different robotic setups, geometric constraints, and visual conditions. 
+
+C.1 Benchmarks 
+
+We conduct evaluations on four distinct simulated environments, visualized in Fig. 7. 
+
+Adroit. Adroit [ 31 ] is a dexterous manipulation benchmark built on a high-degree-of-freedom anthropomorphic hand. It includes tasks such as opening a door with a latch, hammering a nail, and reorienting a pen. These tasks require precise finger coordination and accurate contact-rich control. 
+
+DexArt. DexArt [ 32 ] is a benchmark for dexterous manipulation of articulated objects. It focuses on manipulation problems such as turning faucets, opening laptop lids, lifting buckets, and opening toilet lids. Compared with rigid-object tasks, articulated objects introduce additional motion constraints and stronger geometric variation. 22 MetaWorld. MetaWorld [ 33 ] is a large-scale simulated manipulation suite designed for multi-task and meta-learning. It contains a broad set of tabletop manipulation problems with diverse task semantics. We use a 49-task multi-task setup and group the tasks into four empirical difficulty levels: Easy, Medium, Hard, and Very Hard. A single policy is trained jointly across all 49 tasks. 
+
+RoboTwin 2.0. RoboTwin 2.0 [ 34 ] is a dual-arm manipulation benchmark for robust bimanual control. A key property of RoboTwin 2.0 is strong domain randomization, including cluttered distractors, background textures, lighting conditions, and tabletop height changes. We use RoboTwin 2.0 to evaluate whether OFP can be integrated into a large VLA model and remain stable under semantically rich and visually varying bimanual tasks. 
+
+C.2 Experimental Protocol Adroit and DexArt. For both benchmarks, we train all methods for 3000 epochs. We use 10 demonstrations per task for Adroit, and 100 for DexArt. During training, we evaluate 20 rollout episodes every 50 epochs. Following the DP3 [ 46 ] protocol, the final success rate is defined as the mean of the top-5 rollout success rates observed over training. 
+
+MetaWorld. For the 49-task multi-task setting, we train all methods for 1000 epochs. We use 10 demonstrations per task and evaluate 20 episodes every 200 epochs. We define the final success rate as the mean of the top-3 rollout success rates within the training window. 
+
+RoboTwin 2.0. For the π0.5 integration study, we fine-tune the model for 3k training steps with 100 demonstrations per task. After training, we evaluate each policy on 100 randomized test trials. 
+
+C.3 Full Results 
+
+The detailed 3D results are reported in Table 4. OFP consistently improves over the single-step baselines and remains competitive even against strong multi-step policies. These results show that OFP preserves the speed advantage of one-step generation while maintaining high action quality on control problems. The full π0.5 integration results are shown in Table 5. OFP achieves the best performance on all 4 RoboTwin 2.0 tasks and reaches the highest average success rate. More importantly, OFP at NFE = 1 
+
+outperforms the original π0.5 policy at NFE = 10 on every task. This shows that the proposed self-distillation design remains effective after being inserted into a large VLA backbone and under strong domain randomization. 
+
+# D Ablation Studies 
+
+To rigorously evaluate the individual contributions of our core design mechanisms and understand their sensitivity to hyperparameter variations, we present a comprehensive ablation study. All evaluations are conducted across 7 simulation tasks from the Adroit and DexArt benchmarks in the 3D pointcloud setting. The policy is trained using 10 demonstrations per Adroit task and 100 demonstrations per DexArt task, utilizing a batch size of 64 over 3000 epochs. 
+
+D.1 Component Analysis 
+
+We first dissect the distinct roles of Self-Consistency Training (SCT), Self-Guided Regularization (SGR), and the Warm-Start initialization prior. The comparative results are detailed in Table 6. The data clearly illustrates the fundamental limitation of relying solely on pure trajectory-matching distillation. When training exclusively with SCT, the policy learns robust temporal coherence, achieving a strong average success rate of 72.3% at NFE=4. However, its one-step generation capacity lags significantly, yielding only 68.7%. This performance gap occurs because consistency training aligns the endpoints of the flow trajectory but struggles to enforce precise alignment with the high-density modes of the target data distribution. As a result, one-step predictions often average over multiple valid modes, lacking the sharpness required for precise manipulation. Integrating SGR effectively neutralizes this limitation. By leveraging classifier-free guidance as an explicit corrective signal, SGR repels single-step predictions away from unconditional noise 23 Table 4: Detailed 3D simulation results on Adroit, DexArt, and MetaWorld. Results are averaged over 3 random seeds and reported as mean ± standard deviation. The best result in each column is highlighted in bold .
+
+Method NFE Adroit DexArt 
+
+Hammer Door Pen Laptop Faucet Bucket Toilet DP3 100 100 ±0 70 ±1 67 ±1 94 ±1 44 ±1 34 ±1 82 ±1DP3 10 98 ±2 66 ±4 64 ±4 91 ±1 43 ±1 35 ±1 77 ±1FM Policy 100 100 ±0 76 ±1 74 ±1 92 ±5 39 ±4 32 ±3 83 ±4
+
+FM Policy 10 100 ±0 72 ±3 69 ±3 92 ±3 37 ±5 34 ±5 80 ±7CP 1 98 ±3 67 ±5 65 ±5 87 ±3 44 ±4 29 ±4 82 ±4OneDP 1 99 ±1 67 ±2 65 ±2 89 ±4 45 ±3 33 ±6 83 ±4
+
+MP1 1 100 ±0 74 ±3 72 ±3 88 ±5 42 ±1 33 ±0 82 ±2OFP 1 100 ±0 79 ±7 76 ±7 92 ±3 46 ±4 39 ±0 81 ±3Method NFE 
+
+MetaWorld Easy 
+
+Button Button Press Button Press Button Coffee Dial Press Topdown Topdown Wall Press Wall Button Turn DP3 100 78 ±10 100 ±0 98 ±2 82 ±8 81 ±13 79 ±14 DP3 10 75 ±7 100 ±0 96 ±3 83 ±6 81 ±5 70 ±4FM Policy 100 50 ±14 100 ±0 100 ±0 53 ±2 76 ±3 68 ±11 FM Policy 10 46 ±12 100 ±0 100 ±0 47 ±11 73 ±7 60 ±9CP 1 60 ±4 100 ±0 94 ±3 62 ±7 66 ±4 54 ±8OneDP 1 74 ±5 100 ±0 100 ±0 76 ±8 81 ±5 66 ±5MP1 1 61 ±3 100 ±0 100 ±0 62 ±9 67 ±3 53 ±13 OFP 1 86 ±7 100 ±0 100 ±0 87 ±8 92 ±6 89 ±4
+
+Method NFE 
+
+MetaWorld Easy 
+
+Door Door Door Door Drawer Drawer Close Lock Open Unlock Close Open DP3 100 100 ±0 49 ±20 100 ±0 100 ±0 73 ±15 100 ±0
+
+DP3 10 100 ±0 38 ±9 100 ±0 100 ±0 76 ±6 100 ±0
+
+FM Policy 100 100 ±0 23 ±13 100 ±0 100 ±0 45 ±11 100 ±0
+
+FM Policy 10 100 ±0 31 ±18 100 ±0 100 ±0 41 ±15 100 ±0
+
+CP 1 100 ±0 25 ±2 100 ±0 90 ±5 54 ±6 100 ±0
+
+OneDP 1 100 ±0 29 ±1 100 ±0 100 ±0 69 ±6 100 ±0
+
+MP1 1 100 ±0 21 ±17 100 ±0 100 ±0 56 ±5 100 ±0
+
+OFP 1 100 ±0 61 ±12 100 ±0 100 ±0 81 ±13 100 ±0
+
+Method NFE 
+
+MetaWorld Easy 
+
+Faucet Faucet Handle Handle Handle Handle Close Open Press Pull Press Side Pull Side DP3 100 100 ±0 80 ±15 100 ±0 47 ±21 54 ±7 84 ±12 
+
+DP3 10 100 ±0 75 ±11 100 ±0 42 ±6 57 ±5 80 ±6FM Policy 100 100 ±0 77 ±9 100 ±0 30 ±9 55 ±12 36 ±9FM Policy 10 100 ±0 72 ±10 100 ±0 30 ±11 51 ±10 35 ±19 CP 1 100 ±0 64 ±5 100 ±0 21 ±4 45 ±5 48 ±6OneDP 1 100 ±0 79 ±4 100 ±0 33 ±5 50 ±8 70 ±4MP1 1 100 ±0 65 ±5 100 ±0 34 ±9 45 ±13 59 ±16 OFP 1 100 ±0 88 ±7 100 ±0 63 ±13 91 ±6 69 ±10 Method NFE 
+
+MetaWorld Easy 
+
+Lever Plate Plate Slide Plate Slide Plate Slide Reach Pull Slide Back Back Side Side DP3 100 78 ±14 43 ±21 90 ±13 100 ±0 87 ±9 77 ±11 
+
+DP3 10 66 ±3 39 ±10 99 ±0 100 ±0 87 ±5 69 ±5FM Policy 100 37 ±6 24 ±10 69 ±9 100 ±0 60 ±10 49 ±11 FM Policy 10 32 ±17 24 ±7 63 ±18 100 ±0 58 ±14 45 ±9CP 1 43 ±6 19 ±2 79 ±4 96 ±4 73 ±7 40 ±1OneDP 1 58 ±3 27 ±5 95 ±1 100 ±0 89 ±6 54 ±3MP1 1 46 ±14 28 ±15 77 ±8 100 ±0 73 ±5 43 ±13 OFP 1 74 ±12 57 ±20 95 ±5 100 ±0 94 ±3 71 ±13 24 Table 4: (Continued) Detailed 3D simulation results on Adroit, DexArt, and MetaWorld. 
+
+Method NFE 
+
+MetaWorld Easy MetaWorld Medium 
+
+Reach Window Window Peg Unplug Basket Bin Wall Close Open Side ball Picking DP3 100 62 ±14 100 ±0 87 ±7 90 ±11 100 ±0 19 ±3DP3 10 57 ±2 100 ±0 81 ±10 91 ±3 100 ±0 17 ±5FM Policy 100 24 ±8 100 ±0 84 ±7 67 ±15 100 ±0 17 ±6FM Policy 10 20 ±11 100 ±0 77 ±16 62 ±14 100 ±0 16 ±9CP 1 30 ±7 100 ±0 69 ±4 79 ±8 73 ±9 7±3OneDP 1 44 ±5 100 ±0 85 ±6 95 ±1 100 ±0 13 ±5MP1 1 35 ±10 100 ±0 69 ±13 78 ±8 78 ±11 14 ±6OFP 1 72 ±8 100 ±0 94 ±3 96 ±2 100 ±0 29 ±11 
+
+Method NFE 
+
+MetaWorld Medium 
+
+Box Coffee Coffee Hammer Peg Insert Push Soccer Close Pull Push Side Wall DP3 100 21 ±3 43 ±11 58 ±5 69 ±7 53 ±2 51 ±7 16 ±7DP3 10 20 ±1 43 ±3 55 ±2 70 ±3 55 ±3 53 ±6 13 ±2FM Policy 100 18 ±3 56 ±7 45 ±6 63 ±1 46 ±5 39 ±10 11 ±4FM Policy 10 14 ±6 53 ±11 47 ±6 61 ±9 47 ±10 36 ±13 12 ±5CP 1 6±2 37 ±6 39 ±5 54 ±6 39 ±3 37 ±8 6±1OneDP 1 12 ±6 41 ±12 42 ±12 57 ±15 43 ±11 44 ±19 14 ±7MP1 1 13 ±4 43 ±5 45 ±5 60 ±6 45 ±10 43 ±7 9±3OFP 1 27 ±6 57 ±10 59 ±5 73 ±3 59 ±7 57 ±5 20 ±7
+
+Method NFE 
+
+MetaWorld Medium MetaWorld Hard 
+
+Sweep Sweep Assembly Hand Pick Out Pick Push Into Insert of Hole Place DP3 100 68 ±10 15 ±4 73 ±10 21 ±11 22 ±13 26 ±10 50 ±6DP3 10 66 ±7 17 ±3 72 ±7 18 ±4 20 ±10 25 ±14 47 ±11 FM Policy 100 58 ±7 12 ±8 75 ±7 22 ±1 26 ±5 46 ±10 49 ±5FM Policy 10 57 ±9 12 ±6 69 ±6 19 ±7 26 ±4 41 ±14 47 ±10 CP 1 50 ±8 6±2 63 ±9 11 ±6 14 ±8 22 ±7 35 ±7OneDP 1 54 ±11 16 ±8 72 ±4 17 ±9 19 ±2 38 ±9 48 ±5MP1 1 56 ±15 11 ±4 63 ±6 17 ±10 19 ±11 28 ±13 45 ±8OFP 1 70 ±7 24 ±12 74 ±5 22 ±2 23 ±2 42 ±1 55 ±6
+
+Method NFE 
+
+MetaWorld Very Hard 
+
+Average Shelf Disassemble Stick Stick Pick Place Place Pull Push Wall DP3 100 22 ±5 45 ±4 24 ±1 74 ±8 40 ±3 66.4 ±5.7 DP3 10 21 ±9 52 ±7 28 ±8 80 ±7 47 ±8 65.2 ±2.8 FM Policy 100 26 ±6 54 ±2 36 ±5 82 ±8 41 ±5 59.8 ±4.6 FM Policy 10 25 ±9 52 ±6 36 ±4 79 ±14 42 ±7 57.9 ±7.0 CP 1 12 ±2 42 ±4 21 ±1 69 ±10 36 ±6 54.7 ±2.9 OneDP 1 16 ±5 48 ±6 26 ±6 76 ±8 43 ±5 62.4 ±3.0 MP1 1 8±3 38 ±7 18 ±4 64 ±9 33 ±7 57.4 ±5.8 OFP 1 23 ±2 56 ±2 34 ±5 83 ±6 50 ±7 71.6 ±4.1 
+
+25 Table 5: Detailed π0.5 integration results on RoboTwin 2.0. All methods are evaluated on 100 randomized test trials.                                  
+
+> Method NFE Adjust Beat Block Handover Place Empty Bottle Hammer Mic Cup
+> π0.510 96.0 ±4.0 88.3 ±3.8 90.7 ±1.2 91.0 ±3.0 CFM 185.3 ±3.1 82.0 ±3.6 74.3 ±1.2 74.7 ±2.9 Shortcut 189.3 ±2.3 78.0 ±3.6 75.0 ±3.0 81.3 ±2.5 iMF 192.7 ±2.3 84.3 ±2.5 82.7 ±2.9 87.0 ±3.5 OFP 199.0 ±1.0 91.7 ±2.5 94.3 ±3.8 93.7 ±1.5
+
+Table 6: Component analysis of OFP. SCT: Self-Consistency Training. SGR: Self-Guided Regular-ization.                                                             
+
+> Method NFE Door Hammer Pen Bucket Faucet Laptop Toilet Average SCT 172 ±3100 ±068 ±533 ±342 ±189 ±177 ±168.7 482 ±1100 ±072 ±236 ±244 ±390 ±082 ±172.3 SCT+SGR 177 ±4100 ±073 ±337 ±144 ±090 ±179 ±271.4 482 ±3100 ±073 ±139 ±343 ±190 ±281 ±072.6
+> OFP 179 ±7100 ±076 ±739 ±046 ±492 ±381 ±373.3 486 ±2100 ±079 ±143 ±247 ±192 ±483 ±175.7
+
+and drives them directly toward expert modes. This targeted regularization elevates the one-step success rate to 71.4%, an increase of nearly 3 percentage points. Furthermore, sharpening the one-step prediction provides more accurate local targets for multi-step integration, pushing the NFE=4 performance to 72.6%. This demonstrates that SCT and SGR are highly complementary: SCT smooths the flow trajectory across time, while SGR ensures the final prediction lands precisely on the data manifold. Incorporating the training-free Warm-Start mechanism during inference yields substantial additional gains, raising the success rate to 73.3% at NFE=1 and 75.7% at NFE=4. By constructing an initialization prior from the temporally shifted unexecuted actions, Warm-Start inherently positions the starting state much closer to the target distribution. This reduces the transport distance the generative model must traverse in a single step, reliably amplifying control smoothness and precision. 
+
+D.2 Hyperparameter Analysis 
+
+To optimize system efficiency and stability, we explore the selection and design of hyperparameters. 
+
+Sub-Batch Allocation. To mitigate computational overhead, OFP implements a sub-batch training strategy. We assign a proportion psc of the batch to compute the self-consistency loss ( r̸ = t). The remaining 1 − psc fraction is utilized for standard Flow Matching ( r = t). From this subset, a proportion psg is allocated to calculate the SGR loss. Table 7a indicates that the optimal configuration is psc = 0 .2 and psg = 0 .1. Assigning excessive data to consistency or guidance detracts from the foundational flow-matching objective, whereas maintaining smaller, targeted proportions provides optimal regularization without destabilizing the baseline field. 
+
+Time Sampling Distribution. Generation quality is sensitive to the sampling distributions of the interval times during consistency training. The policy network takes the current time t and the relative interval dt as conditions, and the interval target at r = t + dt . As shown in Table 7b, sampling t from a Beta distribution and dt from a LogNormal distribution achieves the highest success rate (73.3%). 
+
+Guidance Weight. The coefficient λsg modulates the strength of the self-guided regularizer relative to the total objective. Table 7c demonstrates that a conservative weight of λsg = 0 .05 is optimal. Imposing a highly aggressive guidance signal (e.g., 0.5) over-regularizes the generation, forcing the model into mode collapse and actively degrading performance to 68.7%. 
+
+Warm-Start Noise Ratio. Warm-Start initializes the generator by corrupting the unexecuted sequence of a previous action chunk with a specific ratio of Gaussian noise, controlled by the starting time 26 Table 7: Hyperparameter analysis. All results reflect the average success rate across the 7 tasks in Adroit and DexArt.                                                     
+
+> (a) Sub-batch training ratios. Impact of data fraction allocation ( psc ,psg ).
+> psc psg SR (%) 20% 10% 73.3
+> 20% 20% 72.2 50% 10% 71.7 50% 20% 71.4 (b) Time samplers. Performance under various inter-val sampling distributions for tand dt .
+> tsampler dt sampler SR (%) Uniform(0, 1) Uniform(0, 1) 69.9 Uniform(0, 1) LogNorm(-0.2, 1) 71.7 Uniform(0, 1) LogNorm(-0.4, 1) 72.3 Beta(1, 1.5) LogNorm(-0.2, 1) 73.3
+> Beta(1, 1.5) LogNorm(-0.4, 1) 72.2 (c) Guidance scale. The effect of the SGR loss regu-larizer weight λsg .
+> λsg SR (%) 0.5 68.7 0.1 70.4 0.05 73.3
+> 0.01 72.1 (d) Warm-start noise. Modifying the initialization noise ratio via tw.
+> twSR (%) 0.75 69.5 0.5 72.3 0.25 72.1 0.15 73.3
+> 0.0 71.4
+
+parameter tw. As tw → 0, the initialization approaches pure noise. Table 7d establishes that 
+
+tw = 0 .15 yields peak performance. When tw is excessively small, inference effectively deteriorates into standard zero-shot generation, discarding the powerful temporal prior. Conversely, assigning a large tw (e.g., 0.75) heavily suppresses necessary generative randomness. This rigid reliance on past predictions restricts the system’s ability to correct compounding errors or adapt to large shifts in the immediate action space. 
+
+# E Related Work 
+
+E.1 Generative Policies for Robot Control 
+
+Diffusion models initially entered the robotics domain through the planning-as-generation paradigm. Works such as Diffuser [ 42 ] and Decision Diffuser [ 50 ] conceptualized long-horizon behaviors as trajectory samples generated through gradual denoising, replacing traditional dynamic programming with conditional generation. Subsequently, the focus shifted to directly parameterizing visuomotor policies. Diffusion Policy [ 41 ] modeled action sequence generation as a conditional denoising process, significantly improving the expressiveness of multimodal action distributions and overall training stability. However, its deployment requires iterative multi-step sampling, causing inference latency to scale linearly with the step count. Subsequent research expanded along two primary axes. The first focuses on strengthening spatial representations and structural biases to improve fine manipulation, utilizing approaches like cross-attention (Crossway Diffusion [ 51 ]), 3D point cloud conditioning (DP3 [ 46 ], 3D Diffuser Actor [ 61 ]), and key-pose prediction (ChainedDiffuser [ 62 ]). The second axis addresses the strict latency constraints of closed-loop control by exploring high-throughput paradigms (DiffuserLite [63]). In parallel, policy learning based on Flow Matching has gained significant traction. Continuous Flow Matching (CFM) has been successfully integrated with affordance representations [ 44 ] and multi-contact whole-body control [ 64 ]. Works like ActionFlow [ 54 ] inject SE(3) equivariant structures into the velocity field to improve spatial generalization, while AdaFlow [ 53 ] designs adaptive step-size solvers to balance speed and diversity. Within this framework, structured approaches for few-step inference have emerged. For example, FlowPolicy [ 55 ] pursues single-step generation via consistency flow matching, and MP1 [ 45 ] adapts MeanFlow’s interval-averaged velocity to generate 3D point cloud-conditioned actions in a single step (1-NFE). As generative policies scale into massive Vision-Language-Action (VLA) models, the computational cost of iterative sampling becomes a severe bottleneck. Architectures like RDT-1B [ 4 ] scale diffusion transformers to a billion parameters for dual-arm manipulation, while the π series (including π0 [10 ], 27 π0.5 [ 11 ] and π0.6) [ 12 ] establishes Flow Matching as a highly scalable action generation head for open-world tasks. As model capacity and semantic complexity increase, compressing generation into a single step without degrading control accuracy is a critical requirement for real-world deployment. 
+
+E.2 Distillation and Acceleration 
+
+In visual generation, two dominant paradigms exist for few-step acceleration. Consistency Models [ 15 ] map points along a probability path to a single origin, establishing the consistency distillation route. Alternatively, Distribution Matching Distillation (DMD) [ 23 ] uses score differences to align a student model with a teacher’s distribution via reverse-KL gradients. Recently, MeanFlow [ 17 ]enabled from-scratch 1-NFE training by modeling finite-interval average velocity; however, imple-menting its objective requires complex, high-order Jacobian-Vector Products (JVPs) that destabilize training and consume significant memory. These acceleration concepts have rapidly transitioned into robotics. The consistency paradigm was adapted into RL (CPQL [ 65 ]) and visuomotor control (Consistency Policy [ 26 ], ManiCM [ 59 ]). Because consistency distillation forces intermediate states to converge to a shared endpoint, its optimization objective is inherently mode-covering. While this enables few-step inference, it frequently causes the policy to average across multimodal action distributions, resulting in smoothed, imprecise actions that fail in fine manipulation tasks. Conversely, methods like One-Step Diffusion Policy (OneDP) [ 28 ] and SDM Policy [ 40 ] apply DMD-style distribution matching to robotics. This approach is inherently mode-seeking, producing sharper, higher-quality single-step samples. However, it severely limits action diversity. Additionally, it relies heavily on large pre-trained teacher models and auxiliary score networks, which increases training overhead and creates generalization bottlenecks during distribution shifts. Beyond distillation, works like Streaming Diffusion Policy [ 66 ] exploit the temporal correlation of receding-horizon control, reusing intermediate states to reduce required denoising steps and maintain high control frequencies. 
+
+Summary. Existing few-step acceleration methods force a trade-off between the mode-covering stability of consistency models and the mode-seeking precision of score distillation. OFP unites both signals within a unified, from-scratch self-distillation objective. By doing so, it eliminates the computational overhead of external teachers and the instability of JVP operators. Combined with a warm-start mechanism that reuses cross-chunk priors, OFP delivers a highly stable, single-step inference solution with the precision required for complex robotic control. 28

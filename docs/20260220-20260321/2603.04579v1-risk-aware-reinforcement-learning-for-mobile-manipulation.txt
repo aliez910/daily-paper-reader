@@ -1,0 +1,468 @@
+Title: Risk-Aware Reinforcement Learning for Mobile Manipulation
+
+URL Source: https://arxiv.org/pdf/2603.04579v1
+
+Published Time: Fri, 06 Mar 2026 01:12:03 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Risk-Aware Reinforcement Learning for Mobile Manipulation 
+
+Michael Groom 1∗, James Wilson 2, Nick Hawes 1 and Lars Kunze 1,3
+
+> This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible.
+
+Abstract — For robots to successfully transition from lab settings to everyday environments, they must begin to rea-son about the risks associated with their actions and make informed, risk-aware decisions. This is particularly true for robots performing mobile manipulation tasks, which involve both interacting with and navigating within dynamic, un-structured spaces. However, existing whole-body controllers for mobile manipulators typically lack explicit mechanisms for risk-sensitive decision-making under uncertainty. To our knowledge, we are the first to (i) learn risk-aware visuomotor policies for mobile manipulation conditioned on egocentric depth observations with runtime-adjustable risk sensitivity, and (ii) show risk-aware behaviours can be transferred through Imitation Learning (IL) to a visuomotor policy conditioned on egocentric depth observations. Our method achieves this by first training a privileged teacher policy using Distributional Reinforcement Learning (DRL), with a risk-neutral distribu-tional critic. Distortion risk-metrics are then applied to the critic’s predicted return distribution to calculate risk-adjusted advantage estimates used in policy updates to achieve a range of risk-aware behaviours. We then distil teacher policies with IL to obtain risk-aware student policies conditioned on ego-centric depth observations. We perform extensive evaluations demonstrating that our trained visuomotor policies exhibit risk-aware behaviour (specifically achieving better worst-case performance) while performing reactive whole-body motions in unmapped environments, leveraging live depth observations for perception. 
+
+I. I NTRODUCTION 
+
+Mobile manipulators combine a mobile base with a robotic arm to offer expansive workspaces for complex, open-ended tasks. However, these systems face compounded uncer-tainties from noisy localization, perception, and actuation. This aleatoric uncertainty over action execution and envi-ronment dynamics introduces significant risk regarding the value of potential outcomes. Unlike structured settings with bounded uncertainty, dynamic, human-shared environments make standard expected-return optimisation unsafe; explic-itly minimising severe outcomes is critical. By reasoning over a value distribution of potential outcomes rather than just their expected values, a risk-aware controller can assign greater weight to avoiding low-probability, high-cost catas-trophic failures, enabling the robot to act commensurately with an acceptable level of risk. While traditional model-based motion planning ap-proaches excel in static scenarios, they rely on rigid as-
+
+> 1Oxford Robotics Institute, Department of Engineering Science, Univer-sity of Oxford, Oxford, United Kingdom
+> 2Dyson Institute of Engineering & Technology, Malmesbury, United Kingdom
+> 3Bristol Robotics Laboratory, School of Engineering, University of West England, Bristol, United Kingdom
+> ∗Corresponding author: michaelgroom@robots.ox.ac.uk
+
+Fig. 1: Predicted value distributions from a risk-aware critic during a successful pick attempt at key time steps (PDFs via critic-predicted quantiles) shown for different risk attitudes: risk-neutral ( β = 0 .0), risk-seeking ( β = −1.0), and risk-averse ( β = +1 .0). Risk sensitivity alters the perceived rela-tive likelihood of outcomes, producing risk-aware behaviour. Note changing axis ranges. sumptions—such as perfect perception and up-to-date global maps—making real-time replanning computationally pro-hibitive in noisy, dynamic environments [1], [2]. Learning-based approaches, particularly Reinforcement Learning (RL) [3], offer a compelling alternative by enabling reactive con-trol directly from high-dimensional sensor data. However, standard RL is typically formulated to maximize expected return, inherently ignoring the variance and tail-end risks of catastrophic outcomes [4], [5]. To allow explicit reasoning about risk, Distributional RL models the full value distribution [6], yet its application to training visuomotor policies remains largely unexplored due to severe sample inefficiency of online RL. Teacher-student IL [7], [8] is a proven method for mitigating this inefficiency by distilling expert RL policies into vision-based student networks. However, prior distillation frameworks have successfully distilled task-specific expertise without exploring the transfer of risk-aware policy behaviours. To bridge this gap, we propose the first risk-aware RL framework for mobile manipulation capable of runtime-adjustable risk sensitivity from raw sensory input. We first train an expert teacher policy using Distributional Proximal Policy Optimisation (DPPO) [9] on low-dimensional privi-leged states. Crucially, rather than estimating environmental     
+
+> arXiv:2603.04579v1 [cs.RO] 4 Mar 2026 Environment
+> Height Scan
+> Goal Command
+> Proprioception
+> Task-specific Observations
+> Rewards
+> Priviledged Observations
+> Risk Sensitivity,
+> Phase 1 - Risk-Aware Teacher Policy
+> Critic
+> (QR-DQN)
+> Teacher
+> Policy, Risk Metric Distorted Value Expectation
+> Generalized Advantage Estimate
+> Phase 2 -Risk-aware Visuomotor Student Policy
+> Teacher
+> Policy,
+> Environment
+> Proprioception
+> Depth
+> Task-specific Observations
+> Risk Sensitivity,
+> Teacher
+> Observations
+> Student
+> Policy,
+> Initialise
+> Weights
+> Loss
+> PPO Update
+
+Fig. 2: An overview of our proposed framework. Phase 1: A risk-aware DRL teacher policy πθ is trained. A critic predicts value distributions Zϕ(s) which are distorted by a risk metric to calculate a risk distorted expected value, which is used to update the teacher policy πθ , which is also conditioned on the selected risk-sensitivity. Phase 2: A student policy πψ
+
+conditioned on high-dimensional depth observations is learnt through IL with the risk-aware teacher policy πθ . The risk-sensitivity parameter β is assumed to be provided by an external operator or planner at runtime. risk directly, this teacher is conditioned on a dynamic risk-sensitivity parameter that allows a user or higher-level system to continuously modulate behaviour from risk-averse to risk-seeking. Using a teacher-student IL framework [7], we then distil this risk-aware teacher into a student policy conditioned on non-privileged observations, including egocentric depth images. This allows the mobile manipulator to reactively perform whole-body tasks in unstructured, dynamic envi-ronments without a prior map, while maintaining the risk-sensitive behaviours learned in simulation. In summary, our contributions are as follows: 1) We introduce the first framework to combine DRL with distortion risk metrics to train egocentric depth-based mobile manipulation policies, featuring a runtime-adjustable risk-sensitivity parameter. 2) We demonstrate that learned risk-aware behaviours can be transferred via IL to a vision-based student policy capable of whole-body control in unstructured, dynamic environments. We support these contributions with a thorough analysis of policies trained with our framework, detailing emergent risk-aware behaviours. II. R ELATED WORKS 
+
+Whole-body Mobile Manipulation. While classical plan-ners generate optimal trajectories [10], [11], high replan-ning costs limit their reactivity in dynamic environments [2]. Similarly, recent holistic controllers utilizing quadratic programming still rely on static maps and manual behaviour trees [12]. Conversely, learning-based frameworks ( e.g. , RL and IL) bypass explicit mapping, achieving notable success in reactive, sensor-driven whole-body control [13], [14], [15], [16]. However, standard learning frameworks fail to explicitly reason about uncertainty-driven risk, restricting their safety-critical application [1]. While constrained RL addresses safety by maximizing expected returns subject to hard constraints [17], it often lacks conditioning on high-dimensional data and still ignores risk from uncertainty. To overcome this, risk-aware RL applies soft constraints via distortion risk metrics, ensuring low-probability, low-return outcomes commensurately influence policy updates. 
+
+Risk-Aware RL and Distributional Methods. Standard RL maximizes expected return, effectively ignoring the variance and tail-ends of potential outcomes [3]. Risk-aware RL instead optimizes a risk-adjusted metric, such as Conditional Value at Risk (CVaR) [18]. To avoid the time-inconsistency inherent in static risk evaluation, dynamic risk approaches apply risk metrics recursively [4]. This is typically im-plemented via DRL [6], [19]. Unlike standard RL which predicts a scalar expected value, DRL models the full return distribution, allowing risk metrics to be applied directly to the predicted outcomes. In robotics, dynamic risk-aware RL has been successfully applied to quadruped [9], [20] and humanoid locomotion [21], often dynamically adjusting risk sensitivity based on uncertainty estimations [22]. However, these methods rely heavily on low-dimensional propriocep-tive states. While some distributional visuomotor policies exist [23], they are limited to static manipulators and rely on scripted exploration strategies. Consequently, there remains a critical gap in extending dynamic, risk-aware RL to high-dimensional perception in mobile manipulation tasks. 
+
+Imitation Learning and Distillation. Applying RL directly to high-dimensional visual observations in simulation is notoriously sample-inefficient [24]. To overcome this in robotics, expert distillation paradigms are frequently em-ployed: an expert “teacher” policy (often privileged, state-based RL policies [8], [25], or human teleoperation [26]) is distilled into a “student” policy conditioned on realistic, high-dimensional sensor data. While this IL architecture effectively bridges the gap between state-based simulation and vision-based deployment, existing teacher-student frame-works for mobile manipulation lack mechanisms for risk-awareness. Our work addresses this limitation by integrating dynamic risk-aware RL into a distillation pipeline, enabling risk-aware, reactive mobile manipulation driven by raw sen-sory input. III. M ETHOD 
+
+We present a two-phase framework for risk-aware mobile manipulation: training a privileged risk-aware teacher policy (Sec. III-A), followed by distillation into a vision-based student policy via imitation learning (Sec. III-B). 
+
+A. Risk-aware Privileged Teacher Policy (Phase 1) 
+
+To avoid the computational bottleneck of training di-rectly on rendered depth images (Fig. 6), we first train a risk-aware teacher policy πθ (at|oteacher t , β ) using low-dimensional privileged observations. The input oteacher t =(˜ht, s robot t , s goal t , s task t ) includes a ground-truth height scan, robot state, and task goals (detailed in Table III). Importantly, we condition the policy on the risk-sensitivity parameter β,enabling online risk adaption during deployment. Details of action spaces and reward functions can be found in Tables I and V. Privileged height scan information ˜ht is first encoded through a small 2-layer CNN, then concatenated with the remaining observations [srobot t , s goal t , s task t , β ] and passed through an 1-layer LSTM followed by a 3-layer MLP to produce actions. We represent our critic using a QR-DQN [6], which models the risk-neutral value distribution Zϕ(s) as a uniform mixture of Dirac delta functions centred at state-dependent quantiles ϕi(s) predicted by the critic network: 
+
+Zϕ(s) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+δϕi(s), (1) where δz denotes a Dirac distribution centred at z ∈ R,and {ϕ1(s), . . . , ϕ N } are the learned quantile values. To introduce risk sensitivity to actor policy updates, we apply a distortion risk metric [4] to the predicted return distribution 
+
+Zϕ(s) (as shown in Phase 1 of Fig. 2), to obtain a distorted value distribution. Following [9], [19], we compute the distorted expectation as a weighted sum over the distributions risk-adjusted quantile supports: 
+
+Vβ (s) = 
+
+Z 10
+
+g′ 
+
+> β
+
+(τ )Zτϕ (s) dτ =
+
+> N
+
+X
+
+> k=1
+
+(gβ (τk) − gβ (τk−1)) ϕk(s),
+
+(2) where τi = iN for i = 0 , . . . , N are the quantile fractions of the distribution, gβ (τ ) is a distortion function that modifies the quantile fractions based on the risk-sensitivity parameter 
+
+β, and Zτϕ (s) denotes the τ -quantile of the distribution. Similar to [9], the risk-sensitive value estimate Vβ (s) is used in advantage estimates for PPO policy updates. In this work we investigate policies trained with the Wang [27] and CVaR [18] distortion risk metrics, whose distortion functions gβ (τ )
+
+are defined as: 
+
+gWang  
+
+> β
+
+(τ ) = Φ  Φ−1(τ ) + β , (3) 
+
+gCVaR  
+
+> β
+
+(τ ) = min 
+
+ τβ , 1
+
+
+
+, (4) where Φ is the standard normal distribution, and β ∈ R is the scalar risk sensitivity parameter that parametrises the dis-tortion function. Varying β reweighs low-return versus high-return quantiles when computing the distorted value used in policy updates, directly controlling risk-averse or risk-seeking behaviour rather than acting as a generic weight on a single reward term. For the Wang metric, β = 0 produces an unchanged advantage estimate, and therefore a risk-neutral policy, while β > 0 and β < 0 produce risk-averse and risk-seeking advantage estimates respectively. In contrast, CVaR yields a risk-neutral policy when β = 1 , and becomes increasingly risk-averse as β → 0. The distortion metric re-weights probability mass in the distribution according to the risk parameter β: for example, gW ang β> 0 (τ ) (risk-averse) pushes mass to the low-value tail, making bad outcomes appear more likely, penalising risky states. 
+
+B. Risk-aware Visuomotor Student Policy (Phase 2) 
+
+As privileged height scan information ˜ht is not available on the real robot, we need to distil the risk-aware teacher policy into a student policy that acts only on observations available from the real hardware. To do so, we use supervised learning to train a deployable student policy πψ conditioned on observations ostudent  
+
+> t
+
+= ( dt, s robot  
+
+> t
+
+, s goal  
+
+> t
+
+, s task  
+
+> t
+
+), where dt is an egocentric depth image, srobot  
+
+> t
+
+is the robot’s proprioceptive state, sgoal  
+
+> t
+
+is the task goal, and stask  
+
+> t
+
+contains non-privileged task-specific information. To accommodate this change, we replace the teacher’s input height scan CNN encoder with a depth-image CNN encoder Edepth (dt) of matching output dimension, reusing the teacher’s LSTM+MLP architecture (initialised with teacher weights). The student policy πψ is trained with DAgger [7] to minimise the L2 loss between student actions and teacher actions. We first step the envi-ronment with teacher actions for 600 episodes to mitigate distributional shift, updating only the CNN depth encoder weights. We then unfreeze all student policy weights and step the environment with student actions. An overview of our method is provided in Fig. 2. IV. E XPERIMENTS 
+
+Experiments use the Toyota HSR [28] mobile manipulator, featuring a holonomic base and a 5-DoF arm. To simplify the state space, its head-mounted depth camera is fixed facing downward to capture the immediate frontal workspace. The learned policy operates at 30Hz, issuing velocity commands to the mobile base and joint position commands to the arm, resulting in an action space of A ⊆ R8. Depth observation dimensions are 87 × 58 , updated at 10Hz. We train policies in IsaacLab [29] with the RSL-RL library [9], training risk-aware teacher policies using DPPO [9]. We apply our method on two tasks: navigation and object picking, which differ in action/observation spaces, reward structure and training curriculum. For the navigation task, teacher and student ob-servation spaces are O ⊆ R168 and O ⊆ R5091 , respectively. For the pick task, O ⊆ R170 and O ⊆ R5094 . For all evaluation metrics and task performance plots, confidence bounds are calculated as in [30]. (a) Navigation Task (b) Pick Task 
+
+Fig. 3: Training environments. Left: Navigation task, reach-ing a 3D target (axes) while avoiding static and dynamic obstacles. Right: Pick task, grasping and lifting a cube to a goal (red sphere). 
+
+Navigation Task: The robot must perform whole-body control to reach a 3D target in a procedurally generated environment populated with static obstacles and a randomly moving cylinder (Fig. 3a). This dynamic obstacle introduces aleatoric uncertainty into the transition dynamics. The policy must balance reaching the goal (which triggers successful ter-mination) against the risk of collisions, which incur penalties and early termination. 
+
+Pick Task: The robot must grasp and lift a cube to a target position above a table (Fig. 3b). Episodes terminate with a penalty if the robot base collides with the environment or if the cube is displaced beyond a recoverable threshold (e.g., dropped or pushed too far). Unlike the navigation task, goal success does not terminate the episode; rather, rewards accumulate at every timestep the goal is maintained. This requires the policy to balance swift execution against the risk of aggressive, terminating actions. Rewards (Table V) are adapted from ManiSkill3’s PickCube-v1 task [31]. 
+
+Training: For baselines we also train risk-neutral DPPO and PPO [32] policies. Each task makes use of a manually designed curriculum (see Table IV) and is trained with domain randomisation [33]. During student training, we set curriculum level progression to the maximum level for each task, and apply the same domain randomisation techniques as seen during the teacher policy training. During training we uniformly sample β ∈ [−1.0, 1.0] for teacher policies using the Wang metric, and β ∈ [0 .01 , 1.0] for those using CVaR. In the pick task, we successfully train a risk-aware DPPO policy using the Wang metric, and a standard (risk-neutral) DPPO policy. However, we are unable to train PPO or DPPO-CVaR policies for this task. We hypothesise this is due to superior performance of DRL methods over their non-distributional counterparts [5], and the well-documented challenges in training CVaR policies [9]. Training curves for teacher and student policies are shown in Figs. 4a and 4b. Policies were trained using a NVIDIA RTX A6000, hyperparameters are provided in Table II. TABLE I: Actions per task (applied at 30 Hz). 
+
+Action Component Navigation Pick 
+
+Base cmd. vel. vbase  
+
+> t
+
+= ( vx, v y , ω z ) ✓ ✓
+
+Arm joint positions qt ✓ ✓
+
+Gripper close/open agrip  
+
+> t
+
+∈ { 0, 1} — ✓
+
+TABLE II: Hyperparameters for RL training across nav-igation and pick tasks. The same hyperparameters were used across all baselines trained on a task. No extensive hyperparamter searches were performed. Bracketed values denote student distillation settings.                                            
+
+> Hyperparameter Navigation Task Pick Task
+> Learning rate 1×10 −31×10 −3
+> Discount factor γ0.99 0.99 GAE( λ), λ0.95 0.95 Batch size 128 256 Epochs per update 55Clip parameter ϵ0.2 0.15 Entropy coefficient −1×10 −3−5×10 −4
+> Value loss coefficient 0.9 0.7 Max gradient norm 1.0 1.0 Schedule Adaptive Adaptive Target KL-divergence 0.01 0.01 Number of parallel environments 4096 (256) 4096 (256) Number of steps per episode 96 48
+> QR-DQN Critic Network Specific Hyperparameters
+> Number of Quantiles 200
+> SR (λ),λ0.95 Value loss function Quantile L1
+
+TABLE III: Observations and noise terms. ✓= included; ✓*=included with noise; — = not included. TA (Teacher Actor) and S (Students) can receive noise; TC (Teacher Critics) have no additive noise (following [34]). Transforms are in the robot base frame; base pose/velocity via wheel odometry.                                                                                                                                                                                                    
+
+> Component Noise Params Navigation Pick TA TC STA TC S
+> High-level / exteroception
+> Egocentric depth dtU(−a, a )a= 0 .1 m ——✓*——✓*
+> Height scan (1D) ˜ht——✓✓—✓✓—Risk sensitivity β——✓—✓✓—✓
+> Proprioceptive state srobot
+> t
+> Base pose xbase
+> t——✓✓✓✓✓✓
+> Base velocity ˙pbase t——✓✓✓✓✓✓
+> Joint positions qtU(−a, a )a= 0 .01 ✓*✓✓*✓*✓✓*
+> Joint velocities ˙qtU(−a, a )a= 0 .01 ✓*✓✓*✓*✓✓*
+> EE pose xee
+> tU(−a, a )a= 0 .01 ✓*✓✓*✓*✓✓*
+> Previous action at−1——✓✓✓✓✓✓
+> Task observations stask
+> t
+> EE target gee ——✓✓✓———EE–goal dist. pee t−gee ——✓✓✓———Masked cylinder pos. ˜pcyl tU(−a, a )a= 0 .05 m ✓*—————Cylinder pos. pcyl t———✓————Object target gobj —————✓✓✓
+> Masked object ˜pobj tU(−a, a )a= 0 .03 m ———✓*✓✓*
+> Object visible Ivisible t—————✓✓✓
+> Grasp success Igrasp t—————✓✓—EE–object dist. ∥pee t−pobj t∥—————✓✓✓
+> Obj.–goal dist. ∥pobj t−gobj ∥—————✓✓✓
+
+To evaluate the aggregate performance of our trained poli-cies, we perform extensive experiments across both tasks. For the navigation task, we generate a held-out test set of 32 envi-ronments, and evaluate both our teacher and student policies by running 25 rollouts in each environment, resulting in 800 evaluation rollouts. For our risk-aware policies, we repeat this evaluation across a range of risk-sensitivity parameters. For the pick task, we create 32 distinct environments with varying table heights. For each environment, we create a test set of 25 randomly-sampled initial object locations and corresponding goal locations, again repeating across a range TABLE IV: Curricula for navigation and pick teacher policies. Rows cover (i) reward weight updates and (ii) level/difficulty progression, including triggers and parameter ranges. 
+
+Task Aspect Item Setting / Details Trigger / When Navigation 
+
+Reward schedule Action rate ∥at − at−1∥ Update weight wi = −1 × 10 −4 Iter. 400 Arm joint velocity ∥ ˙qarm  
+
+> t
+
+∥ Update weight wi = −2.5 × 10 −3 Iter. 400 Base velocity ∥vbase  
+
+> t
+
+∥ Update weight wi = −5 × 10 −3 Iter. 400 EE acceleration ∥ ˙vee  
+
+> t
+
+∥ Update weight wi = −2.5 × 10 −3 Iter. 800 Level progression Levels 10 total; tracked per environment —Level change rules Success: +1 (cap at max; at max sample levels uni-formly). Failure/termination: −1 (min 0). On episode outcome Goal (x, y ) range Increases with level: ±0.25 m → ± 2.0 m —
+
+Pick 
+
+Reward schedule Arm joint velocity ∥ ˙qarm  
+
+> t
+
+∥ Update weight wi = −0.1 Iter. 300 Action rate ∥at − at−1∥ Update weight wi = −1 Iter. 3500 Difficulty / initial configuration Levels 20 total; tracked per environment —Level change rules Successful grasp: +1 (cap at max; at max sample levels uniformly). No grasp/termination: −1 (min 0). On grasp/termination Initial EE–object distance Sampled with level: [0 .0, 0.5] m Harder with ↑ level Object (x, y ) position perturbation Around nominal: [−0.2, 0.2] m Harder with ↑ level Joint configuration perturbation Around nominal: [−0.5, 0.5] rad Harder with ↑ level 
+
+TABLE V: Reward terms formulas and weights. rt =∆t P
+
+i wir(i)
+
+t , ∆t = simulation dt = 8.33 ×10 −3. Terms 
+
+∥FL,R ∥, Fmin , dL,R , θmax represent absolute contact force in left/right gripper fingers, threshold contact force (0 .5N ), the open directions of the gripper fingers, and minimum angle between contact force and open direction (85 ◦) for a valid grasp. T is the number of timesteps per episode. 
+
+Component / Term Formula Weights wi
+
+Navigation Pick EE goal 15 · I ∥xee t − gee ∥ < 0.15 m  10 —EE shaped ∥pee t − gee ∥ − ∥ pee t−1 − gee ∥ 10 —EE–object 1 − tanh  5 · ∥ pee t − pobj t ∥ — 1.0 Grasp success Igrasp 
+
+> t
+
+I
+
+
+
+∥FL,R ∥ >
+
+Fmin ∧ ∠(FL,R , dL,R ) ≤ θmax 
+
+ — 5.0 Obj.–goal 1 − tanh  ∥pobj t − ggoal ∥ — 5.0 
+
+Iplaced (st, ρ ) := I  ∥pobj t − ggoal ∥ < ρ  — —
+
+Ivel (st, ν ) := I  ∥vobj t ∥ < ν  — —Static vel.  1 − tanh   ∥ ˙qarm   
+
+> t∥+∥vbase
+> t∥
+> 3
+
+ ·
+
+Iplaced (st, 0.25) 
+
+— 10.0 Pick success Ivel (st, 1.5) · Iplaced (st, 0.15) — 20.0 Termination 
+
+Itermination 
+
+> t
+
+I terminal at t −5.0 −20 .0
+
+Alive Ialive  
+
+> t
+
+I episode not terminal at t −0.03 —Padded alive Itermination  
+
+> t
+
+· (T − t) −0.03 —Action rate ∥at − at−1∥ −5×10 −5 −1×10 −4
+
+Arm vel. ∥ ˙qarm t ∥ −2.5×10 −4
+
+−0.03 
+
+Arm acc. ∥¨qarm t ∥ −2.5×10 −5 —Base vel. ∥vbase t ∥ −5×10 −4 −0.01 
+
+Base acc. ∥ ˙vbase t ∥ −1×10 −4 —EE acc. ∥ ˙vee t ∥ −5×10 −4 —
+
+of risk-sensitivities. We also investigate risk-aware behaviour on the pick task by performing 800 rollouts in a challenging single instance of the environment, with the cube placed deep on the table near the edge of the robots reachable workspace. Policies trained with the Wang metric are evalu-ated at β = [ −1.0, −0.5, 0.0, 0.5, 1.0] , and CVaR policies are evaluated at β = [0 .05 , 0.15 , 0.25 , 0.5, 1.0] . We found that performing CVaR policy rollouts with β < 0.05 led to severe performance degradation. We hypothesise this deterioration likely arises as low values of β emphasise a very small portion of the estimated value distribution, resulting in noisy and unreliable risk-adjusted value estimates. 
+
+(a) Navigation task. 
+
+(b) Pick task. 
+
+Fig. 4: Training curves for (a) navigation and (b) pick tasks. Teachers evaluate 16 × more steps per episode due to higher parallel environment counts ( 4096 vs. 256 ). The drop at episode 600 in (b) marks the switch to student-driven environment stepping. V. R ESULTS 
+
+A key aspect of our approach is the transfer of learned risk-aware behaviours from teacher to student policies. We in-vestigate this by comparing the difference in teacher-student rewards in sampled navigation task environment-goal pairs, 1.00 0.50 0.00 0.50 1.00                 
+
+> 45.0%
+> 50.0%
+> 55.0%
+> 60.0%
+> 65.0%
+> 70.0%
+> 75.0%
+> 1.00 0.50 0.00 0.50
+> 25.0%
+> 30.0%
+> 35.0%
+> 40.0%
+> 45.0%
+> 50.0%
+> 1.00 0.50 0.00 0.50 1.00
+> 2.00
+> 2.25
+> 2.50
+> 2.75
+> 3.00
+> 3.25
+> 3.50
+> 3.75
+> DPPO - Wang DPPO - Wang (Teacher) DPPO - Neutral DPPO - Neutral (Teacher) PPO PPO (Teacher) DPPO - CVaR DPPO - CVaR (Teacher) 55.0% Risk Sensitivity Risk Sensitivity Risk Sensitivity Contact Rate Task Success Rate Cumulative Return
+
+(a) Navigation Task 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity                 
+
+> 70.0%
+> 75.0%
+> 80.0%
+> 85.0%
+> 90.0%
+> 95.0% Task Success Rate
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 0.0%
+> 5.0%
+> 10.0%
+> 15.0%
+> 20.0%
+> 25.0% Time Out Rate
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 3.5
+> 3.6
+> 3.7
+> 3.8
+> 3.9
+> 4.0 Time to Success
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> 3.5
+> 4.0
+> 4.5
+> 5.0
+> 5.5 Time to Failure
+> DPPO - Wang DPPO - Wang (Teacher) DPPO - Neutral DPPO - Neutral (Teacher)
+
+(b) Pick Task 
+
+Fig. 5: Task rates for policies evaluated on the navigation and pick tasks. (a) Left to right: task success rate; contact rate with the environment and the dynamic obstacle; cumulative return. (b) Left to right: task success rate; time out rate (not termination); time to reach goal success; time to task failure termination. 
+
+Fig. 6: Navigation task curriculum progression. The privi-leged teacher (Scandots) makes stable progress, while the depth-based policy (Depth) fails to learn, likely due to noisy gradients from small batch sizes necessitated by the high VRAM cost of rendering many parallel high-dimensional depth images. plotting the individual reward terms used in the navigation task (Fig. 7). Ideally, successful transfer manifests as flat lines in these plots, indicating a constant performance gap in teacher-student, regardless of risk-sensitivity. As shown in Fig. 7 student policies in the navigation task maintain this stable difference, suggesting our approach effectively transfers learnt risk-aware behaviour to student policies. Delving deeper into individual reward components in the navigation task (Fig. 7), we see that reward terms with higher weightings, which heavily influence the behaviour of learnt teacher policies, are transferred well to students while terms with lower weightings (e.g., acceleration-based penalties) show larger relative difference. This aligns with expectations; the teacher’s training maximises risk-adjusted return which is dominated by high-weight rewards. Behaviour driven by these terms is more prevalent and thus transfers more readily during IL. To explicitly quantify risk-aware behaviour, we measure catastrophic events via collision and timeout rates. Task performance metrics for both the pick and navigation tasks are plotted in Figs. 5a and 5b, where risk-aware student policies achieve overall performance comparable to risk-neutral baselines. These results demonstrate, for the first time, a framework capable of learning effective, risk-aware visuomotor policies that achieve competent behaviour, es-tablishing the viability of our approach. Interestingly, while DPPO-Neutral and DPPO-Wang evaluated at β = 0 might be expected to perform identically, DPPO-Wang is trained on trajectories induced by a mixture of β values. This changes the state distribution encountered during training, leading to differences in the learned policy even when evaluated at a risk-neutral β = 0 . Exploring whether multi-β training improves overall performance is left for future work. Related works have similarly leveraged uncertainty and risk estimates to improve RL training [35], [36]. Given the complexity of 1.00 0.50 0.00 0.50 1.00                                
+
+> 10.0%
+> 5.0%
+> 0.0%
+> 5.0%
+> 10.0% Alive Reward Difference
+> 1.00 0.50 0.00 0.50 1.00
+> 40%
+> 20%
+> 0%
+> 20%
+> 40%
+> 60% Termination Reward Difference
+> 1.00 0.50 0.00 0.50 1.00
+> 20%
+> 10%
+> 0%
+> 10%
+> 20%
+> 30% Goal Success Reward Difference
+> 1.00 0.50 0.00 0.50 1.00
+> 10.0%
+> 5.0%
+> 0.0%
+> 5.0%
+> 10.0% Shaped Distance Reward Difference
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 20%
+> 10%
+> 0%
+> 10%
+> 20% Velocity Reward Difference
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 20%
+> 0%
+> 20%
+> 40%
+> 60% Acceleration Reward Difference
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 20%
+> 10%
+> 0%
+> 10%
+> 20% End Effector Acceleration Reward Difference
+> 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity
+> 80%
+> 60%
+> 40%
+> 20%
+> 0%
+> 20%
+> 40% Action Rate Reward Difference
+> DPPO - Wang DPPO - Neutral PPO DPPO - CVaR
+
+Fig. 7: Difference in cumulative individual reward terms during the navigation task evaluation. 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity 010 20 30 1.00 0.50 0.00 0.50 1.00 Risk Sensitivity 010 20 30 40 50 60 DPPO - Wang DPPO - Wang (Teacher) DPPO - Neutral DPPO - Neutral (Teacher) Cumulative Return CVaR 20% of Cumulative Return 
+
+Fig. 8: Plots of policies evaluated on a single instance of the pick task. Right: Cumulative return. Left: 20% CVaR of cumulative return. 20% is used as a balanced trade off between statistical reliability on the limited number of considered rollouts while placing emphasis on worst-case outcomes. the multi-reward tasks we train on, emergent risk-aware be-haviours can often remain hidden beneath competing reward signals. To investigate any risk-aware behaviour produced by policies trained with our framework, we plot the 20% 
+
+CVaR of cumulative return from the evaluations performed on the single instance of the pick task, shown in Fig. 8. This figure shows the average return of the 20% worst rollouts, illustrating the policies worst-case performance. In this figure we would expect risk-averse policies (β > 0) to achieve better worst-case performance, which we demonstrate in Fig. 8, indicating our visuomotor student policies show risk-aware behaviours. Conversely, Fig. 8 shows that risk-seeking policies achieve a higher average cumulative return, though with more variability in performance (indicated by wider estimated confidence bounds). Qualitatively, this can be explained by risk-seeking policies attempting grasps sooner, meaning more time can be spent near the goal state and therefore higher return is achieved. However, this approach can sometimes result in poor quality grasps explaining the variability in performance. VI. C ONCLUSION 
+
+In this paper we present a framework to train risk-aware visuomotor policies to reduce severe outcomes caused by aleatoric uncertainty. We propose a two-phase frame-work, first training risk-aware teacher policies on privi-leged observations, then transferring these capabilities to policies conditioned on depth images via IL. Our approach trains risk-aware visuomotor policies for mobile manipu-lation conditioned on egocentric depth observations with runtime-adjustable risk sensitivity, achieving comparable per-formance to risk-neutral methods, and we show learnt risk-aware behaviours can be successfully transferred through IL. This work provides a practical pathway for deploying risk-aware controllers for mobile manipulators using rich, high-dimensional sensor data, enabling more dependable behaviour in complex, dynamic environments. VII. L IMITATIONS AND FUTURE WORK 
+
+While our framework successfully demonstrates the trans-fer of risk-aware behaviours to visuomotor policies, we note several limitations that provide exciting avenues for future research: 
+
+Hardware Validation: Our evaluations are conducted entirely in simulation. Deploying our risk-aware visuomotor policies to physical mobile manipulators to validate sim-to-real transfer is a critical next step. 
+
+Uncertainty Modelling: By trusting the critic’s value distri-bution, we are implicitly assuming pure aleatoric uncertainty. Incorporating risk-aversion to epistemic uncertainty is vital for handling real-world distributional shifts. 
+
+Risk-Aware Student Objective: Currently student policies are trained solely via an IL objective. Future work should fine-tune bootstrapped student policies directly on a risk-aware RL objective. 
+
+Reward Shaping: Relying on shaped rewards for training stability risks incorrect task specification [37]. Exploring intrinsic motivation and reward methods for sparse-reward settings is an important direction. 
+
+Extreme Risk Sensitivities: We observe a trend where policies evaluated at the absolute bound of our trained risk-sensitivities (β = ±1) exhibit degraded risk-aware behaviour. Investigating training paradigms that stabilise performance across wider and more extreme ranges of β
+
+remains an open challenge. 
+
+Task Complexity: The tasks evaluated in this work occur in relatively simple simulated environments. Scaling our approach to handle visually complex, cluttered, and realistic scenes will be necessary to fully test the limits of our risk-aware visuomotor policies. REFERENCES [1] L. Brunke, M. Greeff, A. W. Hall, Z. Yuan, S. Zhou, J. Panerati, and A. P. Schoellig, “Safe learning in robotics: from learning-based control to safe reinforcement learning,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 5, no. 1, pp. 411–444, 2022. [2] T. Sandakalum and M. H. Ang Jr, “Motion planning for mobile manipulators—a systematic review,” Machines , vol. 10, no. 2, p. 97, 2022. [3] R. S. Sutton and A. G. Barto, Reinforcement Learning: An Introduc-tion , 2nd ed. The MIT Press, 2018. [4] A. Majumdar and M. Pavone, “How should a robot assess risk? towards an axiomatic theory of risk in robotics,” in Proceedings of the Internation Symposium on Robotics Research (ISRR) . Springer, 2020, pp. 75–84. [5] M. G. Bellemare, W. Dabney, and M. Rowland, Distributional Rein-forcement Learning . MIT Press, 2023, %urlhttp://www.distributional-rl.org. [6] W. Dabney, M. Rowland, M. Bellemare, and R. Munos, “Distributional Reinforcement Learning With Quantile Regression,” Proceedings of the AAAI Conference on Artificial Intelligence , vol. 32, no. 1, Apr. 2018. [7] S. Ross, G. Gordon, and D. Bagnell, “A reduction of imitation learning and structured prediction to no-regret online learning,” in Proceedings of the fourteenth international conference on artificial intelligence and statistics . JMLR Workshop and Conference Proceedings, 2011, pp. 627–635. [8] X. Cheng, K. Shi, A. Agarwal, and D. Pathak, “Extreme parkour with legged robots,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 11 443–11 450. [9] L. Schneider, J. Frey, T. Miki, and M. Hutter, “Learning risk-aware quadrupedal locomotion using distributional reinforcement learning,” in 2024 International Conference on Robotics and Automation (ICRA) ,2024. [10] N. Ratliff, M. Zucker, J. A. Bagnell, and S. Srinivasa, “CHOMP: Gradient optimization techniques for efficient motion planning,” in 
+
+2009 IEEE international conference on robotics and automation .IEEE, 2009, pp. 489–494. [11] L. E. Kavraki, P. Svestka, J.-C. Latombe, and M. H. Overmars, “Prob-abilistic roadmaps for path planning in high-dimensional configuration spaces,” IEEE transactions on Robotics and Automation , vol. 12, no. 4, pp. 566–580, 1996, publisher: IEEE. [12] J. Haviland, N. S¨ underhauf, and P. Corke, “A holistic approach to reactive mobile manipulation,” IEEE Robotics and Automation Letters ,vol. 7, no. 2, pp. 3122–3129, 2022, publisher: IEEE. [13] C. Tang, B. Abbatematteo, J. Hu, R. Chandra, R. Mart´ ın-Mart´ ın, and P. Stone, “Deep reinforcement learning for robotics: A survey of real-world successes,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 8, no. 1, pp. 153–188, 2025. [14] Z. Fu, T. Z. Zhao, and C. Finn, “Mobile aloha: Learning bimanual mobile manipulation with low-cost whole-body teleoperation,” in 
+
+Conference on Robot Learning (CoRL) , 2024. [15] M. Liu, Z. Chen, X. Cheng, Y. Ji, R.-Z. Qiu, R. Yang, and X. Wang, “Visual whole-body control for legged loco-manipulation,” in Confer-ence on Robot Learning . PMLR, 2025, pp. 234–257. [16] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. Shi, and U. Zhilinsky, “ π0: A Vision-Language-Action Flow Model for General Robot Control,” in Robotics: Science and Systems (RSS) , 2025. [17] I. Dadiotis, M. Mittal, N. Tsagarakis, and M. Hutter, “Dynamic object goal pushing with mobile manipulators through model-free constrained reinforcement learning,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025, pp. 13 363–13 369. [18] R. T. Rockafellar, S. Uryasev et al. , “Optimization of conditional value-at-risk,” Journal of risk , vol. 2, pp. 21–42, 2000. [19] X. Ma, L. Xia, Z. Zhou, J. Yang, and Q. Zhao, “Dsac: Distribu-tional soft actor critic for risk-sensitive reinforcement learning,” arXiv preprint arXiv:2004.14547 , 2020. [20] J. Shi, C. Bai, H. He, L. Han, D. Wang, B. Zhao, M. Zhao, X. Li, and X. Li, “Robust quadrupedal locomotion via risk-averse policy learning,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 11 459–11 466. [21] J. Wu, Y. Cheng, H. Liu, and H. Liu, “Arc: Robots adaptive risk-aware robust control via distributional reinforcement learning,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2025, pp. 10 656–10 663. [22] F. Schubert, T. Eimer, B. Rosenhahn, and M. Lindauer, “Automatic risk adaptation in distributional reinforcement learning,” arXiv preprint arXiv:2106.06317 , 2021. [23] C. Bodnar, A. Li, K. Hausman, P. Pastor, and M. Kalakrishnan, “Quantile qt-opt for risk-aware vision-based robotic grasping,” arXiv preprint arXiv:1910.02787 , 2019. [24] S. Uppal, A. Agarwal, H. Xiong, K. Shaw, and D. Pathak, “SPIN: Simultaneous Perception, Interaction and Navigation,” May 2024, arXiv:2405.07991 [cs, eess]. [25] A. Kumar, Z. Fu, D. Pathak, and J. Malik, “Rma: Rapid motor adaptation for legged robots,” arXiv preprint arXiv:2107.04034 , 2021. [26] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning fine-grained bimanual manipulation with low-cost hardware,” arXiv preprint arXiv:2304.13705 , 2023. [27] S. S. Wang, “A class of distortion operators for pricing financial and insurance risks,” Journal of risk and insurance , pp. 15–36, 2000. [28] Toyota Motor Corporation, “Human support robot (HSR),” 2021, https: //mag.toyota.co.uk/toyota-human-support-robot, accessed 2026-02-28. [29] M. Mittal, C. Yu, Q. Yu, J. Liu, N. Rudin, D. Hoeller, J. L. Yuan, R. Singh, Y. Guo, H. Mazhar, A. Mandlekar, B. Babich, G. State, M. Hutter, and A. Garg, “Orbit: A unified simulation framework for interactive robot learning environments,” IEEE Robotics and Automa-tion Letters , vol. 8, no. 6, pp. 3740–3747, 2023. [30] R. Agarwal, M. Schwarzer, P. S. Castro, A. C. Courville, and M. Bellemare, “Deep reinforcement learning at the edge of the statis-tical precipice,” Advances in Neural Information Processing Systems ,vol. 34, 2021. [31] S. Tao, F. Xiang, A. Shukla, Y. Qin, X. Hinrichsen, X. Yuan, C. Bao, X. Lin, Y. Liu, T.-k. Chan et al. , “Maniskill3: Gpu parallelized robotics simulation and rendering for generalizable embodied ai,” 
+
+arXiv preprint arXiv:2410.00425 , 2024. [32] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Proximal policy optimization algorithms,” arXiv preprint arXiv:1707.06347 , 2017. [33] J. Tobin, R. Fong, A. Ray, J. Schneider, W. Zaremba, and P. Abbeel, “Domain randomization for transferring deep neural networks from simulation to the real world,” in 2017 IEEE/RSJ international con-ference on intelligent robots and systems (IROS) . IEEE, 2017, pp. 23–30. [34] O. M. Andrychowicz, B. Baker, M. Chociej, R. J´ ozefowicz, B. Mc-Grew, J. Pachocki, A. Petron, M. Plappert, G. Powell, A. Ray, J. Schneider, S. Sidor, J. Tobin, P. Welinder, L. Weng, and W. Zaremba, “Learning dexterous in-hand manipulation,” The International Journal of Robotics Research , vol. 39, no. 1, pp. 3–20, 2020. [35] M. Rigter, B. Lacerda, and N. Hawes, “One risk to rule them all: A risk-sensitive perspective on model-based offline reinforcement learn-ing,” Advances in Neural Information Processing Systems , vol. 36, 2024. [36] Y. Burda, H. Edwards, A. Storkey, and O. Klimov, “Exploration by random network distillation,” in 7th International Conference on Learning Representations (ICLR 2019) , 2019. [37] S. Booth, W. B. Knox, J. Shah, S. Niekum, P. Stone, and A. Allievi, “The perils of trial-and-error reward design: misdesign through over-fitting and invalid task specifications,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 37, no. 5, 2023, pp. 5920– 5929.

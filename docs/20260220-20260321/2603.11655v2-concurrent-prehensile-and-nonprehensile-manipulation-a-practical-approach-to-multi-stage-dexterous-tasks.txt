@@ -1,0 +1,485 @@
+Title: Concurrent Prehensile and Nonprehensile Manipulation: A Practical Approach to Multi-Stage Dexterous Tasks
+
+URL Source: https://arxiv.org/pdf/2603.11655v2
+
+Published Time: Tue, 17 Mar 2026 01:09:54 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Concurrent Prehensile and Nonprehensile Manipulation: A Practical Approach to Multi-Stage Dexterous Tasks 
+
+Hao Jiang Yue Wu Yue Wang Gaurav S. Sukhatme Daniel Seita 
+
+Fig. 1: Our method enables real-world dexterous multi-stage manipulation requiring concurrent prehensile and nonprehensile interaction. We demonstrate three challenging tasks: (Top) Grasp+Pull: grasping an object and pulling open a drawer while maintaining the grasp; 
+
+(Middle) Grasp+Open: grasping an object and opening a container lid; (Bottom) Grasp+Grasp: sequentially grasping two objects without releasing the first. Each row shows key frames from a successful rollout, highlighting the robot’s ability to stably hold one object while manipulating another. More videos and code are available on our anonymous website https://dexmulti.github.io/ .
+
+Abstract — Dexterous hands enable concurrent prehensile and nonprehensile manipulation (holding one object while interact-ing with another), a capability essential for everyday tasks yet underexplored in robotics. Learning such long-horizon, contact-rich multi-stage behaviors is challenging: demonstrations are expensive to collect, and end-to-end policies require substantial data to generalize across varied object geometries and place-ments. We present DexMulti , a sample-efficient approach for real-world dexterous multi-task manipulation that decomposes demonstrations into object-centric skills with well-defined tem-poral boundaries. Rather than learning monolithic policies, our method retrieves demonstrated skills based on current object geometry, aligns them to the observed object state using an uncertainty-aware estimator that tracks centroid and yaw, and executes them via a retrieve-align-execute paradigm. We evaluate on three multi-stage tasks requiring concurrent manipulation (Grasp+Pull, Grasp+Open, and Grasp+Grasp) across two dexterous hands (Allegro and LEAP) in over 1,000 real-world trials. Our approach achieves an average success rate of 66% on training objects with only 3-4 demonstrations per object, outperforming diffusion policy baselines by 2-3 × while requiring 5 demonstrations compared to 20-50 for comparable performance. Results demonstrate robust generalization to held-out objects and spatial variations up to ±25 cm.         
+
+> All authors are with the Thomas Lord Department of Computer Sci-ence at the University of Southern California, USA. Correspondence:
+> hjiang86@usc.edu .
+
+I. I NTRODUCTION 
+
+Dexterous hands promise a form of manipulation that is qualitatively different from parallel-jaw grasping: they can stably hold an object while simultaneously interact-ing with a second object or mechanism. This concurrent prehensile and nonprehensile capability underlies many everyday behaviors, such as holding a key while turning a doorknob, stabilizing a container while opening its lid, or carrying an item while pulling a drawer. Despite this, most prior work in dexterous manipulation studies skills centered around a single manipulated object at a time or evaluates policies on relatively short-horizon interactions [1], [2], [3], [4]. As a result, it remains challenging to build systems that can robustly execute long-horizon, contact-rich, multi-stage tasks that require sequential interactions with multiple objects while maintaining stable grasps. For learning-based approaches, a central difficulty is data .Long-horizon dexterous demonstrations are time-consuming and physically taxing to collect, particularly when they require precise finger coordination and sustained contact. At the same time, multi-stage tasks exhibit substantial geometric diversity: success depends on fine alignment between the hand and objects (e.g., a handle) under varying initial place-ments and object shapes. End-to-end visuomotor policies, in-cluding diffusion-based imitation learning approaches, have 
+
+> arXiv:2603.11655v2 [cs.RO] 13 Mar 2026
+
+shown impressive results when trained with sufficient and diverse demonstrations, but their performance can degrade sharply in low-data regimes and under spatial variation [5], [6]. This tension motivates a question that we view as funda-mental for practical learning-based dexterous manipulation: 
+
+How can we learn long-horizon, contact-rich dex-terous multi-task manipulation that generalizes across object instances and placements, using only a small number of real demonstrations? 
+
+In this work, we hypothesize that a key missing ingredient is an object-centric skill abstraction Rather than attempting to learn one monolithic policy that maps observations to actions over an entire episode, we decompose demonstrations into reusable object-centric skills with well-defined temporal boundaries. This enables a retrieve-align-execute paradigm: given the current object geometry, we retrieve a relevant demonstrated skill, align it to the current object state, and ex-ecute it with a stable controller. Crucially, this decomposition isolates the most contact-sensitive parts of the behavior into short segments that can be reliably replayed once the hand is aligned, improving generalization in low-data settings. We instantiate this idea in DexMulti , a real-world dex-terous manipulation system for multi-stage two-object tasks. 
+
+DexMulti combines: (i) a real-time perception pipeline that produces object-centric point clouds and interaction sig-nals; (ii) an object-centric skill segmentation procedure that extracts pre-manipulation keyframes from contact-derived signals; and (iii) a retrieval-based execution mechanism that aligns and replays demonstrated skills in an object-centric frame. Our perception and execution pipeline is designed to be robust to imperfect state estimates rather than assuming full observability. We evaluate DexMulti on a suite of real-world dexterous multi-task problems (Fig. 1), demonstrat-ing strong performance with limited demonstrations. Across tasks and objects, we find that object-centric skill decomposi-tion provides a strong inductive bias and achieves robust per-formance with limited demonstrations, outperforming end-to-end diffusion baselines in our experiments. The contributions of this paper include:  
+
+> •
+
+A formalism of dexterous multi-task manipulation that requires concurrent prehensile and nonprehensile inter-action, a setting common in daily life but underexplored in prior dexterous manipulation research.  
+
+> •
+
+An object-centric skill abstraction for long-horizon dexterous tasks, including a practical keyframe extrac-tion procedure based on interaction signals.  
+
+> •
+
+A retrieval-based execution framework that aligns and replays object-centric skills, improving spatial general-ization and reducing demonstration requirements.  
+
+> •
+
+Comprehensive real-world experiments across two dex-terous hand platforms, including baseline comparisons, sample-efficiency analysis, and embodiment transfer. II. R ELATED WORK 
+
+A. Dexterous Hand Manipulation 
+
+Dexterous manipulation with multi-fingered hands enables more complex maneuvers such as in-hand manipulation [1], [7] compared to suction cup or parallel-jaw grippers, and has been the subject of research for decades [8]. One research direction studies analytical model-based approaches for dexterous grasping [9]. This computation may involve differentiable planners [10] or force-closure objectives [11] to determine grasp quality. Such metrics have recently seen success in providing supervision for large-scale dexterous hand datasets [3], [12], [13], which can facilitate down-stream supervised learning approaches. Beyond grasping, researchers have also recently explored learning-based ap-proaches for dexterous hand manipulation. These approaches are typically based on deep reinforcement learning in sim-ulation with sim-to-real transfer [14], [15], [16], [17], or imitation learning [6] from demonstrations, typically with teleoperation hardware [18]. Our work falls under imitation learning approaches, but differs from prior work in that we systematically explore strategies for improving multi-step manipulation involving a mix of nonprehensile [19] and prehensile manipulation. 
+
+B. Multi-Task and Concurrent Manipulation 
+
+Dexterous hands are especially well-suited for multi-task manipulation, due to their flexibility and degrees of free-dom [20]. One type of multi-task manipulation involves multi-object grasping [21], [22], [23], where a hand enables efficient grasping of objects. Classical work has studied multi-object grasping through theoretical grasp analysis [24], [25], [26], [27]. Unlike analytic approaches, we aim to perform real-world grasping autonomously using perception data and demonstrations, and without humans inserting ob-jects in the hand [28]. Furthermore, unlike recent research showing promising real-world deployment of dexterous, multi-object grasping in single [29] and sequential [30] settings, we study more general multi-task problems beyond solely grasping. Our goal is to develop a recipe and frame-work for dexterous multi-step manipulation which involves smoothly integrating both nonprehensile and prehensile ma-nipulation, going beyond recent work that studies dexterous nonprehensile-only manipulation [31] and without relying on specialized, custom-made hands [32]. 
+
+C. Sequencing and Retrieval in Multi-Task Manipulation 
+
+Our research is also related to multi-step manipulation, which involves a robot performing multiple, clearly-defined steps. In closely-related work, [17] propose a reinforcement learning procedure for multi-step tasks in simulation with transfer to real, utilizing forward-backward fine-tuning to facilitate sequential task compatibility. Our approach is com-plementary, as we study multi-task imitation learning without simulation. Our approach is inspired by studies of design choices for data-efficient learning of multiple tasks, including decompositions that isolate an alignment phase [33] and retrieval over large databases to transfer action-relevant affor-dances [34]. We show how to adapt these ideas for dexterous hands. Furthermore, in contrast to these preceding works, our robotic hand must maintain control of an existing task while concurrently performing the next task. Point Cloud EKF            
+
+> Module
+> (C)
+> Inferred State
+> Retrieval
+> Module
+> (D)
+> t = 0
+> RGB-D Images
+> Robot Model
+> Point-Cloud &
+> Contact Map Perception
+> Module (A)
+> ①Perception Module
+> Point Cloud
+> Demo
+> Pick Start
+> Pick End Pull Start
+> Pull End
+> Pick Task
+> Pull Task
+> Pick Object
+> Demo
+> Pull Drawer
+> Demo
+> KeyFrame
+> Extractor (B)
+> ②Of fl ine Processing
+> ③Online Deployment
+> Real-time Centroid: ct
+> Real-time Yaw: ψt
+> Yaw Observability: 𝕀 obs
+> t
+> Demo Retrieval Canonicalize Demo Trajectory: ξ
+> Yaw Geometric
+> Observability: 𝕀 retr
+> Alignment
+> Module (D)
+> Real-time Alignment
+> Open Loop
+> Execution (D)
+> Real Deployment
+
+Fig. 2: Overview of the proposed pipeline. (1) Perception: Multi-view RGB-D with language-conditioned segmentation produces object-centric point clouds and contact maps. (2) Offline: Demonstrations are segmented into object-centric skills using interaction signals and stored in canonical form. (3) Online: An uncertainty-aware estimator tracks object centroid and yaw. Skills are retrieved via point-cloud matching, aligned under pose uncertainty, and executed via retrieve–align–execute. Panels (A–D) correspond to Sec. IV-A–D. 
+
+III. P ROBLEM STATEMENT AND ASSUMPTIONS 
+
+We consider multi-stage dexterous manipulation tasks in which a robot arm equipped with a dh-DoF multi-fingered hand must sequentially interact with multiple objects on a tabletop. Each task is specified by a natural-language instruction ℓ (e.g., “grasp the apple and open the drawer”) that determines both the relevant object categories and the order of interaction, and consists of an ordered sequence of K object-centric subtasks τ = ( s1, s2, . . . , sK ), where each subtask sk targets a specific object ok and requires a distinct manipulation behavior (e.g., grasping, pulling, pushing). At each timestep t, the robot observes multi-view RGB-D images {I(v) 
+
+> t
+
+, D(v) 
+
+> t
+
+}Vv=1 from V calibrated cameras and its proprioceptive state qt = ( qarm t , qhand t ). The action space is 
+
+at = ( aarm t , ahand t ), where aarm t ∈ SE (3) is a target Tool Center Point (TCP) pose and ahand t ∈ Rdh specifies target hand joint positions. All objects rest on a planar surface, so their poses are characterized by a 3D centroid c ∈ R3 and a yaw angle 
+
+ψ ∈ (−π, π] about the vertical axis; the robot may maintain contact with a grasped object while interacting with the next. We assume access to a small dataset of N expert demon-strations D = {ξ1, . . . , ξN } collected via teleoperation, where each ξi = {(qt , at , It , Dt )}Ti 
+
+> t=1
+
+is a full episode spanning the complete multi-stage task. Demonstrations are collected across a set of training objects with randomized placements, with only 3–4 demonstrations per object. Our goal is to execute all K subtasks in sequence given a new scene with potentially unseen object instances at arbitrary placements, using this limited demonstration budget. IV. P ROPOSED METHOD 
+
+DexMulti decomposes each multi-stage task into object-centric skills that are retrieved and replayed at execution time (see Fig. 2 and Alg. 1). The pipeline consists of: (i) a perception module that produces object-centric point clouds from multi-view RGB-D (Sec. IV-A), (ii) an offline pro-cedure that segments demonstrations into canonical object-centric skills (Sec. IV-B), (iii) an uncertainty-aware object state estimator (Sec. IV-C), and (iv) a retrieve-align-execute policy for deployment (Sec. IV-D). 
+
+A. Perception 
+
+From multi-view RGB-D images {I(v) 
+
+> t
+
+, D(v) 
+
+> t
+
+}, we extract an object-centric point cloud Pk ⊂ R3 for each task-relevant object ok. Given the language instruction ℓ, we use Ground-ing DINO [35] to detect each object category in 2D, then SAM2 [36] for real-time instance segmentation and tracking. Segmented pixels are back-projected into 3D using known camera parameters, and the resulting point clouds are de-noised, clustered, and downsampled to a fixed size of 512 points via farthest point sampling (see Appendix for details). All points are expressed in the robot base frame, and the full pipeline runs at approximately 20 Hz. 
+
+B. Object-centric Skill Decomposition 
+
+Each demonstration ξi spans the full multi-stage task. We decompose it into K object-centric skill segments ξi →
+
+(σi,1, . . . , σi,K ), where σi,k is the sub-trajectory corresponding to subtask sk targeting object ok.
+
+a) Segmentation via Contact Signals: Segment bound-aries are determined by hand-object interaction. We model the dexterous hand as a point cloud obtained via forward kinematics [37] from the recorded joint states, and compute a soft contact signal measuring geometric proximity between the hand and each object’s point cloud Pk [4]. For each object 
+
+ok, the keyframe marking the start of σi,k is the first timestep at which sustained hand-object contact is detected. b) Canonical Skill Representation: Each skill segment 
+
+σi,k is stored in a canonical object-centric frame. Given the object point cloud Pk at the skill’s keyframe, we compute its centroid c and a canonical yaw ψcanon from Principal Component Analysis (PCA) on the horizontal projection, and transform all points as 
+
+Pcanon = {Rz(−ψcanon )( pi − c)}. (1) All end-effector poses and hand joint commands in σi,k
+
+are expressed in the same canonical frame, yielding a skill library that is invariant to object translation and, when yaw is observable, rotation. 
+
+C. Object-centric State Estimation 
+
+During execution, we maintain a real-time estimate of each object’s centroid ct and yaw ψt using an extended Kalman filter (EKF) with constant-velocity dynamics. Object position is measured as the centroid of the segmented point cloud; yaw is measured via PCA on the horizontal projection when the object exhibits sufficient geometric anisotropy. 
+
+a) Design Rationale: Our centroid+yaw representation is motivated by the planar tabletop setting: objects resting on a flat surface have rotation constrained to the vertical axis (perpendicular to the table), as tilting is prevented by gravity and surface contact. This reduces the state estimation burden compared to full 6D pose tracking while retaining the information needed for successful manipulation alignment. A key design choice is explicit yaw observability rea-soning. The estimator computes a continuous observability score from geometric cues (e.g., point cloud anisotropy) and Kalman filter uncertainty, producing a binary yaw-observable flag Iobs t via hysteresis thresholding. When yaw is deemed unobservable (e.g., for round or textureless objects), orienta-tion updates are suppressed and the task-level yaw ψtask t is held constant, preventing spurious rotations. This contrasts with neural 6D pose trackers such as FoundationPose [38], which implicitly assume orientation is always observable; we show in Sec. V-D that explicit observability reasoning is critical for stable manipulation. 
+
+D. Retrieve-Align-Execute 
+
+At execution time, each subtask sk is handled by retrieving, aligning, and replaying a matching skill from the library. 
+
+a) Retrieval: Given the current object point cloud Pobs k ,we retrieve the closest stored skill via Chamfer distance in canonical space: 
+
+i∗ = arg min  
+
+> i
+
+min   
+
+> θ∈Θ
+
+dChamfer 
+
+
+
+Rz(θ )Pobs centered , Pcanon i
+
+
+
+, (2) where Θ is a discrete set of yaw hypotheses. When yaw is observable ( Iobs t = 1), θ is fixed to ψtask t and only one Chamfer distance is evaluated. When yaw is unobservable, we minimize over Θ, jointly recovering the best demonstra-tion i∗ and a relative alignment yaw θ ∗. For multi-stage tasks, we retrieve a single demonstration index i∗ using a joint score across all task-relevant objects, ensuring consistent skill pairings across subtasks. 
+
+Algorithm 1 Deploy-time multi-stage retrieve–align–execute 
+
+Require: Task instruction ℓ, skill library {σ canon i,k } 
+
+> 1:
+
+Parse ℓ to obtain subtask sequence (s1, . . . , sK ) 
+
+> 2:
+
+Detect and track objects (o1, . . . , oK ) 
+
+> 3:
+
+Observe point clouds {Pobs k } for all objects  
+
+> 4:
+
+Retrieve demo i∗ = arg min i ∑k dChamfer (Pobs k , Pcanon i,k ) 
+
+> 5:
+
+for k = 1, . . . , K do  
+
+> 6:
+
+// Closed-loop alignment  
+
+> 7:
+
+while not converged do  
+
+> 8:
+
+Update state estimate (ct , ψt , Iobs t ) from EKF  
+
+> 9:
+
+Transform canonical target to world frame (Eq. 3)  
+
+> 10:
+
+Solve motion planning via Pyroki; send joint cmd  
+
+> 11:
+
+end while  
+
+> 12:
+
+Record (c f ixed , ψ f ixed ) at convergence  
+
+> 13:
+
+// Open-loop execution  
+
+> 14:
+
+for each remaining action in σ canon i∗,k do  
+
+> 15:
+
+Transform to world frame using (c f ixed , ψ f ixed ) 
+
+> 16:
+
+Send arm pose and hand joint cmd  
+
+> 17:
+
+end for  
+
+> 18:
+
+end for 
+
+b) Alignment: After retrieval, the robot performs closed-loop alignment by tracking the first canonical action of the retrieved skill, transformed to the world frame using the real-time object state estimate: 
+
+pworld = ct + Rz(ψt ) pcanon , Rworld = Rz(ψt ) Rcanon , (3) where ψt is selected based on both retrieval-time and real-time yaw observability (see Appendix for the full selection rule). At each control step, we use the Pyroki optimizer [39] to solve a receding-horizon motion planning problem that tracks (pworld , Rworld ) while enforcing collision avoidance against perception-derived obstacle representations, joint limits, and trajectory smoothness. 
+
+c) Execution: Once alignment converges, the robot smoothly transitions via pose interpolation and then exe-cutes the remainder of the skill open-loop, replaying the canonical trajectory in the world frame using the object pose 
+
+(c f ixed , ψ f ixed ) frozen at the end of alignment. This avoids in-stability from continuous pose re-estimation during contact-rich manipulation. For multi-stage tasks, this retrieve-align-execute procedure is applied sequentially to each subtask sk.V. E XPERIMENTS 
+
+We conduct comprehensive real-world experiments to an-swer the following questions:  
+
+> •
+
+How does our method perform on diverse dexterous multi-task manipulation problems compared to learning-based baselines? (§V-B)  
+
+> •
+
+How sample-efficient is our retrieval-based approach compared to end-to-end diffusion policies? (§V-C)  
+
+> •
+
+How do state estimation and object-centric representa-tion choices affect manipulation performance? (§V-D)  
+
+> •
+
+Does our method generalize across mechanically differ-ent dexterous hand embodiments? (§V-E) UFACTORY xArm 7  Leap Hand  
+
+> RGB-D Cameras Fig. 3: Experimental setup. We use an xArm 7 robot arm with a dexterous hand (16-DoF LEAP or Allegro Hand) and two Intel RealSense L515 RGB-D cameras for multi-view perception.
+
+A. Experimental Setup a) Robot Platform and Control: All experiments are conducted on a 7-DoF xArm7 robotic manipulator equipped with a dexterous hand (see Fig. 3). We evaluate two end-effectors: a 16-DoF Allegro Hand and a LEAP Hand [40], en-abling experiments across different dexterous embodiments. The workspace is observed by two Intel RealSense L515 RGB-D cameras at complementary viewpoints, providing multi-view input to the perception pipeline described in Sec. IV-A. Both arm and hand commands are issued at 10 Hz; additional details on control frequencies, velocity limits, and command interfaces are provided in the Appendix. 
+
+b) Task Suite: We evaluate on a suite of real-world dex-terous multi-task manipulation problems requiring sequential interaction with multiple objects. Each task consists of two object-centric subtasks executed in sequence:  
+
+> •
+
+Grasp+Pull: grasp an object from the table, pull open a drawer by its handle, and place the object in the drawer.  
+
+> •
+
+Grasp+Open: grasp an object, push open a container lid, and place the object inside.  
+
+> •
+
+Grasp+Grasp: sequentially grasp two objects without releasing the first, similar to [30]. Critically, all tasks require concurrent manipulation: the robot must maintain a stable grasp on the first object while performing the second subtask. This tests a key capability that distinguishes dexterous hands from parallel-jaw grippers. Across all tasks, object shapes, sizes, and initial placements are randomized (within a ±25 cm workspace region) to evaluate robustness and spatial generalization. Fig. 4 shows all training and test objects. 
+
+c) Demonstrations: Expert demonstrations are col-lected via the DexCap teleoperation system [18]. For each task, we collect 3-4 demonstrations per object across 13 distinct objects, yielding approximately 40 demonstrations per task. To evaluate sample efficiency, we additionally collect up to 50 demonstrations for selected object-task combinations. All demonstrations use randomized object placements. Further details on recording format and data contents are in the Appendix. 
+
+d) Baselines: We test three learning-based baselines: Train Objects Test Objects       
+
+> Fig. 4: Objects used in our experiments. Left: training objects for demonstration collection. Right: held-out test objects used exclusively for evaluation, and unseen during training. The set spans a diverse range of geometries, sizes, and interaction affordances.
+> •
+
+Image-based DP: a diffusion policy trained on RGB observations [5].  
+
+> •
+
+DP3 (raw point cloud): a diffusion policy conditioned on raw scene point clouds [6].  
+
+> •
+
+Object-centric point cloud diffusion: a diffusion pol-icy conditioned on object-centric point clouds, similar in spirit to CordViP-style formulations [4]. The object-centric baseline extends DP3 [6] with per-object segmented point clouds following CordViP [4]. For each object, we compute a per-point contact map and con-catenate it as an additional channel. Each object is encoded via PointNet [41] and fused with proprioceptive state; the diffusion backbone is shared with the other baselines. This is our strongest baseline; details are in the Appendix. 
+
+B. Overall Task Performance 
+
+We evaluate overall task success across the suite of dexterous multi-task manipulation problems, comparing our method against learning-based diffusion policies. We eval-uate using training objects (seen during demonstration collection) and test objects (held out during training; see Fig. 4). Each method is evaluated over multiple trials per task-object pair with randomized initial object placements; the number of trials varies by task as shown in Table I. 
+
+a) Metrics: We report task success rate, defined as completing both subtasks in sequence without external in-tervention. A trial is considered successful only if all task objectives are satisfied (e.g., successful grasp, articulated manipulation, and object placement). Across all evaluated tasks, our method consistently out-performs diffusion-based policies on both training and test objects. The performance gap is particularly pronounced for tasks that require precise hand-object alignment and sequen-tial coordination, such as Grasp+Pull and Grasp+Open .These results demonstrate the effectiveness of object-centric skill segmentation and retrieval-based execution for real-world dexterous multi-task manipulation. 
+
+b) Failure Mode Analysis: To understand performance differences, we analyze failure modes of each approach. 
+
+Image-based DP struggles primarily with 3D localiza-tion, particularly for small objects where inferring depth TABLE I: Overall task success rates on the LEAP Hand . Results are reported as successes / total trials for training objects and test objects (see Fig. 4). Best results per column are highlighted in bold.                                
+
+> Method Training Objects Test Objects Grasp+Pull Grasp+Open Grasp+Grasp Grasp+Pull Grasp+Open Grasp+Grasp Image-based DP 3 / 34 3 / 34 0 / 27 3 / 31 2 / 31 0 / 15 DP3 (raw point cloud) 3 / 34 2 / 34 0 / 27 3 / 31 1 / 31 0 / 15 Object-centric DP3 7 / 34 12 / 34 8 / 27 8 / 31 12 / 31 7 / 15 Ours (retrieval-based) 22 / 34 23 / 34 12 / 27 24 / 31 22 / 31 3 / 15
+
+from multi-view 2D observations is challenging in low-data regimes. Additionally, RGB-based policies exhibit sensitivity to visual domain shifts: test objects with different colors or under varying lighting conditions lead to degraded perfor-mance, consistent with prior observations [5]. 
+
+DP3 (raw point cloud) addresses visual domain shift but introduces a different challenge: localizing target objects within cluttered raw point clouds. Without explicit object segmentation, the policy must implicitly learn to identify and focus on task-relevant regions, which is difficult with limited demonstrations. This failure mode aligns with recent findings in [42], [4] that motivate object-centric representations. 
+
+Object-centric DP3 , our strongest baseline, shows sub-stantially improved performance by conditioning on seg-mented object point clouds. However, it exhibits two key lim-itations: (i) lower spatial generalization, requiring multiple attempts to succeed across varied object placements, and (ii) higher sensitivity to the specific trained policy checkpoint, with performance varying noticeably across training runs. 
+
+DexMulti (ours) also has failure cases, mainly in contact-sensitive stages (Fig. 5). The bottom-left shows a first-stage grasp failure on a banana, where stable force balance is hard. The bottom-right shows a pulling failure where the hand does not contact the drawer handle at the correct location. 
+
+c) Safety and Robustness: Beyond success rate, we observe a qualitative difference in failure characteristics. All diffusion-based methods occasionally produce unsafe behaviors when encountering out-of-distribution object con-figurations, such as commanding the hand to collide with un-expectedly large or tall objects, triggering emergency stops. In contrast, our retrieval-based approach exhibits more pre-dictable failure modes: when no good demonstration match exists, the robot typically fails to establish stable contact or alignment, but does so in a controlled manner without sudden collisions. Fig. 5 (top) further shows robustness under moderate external perturbations during execution. 
+
+C. Sample Efficiency 
+
+Our goal is to enable dexterous multi-task manipulation with few real-world demonstrations . We therefore evaluate sample efficiency along two complementary dimensions: (i) demonstration quantity and (ii) demonstration diversity .
+
+a) Evaluation Protocol: We consider a representative task ( Grasp+Open ) and evaluate performance under con-trolled variations in both the number and diversity of demon-strations. All methods are trained using identical subsets of demonstrations and evaluated on held-out trials. 
+
+Fig. 5: Qualitative robustness and failure analysis. Top row: our method remains effective under external perturbations. Bottom-left: 
+
+failure in the first task stage during banana grasping, where stable force balance is difficult. Bottom-right: failure in the pulling stage, where the hand does not contact the handle at the correct location. 5 10 20 50    
+
+> # Demonstrations
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)  (a) Demonstration Quantity
+> 4711
+> # Training Objects
+> (b) Demonstration Diversity
+> Object-centric DP3 Ours (retrieval-based)
+
+Fig. 6: Sample efficiency analysis along two complementary di-mensions. Left: effect of demonstration quantity for a fixed object, varying the number of demonstrations in {5, 10 , 20 , 50 }. Right: 
+
+effect of demonstration diversity, varying the number of distinct training objects in {4, 7, 11 } totaling 44 demonstrations. 
+
+b) Effect of Demonstration Quantity: As shown in Fig. 6 (left), our method achieves perfect success rates with only 5 demonstrations per object-task configuration , main-taining 100% across all data budgets. In contrast, the object-centric DP3 baseline fails with 5 and 10 demonstrations and only reaches 30-40% with 20-50 demonstrations. This highlights that retrieval-based execution can leverage even a handful of demonstrations effectively by directly replaying object-centric skills, whereas end-to-end policies require substantially more data to learn generalizable behavior. 
+
+c) Effect of Demonstration Diversity: Fig. 6 (right) shows performance as the number of distinct training objects increases while fixing the total number of demonstrations. Performance initially improves with object diversity but plateaus as the training set grows; our method consistently outperforms the baseline across all diversity levels. These experiments reveal complementary insights: while both methods benefit from increased object diversity, our method’s key advantage is sample-efficient per-object gen-eralization , requiring only 5 demonstrations per object com-pared to 20-50 for diffusion policies. TABLE II: Ablation on state estimation methods. All experiments are done using training objects. Results are reported as successes / total trials .          
+
+> Estimator Grasp+Pull Grasp+Open FoundationPose 12 / 34 9 / 34 Raw PCA yaw 11 / 34 12 / 34 Centroid-only 6 / 34 8 / 34
+> Ours (uncertainty-aware) 22 / 34 23 / 34
+
+D. State Estimation and Representation Ablations 
+
+We perform ablation studies to analyze the contribution of key design choices in our perception and execution pipeline, with a particular focus on how object state is estimated and represented for object-centric skill alignment. 
+
+a) State Estimation and Yaw Representation: Accurate object state estimation is critical for object-centric skill align-ment. However, we hypothesize that recovering a precise 6D object pose is not a necessary condition for successful ma-nipulation . In many contact-rich tasks, only a subset of state variables—such as the object centroid and a task-relevant orientation—are required for reliable execution. To study this trade-off, we compare three state estimation variants:  
+
+> •
+
+Ours: an uncertainty-aware state estimator that tracks the object centroid and a filtered yaw angle, explicitly modeling uncertainty and avoiding over-commitment to noisy pose estimates.  
+
+> •
+
+FoundationPose: an off-the-shelf 6D pose estima-tor [38] that outputs a full object pose.  
+
+> •
+
+Raw PCA: direct yaw estimation from point cloud PCA without temporal filtering or uncertainty modeling. As shown in Table II, our uncertainty-aware estimator con-sistently outperforms both raw PCA-based yaw estimation and full 6D pose estimation. While FoundationPose performs well on textured objects with distinctive geometry, its per-formance deteriorates significantly on small, symmetric, or weakly textured objects commonly encountered in our task suite. In contrast, our approach explicitly balances estimation fidelity with robustness by tracking only task-relevant state and reasoning under uncertainty. 
+
+b) Object-Centric Canonicalization: We further ablate the object-centric representation by comparing centroid-only 
+
+canonicalization (ignoring orientation) against our centroid + yaw approach. As shown in Table II, removing yaw canonicalization substantially degrades performance, partic-ularly for elongated or articulated objects such as bananas and drawer handles. Without orientation alignment, replayed trajectories exhibit systematic misalignment that leads to failed contact initiation or unstable grasps. 
+
+E. Embodiment Generalization 
+
+We evaluate embodiment generalization by deploying the proposed method on two dexterous hands: the 16-DoF Al-legro Hand and the LEAP Hand [40]. These hands differ in kinematic structure, joint limits, actuation bandwidth, and contact geometry. For each embodiment, we collect the same amount of demonstration data and apply the same perception, segmentation, and skill execution pipeline.                
+
+> TABLE III: Embodiment generalization across dexterous hands. Results are reported as successes / total trials . “G” denotes grasp. Method Allegro LEAP G+Pull G+Open G+Pull G+Open Object-centric DP3 17 / 34 2 / 34 7 / 34 12 / 34
+> Ours 30 / 34 20 / 34 22 / 34 23 / 34
+
+We compare our method against the strongest learning-based baseline under both embodiments. Table III reports success rates on representative tasks. Across both embod-iments, our method consistently outperforms the strongest baseline. We observe that certain tasks benefit more from specific hardware designs. For example, the Allegro Hand has higher success on Grasp+Pull , partially due to its stable performance on small and thin objects. This indicates that hardware constraints can significantly influence the upper bound of achievable task performance. Our method maintains strong performance across embodiments and consistently outperforms learning-based baselines. 
+
+F. Comparison with Demonstration-Free Methods 
+
+A natural question is whether demonstration-free ap-proaches, such as reinforcement learning [17], [14] or grasp synthesis [3], [9], [11], could replace our demonstration-based pipeline. In practice, these methods rely on carefully engineered reward or energy functions and well-chosen ini-tializations to elicit the desired behavior, which becomes in-creasingly difficult for multi-stage tasks. We show illustrative examples of these challenges on our project website. To promote transparency, we release all experiment videos (for all methods) on our project website (dexmulti.github.io) VI. C ONCLUSION , L IMITATIONS , AND FUTURE WORK 
+
+We introduce DexMulti , a practical approach to concur-rent prehensile and nonprehensile dexterous manipulation through object-centric skill decomposition and a retrieve-align-execute paradigm. By decomposing demonstrations into reusable skills with well-defined temporal boundaries and combining them with uncertainty-aware state estimation, the system achieves sample-efficient learning for contact-rich multi-stage tasks. Across three manipulation tasks and two hand embodiments, DexMulti substantially outperforms end-to-end diffusion policy baselines while requiring far fewer demonstrations. Our results suggest that explicit object-centric reasoning offers a practical path toward more general-izable and sample-efficient dexterous manipulation systems. 
+
+Limitations and Future Work. Our approach remains dependent on high-quality real-world teleoperation demon-strations and multi-view RGB-D sensing. Generalization is primarily limited to object geometries within the training distribution, with performance degrading under extreme con-figurations. In addition, the relatively bulky hand hardware makes manipulation of very thin objects (e.g., credit cards or thin fabric) challenging. Future work includes tactile feedback, improved hand hardware (e.g. ORCA Hand [43]), and stronger single-view geometry estimation [44]. REFERENCES [1] OpenAI, I. Akkaya, M. Andrychowicz, M. Chociej, M. Litwin, B. McGrew, A. Petron, A. Paino, M. Plappert, G. Powell, R. Ribas, J. Schneider, N. Tezak, J. Tworek, P. Welinder, L. Weng, Q. Yuan, W. Zaremba, and L. Zhang, “Solving rubik’s cube with a robot hand,” arXiv preprint arXiv:1910.07113, 2019. [2] H. Qi, A. Kumar, R. Calandra, Y. Ma, and J. Malik, “In-Hand Object Rotation via Rapid Motor Adaptation,” in Conference on Robot Learning (CoRL), 2022. [3] R. Wang, J. Zhang, J. Chen, Y. Xu, P. Li, T. Liu, and H. Wang, “Dexgraspnet: A large-scale robotic dexterous grasp dataset for general objects based on simulation,” in IEEE International Conference on Robotics and Automation (ICRA), 2023. [4] Y. Fu, Q. Feng, N. Chen, Z. Zhou, M. Liu, M. Wu, T. Chen, S. Rong, J. Liu, H. Dong, and S. Zhang, “CordViP: Correspondence-based Visuomotor Policy for Dexterous Manipulation in Real-World,” in Robotics: Science and Systems (RSS), 2025. [5] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion Policy: Visuomotor Policy Learning via Action Diffusion,” in Robotics: Science and Systems (RSS), 2023. [6] Y. Ze, G. Zhang, K. Zhang, C. Hu, M. Wang, and H. Xu, “3D Diffusion Policy: Generalizable Visuomotor Policy Learning via Simple 3D Representations,” in Robotics: Science and Systems (RSS), 2024. [7] S. Patidar, A. Sieler, and O. Brock, “In-hand cube reconfiguration: Simplified,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2023. [8] D. Rus, “In-Hand Dexterous Manipulation of Piecewise-Smooth 3-D Objects,” in International Journal of Robotics Research (IJRR), 1999. [9] A. H. Li, P. Culbertson, J. W. Burdick, and A. D. Ames, “Frogger: Fast robust grasp generation via the min-weight metric,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2023. [10] M. Liu, Z. Pan, K. Xu, K. Ganguly, and D. Manocha, “Deep differen-tiable grasp planner for high-dof grippers,” in Robotics: Science and Systems (RSS), 2020. [11] T. Liu, Z. Liu, Z. Jiao, Y. Zhu, and S.-C. Zhu, “Synthesizing diverse and physically stable grasps with arbitrary hand structures using dif-ferentiable force closure estimator,” in IEEE Robotics and Automation Letters (RA-L), 2022. [12] J. He, D. Li, X. Yu, Z. Qi, W. Zhang, J. Chen, Z. Zhang, Z. Zhang, L. Yi, and H. Wang, “DexVLG: Dexterous Vision-Language-Grasp Model at Scale,” in IEEE International Conference on Computer Vision (ICCV), 2025. [13] T. G. W. Lum, A. H. Li, P. Culbertson, K. Srinivasan, A. D. Ames, M. Schwager, and J. Bohg, “Get a grip: Multi-finger grasp evaluation at scale enables robust sim-to-real transfer,” in Conference on Robot Learning (CoRL), 2024. [14] H. Jiang, Y. Wang, H. Zhou, and D. Seita, “Learning to Singu-late Objects in Packed Environments using a Dexterous Hand,” in International Symposium on Robotics Research (ISRR), 2024. [15] Y. Yuan, H. Che, Y. Qin, B. Huang, Z.-H. Yin, K.-W. Lee, Y. Wu, S.-C. Lim, and X. Wang, “Robot Synesthesia: In-Hand Manipulation with Visuotactile Sensing,” in IEEE International Conference on Robotics and Automation (ICRA), 2024. [16] OpenAI, M. Andrychowicz, B. Baker, M. Chociej, R. Jozefowicz, B. McGrew, J. Pachocki, A. Petron, M. Plappert, G. Powell, A. Ray, J. Schneider, S. Sidor, J. Tobin, P. Welinder, L. Weng, and W. Zaremba, “Learning Dexterous In-Hand Manipulation,” in International Journal of Robotics Research (IJRR), 2019. [17] Y. Chen, C. Wang, L. Fei-Fei, and C. K. Liu, “Sequential dexter-ity: Chaining dexterous policies for long-horizon manipulation,” in Conference on Robot Learning (CoRL), 2023. [18] C. Wang, H. Shi, W. Wang, R. Zhang, L. Fei-Fei, and C. K. Liu, “DexCap: Scalable and Portable Mocap Data Collection System for Dexterous Manipulation,” in Robotics: Science and Systems (RSS), 2024. [19] M. T. Mason, “Progress in Nonprehensile Manipulation,” in International Journal of Robotics Research (IJRR), 1999. [20] J. Chen, Y. Chen, J. Zhang, and H. Wang, “Task-oriented dexterous hand pose synthesis using differentiable grasp wrench boundary es-timator,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2024. [21] Y. Sun, E. Amatova, and T. Chen, “Multi-object grasping-types and taxonomy,” in IEEE International Conference on Robotics and Automation (ICRA), 2022. [22] T. Chen, A. Shenoy, A. Kolinko, S. Shah, and Y. Sun, “Multi-object grasping – estimating the number of objects in a robotic grasp,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2021. [23] H. Lu, Y. Dong, Z. Weng, F. T. Pokorny, J. Lundell, and D. Kragic, “Grasping a handful: Sequential multi-object dexterous grasp genera-tion,” in IEEE Robotics and Automation Letters (RA-L), 2025. [24] T. Yamada and H. Yamamoto, “Static grasp stability analysis of multiple spatial objects,” Journal of Control Science and Engineering, vol. 3, 2015. [25] Y. Yu, K. Fukuda, and S. Tsujio, “Computation of grasp internal forces for stably grasping multiple objects,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2001. [26] T. Yoshikawa, T. Watanabe, and M. Daito, “Optimization of power grasps for multiple objects,” in IEEE International Conference on Robotics and Automation (ICRA), 2001. [27] K. Harada and M. Kaneko, “Kinematics and internal force in grasping multiple objects,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 1998. [28] K. Yao and A. Billard, “Exploiting kinematic redundancy for robotic grasping of multiple objects,” in IEEE Transactions on Robotics, 2023. [29] Y. Li, B. Liu, Y. Geng, P. Li, Y. Yang, Y. Zhu, T. Liu, and S. Huang, “Grasp multiple objects with one hand,” in IEEE Robotics and Automation Letters (RA-L), 2024. [30] S. He, Z. Shangguan, K. Wang, Y. Gu, Y. Fu, Y. Fu, and D. Seita, “Se-quential multi-object grasping with one dexterous hand,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2025. [31] Y. Li, Y. Ling, G. Sukhatme, and D. Seita, “Learning geometry-aware nonprehensile pushing and pulling with dexterous hands,” in IEEE International Conference on Robotics and Automation (ICRA), 2026. [32] J. Eom, S. Y. Yu, W. Kim, C. Park, K. Y. Lee, and K.-J. Cho, “Mogrip: Gripper for multiobject grasping in pick-and-place tasks using translational movements of fingers,” Science Robotics, 2024. [33] K. Dreczkowski, P. Vitiello, V. Vosylius, and E. Johns, “Learning a thousand tasks in a day,” Science Robotics, 2025. [34] Y. Kuang, J. Ye, H. Geng, J. Mao, C. Deng, L. Guibas, H. Wang, and Y. Wang, “Ram: Retrieval-based affordance transfer for generalizable zero-shot robotic manipulation,” in Conference on Robot Learning (CoRL), 2024. [35] S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, C. Li, J. Yang, H. Su, J. Zhu, et al., “Grounding DINO: Marrying DINO with Grounded Pre-training for Open-set Object Detection,” in European Conference on Computer Vision (ECCV), 2024. [36] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. R¨ adle, C. Rolland, L. Gustafson, E. Mintun, J. Pan, K. V. Alwala, N. Carion, C.-Y. Wu, R. Girshick, P. Doll´ ar, and C. Feichtenhofer, “SAM 2: Segment Anything in Images and Videos,” arXiv preprint arXiv:2408.00714, 2024. [37] Y. Qin, B. Huang, Z.-H. Yin, H. Su, and X. Wang, “Dexpoint: Gener-alizable point cloud reinforcement learning for sim-to-real dexterous manipulation,” Conference on Robot Learning (CoRL), 2022. [38] B. Wen, W. Yang, J. Kautz, and S. Birchfield, “FoundationPose: Unified 6d pose estimation and tracking of novel objects,” in CVPR, 2024. [39] C. M. Kim*, B. Yi*, H. Choi, Y. Ma, K. Goldberg, and A. Kanazawa, “Pyroki: A modular toolkit for robot kinematic optimization,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2025. [40] K. Shaw, A. Agarwal, and D. Pathak, “Leap hand: Low-cost, efficient, and anthropomorphic hand for robot learning,” in Robotics: Science and Systems (RSS), 2023. [41] C. R. Qi, H. Su, K. Mo, and L. J. Guibas, “Pointnet: Deep learning on point sets for 3d classification and segmentation,” in IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2017. [42] C. Wang, H. Fang, H.-S. Fang, and C. Lu, “RISE: 3D Perception Makes Real-World Robot Imitation Simple and Effective,” arXiv preprint arXiv:2404.12281, 2024. [43] C. C. Christoph, M. Eberlein, F. Katsimalis, A. Roberti, A. Sympetheros, M. R. Vogt, D. Liconti, C. Yang, B. G. Cangan, R. J. Hinchet, and R. K. Katzschmann, “Orca: An open-source, reliable, cost-effective, anthropomorphic robotic hand for uninterrupted dexterous task learning,” 2025. [Online]. Available: https://arxiv.org/abs/2504.04259 [44] Y. Lyu, N. Madapana, V. Aggarwal, Q. Deng, J. Tremblay, J. Wang, K. Zheng, R. Rallapalli, N. Jaipuria, B. K. Iwana, and I. Prasad, “SAM 3D: 3Dfy Anything in Images,” 2025. [Online]. Available: https://arxiv.org/abs/2511.16624 [45] M. Ester, H.-P. Kriegel, J. Sander, X. Xu, et al., “A Density-based Algorithm for Discovering Clusters in Large Spatial Databases with Noise,” in International Conference on Knowledge Discovery and Data Mining (KDD), 1996. [46] J. Song, C. Meng, and S. Ermon, “Denoising diffusion implicit models,” in International Conference on Learning Representations (ICLR), 2021. [47] K. Shaw and D. Pathak, “LEAP Hand V2 Advanced: Dexterous, Low-cost Hybrid Rigid-Soft Hand for Robot Learning,” in IEEE-RAS International Conference on Humanoid Robots (Humanoids), 2025. APPENDIX 
+
+A. Additional Method Details a) Perception Pipeline: We stream synchronized RGB-D images from one or more calibrated depth cameras. Using known camera intrinsics and extrinsics, depth images are back-projected into 3D space and transformed into the robot base frame, yielding a fused scene point cloud. The multi-view setup mitigates occlusion and improves geometric cov-erage during manipulation. Given the language instruction 
+
+ℓ, we use Grounding DINO [35] to generate an initial 2D bounding box for each task-relevant object category. The bounding box is then used as a prompt for SAM2 [36], which performs real-time instance segmentation and tracking across frames. Using the resulting masks, we project only the pixels corresponding to each tracked object into 3D, producing an object-only point cloud that discards background clutter (tabletop, robot arm, surrounding environment). All points are expressed in the robot base frame to ensure consistency across views and time. Raw segmented point clouds are often noisy and contain outliers. To produce clean, fixed-size object point clouds, we apply the following denoising pipeline: 1) Workspace cropping: Points are cropped to a prede-fined 3D bounding region around the tabletop. 2) Random downsampling: The cropped cloud is uni-formly downsampled to at most 8192 points to bound computation cost. 3) Statistical outlier removal: Points with abnormally large distances to their neighbors are removed. 4) Radius outlier removal: Sparse points with insuffi-cient local support are discarded. 5) Density-based clustering: DBSCAN [45] is applied to remove small isolated clusters, assuming segmented object point clouds form coherent structures. 6) Farthest point sampling (FPS): The remaining points are downsampled to a fixed size of 512 points. All denoising and downsampling operations are implemented on the GPU and deployed across multiple ROS nodes. 
+
+b) Skill Segmentation: To reason about hand-object interaction for skill segmentation, we model the dexterous hand as a point cloud. Given a joint configuration, link-level surface points sampled from the robot URDF are transformed into the world frame via forward kinematics, producing a hand point cloud synchronized with the object point cloud. Using these paired point clouds, we compute a soft contact signal measuring geometric proximity between the hand and each object surface [4]: for each object surface point, we evaluate its distance to the hand and convert this into a continuous contact indicator. The resulting signal provides a temporally consistent measure of interaction strength that is robust to sensor noise and partial occlusion. Keyframes are detected as the first timestep at which sustained hand-object contact occurs for each object ok, and the demonstration is segmented at these boundaries into object-centric skills 
+
+(σi,1, . . . , σi,K ).
+
+c) EKF State Representation: For each object, the esti-mator maintains the state xt = ( ct , ψt , ˙ct , ˙ψt ) with a Gaussian belief p(xt ) = N (μt , Pt ) using constant-velocity dynamics. The yaw observability score is computed from geometric cues (anisotropy and spatial extent of the point cloud) and the filter’s yaw uncertainty. This score is temporally smoothed and thresholded with hysteresis to produce the binary flag 
+
+Iobs t . When yaw is observable, the task-level yaw ψtask t
+
+smoothly tracks the estimated yaw; when unobservable, it is held constant. 
+
+d) Yaw Selection Rule During Alignment: Let ψretr de-note the yaw used during retrieval (either the task-level yaw when geometrically identifiable, or the relative alignment θ ∗
+
+when not), and let Iretr ∈ { 0, 1} indicate whether yaw was observable at retrieval time. At each alignment step, the yaw used for world-frame transformation is: 
+
+ψt =
+
+
+
+ψtask t , if Iretr = 1 and Iobs t = 1,
+
+ψtask t−1 , if Iretr = 1 and Iobs t = 0,
+
+ψretr , if Iretr = 0.
+
+(4) Retrieval-time observability captures ambiguity from object geometry, while real-time observability reflects estimator confidence that can vary due to occlusion. Separating these two notions avoids spurious orientation changes under am-biguity while still exploiting reliable yaw updates when available. 
+
+e) Collision Representation for Motion Planning: 
+
+To enable real-time collision avoidance during closed-loop alignment, we approximate each obstacle point cloud with a compact multi-sphere envelope. Given an object point cloud, we perform PCA to identify its principal axis and partition the cloud into K bins along this axis (typically K=6). For each bin, we compute a medial-axis sphere center from the local point distribution and estimate the sphere radius from orthogonal thickness (using a conservative percentile). The resulting K sphere centers and radii are temporally smoothed using critically damped second-order filters to prevent jit-ter. These collision spheres, together with static workspace boundaries, are passed to the Pyroki motion planner at each control step, enabling efficient collision checking against perception-derived obstacle geometries. 
+
+B. Baseline Implementation Details 
+
+All baselines are trained on the same set of expert demonstrations and share the same perception pipeline where applicable. 
+
+a) Image-based DP: We use the Diffusion Policy im-plementation of Chi et al. [5] with a ResNet-18 visual encoder. The policy receives RGB images from both cameras and the robot’s proprioceptive state (end-effector pose and hand joint angles). We train for 600 epochs with a prediction horizon of 32, an observation window of 3 steps, and an action chunk size of 16. 
+
+b) DP3 (raw point cloud): We use the 3D Diffusion Policy of Ze et al. [6], which conditions on a single scene-level point cloud synthesized from multi-view RGB-D. The point cloud is cropped to the workspace bounding box and downsampled to 4096 points via farthest point sampling (FPS). We train for 300 epochs with a prediction horizon of 32, an observation window of 3 steps, and an action chunk size of 16. 
+
+c) Object-centric DP3: This baseline builds on the 3D Diffusion Policy, incorporating key ideas from CordViP [4] to process object-centric point clouds instead of raw scene point clouds. We describe the design choices below. 
+
+Point cloud input. Rather than encoding a single mono-lithic scene point cloud, we use our language-conditioned segmentation pipeline (§IV-A) to produce separate per-object point clouds. Each object’s point cloud consists of 512 points with 4 channels: XYZ coordinates plus a per-point contact map computed following CordViP [4]. 
+
+Encoder architecture. Each point cloud is independently processed by a shared PointNet [41] encoder consisting of three fully connected layers with LayerNorm and ReLU activations, producing a 256-dimensional feature vector per object. Feature vectors from all objects are concatenated to form the visual observation embedding. In parallel, the robot’s proprioceptive state—end-effector position (3D), end-effector orientation (9D flattened rotation matrix), and hand joint angles (16D)—is encoded via a separate MLP into a 64-dimensional vector. The point cloud and proprioceptive features are concatenated to form the full observation con-ditioning vector. 
+
+Diffusion policy head. We adopt the same conditional UNet1D architecture as DP3, with FiLM-based conditioning on the observation features. The policy jointly predicts a 28-dimensional action: 3D TCP position, 9D rotation matrix (projected to SO (3) via SVD), and 16D hand joint targets. We use 50 diffusion timesteps during training and accelerate inference with DDIM [46] using 10 denoising steps. 
+
+Data augmentation. We apply SE(3) augmentation to the point clouds during training, consisting of small ran-dom translations (scale 0 .01 m) and point-level jitter (scale 0.01 m), applied consistently across all point clouds in a given sample to preserve spatial relationships. 
+
+Distinction from CordViP. This baseline adapts CordViP’s core ideas of using separately segmented object point clouds and per-point contact maps as policy input. Following Cord-ViP, we generate hand point clouds via a forward kinematics model and use them to compute per-point contact maps on each object surface. However, we omit several components of the full CordViP pipeline: (1) we do not use Founda-tionPose for 6D pose-driven point cloud tracking—point clouds come directly from RGB-D segmentation; and (2) we do not employ CordViP’s hand-arm coordination pre-training objectives. This design isolates the contribution of object-centric 3D representations and contact maps from the auxiliary pre-training losses. 
+
+Training details. We train for 300 epochs using the AdamW optimizer with a learning rate of 1 × 10 −4, a pre-diction horizon of 32, an observation window of 3 steps, and an action chunk of 16. Images, point cloud coordinates, TCP positions, and hand joint positions are linearly normalized to [−1, 1] per dimension for training stability; orientations (rotation matrices or quaternions) are left unnormalized. 
+
+C. Additional Experiment Details a) Control Frequencies and Command Interfaces: 
+
+For the arm, the action space is defined in task space as target TCP poses. Arm commands are issued at 10 Hz and linearly interpolated to the robot’s internal control frequency of 20 Hz. To ensure smooth and safe execution, each arm command is constrained to remain close to the current TCP pose: translational motion is limited to at most 10 cm per second, and rotational motion to at most 25 degrees per second. For the hand, we directly command joint positions for each degree of freedom via the underlying PD controller provided by the hardware interface. Hand commands are issued at 10 Hz and internally upsampled by the robot controller to the native control frequencies (40 Hz for the LEAP Hand and 200 Hz for the Allegro Hand). This unified command interface allows consistent high-level control across different embodiments while preserving smooth low-level actuation. The perception pipeline runs fully online, producing object-centric point clouds at approximately 20 Hz. Hand point clouds generated via forward kinematics are published at approximately 30 Hz. All point cloud denoising, contact map computation, and interaction signal extraction are im-plemented on the GPU and deployed as ROS nodes. 
+
+b) Demonstration Recording: Expert demonstrations are recorded at 10 Hz, matching the high-level control fre-quency. Each demonstration includes synchronized robot states (arm joint positions, hand joint positions, TCP pose), multi-view RGB-D observations, object-centric point clouds, and contact maps. For each task, we collect demonstrations using a set of 13 distinct training objects. For standard experiments, we collect 3–4 demonstrations per object, re-sulting in approximately 40 demonstrations per task. These demonstrations are used both by our retrieval-based method and to train end-to-end learning baselines. To evaluate sample efficiency, we additionally collect up to 50 demonstrations for selected object-task combinations. All demonstrations are initialized from randomized object configurations across the workspace. 
+
+D. Detailed Limitations and Future Work a) Current Limitations: Although DexMulti is sample-efficient relative to end-to-end baselines, it still depends on high-quality teleoperation demonstrations to define reusable skill segments. The retrieval-and-alignment mechanism can also degrade when test-time scenes lie far outside the geometry and placement distribution seen during training, especially under severe occlusion or highly cluttered layouts. Our current perception stack relies on calibrated multi-view RGB-D sensing and accurate language-conditioned segmen-tation; this improves robustness but introduces deployment overhead and sensitivity to sensor placement. On the hard-ware side, the hand embodiment and fingertip geometry still limit reliable manipulation of very thin or highly deformable objects. Finally, while object-centric decomposition improves compositionality, the current pipeline assumes a fixed inter-action order and does not yet reason over alternative task graphs or recover from large sequencing errors. 
+
+b) Future Work: Several directions could extend prac-ticality and generalization. First, integrating tactile sensing for both contact-state estimation and policy conditioning could improve robustness during concurrent prehensile and nonprehensile interactions, where visual ambiguity is com-mon. Second, adopting improved hand designs with better compliance and slimmer fingertips (e.g., LEAP v2 [47] and ORCA Hand [43]) may expand the feasible object set. Third, reducing dependence on multi-view RGB-D by leveraging stronger single-view 3D reconstruction and geometry pri-ors [44] would simplify deployment. Finally, combining object-centric skill libraries with higher-level planners that can branch, re-order, and recover online is a promising path toward more open-world long-horizon dexterous manipula-tion.

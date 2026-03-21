@@ -1,0 +1,320 @@
+Title: TGM-VLA: Task-Guided Mixup for Sampling-Efficient and Robust Robotic Manipulation
+
+URL Source: https://arxiv.org/pdf/2603.00615v1
+
+Published Time: Tue, 03 Mar 2026 01:53:48 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# TGM-VLA: Task-Guided Mixup for Sampling-Efficient and Robust Robotic Manipulation 
+
+Fanqi Pu 1, Lei Jiang 2,∗ and Wenming Yang 1,∗
+
+Abstract — The performance of robotic imitation learning is fundamentally limited by data quality and training strategies. Prevalent sampling strategies on RLBench suffer from severe keyframe redundancy and imbalanced temporal distribution, leading to inefficient memory usage and unstable optimization. Moreover, reprojecting point clouds onto multi-view images with a black background—while more efficient than voxel-based methods—often causes dark objects to be indistinguishable and hard to manipulate. In this work, we propose a novel holistic framework that significantly improves both model performance and training efficiency. First, we redesign and optimize the keyframe sampling strategy, reducing memory consumption by 80% and accelerating training speed by 5x. Second, we augment the model with a color inversion projection branch—a simple yet effective module that resolves the ambiguity of dark objects. Finally, we propose a task-guided mixup technique that dynamically fuses point clouds and action heatmaps according to task instructions, greatly improving robustness to distractors and performance in multi-goal scenarios. Extensive experiments demonstrate that our method achieves state-of-the-art performance with a 90.5% success rate on RLBench and 68.8% on the COLOSSEUM benchmark under challenging interference conditions. Our code and checkpoints are available at https://github.com/PuFanqi23/TGM-VLA .
+
+I. INTRODUCTION Robotic imitation learning aims to enable robots to acquire complex manipulation skills through expert demonstration data. While conventional 2D image-based imitation methods [1]–[10] struggle with perception and generalization in un-structured settings, recent advances in 3D Vision-Language-Action (VLA) Models have shown remarkable promise [11]– [18]. These models interpret language instructions to output actions from multi-view point clouds, demonstrating strong spatial generalization. Notably, frameworks like RVT [13] boost efficiency by reprojecting 3D point clouds into a 2D virtual images, reducing background interference. Despite these advances, several critical limitations persist in current 3D VLA methods. First, conventional demonstra-tion sampling strategies remain inefficient. Early sampling approaches like C2F-ARM [19] and PerACT [12] heavily oversample keyframes on RLBench benchmarks [20] to ensure the coverage of critic states and predict the next best action, a practice continued in later works such as RVT-2 [14] and SAM2ACT [21]. Although simple, this leads to substan-tial storage overhead and introduces severe temporal bias,    
+
+> 1Shenzhen International Graduate School, Tsinghua University, Shen-zhen, China. Email:
+
+pfq23@mails.tsinghua.edu.cn and 
+
+yang.wenming@sz.tsinghua.edu.cn  
+
+> 2The National and Local Co-Build Humanoid Robotics Innovation Cen-ter, Shanghai, China. Email:
+
+jianglei@openloong.net  
+
+> ∗Corresponding Authors
+
+Keyframes 
+
+> (20 G)
+
+Key N 
+
+Demo Aug  
+
+> (42 G) k1
+
+Key 2 Redundant Keyframes k2 
+
+> (349 G)
+
+Key 1 
+
+(a) RLBench Replay Buffer Distribution (b) Keyframe and Demo 
+
+Augmentation Sampling Strategy 
+
+Fig. 1: Data Distribution and Sampling. Red dots represent next target poses. Orange dots represent observed states sampled every 10 frames. Yellow arrows depict keyframe samples, while white arrows depict augmented samples. The original sampling strategy causes data redundancy and tem-poral imbalance, as each augmented sample forces repeated sampling of all subsequent keyframe samples. with later frames disproportionately represented. Moreover, the choice of keyframes significantly affects performance; even large-scale models like BridgeVLA [22] can fail com-pletely on certain tasks due to poorly chosen keyframes. Second, the robustness of visual perception remains a bottleneck. For instance, while point cloud reprojection re-duces computational cost, rendering points against a uniform background causes perceptual collapse when objects and background share similar colors, leading to failures even in training. Furthermore, real-world scenes contain abundant task-irrelevant distractors, whereas current training typically includes only task-relevant objects. Consequently, these mod-els underutilize textual instructions, becoming heavily depen-dent on visual inputs. During testing, the presence of novel distractors often distracts the model, leading to degraded accuracy or task failure. We address these challenges with following contributions:  
+
+> •
+
+An optimized keyframe sampling strategy reorganizes the dataset and uses cyclic alternate training, reducing replay buffer usage by over 80% and accelerating train-ing by 5× while improving performance.  
+
+> •
+
+A color inversion point cloud projection branch is introduced to enhance contrast for dark objects, raising success rates by over 10% in low-contrast scenes.  
+
+> •
+
+A task-guided mixup strategy includes cross-task mixup to strengthen language-action alignment and intra-task mixup to capture multimodal action distributions.  
+
+> •
+
+Our method achieves state-of-the-art results on two benchmarks: 90.5% success on RLBench and 68.8% on COLOSSEUM’s 14 interference settings. 
+
+> arXiv:2603.00615v1 [cs.RO] 28 Feb 2026
+
+Point Cloud 
+
+Reconstruction RGB INV 
+
+Rende 
+
+Images e
+
+## 3D Transformations Instruction 
+
+十
+
+Intra-Task and 
+
+Cross-Task Mixup 
+
+"stack the other cup 
+
+top of the maroon 
+
+TGM-VLA(Coarse Stage) 
+
+Image 
+
+Encoder 
+
+Mulit-View 
+
+Transformer 
+
+Tokenizer 
+
+## cup n
+
+Lift to 3D 
+
+& Zoom in Position(X,Y,Z) 
+
+# Muliti-Resolution Upsampling Crop Point Cloud Rotation 
+
+& Render Images 
+
+TGM-VLA 十 Gripper 
+
+(Fine Stage) Collision 
+
+Action Heatmap(coarse) Action Heatmap(fine) Fig. 2: Overview of TGM-VLA . Given the current point cloud and a task instruction, TGM-VLA predicts the next key-frame pose. This model employs data augmentations including 3D transformations, intra-task, and cross-task mixup. At inference, it first renders point cloud into orthogonal views, enhanced with inverted-color images for improved contrast, to coarsely localize the area of interest. The second stage uses zoomed-in views to precisely predict the gripper pose. II. RELATED WORK 
+
+Learning robotic manipulation from demonstrations .Imitation learning enables robots to acquire skills from expert demonstrations. Recent works have developed various approaches for different task settings, such as Diffusion Policy [2] for Push-T, ACT [1] for bimanual manipulation, and RVT-2 [14] for language-conditioned tasks. In keyframe-based imitation learning, each datapoint in a demonstration is typically cast as a “predict the next (best) keyframe action” task [19], [23], [24]. Many approaches [12], [25] employ keyframe discovery and demonstration augmenta-tion to expand training data. However, these techniques often introduce noisy or sub-optimal samples, forcing heavy oversampling of keyframes to maintain performance. This results in highly redundant replay buffers, increased storage costs, and reduced training efficiency. Moreover, inappro-priate keyframe selection can lead to critical failures such as motion repetition, inverse kinematics (IK) infeasibility, or obstacle avoidance breakdowns. Therefore, an optimized keyframe sampling strategy is essential to overcome these limitations. 
+
+3D Vision-Language-Action (VLA) Models . While 2D VLAs are efficient, they lack robustness in spatially complex tasks. These methods typically employ Transformers [26] to process 2D visual inputs and directly predict 3D ac-tions, often leveraging pre-trained vision-language models (VLMs) to build VLA models for complex manipulation learning [1], [3]–[9], [27]–[29]. Despite their effectiveness, such 2D image-based policies usually require extensive data collection, frequently demanding hundreds of trajectories per task to achieve reliable performance. This data inefficiency motivates the integration of 3D perception, leading to 3D VLA models that leverage structural scene understanding. Representative methods can be categorized into several groups. Point-cloud-based techniques, such as Act3D [11], lift 2D features into 3D for action prediction. Voxel-based methods, including PerACT [12], operate within a unified 3D voxel space. Hybrid designs aim to balance 3D capability with 2D efficiency; for example, RVT [13] and its successor RVT-2 [14] reproject 3D point clouds into 2.5D multi-view images, thereby avoiding direct 3D processing and accelerating training. SAM2ACT [21] and BridgeVLA [22] employ pre-trained backbones to predict heatmaps on 2D im-ages projected from point clouds. However, this reprojection method struggles with low-contrast objects (e.g., dark items on black backgrounds). To mitigate this issue, we introduce a color inversion branch to strengthen perception, along with a task-guided point-cloud mixup strategy to improve language-action alignment and robustness against distractors. III. METHOD The proposed framework TGM-VLA learns a mapping 
+
+(P, L) → A from a 3D point cloud P and a language instruction L to an action command A. As shown in Fig.2, the multi-camera point cloud P ∈ RN ×3 is first ortho-graphically projected into multi-view images {Vi}Ki=1 , with inverted-color counterparts {Vi} generated to boost contrast. A visual encoder SAM2 [30] extracts features from both Vi
+
+and Vi, while a text encoder CLIP [31] processes L. Per-view multimodal features Fi = [ Fvis ; Ftext ] are fused via a multi-view Transformer T using cross-attention, yielding a global representation F.An upsampling head [32] converts F into orthogonal 2D action heatmaps {Hi}, whose back-projection identifies the coarse 3D position with the highest score. This region is then cropped to obtain a refined, high-resolution point cloud patch Prefined , and the same encoding-prediction process is repeated. The model finally outputs an 8D action A =(T, s, c ), which includes a 6-DoF pose T ∈ SE (3) (position 
+
+t ∈ R3 and orientation R ∈ SO (3) ), a gripper state 
+
+s ∈ { 0, 1}, and a collision-avoidance flag c ∈ { 0, 1}, for subsequent motion planning. 
+
+A. Optimized Keyframe Sampling Strategy 
+
+In keyframe based robotic manipulation, the trajec-tory is represented as a sequence of key poses K =
+
+{k1, k2, . . . , kN }. For instance, in a ”stacking cups” task, keyframes are annotated at the pre-alignment and contact Predict 
+
+next pose 
+
+Frame 120(Observation) 
+
+Modify 
+
+Frame 123(Key) 
+
+(a) Repetitive Motions 
+
+Predict Predict 
+
+## next pose next pose 
+
+Frame 104(Key) Collision Avoidance Keyframe 
+
+(c) Collision Avoidance Breakdowns 
+
+Frame 112(Key) Frame 100(Key) 
+
+(b) Inverse Kinematics Limits 
+
+Frame 182(Key) 
+
+(d) Insufficient Motion Clearance 
+
+Predict Predict 
+
+next pose next pose 
+
+Frame 91(Key) Intermediate_Via-point Keyframe Frame 236(Key) 
+
+(e) Lack of Intermediate Motions Fig. 3: Remedies for Failure Scenarios. Each subfigure pairs a specific failure mode with our corrective measures. moments. These poses are sampled from expert demonstra-tion to construct a training replay buffer. Specifically, Current point cloud Pt and language instruction L are taken as input to predict the next keyframe pose kt+1 .The replay buffer consists of two sample types: demo augmentation samples , which use the point cloud at an observation frame as input and label it with the next keyframe pose to teach the model to progress from intermediate to target states; and keyframe samples , which take the point cloud at a keyframe as input and label it with the next keyframe pose to focus on transitions between critical states. However, the conventional sampling strategy, which re-samples all subsequent keyframes whenever an observation frame is selected, introduces two critical problems: data redundancy , as it generates duplicate samples that increase storage overhead and reduce dataset entropy; and temporal imbalance , since later keyframes are oversampled, causing the model to over-emphasize later-stage actions at the ex-pense of early-stage prediction. To address these issues, we first removed redundant keyframes and employed a cyclic training strategy that al-ternates between keyframe samples and demo augmentation samples. However, after retraining, the model exhibited two unexpected failure modes:  
+
+> •
+
+Training Degradation : For simple tasks (e.g., “pick and place”), the model initially reached 100% success rate, but then declined substantially, stabilizing at a lower performance level ( 60 –70% ).  
+
+> •
+
+Training Deadlock : For complex tasks (e.g., “empty dishwasher” or “wipe desk”), the model failed to learn from the start, maintaining a near-zero success rate. Analysis indicates that for imitation learning, data qual-ity (“what to learn”) is as crucial as model architecture (“how to learn”). Thus, poor sampling becomes a bottleneck. These failures stem from two issues: the ineffectiveness of keyframes in capturing task states, and increased interference from erroneous samples under the new training strategy. To determine whether a given sampling strategy is suitable for a task and to detect erroneous samples, we developed a stepwise diagnostic pipeline that monitors dynamic training success rates across task categories, enabling rapid identi-fication of potential problem types. Based on success-rate patterns, training scenarios fall into three categories:  
+
+> •
+
+Scenario A : Erroneous Samples — Persistent decline in training success rate indicates erroneous samples in the replay buffer, requiring targeted data cleaning.  
+
+> •
+
+Scenario B : Ineffective Keyframes — Steady overall success rate with certain instances at zero indicates ineffective keyframe selection, requiring respecification.  
+
+> •
+
+Scenario C : Generalization Limitations — Stable train-ing performance with a test-set gap confirms sampling effectiveness, requiring improved model generalization. Based on preliminary diagnosis, we further record and analyze task failures such as repetitive motions and obstacle avoidance breakdowns. We observe that discarding redundant keyframes raised the sampling rate of demo augmentation frames, which contain erroneous samples. These previously diluted erroneous samples disrupted training and led to performance degradation or convergence stagnation. Accordingly, we applied specific remedies: data cleaning for erroneous samples (Scenario A) and sampling redesign for ineffective keyframes (Scenario B). These measures eliminated systematic bias from prior sampling strategy, establishing a reliable data foundation for model training. 
+
+Repetitive Motions (e.g., ”put item in drawer”). The original sampling strategy selects observation frames at fixed intervals ∆t without imposing a minimum distance constraint between observation pose and next keyframe pose. These overly spatiotemporally close samples will induce the model to converge to a local optimum of near-static behaviors. To address this, we introduce a motion-saliency filter that retains only samples where the Euclidean distance exceeds a threshold. This adjustment improves training convergence and raises simple tasks from 60% to a stable 100%. 
+
+Inverse Kinematics Limits (e.g., ”open drawer”). When demonstration keyframes lie near workspace boundaries, even small perturbations during augmentation or inference can push target poses outside the feasible kinematic set, triggering IK failures. We mitigate this by retreating along the demonstrated trajectory by a fraction α ∈ [0 .8, 0.9] and creating a safety buffer before physical limits. Consequently, ”open drawer” success increases from 88% to 100%. 
+
+Collision Avoidance Breakdowns (e.g., ”empty dish-washer”). In cluttered or narrow environments, limited per-ception range and low-level motion planners often fail to prevent collisions. Therefore, we insert defensive via-point keyframes at high-risk zones, guiding the arm with a collision-free preparatory pose and decomposing risky motions into safer sub-trajectories. This raises the success rate of ”empty dishwasher” from 0% to 36%. 
+
+Lack of Intermediate Motions (e.g., ”wipe desk”). Tasks with specific trajectory patterns such as zig-zag wiping suffer from weak path constraints when only current end-effector pose and next keyframe pose are provided. By inserting intermediate keyframes {k(i) 
+
+> via
+
+}M −1 
+
+> i=1
+
+at curvature peaks of the desired trajectory, we enforce shape priors that compel the model to reproduce the intended motion trajectory. This raises the success rate of ”wipe desk” from 0% to 34%. 
+
+Insufficient Motion Clearance (e.g., ”hockey”). Some expert trajectories lack sufficient ground clearance at their lowest point. We present a defensive trajectory offset strategy that adopts a minimal 0.8 cm height offset to avoid the high-probability, high-severity ground-collision failure mode. This fine-grained adjustment raises the success rate of ”hockey” ? 
+
+> (a) RGB (left), inverted color(right) (b) Blind spots during reprojection
+
+Fig. 4: Low Contrast Problem and Color Inversion. from 20% to over 64%, underscoring the importance of micro-scale physical optimization. Following data-level diagnosis, we executed data dedupli-cation, anomaly cleansing, and sampling optimization. These steps improved overall task success, reduced replay buffer storage by 85% (411 GB to 62 GB), and cut training time by 80% (120 hours to 24 hours on 2 A6000 GPUs), significantly accelerating algorithm iteration. 
+
+B. Color Inversion for Contrast Enhancement 
+
+For 3D manipulation, methods like RVT [13] reconstruct point clouds and project them into several fixed orthogonal views. This avoids expensive 3D representations while pro-viding multi-view perspectives beyond single images. However, a key limitation persists: projections are typi-cally rendered on a black background. As shown in Fig.4 (a), dark objects such as dark cups blend into this background, losing contour and texture detail. This hinders detection and localization, so even if trained on such objects, the model fails to learn effective manipulation policies. In complex scenes, the issue worsens. In Fig.4 (b), dark, low-contrast regions can be mistaken for occlusion gaps or sensor blind spots, making it hard to tell empty areas from dark objects. To address this issue, we introduce a color inversion branch that enables the network to simultaneously pro-cess standard and inverted RGB streams. This ensures at least one stream exhibits high contrast against the black background, eliminating confusion from color similarity. Specifically, while generating standard orthogonal views, we create inverted views by replacing each pixel’s color with 
+
+[255 −R, 255 −G, 255 −B]. Dark objects then appear bright, yielding clear contours. A feature fusion module integrates these complementary representations, preserving both true appearance and enhanced structure. To further substantiate the necessity of color-space en-hancement, we examine an alternative design that replaces the inversion branch with an auxiliary depth branch. Surpris-ingly, this variant yields no improvement in manipulation success on dark objects compared to the baseline without any augmentation. This finding reveals two critical aspects: first, the inversion branch is indispensable for resolving low-contrast failures; second, depth information, despite its geometric completeness, exhibits inherent limitations under the reprojection paradigm—it cannot compensate for the loss of color signals. We delve into these limitations from both data representation and network learning perspectives. We attribute this ineffectiveness to two fundamental lim-itations of depth sensing within the reprojection paradigm. Instruction 
+
+"stack the other cups 
+
+on top of the(black cup” 
+
+Where? Which? 
+
+× ×
+
+RGB Depth INV Fig. 5: Alignment of Different Visual Modalities with Text Instructions. From a data perspective, depth maps capture geometry but lack color information, yet manipulation instructions often involve specific color semantics (e.g., ”stack on top of the black cup”). As shown in Fig. 5, even perfect 3D reconstruc-tion provides no cue about object color, leaving the root cause—color-space signal degradation—unaddressed. From a network perspective, low contrast causes patch features of dark objects to approach zero vectors, rendering them indistinguishable from background in subsequent attention layers. Depth maps, residing in a different feature space, would require massive data-driven alignment with these degraded RGB features—a cross-modal association difficult to establish given limited dark-object examples. Thus, ge-ometry alone cannot substitute for missing color signals; the problem fundamentally demands enhancing color contrast at the source. In summary, our method generates both standard and inverted RGB views from point clouds, ensuring high-contrast representations across all colors against the black background. Geometry and color are orthogonal dimensions for describing objects—neither can substitute for the other. Therefore, the dark object perception problem can only be solved by enhancing the color signal itself. Our design effectively mitigates failures in low-contrast scenarios by preserving both true appearance and enhanced structure. 
+
+C. Task-Guided Mixup for Input-Output Alignment 
+
+In real-world robotic operations, irrelevant objects often interfere with the model’s perception of key regions and trigger erroneous actions. This stems from training on sim-plified scenes with only task-relevant objects, which makes the model over-rely on visual features and underutilize language guidance—even without language inputs, it still can achieve high success rates in many tasks. Furthermore, in tasks involving multiple targets (such as stacking cups), the model predicts actions for a single target at a time and treats others as negative samples, confining it to a fixed operation sequence. Consequently, demonstrations with varying sequences create conflicting samples that impede model convergence. We aim to enhance scene diversity without collecting new data, but traditional vision-language-action models operate Text Instruction Text Instruction   
+
+> Stack Sort
+> Blocks
+
+Shape    
+
+> 班袤
+> Text Instruction Text Instruction
+> Put in Stack
+> Drawer Cups
+
+Fig. 6: Illustration of Intra-Task Mixup (top row) and Cross-Task Mixup (bottom row). in a continuous action space defined by joint angles or end-effector poses, which cannot output actions targeting multiple distinct locations simultaneously. Directly mixing samples from different tasks can easily lead to confusion in action representations, while simply averaging multiple target positions may yield physically implausible actions. In contrast, methods such as RVT [13] reformulate action prediction as multi-view 2D probability heatmap prediction, allowing alignment between the image space and the action heatmap space. Under this paradigm, action outputs possess spatial additivity: multiple target positions can be integrated into a multi-peak heatmap, enabling the model to learn multiple feasible solutions simultaneously. Therefore, we propose a task-guided point cloud mixup strategy, which is divided into intra-task mixup and cross-task mixup based on task types and textual instructions. 
+
+Intra-task mixup addresses tasks where a single instruc-tion L corresponds to multiple valid actions. During training, we blend point clouds from samples sharing the same in-struction while directly concatenating their action heatmaps. Formally, given two samples (P1 ∈ RN1×3, L, H1) and 
+
+(P2 ∈ RN2×3, L, H2), the augmented sample is: 
+
+˜P = Concat( P1, P2) ∈ R(N1+N2)×3, ˜H = H1 + H2 (1) Unlike regression-based methods that converge to a single optimal action, this strategy provides multimodal supervi-sion. Consequently, the model learns to predict multi-peak heatmap distributions, capturing a set of plausible action locations {pk} rather than a single point p∗. This improves the model’s ability to differentiate between category-level se-mantic abstraction and instance-specific actions. As a result, it enhances adaptability in multi-target decision-making. 
+
+Cross-task mixup improves instruction following and attentional focus in cluttered scenes. It concatenates point clouds from M samples with distinct task instructions while retaining only the heatmap corresponding to the current instruction. Formally, given a set of samples {(Pm ∈
+
+RNm×3, Lm, Hm)}Mm=1 with L1̸ = Lm for m̸ = 1 , the augmented sample is constructed as: Overall Task Success Rate (%) Models Avg. SR (%) ↑                                                                                                                                                                 
+
+> Reported Hardware
+> Close Jar Drag Stick Insert Peg Meat off Grill Open Drawer Place Cups Place Wine Push Buttons PerAct [12] 49.4 8V100 ×16d 55.2 ±4.7 89.6 ±4.1 5.6 ±4.1 70.4 ±2.0 88.0 ±5.7 2.4 ±3.2 44.8 ±7.8 92.8 ±3.0 RVT [13] 62.9 8V100 ×1d 52.0 ±2.5 99.2 ±1.6 11.2 ±3.0 88.0 ±2.5 71.2 ±6.9 4.0 ±2.5 91.0 ±5.2 100.0 ±0.0
+> RVT-2 [14] 81.4 8V100 ×20h 100.0 ±0.0 99.0 ±1.7 40.0 ±0.0 99.0 ±1.7 74.0 ±11.8 38.0 ±4.5 95.0 ±3.3 100.0 ±0.0
+> SAM2ACT [21] 86.8 8H100 ×12h or 2A6000 ×5d 99.0 ±2.0 99.0 ±2.0 84.0 ±5.7 98.0 ±2.3 83.0 ±6.0 47.0 ±6.0 93.0 ±3.8 100.0 ±0.0
+> BridgeVLA [22] 88.2 48H100 ×20h 100.0 ±0.0 100.0 ±0.0 88.0 ±2.8 100.0 ±0.0 100.0 ±0.0 58.4 ±10.0 88.0 ±2.8 98.4 ±2.2
+> TGM-VLA w/o CTM 88.2 -99.0 ±2.0 98.0 ±2.3 92.0 ±3.3 96.0 ±3.3 100.0 ±0.0 47.0 ±6.9 94.0 ±2.0 100.0 ±0.0 TGM-VLA w/o ITM 88.8 -98.0 ±2.3 100.0 ±0.0 91.0 ±3.8 99.0 ±2.0 100.0 ±0.0 50.0 ±4.0 92.0 ±3.3 100.0 ±0.0 TGM-VLA 90.5 2A6000 ×1d 99.0 ±2.0 100.0 ±0.0 94.0 ±2.3 98.0 ±2.3 100.0 ±0.0 60.0 ±7.3 94.0 ±2.3 100.0 ±0.0 Models Put in Cupboard Put in Drawer Put in Safe Screw Bulb Slide Block Sort Shape Stack Blocks Stack Cups Sweep to Dustpan Turn Tap PerAct [12] 28.0 ±4.4 51.2 ±4.7 84.0 ±3.6 17.6 ±2.0 74.0 ±13.0 16.8 ±4.7 26.4 ±3.2 2.4 ±2.0 52.0 ±0.0 88.0 ±4.4 RVT [13] 49.6 ±3.2 88.0 ±5.7 91.2 ±3.0 48.0 ±5.7 81.6 ±5.4 36.0 ±2.5 28.8 ±3.9 26.4 ±8.2 72.0 ±0.0 93.6 ±4.1 RVT-2 [14] 66.0 ±4.5 96.0 ±0.0 96.0 ±2.8 88.0 ±4.9 92.0 ±2.8 35.0 ±7.1 80.0 ±2.8 69.0 ±5.9 100.0 ±0.0 99.0 ±1.7
+> SAM2ACT [21] 75.0 ±3.8 99.0 ±2.0 98.0 ±2.3 89.0 ±2.0 86.0 ±4.0 64.0 ±4.6 76.0 ±8.6 78.0 ±4.0 99.0 ±2.0 96.0 ±5.7 BridgeVLA [22] 73.6 ±4.6 99.2 ±1.8 99.2 ±1.8 87.2 ±6.6 96.0 ±2.8 60.8 ±7.7 76.8 ±8.7 81.6 ±3.6 87.2 ±1.8 92.8 ±3.3
+> TGM-VLA w/o CTM 80.0 ±3.3 95.0 ±2.0 94.0 ±2.3 88.0 ±4.6 97.0 ±2.0 73.0 ±3.8 62.0 ±2.3 79.0 ±8.2 98.0 ±2.3 96.0 ±4.6
+> TGM-VLA w/o ITM 82.0 ±5.2 98.0 ±2.3 95.0 ±3.8 86.0 ±6.0 99.0 ±2.0 78.0 ±7.3 65.0 ±3.8 82.0 ±6.5 92.0 ±3.3 96.0 ±2.3
+> TGM-VLA 83.0 ±2.0 100.0 ±0.0 96.0 ±4.6 89.0 ±3.8 99.0 ±2.0 80.0 ±5.7 70.0 ±4.0 87.0 ±2.0 88.0 ±4.6 93.0 ±3.8
+
+TABLE I: Results on RLBench. This table compares our TGM-VLA with prior works and ablations. “Avg. SR” is the average success rate over 18 tasks (higher is better). “Reported Hardware” lists the training resources (GPUs ×Type ×Time). “w/o CTM” and “w/o ITM” denote ablations without Cross-Task and Intra-Task Mixup, respectively. 
+
+˜P = Concat( P1, P2, . . . , PM ), ˜L = L1, ˜H = H1 (2) This simulates environments with task-irrelevant objects and enforces label preservation: the model must rely solely on L1 to identify relevant regions and suppress distractors from {L m}Mm=2 . As a result, an instruction-guided attention mechanism emerges, strengthening the cross-modal associa-tion and improving localization accuracy in blended scenes. Overall, the integrated strategy enhances robustness by teaching the model to disregard instruction-irrelevant regions, reinforces text-action associations, and improves multi-target handling. Crucially, it establishes invariant relationships between language instructions and action goals by in-troducing controlled variations in visual scenes . This is achieved without extra modules or inference overhead, leading to significant gains in generalization, interference re-sistance, instruction follow-up accuracy, and data efficiency. IV. EXPERIMENTS 
+
+A. Settings 
+
+We conduct experiments on RLBench [20], with tasks sim-ulated in CoppeliaSim [33] using a Franka Panda robot. The observations are four calibrated RGB-D views from the front, left shoulder, right shoulder, and wrist. Consistent with prior work [11]–[14], [34], we evaluate performance on 18 tasks covering three types: non-prehensile manipulation, pick-and-place, and high-precision insertion. Each task provides 100 expert demonstrations, annotated with language instructions and keyframes. Models are assessed by their task success rate over 25 trials, with a maximum of 25 actions per trial. To ensure statistical robustness, we repeat this evaluation four times and report the mean success rate along with the standard deviation across runs. To further evaluate the generalization capabilities of TGM-VLA, we perform experiments on COLOSSEUM benchmark [35]. Our model is trained on the standard RLBench but tested in environments with 12 unseen perturbations, in-cluding changes to object texture, color, size, background, lighting, distractors, and camera pose. In total, COLOS-SEUM provides 20,371 unique perturbed task instances to thoroughly examine model generalization. Our procedure in-cludes: 1) training on 20 RLBench tasks (100 demonstrations per task), 2) testing each task over 25 trials per perturbation type, and 3) averaging the success rate across all tasks for each perturbation. We also report results on the original RLBench tasks and a challenging scenario combining all 12 perturbations. 
+
+B. Main Results 
+
+Table I compares TGM-VLA with prior keyframe-based 3D VLA methods on the RLBench benchmark. Overall, TGM-VLA achieves a new state-of-the-art average suc-cess rate of 90.5% , significantly surpassing the previous best-performing method BridgeVLA ( 88.2% ). Notably, our method attains this performance using only 2×A6000 for one day of hardware resources, which corresponds to a 5×
+
+training speed improvement over the baseline SAM2ACT, which requires 2 ×A6000 for five days. A closer inspection of individual tasks reveals that TGM-VLA achieves the highest success rate in 11 out of 18 tasks. The most substantial im-provements are observed in precision-demanding and long-horizon tasks: on Stack Cups , TGM-VLA reaches 87.0% compared to BridgeVLA’s 81.6% (+5.4%); on Sort Shape , it attains 80.0% versus BridgeVLA’s 60.8% (+19.2%). These results demonstrate that TGM-VLA achieves SOTA perfor-mance while exhibiting superior data utilization efficiency and training speed, significantly accelerating the iteration of subsequent algorithms. Table II evaluates TGM-VLA and prior methods on the COLOSSEUM benchmark, which tests generalization under 12 unseen environmental perturbations. TGM-VLA achieves Overall Success Rate (%) Models Avg. SR (%) ↑ Avg. Rank ↓ All Perturbations MO-COLOR RO-COLOR MO-TEXTURE RO-TEXTURE MO-SIZE PerAct [12] 27.9 5.71 7.2 24.0 29.2 28.8 17.71 35.6 RVT [13] 35.4 5.28 6.4 26.0 31.3 44.8 41.1 35.3 RVT-2 [14] 56.7 3.92 15.6 ± 0.8 53.0 ± 0.9 54.6 ± 0.6 59.7 ± 0.7 56.7 ± 1.4 60.9 ± 0.9 SAM2ACT [21] 61.9 2.93 18.5 ± 3.5 62.1 ± 0.9 60.9 ± 0.3 58.6 ± 0.6 63.4 ± 2.1 61.8 ± 0.5 BridgeVLA [22] 64.0 2.14 18.7 ± 2.2 60.5 ± 1.1 63.8 ± 0.1 63.5 ± 1.5 68.4 ± 3.3 69.3 ± 1.0                                                                                                                                             
+
+> TGM-VLA 68.8 1.14 24.3 ±1.1 65.3 ±0.6 62.1 ±1.0 72.1 ±0.6 72.4 ±1.0 70.4 ±0.9 Models RO-SIZE Light Color Table Color Table Texture Distractor Background Texture RLBench Camera Pose PerAct [12] 29.3 29.1 30.4 23.2 27.1 33.5 39.4 36.3 RVT [13] 40.5 34.0 30.0 45.2 18.8 46.4 53.4 42.2 RVT-2 [14] 53.4 ±1.5 58.0 ±1.1 62.6 ±0.9 56.6 ±0.9 60.8 ±0.5 68.7 ±1.1 68.8 ±1.3 64.4 ±0.5 SAM2ACT [21] 59.0 ±2.4 70.3 ±0.9 71.8 ±0.3 68.2 ±2.3 62.3 ±0.7 68.6 ±0.7 70.8 ±1.4 69.7 ±0.8 BridgeVLA [22] 61.7 ±0.8 69.7 ±1.2 75.7 ±0.9 71.3 ±0.7 51.8 ±1.5 74.8 ±1.0 73.1 ±0.2 73.8 ±0.3
+> TGM-VLA 69.4 ±2.1 71.4 ±0.7 73.6 ±0.8 71.5 ±0.6 74.3 ±0.8 78.9 ±1.2 79.6 ±0.7 78.7 ±0.9
+
+TABLE II: Results on the COLOSSEUM Benchmark. This table shows the success rates across 14 generalization settings (12 unseen environmental perturbations + all perturbations + RLBench). The “Avg. Rank” column reports the average rank of each method across all perturbations, where lower values indicate better overall performance.                  
+
+> Method Training Testing Stack Cups Setup Chess Stack Cups Setup Chess w/o CIB 80.0 ±3.0 16.0 ±3.8 74.0 ±4.6 12.0 ±2.3
+> Ours 94.0 ±1.0 46.0 ±7.3 87.0 ±2.0 30.0 ±4.0
+> Improvement +14.0 +30.0 +13.0 +18.0
+
+TABLE III: Ablation Study on Color Inversion. ”w/o CIB” denotes ablations without a color inversion branch. a state-of-the-art average success rate of 68.8% and the best average rank of 1.14 , surpassing BridgeVLA (64.0%) and demonstrating superior robustness. Notably, TGM-VLA excels in the most challenging ”All Perturbations” setting (24.3%), outperforming BridgeVLA by 5.6%, and achieves the highest scores in 12 out of 14 perturbation categories. These results confirm TGM-VLA’s strong generalization capability to diverse visual perturbations. 
+
+C. Ablation Study 
+
+To validate the effectiveness of Cross-Task Mixup (CTM) and Intra-Task Mixup (ITM) , we conduct sys-tematic ablation studies. The full model achieves the best average success rate of 90.5%. Removing CTM or ITM reduces performance to 88.2% (-2.3%) and 88.8% (-1.7%) ,respectively, indicating that both strategies contribute posi-tively, with CTM offering a slightly larger gain. CTM excels in complex tasks requiring multi-step planning or precise spatial reasoning (e.g., +7-8% improvement on Sort Shape and Stack Blocks), as it trains the model to focus on task-relevant features. ITM provides robust generalization across most tasks by learning a broader solution space, making the model less sensitive to minor variations. We further conduct an ablation study to evaluate the 
+
+color inversion branch (CIB) , which enhances perception for low-contrast objects. As shown in Table III, our full model achieves significant improvements across both training and testing environments. The gains are most prominent on 
+
+Setup Chess task, where training performance rises from 
+
+16.0% to 46.0% (+30.0%) and testing performance from 
+
+12.0% to 30.0% (+18.0%) . Consistent improvements are Real Robot Setup Basic Setting Generalization Setting 
+
+Fig. 7: Real Robot Experimental Setup.                      
+
+> Method Basic Tasks Generalization
+> Stack Blocks Put in Drawer Put on Plate Distractor Background
+> w/o TGM 60% 60% 80% 40% 60%
+> TGM-VLA 80% 70% 90% 90% 80%
+> Improvement +20% +10% +10% +50% +20%
+
+TABLE IV: Results in the real world. ”w/o TGM” denotes ablations without task-guided mixup technique. also observed on Stack Cups , demonstrating the robustness and generalizability of the proposed branch. 
+
+D. Real World Experiments 
+
+We also validate our model on a real-world setup using an SO101 robot arm with a static D435 RGB-D camera, as illustrated in Fig. 7. The experiments cover five manipulation tasks that range from basic operations to more challenging scenarios involving visual perturbations. For each task, we define 5–8 keyframes and collect 10 expert trajectories via teleoperation for training. During evaluation, the robot se-quentially reaches the predicted key poses; we report success rates averaged over 10 trials per task. Table IV compares the performance of TGM-VLA with a baseline that omits task-guided mixup (w/o TGM). Our full model consistently outperforms the baseline across all five tasks. On basic manipulation tasks (Stack Blocks, Put in Drawer, Put on Plate), TGM-VLA achieves success rates of 80%, 70%, and 90%, respectively, surpassing the baseline by +20%, +10%, and +10%. The gains are even more pronounced on generalization tasks: under distractor pertur-bation, the success rate increases from 40% to 90% (+50%), and under background changes, it rises from 60% to 80% (+20%). These substantial improvements demonstrate that task-guided mixup is critical for robustness to environmental perturbations, as it encourages the model to focus on task-relevant features while ignoring task-irrelevant variations. V. CONCLUSION This paper presents TGM-VLA, a sampling-efficient and robust 3D vision-language-action model that achieves SOTA performance by addressing three key bottlenecks: an opti-mized sampling strategy, a color inversion branch, and a task-guided mixup technique. These innovations directly tackle the core challenges of data redundancy, perceptual ambi-guity, and instruction underutilization that hinder existing methods. Looking forward, while our handcrafted heuristic sampling proves effective, it also invites future research into adaptive sampling and physics-aware data augmentation to further bridge the sim-to-real gap. This work underscores the substantial impact of data-centric innovations in developing more capable and generalizable robotic agents. REFERENCES [1] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning fine-grained bimanual manipulation with low-cost hardware,” arXiv preprint arXiv:2304.13705 , 2023. [2] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via ac-tion diffusion,” The International Journal of Robotics Research , p. 02783649241273668, 2023. [3] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn, K. Gopalakrishnan, K. Hausman, A. Herzog, J. Hsu, et al. , “Rt-1: Robotics transformer for real-world control at scale,” arXiv preprint arXiv:2212.06817 , 2022. [4] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, X. Chen, K. Choro-manski, T. Ding, D. Driess, A. Dubey, C. Finn, et al. , “Rt-2: Vision-language-action models transfer web knowledge to robotic control,” 
+
+arXiv preprint arXiv:2307.15818 , 2023. [5] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, et al. , “Open-vla: An open-source vision-language-action model,” arXiv preprint arXiv:2406.09246 , 2024. [6] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , 2024. [7] C.-L. Cheang, G. Chen, Y. Jing, T. Kong, H. Li, Y. Li, Y. Liu, H. Wu, J. Xu, Y. Yang, et al. , “Gr-2: A generative video-language-action model with web-scale knowledge for robot manipulation,” arXiv preprint arXiv:2410.06158 , 2024. [8] H. Wu, Y. Jing, C. Cheang, G. Chen, J. Xu, X. Li, M. Liu, H. Li, and T. Kong, “Unleashing large-scale video generative pre-training for visual robot manipulation,” in International Conference on Learning Representations , 2024. [9] P. Li, H. Wu, Y. Huang, C. Cheang, L. Wang, and T. Kong, “Gr-mg: Leveraging partially-annotated data via multi-modal goal-conditioned policy,” IEEE Robotics and Automation Letters , 2025. [10] M. Shridhar, L. Manuelli, and D. Fox, “Cliport: What and where pathways for robotic manipulation,” in Conference on robot learning .PMLR, 2022, pp. 894–906. [11] T. Gervet, Z. Xian, N. Gkanatsios, and K. Fragkiadaki, “Act3d: Infinite resolution action detection transformer for robotic manipulation,” 
+
+arXiv preprint arXiv:2306.17817 , 2023. [12] M. Shridhar, L. Manuelli, and D. Fox, “Perceiver-actor: A multi-task transformer for robotic manipulation,” in Conference on Robot Learning . PMLR, 2023, pp. 785–799. [13] A. Goyal, J. Xu, Y. Guo, V. Blukis, Y.-W. Chao, and D. Fox, “Rvt: Robotic view transformer for 3d object manipulation,” in Conference on Robot Learning . PMLR, 2023, pp. 694–710. [14] A. Goyal, V. Blukis, J. Xu, Y. Guo, Y.-W. Chao, and D. Fox, “Rvt-2: Learning precise manipulation from few demonstrations,” arXiv preprint arXiv:2406.08545 , 2024. [15] Y. Jia, J. Liu, S. Chen, C. Gu, Z. Wang, L. Luo, L. Lee, P. Wang, Z. Wang, R. Zhang, et al. , “Lift3d foundation policy: Lifting 2d large-scale pretrained models for robust 3d robotic manipulation,” arXiv preprint arXiv:2411.18623 , 2024. [16] R. Yang, G. Chen, C. Wen, and Y. Gao, “Fp3: A 3d foundation policy for robotic manipulation,” arXiv preprint arXiv:2503.08950 , 2025. [17] C. Li, J. Wen, Y. Peng, Y. Peng, F. Feng, and Y. Zhu, “Pointvla: Injecting the 3d world into vision-language-action models,” arXiv preprint arXiv:2503.07511 , 2025. [18] D. Qu, H. Song, Q. Chen, Y. Yao, X. Ye, Y. Ding, Z. Wang, J. Gu, B. Zhao, D. Wang, et al. , “Spatialvla: Exploring spatial representations for visual-language-action model,” arXiv preprint arXiv:2501.15830 ,2025. [19] S. James and P. Abbeel, “Coarse-to-fine q-attention with learned path ranking,” arXiv preprint arXiv:2204.01571 , 2022. [20] S. James, Z. Ma, D. R. Arrojo, and A. J. Davison, “Rlbench: The robot learning benchmark & learning environment,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 3019–3026, 2020. [21] H. Fang, M. Grotz, W. Pumacay, Y. R. Wang, D. Fox, R. Krishna, and J. Duan, “Sam2act: Integrating visual foundation model with a memory architecture for robotic manipulation,” arXiv preprint arXiv:2501.18564 , 2025. [22] P. Li, Y. Chen, H. Wu, X. Ma, X. Wu, Y. Huang, L. Wang, T. Kong, and T. Tan, “Bridgevla: Input-output alignment for efficient 3d manipulation learning with vision-language models,” arXiv preprint arXiv:2506.07961 , 2025. [23] S. James and A. J. Davison, “Q-attention: Enabling efficient learning for vision-based robotic manipulation,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 1612–1619, 2022. [24] S. Liu, S. James, A. J. Davison, and E. Johns, “Auto-lambda: Disentan-gling dynamic task relationships,” arXiv preprint arXiv:2202.03091 ,2022. [25] E. Johns, “Coarse-to-fine imitation learning: Robot manipulation from a single demonstration,” in 2021 IEEE international conference on robotics and automation (ICRA) . IEEE, 2021, pp. 4613–4619. [26] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin, “Attention is all you need,” 
+
+Advances in neural information processing systems , vol. 30, 2017. [27] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. , “ π0: A vision-language-action flow model for general robot control,” arXiv preprint arXiv:2410.24164 , 2024. [28] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, et al. , “ π0.5: a vision-language-action model with open-world generalization,” arXiv preprint arXiv:2504.16054 , 2025. [29] X. Li, M. Liu, H. Zhang, C. Yu, J. Xu, H. Wu, C. Cheang, Y. Jing, W. Zhang, H. Liu, et al. , “Vision-language foundation models as effective robot imitators,” arXiv preprint arXiv:2311.01378 , 2023. [30] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. R¨ adle, C. Rolland, L. Gustafson, et al. , “Sam 2: Segment anything in images and videos,” arXiv preprint arXiv:2408.00714 , 2024. [31] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark, et al. , “Learning transferable visual models from natural language supervision,” in International conference on machine learning . PmLR, 2021, pp. 8748–8763. [32] Z. Teed and J. Deng, “Raft: Recurrent all-pairs field transforms for optical flow,” in Computer Vision–ECCV 2020: 16th European Conference, Glasgow, UK, August 23–28, 2020, Proceedings, Part II 16 . Springer, 2020, pp. 402–419. [33] E. Rohmer, S. P. Singh, and M. Freese, “V-rep: A versatile and scalable robot simulation framework,” in 2013 IEEE/RSJ international conference on intelligent robots and systems . IEEE, 2013, pp. 1321– 1326. [34] T.-W. Ke, N. Gkanatsios, and K. Fragkiadaki, “3d diffuser actor: Policy diffusion with 3d scene representations,” in 8th Annual Conference on Robot Learning , 2024. [35] W. Pumacay, I. Singh, J. Duan, R. Krishna, J. Thomason, and D. Fox, “The colosseum: A benchmark for evaluating generalization for robotic manipulation,” arXiv preprint arXiv:2402.08191 , 2024.
