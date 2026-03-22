@@ -1,0 +1,406 @@
+Title: AeroGrab: A Unified Framework for Aerial Grasping in Cluttered Environments
+
+URL Source: https://arxiv.org/pdf/2603.15097v1
+
+Published Time: Tue, 17 Mar 2026 06:33:40 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# AeroGrab: A Unified Framework for Aerial Grasping in Cluttered Environments 
+
+Shivansh Pratap Singh 1∗, Naveen Sudheer Nair 1∗, Samaksh Ujjawal 1, Sarthak Mishra 1, Soham Patil 1,Rishabh Dev Yadav 2, Spandan Roy 1
+
+Abstract — Reliable aerial grasping in cluttered environments remains challenging due to occlusions and collision risks. Existing aerial manipulation pipelines largely rely on centroid-based grasping and lack integration between the grasp pose generation models, active exploration, and language-level task specification, resulting in the absence of a complete end-to-end system. In this work, we present an integrated pipeline for reliable aerial grasping in cluttered environments. Given a scene and a language instruction, the system identifies the target object and actively explores it to gain better views of the object. During exploration, a grasp generation network predicts multiple 6-DoF grasp candidates for each view. Each candidate is evaluated using a collision-aware feasibility framework, and the overall best grasp is selected and executed using standard trajectory generation and control methods. Experiments in cluttered real-world scenarios demonstrate robust and reliable grasp execution, highlighting the effectiveness of combining active perception with feasibility-aware grasp selection for aerial manipulation. 
+
+I. I NTRODUCTION 
+
+Aerial manipulators have gained significant attention for performing contact-rich interaction tasks such as grasping, picking, and relocating objects in environments that are difficult to access with ground robots [1]–[3]. Successfully executing such tasks requires the aerial manipulator to detect and locate the target object, estimate a feasible grasp pose, and plan actions that ensure safe interaction with the environ-ment while considering the reachability of the manipulator and avoiding collisions in cluttered scenes. Many existing aerial manipulation systems simplify grasp pose generation by targeting the geometric center of the object [4], [5]. While this strategy can be effective for homogeneous and compact objects, centroid-based approaches often fail for everyday objects whose stable grasp regions lie on functional com-ponents such as handles, rims, or edges. Furthermore, most aerial manipulation systems assume that the target object is clearly visible. In cluttered environments, however, objects are frequently partially occluded, making feasible grasp pose estimation highly viewpoint-dependent. Consequently, the aerial platform must actively reposition to improve object observability while maintaining safety around nearby obsta-cles and respecting platform constraints [6]. Despite these challenges, most existing aerial manipulation pipelines [7], [8] do not integrate active perception with collision-aware grasp pose generation, which limits their reliability when operating in cluttered environments.    
+
+> ∗These authors contributed equally.
+> 1Robotics Research Center (RRC), IIIT Hyderabad
+> 2Department of Computer Science, The University of Manchester
+
+To address these limitations, we propose a framework (Fig. 1) that enables language-guided 6-DoF feasible grasp generation for aerial manipulators operating in cluttered scenes. The proposed system integrates perception, grasp feasibility analysis, and collision-aware planning to allow the aerial manipulator to actively reposition, identify func-tional grasp regions, and execute safe grasping actions while avoiding collisions with surrounding obstacles. To ensure reliable execution, the system integrates a minimum-snap trajectory generator [9] together with an adaptive control [10] for robust aerial manipulation. The proposed framework is validated through extensive simulation and hardware experi-ments, demonstrating successful grasping and object retrieval across diverse objects in cluttered environments. II. R ELATED WORK AND CONTRIBUTION 
+
+Early research in aerial manipulation focused on enabling stable physical interaction between uncrewed aerial vehicles and the environment through advances in modeling, control, and mechanical design [11]. Initial works demonstrated sta-ble contact and whole-body control using rigid or compliant manipulators mounted on aerial platforms [12]–[14]. Subse-quent systems incorporated onboard perception and visual feedback to enable autonomous grasping and manipulation tasks [15], [16]. Surveys of aerial robots with grasping and perching capabilities are provided in [17], [18]. More recent works integrate perception, planning, and control to improve autonomy and robustness in aerial interaction, in-cluding vision-based grasping, force-aware grasp execution, and compliant contact control [7], [19]–[21]. Despite these advances, aerial grasping in cluttered envi-ronments remains comparatively underexplored. Many sys-tems [4], [18], [22] assume that the target object is clearly visible or that object segmentation is available beforehand. In realistic environments, however, objects are often par-tially occluded, making grasp feasibility strongly viewpoint-dependent and requiring the aerial platform to actively repo-sition to improve visibility before reliable grasp synthesis can be performed. Beyond core aerial manipulation, recent robotics research has turned its attention toward more intuitive task specifi-cation via natural language. Vision–language and large lan-guage models (VLMs/LLMs) now enable robots to ground complex instructions within visual scenes and isolate task-relevant objects [23]–[25]. Concurrently, progress in safe motion generation has leveraged simplified robot represen-tations and visual sensing. Techniques such as null–space 
+
+> arXiv:2603.15097v1 [cs.RO] 16 Mar 2026
+
+Fig. 1: Architecture Overview. A unified aerial grasping framework that tightly couples language-guided semantic perception with platform-aware kinematic and collision constraints, enabling safe interaction in a cluttered environment. saturation for redundant manipulators [26] and image-space planning using visual keypoints [27] have demonstrated significant efficacy in ground-based manipulation. However, the integration of these advances into aerial systems remains a largely unexplored research frontier. Motivated by these limitations, we couple viewpoint adap-tation with grasp synthesis and feasibility evaluation. Our system integrates language-guided target grounding, active viewpoint selection, and collision-aware 6-DoF grasp gener-ation. Unlike approaches that reason only about the manipu-lator arm or rely on simplified visual abstractions, we project a convex-hull approximation of the full aerial manipulator body into the camera frame and evaluate potential collisions directly against sensed depth during grasp selection, enabling safe execution with lightweight onboard computation. Our main contributions are as follows:  
+
+> •
+
+Language-guided aerial grasping in clutter: We present a unified aerial manipulation pipeline that translates natural language instructions into executable grasping actions by combining language-guided target grounding, perception, and aerial manipulation.  
+
+> •
+
+Active perception for viewpoint-dependent grasping: 
+
+We introduce an active viewpoint adaptation strategy that allows the aerial manipulator to autonomously reposition around cluttered scenes to improve target observability and expose feasible grasp approaches.  
+
+> •
+
+Collision-aware 6-DoF grasp feasibility evaluation: 
+
+We propose a feasibility ranking module that evaluates candidate grasp poses by explicitly considering full-body approach clearance, platform reachability, and surrounding clutter, enabling safe grasp selection simul-taneously with active collision checking. III. M ETHODOLOGY 
+
+This section describes the architecture and implementation of the proposed aerial grasping framework. The objective is to convert language instructions into collision-safe aerial grasps through integrated planning control and streamed segmentation. An overview of the complete pipeline is il-lustrated in Fig. 2. 
+
+A. Language-Guided Target Localization 
+
+The pipeline begins by converting the natural language instruction into structured visual targets. Given a command such as “Grasp the green bottle from the steel table,” the system first decomposes the instruction using an LLM into two structured prompts: a scene reference prompt Tctx (“steel Text Query Ex: Grasp Silver Bottle from White Table Filtered Point Cloud of Scene RGB-D 
+
+Target Localization LLM Decomposition Context Prompt Target Prompt  
+
+> Scene Search Active Target Search Scenecentricorbit
+
+Target Synthesis 
+
+> Target Mask Region of Interest crop Hybrid CNN-ViT Architecture Ranked 6-DoF Grasp Set Grasp Trajectory Assessment AM Convex Hull
+> CNN ViT Unified Safety Score
+> ONBOARD OFFBOARD
+
+Feasible 6-DoF Grasp Pose Minimum Snap Trajectory Generation S best > δ    
+
+> (Safe Grasp) Sbest ≤ δ
+> (Unsafe Grasp) Active Re-Positioning Target-centric orbit C obj
+> Adaptive AM Controller
+> Arm Control Input Quadrotor Control Input
+> Feasible Grasp Search
+
+Fig. 2: Unified perception, planning, and control pipeline for aerial grasping in clutter. The framework connects language grounding, active perception, 6-DoF grasp generation, platform-aware feasibility analysis, and collision-safe execution. table”) and a target reference prompt Tob j (“green bottle”). The platform first localizes the visually dominant scene before identifying the graspable object. The aerial platform initially performs a stationary yaw-based scan to search for Tctx within the camera field of view. During this phase, we employ SAM-3 [28] for real-time segmentation due to its strong zero-shot generalization and ability to produce stable object masks from sparse prompts. Once the scene is detected, the model maintains the segmen-tation mask consistently across subsequent frames, providing a reliable visual reference for downstream perception and grasp planning. Using the segmented region and its associated depth measurements, the system estimates the 3D centroid cctx of the scene surface. The drone then transitions from stationary scanning to an active orbital exploration motion around 
+
+cctx , inspired by the active perception strategies that seek viewpoint diversity to reveal occluded objects [6]. During this motion, the orbit radius is regulated so that the entire scene volume remains within the camera’s field of view (FoV), the desired orbital radius rgoal is adapted based on the spatial extent of the segmented scene region: 
+
+rgoal = max (∥p − cctx ∥)
+
+tan (FoV /2) , ∀p ∈ Pctx (1) where Pctx denotes the set of 3D points belonging to the segmented scene surface, and p represents an individual 3D point in this set expressed in the world frame. The velocity command is defined as 
+
+vcmd = vorb · ttan + kp
+
+ rgoal − ∥ pB − cctx ∥ nrad , (2) where vcmd denotes the commanded translational velocity of the aerial platform, vorb is the desired tangential orbiting speed, kp is a proportional gain regulating the radial distance, 
+
+pB represents the current position of the drone in the world frame, ttan is the unit tangential direction along the orbit, and nrad is the unit radial direction pointing toward the orbit center. As the drone orbits, SAM-3 continues to update the segmentation masks, allowing the system to detect the target object Tob j once it enters the visible region. When the target mask Mob j becomes available, the system has both a local-ized object region and its associated depth measurements. At this stage, the problem shifts from scene exploration to selecting physically executable grasp. 
+
+B. Target Synthesis 
+
+Given the segmented target region, we extract a cropped Region of Interest (RoI) Icrop from the RGB-D stream centered on Mob j . This crop isolates the object from cluttered scene while preserving its local geometric structure. The objective of this stage is to generate a diverse set of candidate 6-DoF grasps directly from the RGB-D ob-servation. Each grasp is parameterized by a translation t,orientation R, gripper width w, and an associated confidence score s.To generate these candidates, we use a Hybrid CNN-ViT architecture trained on the GraspNet-1Billion [29] dataset. Given the cropped RGB-D input, the network predicts a fixed set of 6-DoF grasp poses and associated quality scores, forming the raw candidate set Graw .Since GraspNet annotations are designed primarily for fixed-base manipulators, many predicted grasps are infeasible for aerial platforms. To address this mismatch, we filter the raw grasp set using aerial feasibility constraints that reflect the physical limitations of aerial manipulation. Specifically, we enforce the following constraints: • Gravity-aligned approach. Grasps whose approach direction opposes gravity are discarded, as aerial robots typically access objects from above and cannot execute grasps requiring access beneath support surfaces.  
+
+> •
+
+Stability-aware scoring. Grasps located far from the object centroid introduce larger moment arms during lift-off that can destabilize the vehicle. Instead of re-moving these grasps entirely, their scores are penalized according to their centroid distance so that they remain available in cluttered scenes where collision constraints may eliminate more stable alternatives. The final grasp score is computed as 
+
+s f inal = s · exp  −α∥t − cob j ∥ (3) where s denotes the network confidence, cob j is the 3D centroid and α controls the strength of the stability penalty. After applying these constraints and re-weighting, the re-maining grasps form the feasible set G f easible , which contains multiple physically executable grasp candidates suitable for aerial manipulation. 
+
+C. Collision Feasibility Filtering 
+
+Although visually valid, predicted grasps may be infeasi-ble for an aerial platform. Each candidate is therefore filtered using kinematic reachability and collision constraints prior to execution. The grasp network predicts candidate poses in the camera frame, which are transformed into the world frame using the onboard visual–inertial state estimate. For each candidate, inverse kinematics is solved to determine whether the manip-ulator can reach the corresponding end-effector pose without violating joint limits. Grasps with no valid joint solution are discarded. Even when a grasp is kinematically reachable, executing it may still be unsafe due to potential collisions between the manipulator, drone body, and surrounding obstacles during the approach motion. 
+
+1) Batched Trajectory Collision Evaluation: Once we isolate the set of kinematically reachable grasps, we must verify that the drone can physically fly to them without colliding with the environment. Checking each grasp sequen-tially would be too slow for a real-time control loop. Instead, we formulate a batched process that evaluates the approach paths for all candidate grasps simultaneously. Let the visual output be defined over an image grid of size 
+
+W × H. For the k-th valid pixel (u, v) belonging to the target object, the synthesis network provides a grasp candidate gk
+
+with an initial visual quality score vk.For each grasp gk, we define the required target state using the spatial pose of the drone base Tk ∈ SE (3) and the corresponding manipulator joint configuration qk ∈ R4
+
+derived from the inverse kinematics step. We then generate a full-body approach trajectory τk by linearly interpolating between the robot’s current state (Tcurr , qcurr ) and the target state (Tk, qk). Mathematically, we discretize this trajectory into a set of S waypoints: 
+
+τk = {w1, w2, . . . , wS} (4) To evaluate environmental collisions along these way-points, we approximate the robot’s physical volume as a set of convex hulls, denoted as Hrobot . By representing these convex hulls algebraically as a set of planar half-spaces (defined by face normals and offsets), we can convert the 3D intersection problem into highly parallelized matrix multiplications. This specific formulation allows the onboard GPU to evaluate thousands of scene points across hundreds of trajectory waypoints in real time. We execute this collision check in two sequential steps to maximize computational efficiency: 1) Coarse Filtering: First, we perform a rapid spatial query using a KD-tree representation of the environ-ment’s point cloud Pscene . We project a conservative bounding sphere around each trajectory waypoint ws.If a sphere contains zero environmental points, that specific segment of the path is guaranteed to be safe, bypassing further calculations. 2) Exact GPU Intersection: If a bounding sphere con-tains points, we extract that localized subset Plocal (ws)
+
+and pass it to the GPU. The GPU evaluates whether these points fall strictly inside the geometric bound-aries of the robot’s convex hulls at that specific way-point. Let V (ws) represent the spatial volume occupied by the robot hulls at waypoint ws. For a given grasp candidate gk,the total collision penalty nk is calculated by aggregating every environmental point p that penetrates the robot’s volume across all S waypoints of the approach path: 
+
+nk =
+
+> S
+
+# ∑
+
+> s=1
+
+# ∑ 
+
+> p∈Plocal (ws)
+
+I
+
+
+
+p ∈ V (ws)
+
+
+
+(5) where the indicator function I(·) returns 1 if the point p
+
+lies inside the robot volume, and 0 otherwise. By summing across all discrete waypoints, this formulation can be used to calculate a collision penalty across the duration and depth of the trajectories. Any trajectories that dwell inside obstacles accumulate an exponentially higher penalty than those resulting in brief, grazing contacts. We use this collision penalty to adjust the network’s original visual score vk. The final execution score Sk is computed as: 
+
+Sk = vk · max (0, 1 − λ nk) (6) where λ is a tunable penalty scalar. This equation acts as a soft constraint. It heavily penalizes grasps that require the drone to fly directly through dense obstacles, driving their score to zero. At the same time, it is forgiving enough to allow grasps that might involve minor, grazing contacts with the environment, which are often unavoidable when interacting with dense clutter. 
+
+D. Decision Logic and Grasp Execution 
+
+The final phase of the pipeline arbitrates the physical execution based on the highest safety-weighted score, Sbest .1) Active Re-Positioning (Unsafe Grasp): If all candidates are deemed kinematically unreachable or severely obstructed (Sbest ≤ δ ), where δ is a predefined feasibility threshold, the system declines to execute the grasp. Instead of failing, the drone autonomously continues the active orbiting behavior defined in Eq. (2). However, the guidance law is now locked onto the specific Target Centroid cob j rather than the broader scene. This target-centric orbit continuously updates the environmental point cloud, systematically exploring the kinematic manifold until a collision-free geometric corridor is revealed. 
+
+2) Approach and Execution (Safe Grasp): Once a valid candidate ( Sbest > δ ) is identified, the system transitions to the execution phase. The manipulator gripper is opened and the arm joints are pre-positioned to qsol . The UAV then follows the planned approach trajectory toward the grasp pose τ(g∗). Upon reaching the pre-grasp waypoint, the drone holds a short stabilizing hover to dissipate aerodynamic disturbances. The gripper is then actuated to secure the object, followed by a vertical translation phase to clear the surrounding clutter. 
+
+Algorithm 1 Language-Guided Aerial Grasping Pipeline  
+
+> 1:
+
+Input: Language command Lcmd , RGB-D stream It 
+
+> 2:
+
+(Tctx , Tob j ) ← LLM (Lcmd ) 
+
+> 3:
+
+loop  
+
+> 4:
+
+(Mctx , Mob j ) ← SAM-3 (It , Tctx , Tob j ) 
+
+> 5:
+
+if Mctx = /0 then  
+
+> 6:
+
+Execute yaw search  
+
+> 7:
+
+continue  
+
+> 8:
+
+end if  
+
+> 9:
+
+if Mob j = /0 then  
+
+> 10:
+
+cctx ← Centroid (Mctx ) 
+
+> 11:
+
+rgoal ← OrbitRadius (Tctx ) 
+
+> 12:
+
+Execute orbit vcmd (cctx , rgoal ) 
+
+> 13:
+
+continue  
+
+> 14:
+
+end if  
+
+> 15:
+
+Icrop ← CropRGBD (It , Mob j ) 
+
+> 16:
+
+Graw ← GraspNet (Icrop ) 
+
+> 17:
+
+G f easible ← AerialFeasibilityFilter (Graw ) 
+
+> 18:
+
+for each grasp gk ∈ G f easible do  
+
+> 19:
+
+if ∃qk = IK (gk) then  
+
+> 20:
+
+Generate approach trajectory τk 
+
+> 21:
+
+nk ← BatchedCollisionEval (τk, Pscene ) 
+
+> 22:
+
+Sk ← vk · max (0, 1 − λ nk) 
+
+> 23:
+
+end if  
+
+> 24:
+
+end for  
+
+> 25:
+
+Sbest ← max k Sk 
+
+> 26:
+
+if Sbest > δ then  
+
+> 27:
+
+Execute trajectory τ(g∗) 
+
+> 28:
+
+Close gripper and lift  
+
+> 29:
+
+break  
+
+> 30:
+
+else  
+
+> 31:
+
+cob j ← Centroid (Mob j ) 
+
+> 32:
+
+Continue orbit around cob j  
+
+> 33:
+
+end if  
+
+> 34:
+
+end loop 
+
+IV. C ONTROL AND TRAJECTORY EXECUTION 
+
+Once a valid grasp is selected, the aerial manipulator ex-ecutes a dynamically feasible approach trajectory generated using a minimum-snap trajectory [9] formulation based on differential flatness. The generated trajectory is tracked using an adaptive controller [10], which compensates for mod-elling uncertainties and external disturbances during close-proximity iteration. All experiments use identical trajectory and control parameters. V. E XPERIMENTS 
+
+We evaluate the proposed framework through a series of simulated and real-world experiments designed to test its reliability in unstructured environments. Specifically, our evaluation focuses on three primary objectives: (i) the ac-curacy of the Hybrid CNN-ViT grasp synthesis in dense tabletop clutter, (ii) the robustness of the semantic tracking pipeline under continuous platform ego-motion, and (iii) 
+
+the effectiveness of the active collision-informed search in Successfully Grasped 
+
+> Successfully Grasped
+> Successfullly Grasped
+
+(a) (b) (c)  
+
+> Grasp the Gray case with yellow latches on the white table Grasp the Grey and white triangular pipe structure inside the shelf Grasp the Silver bottle on the white table inside room
+
+Fig. 3: Experiment Scenarios. (a) Tabletop clutter, (b) window-constrained access, (c) shelf reachability test. For each scenario, we show the scene view, trajectory, and successful grasp. Orin Nano Super Robotis Xh430w350t ZED 2i Cuav x7 + 
+
+Fig. 4: System Hardware Overview. Custom 450 mm quadro-tor platform featuring an Orin Nano Super, ZED 2i stereo camera, and a 4-DoF manipulator. ensuring kinematically feasible and collision-free approach trajectories. Grasp synthesis, feasibility scoring, trajectory generation, and control are executed onboard on the Orin Nano Su-per. For these experiments, SAM-3 target segmentation is computed on an offboard workstation and streamed to the onboard stack; the offboard machine is otherwise used only for visualization 
+
+A. Experimental Platform 
+
+Our aerial manipulation platform is built on a custom 450 mm quadrotor frame (Fig. 4) with a total takeoff weight of 2.5 kg excluding payload. The system is designed to support perception-driven aerial grasping while maintaining real-time execution. The propulsion system consists of FlyCat 5010 750 KV BLDC motors with 12-inch propellers, regulated by aCUAV X7+ flight controller running PX4 firmware. Low-level attitude stabilization and flight control are handled by PX4, while high-level control commands are communicated through ROS2 Humble using the PX4 DDS interface. We used NVIDIA Orin Nano Super as the onboard com-panion computer that executes grasp synthesis, trajectory generation, and control logic. Visual sensing is provided by a ZED 2i stereo RGB-D camera. The aerial manipulator consists of a lightweight 4-DoF (4R) serial arm actuated by Dynamixel XH430-W350 servos mounted beneath the airframe. The actuator bus is powered through a regulated 12 V buck converter to ensure stable torque delivery during grasp execution. A separate offboard workstation equipped with an NVIDIA RTX 4090 GPU (24 GB VRAM) and an AMD Ryzen 9 processor is connected through ROS2 DDS. The offboard system is used for visualization and target seg-mentation, while all time-critical perception, planning, and control modules execute onboard the aerial platform. Experiments are conducted inside a motion-capture envi-ronment using an OptiTrack system, which provides high-precision pose measurements for evaluation and controller validation during aerial grasping trials. 
+
+B. Simulation Environment and Setup 
+
+We validate the proposed active search and collision-aware grasping pipeline in a high-fidelity Gazebo Harmonic simulation prior to hardware deployment. Quadrotor dynam-ics and low-level attitude control are simulated using the PX4 Software-In-The-Loop (SITL) stack. A 4-DoF (4R) manipulator is simulated via ros2 control in torque-control mode to capture arm–base dynamic coupling during approach and grasp execution. We use an OAK-Lite RGB-D sensor model in simulation Fig. 5: Simulation Setup Overview. and inject Gaussian depth noise ( σ = 0.02 m) with depth-dropout artifacts to reduce sim-to-real mismatch. (Fig. 5) 
+
+C. Scenario Definitions and Task Procedures 
+
+We evaluated three task scenarios, each targeting a distinct failure mode of aerial manipulation. In each trial, the AM receives a natural-language query specifying the target ob-ject, performs an active visual search to localize it, selects a feasible 6-DoF grasp, and then approaches and executes the grasp while maintaining target association under viewpoint changes and occlusions. 
+
+Scenario 1 (Tabletop Clutter): Dense tabletop clutter with partial overlaps; evaluate grasp selection and collision-feasible approach in near-field clutter. (Fig. 3(a), Table II) 
+
+Scenario 2 (Window / Aperture-Constrained): Target must be approached through a narrow window, enforcing strict base-clearance and partial observability. (Fig. 3(b), Table II) 
+
+Scenario 3 (Shelf / Reachability & Stability): Multi-tier shelf with restricted access in depth/height; evaluate reachability and stability constraints. (Fig. 3(c), Table II) 
+
+D. Comparative Metrics 
+
+We utilize the following metrics for quantitative analysis:  
+
+> •
+
+Grasp Accuracy (GA) : The Euclidean distance error 
+
+etrans = ∥ppred − pgt ∥2 between the network’s predicted 3D grasp center ppred ∈ R3 and the ideal ground-truth grasp center pgt , obtained from the state of the simulator object and from the offline annotation in hardware trials.  
+
+> •
+
+Search-to-Grasp Latency (SGL) : The total elapsed time from receiving the language query, executing the active search maneuvers, to finalizing the physical approach vector. (Note: SGL measures end-to-end mission time (distinct model inference latency))  
+
+> •
+
+Collision free Grasp Rate (CFGR) : The number of times a complete end-to-end collision-free grasp is found and executed such that the object is lifted stably.  
+
+> •
+
+Collision-Induced Failures (CIF) : Number of trials where grasp execution fails due to collision in clutter.  
+
+> •
+
+Object Search Failures (OSF) : The number of times the pipeline is unable to find the correct object. TABLE I: Baseline Comparison Under Sparse and Dense Clutter (Scenario-1: Tabletop, Hardware Runs N = 30)                                                 
+
+> Method Clutter GA (cm) ↓CFGR ↑OSF ↓CIF ↓
+> Bauer-CoRL25 [4] Sparse 1.2 ±0.4 43.33% (13/30) –a56.67% (17/30) RamonSoria-Eng20 [22] Sparse 4.6 ±0.5 56.67% (17/30) 20% (6/30) 23.33% (7/30)
+> AeroGrab (Ours) Sparse 2.2 ±0.6 90% (27/30) 3.33% (1/30) 6.67% (2/30)
+> Bauer-CoRL25 [4] Dense 2.4 ±0.5 10% (3/30) –a90% (27/30) RamonSoria-Eng20 [22] Dense 5.5 ±0.4 23.33% (7/30) 43.33% (13/30) 33.33% (10/30)
+> AeroGrab (Ours) Dense 3.1 ±0.6 80% (24/30) 10% (3/30) 10% (3/30)
+> a
+
+OSF not reported in Bauer-CoRL25; the target object is assumed to already be visible. 
+
+TABLE II: Grasping performance of the AeroGrab method across three scenarios. Scenario Metrics GA (cm) ↓ SGL (s) ↓ CFGR (%) ↑ OSF (%) ↓ CIF (%) ↓                                              
+
+> Hardware Runs (N =30 )
+> 1 (Tabletop) 3.1 ±0.6 16.8 80.0 10.0 10.0 2 (Window) 3.8 ±0.6 10.5 73.33 10.0 16.67 3 (Shelf) 4.9 ±0.4 15.0 70.0 16.67 13.33
+> Simulation Runs (N =50 )
+> 1 (Tabletop) 1.2 ±0.2 6.8 90.0 4.0 6.0 2 (Window) 2.1 ±0.4 4.7 86.0 6.0 8.0 3 (Shelf) 1.9 ±0.3 5.0 80.0 8.0 12.0
+
+E. Baseline Comparisons 
+
+To the best of our knowledge, recent aerial manipula-tion frameworks were primarily developed for environments where the target object is clearly visible and isolated [4], [5]. These methods lack explicit design considerations or evaluations for dense, cluttered scenes involving occlusions. Consequently, we evaluate our proposed method against representative baselines under an identical cluttered exper-imental setup to assess comparative robustness (see Table I). Specifically, we compare against Bauer et al. [4], acentroid-based grasping approach, and Ramon-Soria et al. [22], a traditional 6-DoF aerial manipulation baseline. No-tably, while centroid-based methods such as [4] may exhibit a superficially lower Grasp Accuracy (GA) error by trivially minimizing the Euclidean distance to the object’s geometric center, this geometric simplification fails to capture func-tional of general objects. This limitation is evidenced by a severe drop in the Collision-Free Grasp Rate (CFGR) during our dense clutter trials. Furthermore, while [22] synthesizes 6-DoF grasp poses, its lack of active viewpoint adaptation and tightly coupled collision-feasibility evaluation results in high Object Search Failures (OSF) when subjected to severe occlusions. 
+
+F. Ablation Study 
+
+To isolate the contributions of our algorithmic design choices, we ablate key components of the perception and planning stack. The evaluation is conducted on physical hardware in a standardized suite of cluttered tabletop trials 
+
+N = 30. We evaluate against four distinct system config-urations, focusing on the interplay between computational latency, environmental awareness, and physical execution success. 
+
+1) Experimental Protocol & Configurations: We compare our full proposed model against three degraded baselines: • No Obstacle Awareness (Kinematic-Only): Bypasses the collision check. Grasps are selected purely based on the CNN-ViT visual affordance score, ignoring the point cloud Pscene . 
+
+> •
+
+No Real-Time Update (Open-Loop): The pipeline computes the optimal grasp and approach vector at 
+
+t = 0. The execution proceeds blindly without updating the robot dynamic hulls Harm (q) or tracking the target 
+
+Mob j during the approach phase.  
+
+> •
+
+CPU-Only Collision (Standard Pipeline): Retains full obstacle awareness but replaces our GPU-accelerated batched hybrid scoring with a standard CPU-based spatial tree query (e.g., Octree or Bounding Volume Hi-erarchy) [30], [31]. This mimics the standard collision-checking pipelines found in traditional ROS-based ma-nipulation frameworks.  
+
+> •
+
+Full Pipeline (Ours): The complete AeroGrab frame-work as detailed in Section III. 
+
+G. Results and Discussion 
+
+Table III reports an ablation over three design choices: obstacle-aware feasibility reasoning, closed-loop perception updates, and low-latency collision evaluation. Removing ob-stacle awareness yields the lowest perception-to-plan latency (24 ms) but severely degrades reliability, reducing CFGR to 33.33% and increasing collision-induced failures (CIF) to 53.34%. This indicates that many high-confidence grasps become infeasible once full-body clearance of the aerial manipulator and nearby clutter is enforced. Disabling real-time perception updates (open-loop exe-cution) increases grasp error to 4.5 cm and reduces CFGR to 46.66%, while also raising object search failures (OSF) to 33.34%. This behavior is consistent with state drift and unmodeled disturbances during approach, where the system cannot correct target pose and clearance estimates online. Replacing the GPU-based collision evaluation with a CPU-only pipeline increases latency to 145 ms and achieves CFGR 53.34%, but still incurs substantial OSF (23.33%) and CIF (23.33%). This suggests that slower feasibility updates can make the planner less responsive to rapidly changing ge-ometry and state, leading to missed opportunities and late-stage failures. With all modules enabled, the full pipeline achieves the best overall performance, reaching CFGR 80% with the lowest grasp error (3.1 cm) and reduced failure rates (OSF 10%, CIF 10%) at a moderate compute latency of 41 ms. Overall, reliable aerial grasping in clutter requires jointly combining collision-aware feasibility reasoning, fast feasibility updates, and closed-loop perception during the approach. TABLE III: System Architecture Ablation Study (Hardware Runs, N = 30)                                                
+
+> Architecture Variant Latency †(ms) ↓GA (cm) ↓CFGR ↑OSF ↓CIF ↓
+> No Obstacle Awareness 24 ±65.2 ±0.3 33.33% 13.33% 53.34% No Real-Time Update 41 ±10 4.5 ±1.1 46.66% 33.34% 20.00% CPU-Only Collision 145 ±12 3.8 ±0.5 53.34% 23.33% 23.33%
+> Full Pipeline (Ours) 41 ±12 3.1 ±0.6 80% 10% 10%
+> †Latency is the perception-to-plan compute time ( grasp scoring + feasibility evaluation) per planning cycle, excluding robot motion time.
+
+VI. C ONCLUSION AND FUTURE WORK 
+
+We presented a language-driven aerial grasping pipeline that integrates target grounding, real-time 6-DoF grasp pre-diction, and platform-aware feasibility filtering for operation in cluttered environments. By enforcing kinematic and full-body collision constraints during grasp selection, the system generates executable grasp approaches while maintaining real-time perception-to-plan compute latency on lightweight onboard hardware. Hardware experiments achieve an 80% collision-free grasp rate with a 41 ms perception-to-plan latency and an average end-to-end episode time of 16.8 s. Future work will focus on deploying the complete pipeline fully onboard (including segmentation) and extending opera-tion to GPS-denied environments without external infrastruc-ture such as motion-capture systems, enabling autonomous aerial manipulation in real-world field conditions. ACKNOWLEDGMENT The authors would like to acknowledge the use of large language models (Gemini, ChatGPT) solely for refining and improving the linguistic flow of this manuscript. REFERENCES [1] F. Ruggiero, V. Lippiello, and A. Ollero, “Aerial manipulation: A literature review,” IEEE Robotics and Automation Letters , vol. 3, no. 3, pp. 1957–1964, 2018. [2] A. Ollero et al. , “Past, present, and future of aerial manipulation,” 
+
+IEEE Robotics & Automation Magazine , 2018. [3] A. Suarez, V. M. Vega, M. Fernandez, G. Heredia, and A. Ollero, “Benchmarks for aerial manipulation,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 2650–2657, 2020. [4] E. Bauer, M. Bl¨ ochlinger, P. Strauch, A. Raayatsanati, C. Curdin, and R. K. Katzschmann, “An open-source soft robotic platform for autonomous aerial manipulation in the wild,” in Conference on Robot Learning . PMLR, 2025, pp. 3094–3106. [5] E. Bauer, B. G. Cangan, and R. K. Katzschmann, “Autonomous marker-less rapid aerial grasping,” in 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2023, pp. 6395–6402. [6] R. Bajcsy, Y. Aloimonos, and J. K. Tsotsos, “Revisiting active per-ception,” Autonomous Robots , vol. 42, pp. 177–196, 2018. [7] S. Ubellacker, A. Ray, J. M. Bern, J. Strader, and L. Carlone, “High-speed aerial grasping using a soft drone with onboard perception,” npj Robotics , vol. 2, p. 5, 2024. [8] J. Thomas, J. Polin, K. Sreenath, and V. Kumar, “Toward image based visual servoing for aerial grasping and perching,” in Proceedings of the IEEE International Conference on Robotics and Automation (ICRA) ,2014, pp. 2113–2118. [9] D. Mellinger and V. Kumar, “Minimum snap trajectory generation and control for quadrotors,” in Proceedings of the IEEE International Conference on Robotics and Automation (ICRA) . Shanghai, China: IEEE, 2011, pp. 2520–2525. [10] R. D. Yadav, B. Jones, S. Gupta, A. Sharma, J. Sun, J. Zhao, and S. Roy, “An integrated approach to aerial grasping: Combining a bistable gripper with adaptive control,” IEEE/ASME Transactions on Mechatronics , 2025. [11] M. Orsag, C. Korpela, P. Oh, S. Bogdan, and A. Ollero, Aerial manipulation . Springer, 2018. [12] S.-W. Kim, H. Ono, K. Okada, and H. Tsukagoshi, “Aerial manipu-lation using a quadrotor with a two dof robotic arm,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2013, pp. 243–248. [13] M. Fumagalli, P. Rocco, A. Quattrini, C. Secchi, M. Fontana, and S. Taddei, “Developing an aerial manipulator prototype: Physical interaction with the environment,” IEEE Robotics and Automation Magazine , vol. 21, no. 3, pp. 62–74, 2014. [14] A. Suarez, J. Saez-Pons, G. Mascaro, and J. Valente, “Compliant aerial manipulation for contact-based inspection,” IEEE Robotics and Automation Letters , vol. 2, no. 3, pp. 1432–1438, 2017. [15] H. Chen, F. Quan, L. Fang, and S. Zhang, “Aerial grasping with a lightweight manipulator based on multi-objective optimization and visual compensation,” Sensors , vol. 19, no. 19, p. 4253, 2019. [16] A. Appius, E. Bauer, M. Bl¨ ochlinger, A. Kalra, R. Oberson, A. Raay-atsanati, P. Strauch, S. Suresh, M. von Salis, and R. K. Katzschmann, “Raptor: Rapid aerial pickup and transport of objects by robots,” in 
+
+2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2022, pp. 349–355. [17] X. Meng, Y. He, and J. Han, “Survey on aerial manipulator: System, modeling, and control,” Robotica , vol. 38, no. 7, pp. 1288–1317, 2020. [18] J. Meng, J. Buzzatto, Y. Liu, and M. Liarokapis, “On aerial robots with grasping and perching capabilities: A comprehensive review,” 
+
+Frontiers in Robotics and AI , vol. 8, p. 739173, 2022. [19] H. Chen, W. Deng, B. Ye, Y. Xiong, Z. Pan, and X. Lyu, “Aerial grasping via maximizing delta-arm workspace utilization,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2025, pp. 12 216–12 223. [20] K. Hoi, Y. Wu, A. Ding, J. Wang, A. Zhao, C. Zhang, and F. Gao, “A precise real-time force-aware grasping system for robust aerial manipulation,” arXiv preprint arXiv:2602.08599 , 2026. [21] Y. Zhan, Y. Jiang, M. Cao, and J. Geng, “Aerial manipulation with contact-aware onboard perception and hybrid control,” arXiv preprint arXiv:2602.08251 , 2026. [22] P. Ramon-Soria, B. C. Arrue, and A. Ollero, “Grasp planning and visual servoing for an outdoors aerial dual manipulator,” Engineering ,vol. 6, no. 1, pp. 77–88, 2020. [23] M. Shridhar, L. Manuelli, and D. Fox, “Alfred: A benchmark for interpreting grounded instructions for everyday tasks,” in CVPR , 2020. [24] C. Lynch et al. , “Rt-2: Vision-language-action models transfer web knowledge to robotic control,” arXiv preprint arXiv:2307.15818 , 2023. [25] M. Ahn et al. , “Do as i can, not as i say: Grounding language in robotic affordances,” Robotics: Science and Systems (RSS) , 2022. [26] F. Flacco, A. De Luca, and O. Khatib, “Control of redundant robots under hard joint constraints: Saturation in the null space,” IEEE Transactions on Robotics , vol. 31, no. 3, pp. 637–654, 2015. [27] S. Chatterjee, A. Gandhi, B. Calli, and C. Chamzas, “Image-based roadmaps for vision-only planning and control of robotic manipula-tors,” IEEE Robotics and Automation Letters , 2025. [28] A. Kirillov, N. Ravi, C. Rolland, H. Mao, et al. , “Segment anything model 3,” arXiv preprint arXiv:2408.00714 , 2024. [29] H.-S. Fang, C. Wang, M. Gou, and C. Lu, “Graspnet-1billion: A large-scale benchmark for general object grasping,” in IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , 2020. [30] A. Hornung, K. M. Wurm, M. Bennewitz, C. Stachniss, and W. Bur-gard, “OctoMap: An efficient probabilistic 3D mapping framework based on octrees,” Autonomous Robots , vol. 34, no. 3, pp. 189–206, 2013. [31] J. Pan, S. Chitta, and D. Manocha, “FCL: A general purpose library for collision and proximity queries,” in 2012 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2012, pp. 3859–3866.
