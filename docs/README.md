@@ -6,73 +6,73 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-03-22
-- 运行时间：2026-03-22 19:39:56 UTC
+- 最新运行日期：2026-03-23
+- 运行时间：2026-03-23 20:13:35 UTC
 - 运行状态：成功
 - 本次总论文数：17
 - 精读区：6
 - 速读区：11
 
 ### 今日简报（AI）
-今日精选 17 篇机器人前沿论文，重点攻克从不完美先验到真实环境的策略迁移与高效生成控制。
-推荐关注 ExpertGen 如何实现可扩展的 Sim-to-Real 学习，以及 KoopmanFlow 在生成式控制策略中的结构化偏置创新。
-建议开发者深入研究 VLA 模型的混合投机解码技术，以显著提升具身智能体的实时推理性能。
-- 详情：[/202603/22/README](/202603/22/README)
+今日深度解析 17 篇 AI 论文，重点突破多视图点图扩散策略与视频动作模型的视觉动力学优化。
+ReMAP-DP 实现了高效的多视图空间对齐，而 VAMPO 则通过策略优化显著提升了视频生成中的物理一致性。
+推荐优先研读两篇 9.0 分力作，深入探索具身智能在复杂感知与精细操作上的前沿进展。
+- 详情：[/202603/23/README](/202603/23/README)
 
 ### 精读区论文标签
-1. [ExpertGen: Scalable Sim-to-Real Expert Policy Learning from Imperfect Behavior Priors](/202603/22/2603.15956v1-expertgen-scalable-sim-to-real-expert-policy-learning-from-imperfect-behavior-priors)  
+1. [ReMAP-DP: Reprojected Multi-view Aligned PointMaps for Diffusion Policy](/202603/23/2603.14977v2-remap-dp-reprojected-multi-view-aligned-pointmaps-for-diffusion-policy)  
    标签：评分：9.0/10、query:rob-il
-   evidence：机器人行为克隆的可扩展专家策略学习
-2. [KoopmanFlow: Spectrally Decoupled Generative Control Policy via Koopman Structural Bias](/202603/22/2603.13781v1-koopmanflow-spectrally-decoupled-generative-control-policy-via-koopman-structural-bias)  
+   evidence：结合扩散策略与 3D 空间感知的通用机器人策略
+2. [VAMPO: Policy Optimization for Improving Visual Dynamics in Video Action Models](/202603/23/2603.19370v1-vampo-policy-optimization-for-improving-visual-dynamics-in-video-action-models)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：改进视频动作模型中的视觉动力学以用于机器人控制
+3. [AerialVLA: A Vision-Language-Action Model for UAV Navigation via Minimalist End-to-End Control](/202603/23/2603.14363v1-aerialvla-a-vision-language-action-model-for-uav-navigation-via-minimalist-end-to-end-control)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于稳定高频机器人操纵的生成式控制策略
-3. [RealVLG-R1: A Large-Scale Real-World Visual-Language Grounding Benchmark for Robotic Perception and Manipulation](/202603/22/2603.14880v1-realvlg-r1-a-large-scale-real-world-visual-language-grounding-benchmark-for-robotic-perception-and-manipulation)  
+   evidence：用于连续控制的端到端视觉-语言-动作框架
+4. [MA-VLCM: A Vision Language Critic Model for Value Estimation of Policies in Multi-Agent Team Settings](/202603/23/2603.15418v1-ma-vlcm-a-vision-language-critic-model-for-value-estimation-of-policies-in-multi-agent-team-settings)  
    标签：评分：8.0/10、query:rob-il
-   evidence：统一真实世界的视觉语言定位与抓取任务
-4. [End-to-End Dexterous Grasp Learning from Single-View Point Clouds via a Multi-Object Scene Dataset](/202603/22/2603.15410v1-end-to-end-dexterous-grasp-learning-from-single-view-point-clouds-via-a-multi-object-scene-dataset)  
+   evidence：用于多智能体机器人系统价值估计的VLA模型
+5. [MG-Grasp: Metric-Scale Geometric 6-DoF Grasping Framework with Sparse RGB Observations](/202603/23/2603.16270v1-mg-grasp-metric-scale-geometric-6-dof-grasping-framework-with-sparse-rgb-observations)  
    标签：评分：8.0/10、query:rob-il
-   evidence：从点云进行端到端抓取预测
-5. [Zero-Shot Generalization from Motion Demonstrations to New Tasks](/202603/22/2603.15445v1-zero-shot-generalization-from-motion-demonstrations-to-new-tasks)  
+   evidence：基于RGB观测的六自由度机器人抓取与操纵
+6. [DexGrasp-Zero: A Morphology-Aligned Policy for Zero-Shot Cross-Embodiment Dexterous Grasping](/202603/23/2603.16806v2-dexgrasp-zero-a-morphology-aligned-policy-for-zero-shot-cross-embodiment-dexterous-grasping)  
    标签：评分：8.0/10、query:rob-il
-   evidence：从运动演示到新任务的泛化
-6. [Large Reward Models: Generalizable Online Robot Reward Generation with Vision-Language Models](/202603/22/2603.16065v1-large-reward-models-generalizable-online-robot-reward-generation-with-vision-language-models)  
-   标签：评分：8.0/10、query:rob-il
-   evidence：基于VLM的机器人操纵策略优化奖励生成
+   evidence：用于零样本跨具身灵巧抓取的形态对齐策略
 
 ### 速读区论文标签
-1. [Conservative Offline Robot Policy Learning via Posterior-Transition Reweighting](/202603/22/2603.16542v1-conservative-offline-robot-policy-learning-via-posterior-transition-reweighting)  
+1. [PhysQuantAgent: An Inference Pipeline of Mass Estimation for Vision-Language Models](/202603/23/2603.16958v1-physquantagent-an-inference-pipeline-of-mass-estimation-for-vision-language-models)  
    标签：评分：8.0/10、query:rob-il
-   evidence：从异构数据集中进行离线机器人策略学习和后训练
-2. [Dexterous grasp data augmentation based on grasp synthesis with fingertip workspace cloud and contact-aware sampling](/202603/22/2603.16609v1-dexterous-grasp-data-augmentation-based-on-grasp-synthesis-with-fingertip-workspace-cloud-and-contact-aware-sampling)  
+   evidence：基于 VLM 的操纵物理属性估计
+2. [TeleDex: Accessible Dexterous Teleoperation](/202603/23/2603.17065v1-teledex-accessible-dexterous-teleoperation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：抓取姿态演示与数据增强
-3. [HeiSD: Hybrid Speculative Decoding for Embodied Vision-Language-Action Models with Kinematic Awareness](/202603/22/2603.17573v1-heisd-hybrid-speculative-decoding-for-embodied-vision-language-action-models-with-kinematic-awareness)  
+   evidence：用于收集机器人操纵策略演示的遥操作系统
+3. [TeleDex: Accessible Dexterous Teleoperation](/202603/23/2603.17065v2-teledex-accessible-dexterous-teleoperation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：加速用于机器人控制的视觉-语言-动作（VLA）模型
-4. [Rapid Adaptation of Particle Dynamics for Generalized Deformable Object Mobile Manipulation](/202603/22/2603.18246v1-rapid-adaptation-of-particle-dynamics-for-generalized-deformable-object-mobile-manipulation)  
+   evidence：用于收集机器人操纵策略演示数据的系统
+4. [V-Dreamer: Automating Robotic Simulation and Trajectory Synthesis via Video Generation Priors](/202603/23/2603.18811v1-v-dreamer-automating-robotic-simulation-and-trajectory-synthesis-via-video-generation-priors)  
    标签：评分：8.0/10、query:rob-il
-   evidence：操纵具有未知动力学的可变形物体
-5. [Pixel-level Scene Understanding in One Token: Visual States Need What-is-Where Composition](/202603/22/2603.13904v1-pixel-level-scene-understanding-in-one-token-visual-states-need-what-is-where-composition)  
+   evidence：自动化机器人仿真和操纵专家轨迹合成
+5. [WestWorld: A Knowledge-Encoded Scalable Trajectory World Model for Diverse Robotic Systems](/202603/23/2603.14392v1-westworld-a-knowledge-encoded-scalable-trajectory-world-model-for-diverse-robotic-systems)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于机器人决策的视觉状态表示
-6. [Vision-guided Autonomous Dual-arm Extraction Robot for Bell Pepper Harvesting](/202603/22/2603.13987v1-vision-guided-autonomous-dual-arm-extraction-robot-for-bell-pepper-harvesting)  
+   evidence：用于多种机器人系统和控制的轨迹世界模型
+6. [AutoMoT: A Unified Vision-Language-Action Model with Asynchronous Mixture-of-Transformers for End-to-End Autonomous Driving](/202603/23/2603.14851v1-automot-a-unified-vision-language-action-model-with-asynchronous-mixture-of-transformers-for-end-to-end-autonomous-driving)  
    标签：评分：7.0/10、query:rob-il
-   evidence：视觉引导的自主双臂移动操纵系统
-7. [Ego to World: Collaborative Spatial Reasoning in Embodied Systems via Reinforcement Learning](/202603/22/2603.14811v1-ego-to-world-collaborative-spatial-reasoning-in-embodied-systems-via-reinforcement-learning)  
+   evidence：用于端到端控制的统一视觉-语言-动作模型
+7. [Emergent Dexterity via Diverse Resets and Large-Scale Reinforcement Learning](/202603/23/2603.15789v1-emergent-dexterity-via-diverse-resets-and-large-scale-reinforcement-learning)  
    标签：评分：7.0/10、query:rob-il
-   evidence：基于异构视角的面向动作抓取
-8. [AeroGrab: A Unified Framework for Aerial Grasping in Cluttered Environments](/202603/22/2603.15097v1-aerograb-a-unified-framework-for-aerial-grasping-in-cluttered-environments)  
+   evidence：用于长程、高接触灵巧操纵的强化学习
+8. [FEEL (Force-Enhanced Egocentric Learning): A Dataset for Physical Action Understanding](/202603/23/2603.15847v1-feel-force-enhanced-egocentric-learning-a-dataset-for-physical-action-understanding)  
    标签：评分：7.0/10、query:rob-il
-   evidence：空中抓取的端到端系统
-9. [A Real-Time Neuro-Symbolic Ethical Governor for Safe Decision Control in Autonomous Robotic Manipulation](/202603/22/2603.14221v1-a-real-time-neuro-symbolic-ethical-governor-for-safe-decision-control-in-autonomous-robotic-manipulation)  
+   evidence：用于操纵的大规模第一视角视频和力反馈数据集
+9. [PerlAD: Towards Enhanced Closed-loop End-to-end Autonomous Driving with Pseudo-simulation-based Reinforcement Learning](/202603/23/2603.14908v1-perlad-towards-enhanced-closed-loop-end-to-end-autonomous-driving-with-pseudo-simulation-based-reinforcement-learning)  
    标签：评分：6.0/10、query:rob-il
-   evidence：机器人操纵中的安全决策控制
-10. [Context-Aware Adaptive Shared Control for Magnetically-Driven Bimanual Dexterous Micromanipulation](/202603/22/2603.14388v1-context-aware-adaptive-shared-control-for-magnetically-driven-bimanual-dexterous-micromanipulation)  
+   evidence：用于闭环端到端控制的模仿学习
+10. [KiRAS: Keyframe Guided Self-Imitation for Robust and Adaptive Skill Learning in Quadruped Robots](/202603/23/2603.15179v1-kiras-keyframe-guided-self-imitation-for-robust-and-adaptive-skill-learning-in-quadruped-robots)  
    标签：评分：6.0/10、query:rob-il
-   evidence：双臂灵巧微操纵控制
-11. [eNavi: Event-based Imitation Policies for Low-Light Indoor Mobile Robot Navigation](/202603/22/2603.14397v1-enavi-event-based-imitation-policies-for-low-light-indoor-mobile-robot-navigation)  
+   evidence：用于四足机器人技能获取的自我模仿学习
+11. [AsgardBench - Evaluating Visually Grounded Interactive Planning Under Minimal Feedback](/202603/23/2603.15888v1-asgardbench---evaluating-visually-grounded-interactive-planning-under-minimal-feedback)  
    标签：评分：6.0/10、query:rob-il
-   evidence：基于事件相机的机器人导航模仿策略
+   evidence：视觉接地交互式规划与计划调整的基准测试
 
 
 <div class="dpr-home-promo-card">
