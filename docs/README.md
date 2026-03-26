@@ -6,85 +6,73 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-03-25
-- 运行时间：2026-03-25 20:14:56 UTC
+- 最新运行日期：2026-03-26
+- 运行时间：2026-03-26 20:26:33 UTC
 - 运行状态：成功
-- 本次总论文数：21
-- 精读区：10
+- 本次总论文数：17
+- 精读区：6
 - 速读区：11
 
 ### 今日简报（AI）
-今日深度解析 21 篇机器人前沿进展，聚焦 VLA 模型在复杂操作任务中的性能飞跃。
-满分论文 SG-VLA 与 Gaze-Regularized VLA 证明了空间感知与视线引导是提升机器人操作精度的核心。
-建议关注视频世界模型与人形机器人交互的融合，探索更具“拟人感”的智能控制方案。
-- 详情：[/202603/25/README](/202603/25/README)
+今日聚焦 VLA 模型性能飞跃，重点攻克机器人视觉-语言-动作系统的鲁棒性与 3D 空间感知难题。
+满分论文 SOMA 与 3D-Mix 揭示了通过上下文适配增强系统韧性，以及利用即插即用模块融合 3D 信息是提升 VLA 表现的关键。
+建议关注 VLA 模型在复杂环境下的泛化能力，尝试将 3D 空间信息集成到现有机器人策略中以优化交互精度。
+- 详情：[/202603/26/README](/202603/26/README)
 
 ### 精读区论文标签
-1. [SG-VLA: Learning Spatially-Grounded Vision-Language-Action Models for Mobile Manipulation](/202603/25/2603.22760v1-sg-vla-learning-spatially-grounded-vision-language-action-models-for-mobile-manipulation)  
+1. [SOMA: Strategic Orchestration and Memory-Augmented System for Vision-Language-Action Model Robustness via In-Context Adaptation](/202603/26/2603.24060v1-soma-strategic-orchestration-and-memory-augmented-system-for-vision-language-action-model-robustness-via-in-context-adaptation)  
    标签：评分：10.0/10、query:rob-il
-   evidence：用于移动操纵的空间对齐VLA模型
-2. [Gaze-Regularized Vision-Language-Action Models for Robotic Manipulation](/202603/25/2603.23202v1-gaze-regularized-vision-language-action-models-for-robotic-manipulation)  
+   evidence：升级冻结的VLA策略以实现鲁棒的上下文自适应
+2. [3D-Mix for VLA: A Plug-and-Play Module for Integrating VGGT-based 3D Information into Vision-Language-Action Models](/202603/26/2603.24393v1-3d-mix-for-vla-a-plug-and-play-module-for-integrating-vggt-based-3d-information-into-vision-language-action-models)  
    标签：评分：10.0/10、query:rob-il
-   evidence：用于操纵的视线正则化视觉-语言-动作 (VLA) 模型
-3. [VTAM: Video-Tactile-Action Models for Complex Physical Interaction Beyond VLAs](/202603/25/2603.23481v1-vtam-video-tactile-action-models-for-complex-physical-interaction-beyond-vlas)  
+   evidence：将3D信息集成到用于操纵的视觉-语言-动作模型中
+3. [TAG: Target-Agnostic Guidance for Stable Object-Centric Inference in Vision-Language-Action Models](/202603/26/2603.24584v1-tag-target-agnostic-guidance-for-stable-object-centric-inference-in-vision-language-action-models)  
    标签：评分：10.0/10、query:rob-il
-   evidence：用于复杂物理交互的视频-触觉-动作模型
-4. [Towards the Vision-Sound-Language-Action Paradigm: The HEAR Framework for Sound-Centric Manipulation](/202603/25/2603.16086v1-towards-the-vision-sound-language-action-paradigm-the-hear-framework-for-sound-centric-manipulation)  
+   evidence：视觉-语言-动作模型的推理时引导
+4. [Do World Action Models Generalize Better than VLAs? A Robustness Study](/202603/26/2603.22078v1-do-world-action-models-generalize-better-than-vlas-a-robustness-study)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于实时操纵的视觉-声音-语言-动作范式
-5. [Understanding Behavior Cloning with Action Quantization](/202603/25/2603.20538v1-understanding-behavior-cloning-with-action-quantization)  
+   evidence：视觉-语言-动作（VLA）与世界动作模型的鲁棒性研究
+5. [ABot-PhysWorld: Interactive World Foundation Model for Robotic Manipulation with Physics Alignment](/202603/26/2603.23376v1-abot-physworld-interactive-world-foundation-model-for-robotic-manipulation-with-physics-alignment)  
    标签：评分：9.0/10、query:rob-il
-   evidence：VLA系统中行为克隆的理论分析
-6. [StageCraft: Execution Aware Mitigation of Distractor and Obstruction Failures in VLA Models](/202603/25/2603.20659v1-stagecraft-execution-aware-mitigation-of-distractor-and-obstruction-failures-in-vla-models)  
+   evidence：机器人操纵的世界基础模型
+6. [Chameleon: Episodic Memory for Long-Horizon Robotic Manipulation](/202603/26/2603.24576v1-chameleon-episodic-memory-for-long-horizon-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：缓解VLA模型在机器人泛化中的失效问题
-7. [Grounding Sim-to-Real Generalization in Dexterous Manipulation: An Empirical Study with Vision-Language-Action Models](/202603/25/2603.22876v1-grounding-sim-to-real-generalization-in-dexterous-manipulation-an-empirical-study-with-vision-language-action-models)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：VLA模型在灵巧操纵中的仿真到现实泛化
-8. [Agile-VLA: Few-Shot Industrial Pose Rectification via Implicit Affordance Anchoring](/202603/25/2603.22899v1-agile-vla-few-shot-industrial-pose-rectification-via-implicit-affordance-anchoring)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：用于工业操纵和闭环控制的VLA框架
-9. [VLA-IAP: Training-Free Visual Token Pruning via Interaction Alignment for Vision-Language-Action Models](/202603/25/2603.22991v1-vla-iap-training-free-visual-token-pruning-via-interaction-alignment-for-vision-language-action-models)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：针对支持操纵任务的VLA模型的视觉标记剪枝
-10. [Efficient Hybrid SE(3)-Equivariant Visuomotor Flow Policy via Spherical Harmonics for Robot Manipulation](/202603/25/2603.23227v1-efficient-hybrid-se3-equivariant-visuomotor-flow-policy-via-spherical-harmonics-for-robot-manipulation)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：用于机器人操纵的视觉运动流策略
+   evidence：利用多模态标记实现长程机器人操纵的片段记忆
 
 ### 速读区论文标签
-1. [Efficient and Reliable Teleoperation through Real-to-Sim-to-Real Shared Autonomy](/202603/25/2603.17016v2-efficient-and-reliable-teleoperation-through-real-to-sim-to-real-shared-autonomy)  
+1. [ReSteer: Quantifying and Refining the Steerability of Multitask Robot Policies](/202603/26/2603.17300v1-resteer-quantifying-and-refining-the-steerability-of-multitask-robot-policies)  
    标签：评分：8.0/10、query:rob-il
-   evidence：通过学习到的纠正行为增强人类遥操作的共享自主框架
-2. [EVA: Aligning Video World Models with Executable Robot Actions via Inverse Dynamics Rewards](/202603/25/2603.17808v2-eva-aligning-video-world-models-with-executable-robot-actions-via-inverse-dynamics-rewards)  
+   evidence：提高多任务机器人策略的任务可控性
+2. [HyReach: Vision-Guided Hybrid Manipulator Reaching in Unseen Cluttered Environments](/202603/26/2603.21421v1-hyreach-vision-guided-hybrid-manipulator-reaching-in-unseen-cluttered-environments)  
    标签：评分：8.0/10、query:rob-il
-   evidence：将视频世界模型与可执行机器人动作对齐
-3. [Morphology-Consistent Humanoid Interaction through Robot-Centric Video Synthesis](/202603/25/2603.19709v2-morphology-consistent-humanoid-interaction-through-robot-centric-video-synthesis)  
+   evidence：杂乱环境下视觉引导的混合机械臂到达任务
+3. [PRM-as-a-Judge: A Dense Evaluation Paradigm for Fine-Grained Robotic Auditing](/202603/26/2603.21669v1-prm-as-a-judge-a-dense-evaluation-paradigm-for-fine-grained-robotic-auditing)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于零样本交互和任务完成的机器人中心视频合成
-4. [Speedup Patch: Learning a Plug-and-Play Policy to Accelerate Embodied Manipulation](/202603/25/2603.20658v1-speedup-patch-learning-a-plug-and-play-policy-to-accelerate-embodied-manipulation)  
+   evidence：机器人策略执行的密集评估范式
+4. [BiPreManip: Learning Affordance-Based Bimanual Preparatory Manipulation through Anticipatory Collaboration](/202603/26/2603.21679v1-bipremanip-learning-affordance-based-bimanual-preparatory-manipulation-through-anticipatory-collaboration)  
    标签：评分：8.0/10、query:rob-il
-   evidence：使用离线数据加速具身操纵策略
-5. [ManiTwin: Scaling Data-Generation-Ready Digital Object Dataset to 100K](/202603/25/2603.16866v1-manitwin-scaling-data-generation-ready-digital-object-dataset-to-100k)  
+   evidence：复杂任务的双臂准备性操纵
+5. [ManiDreams: An Open-Source Library for Robust Object Manipulation via Uncertainty-aware Task-specific Intuitive Physics](/202603/26/2603.18336v1-manidreams-an-open-source-library-for-robust-object-manipulation-via-uncertainty-aware-task-specific-intuitive-physics)  
    标签：评分：7.0/10、query:rob-il
-   evidence：扩展用于机器人操纵数据生成的数字物体数据集
-6. [Recurrent Reasoning with Vision-Language Models for Estimating Long-Horizon Embodied Task Progress](/202603/25/2603.17312v1-recurrent-reasoning-with-vision-language-models-for-estimating-long-horizon-embodied-task-progress)  
+   evidence：不确定性感知的操纵规划框架
+6. [ManiDreams: An Open-Source Library for Robust Object Manipulation via Uncertainty-aware Task-specific Intuitive Physics](/202603/26/2603.18336v2-manidreams-an-open-source-library-for-robust-object-manipulation-via-uncertainty-aware-task-specific-intuitive-physics)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于长程具身任务进度估计的视觉语言模型
-7. [DexEXO: A Wearability-First Dexterous Exoskeleton for Operator-Agnostic Demonstration and Learning](/202603/25/2603.17323v1-dexexo-a-wearability-first-dexterous-exoskeleton-for-operator-agnostic-demonstration-and-learning)  
+   evidence：基于直觉物理的不确定性感知操纵规划
+7. [Robotic Agentic Platform for Intelligent Electric Vehicle Disassembly](/202603/26/2603.18520v1-robotic-agentic-platform-for-intelligent-electric-vehicle-disassembly)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于收集灵巧机器人学习高质量演示的外骨骼
-8. [Morphology-Consistent Humanoid Interaction through Robot-Centric Video Synthesis](/202603/25/2603.19709v1-morphology-consistent-humanoid-interaction-through-robot-centric-video-synthesis)  
+   evidence：车辆拆解的感知驱动操纵
+8. [Articulated-Body Dynamics Network: Dynamics-Grounded Prior for Robot Learning](/202603/26/2603.19078v1-articulated-body-dynamics-network-dynamics-grounded-prior-for-robot-learning)  
    标签：评分：7.0/10、query:rob-il
-   evidence：以机器人为中心的视频合成实现零样本交互
-9. [REAL: Robust Extreme Agility via Spatio-Temporal Policy Learning and Physics-Guided Filtering](/202603/25/2603.17653v1-real-robust-extreme-agility-via-spatio-temporal-policy-learning-and-physics-guided-filtering)  
+   evidence：机器人学习和策略网络的动力学基础先验
+9. [Efficient Soft Actor-Critic with LLM-Based Action-Level Guidance for Continuous Control](/202603/26/2603.17468v1-efficient-soft-actor-critic-with-llm-based-action-level-guidance-for-continuous-control)  
    标签：评分：6.0/10、query:rob-il
-   evidence：感官受损下可靠机器人控制的端到端框架
-10. [Accurate Open-Loop Control of a Soft Continuum Robot Through Visually Learned Latent Representations](/202603/25/2603.19655v1-accurate-open-loop-control-of-a-soft-continuum-robot-through-visually-learned-latent-representations)  
+   evidence：基于大语言模型的连续控制动作级引导
+10. [Geometrically Plausible Object Pose Refinement using Differentiable Simulation](/202603/26/2603.20992v1-geometrically-plausible-object-pose-refinement-using-differentiable-simulation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：用于机器人控制和跟踪的视觉学习潜变量表示
-11. [The Robot's Inner Critic: Self-Refinement of Social Behaviors through VLM-based Replanning](/202603/25/2603.20164v1-the-robots-inner-critic-self-refinement-of-social-behaviors-through-vlm-based-replanning)  
+   evidence：灵巧操纵中的物体位姿精细化
+11. [Dynamic Control Barrier Function Regulation with Vision-Language Models for Safe, Adaptive, and Realtime Visual Navigation](/202603/26/2603.21142v1-dynamic-control-barrier-function-regulation-with-vision-language-models-for-safe-adaptive-and-realtime-visual-navigation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：基于VLM的重新规划和底层关节控制
+   evidence：使用VLM风险评估的视觉到控制导航框架
 
 
 <div class="dpr-home-promo-card">
