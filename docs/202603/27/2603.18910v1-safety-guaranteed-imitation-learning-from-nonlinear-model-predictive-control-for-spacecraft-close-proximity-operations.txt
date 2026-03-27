@@ -1,0 +1,405 @@
+Title: Safety-Guaranteed Imitation Learning from Nonlinear Model Predictive Control for Spacecraft Close Proximity Operations
+
+URL Source: https://arxiv.org/pdf/2603.18910v1
+
+Published Time: Fri, 20 Mar 2026 01:11:20 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Safety-Guaranteed Imitation Learning from Nonlinear Model Predictive Control for Spacecraft Close Proximity Operations 
+
+Alexander Meinert 1, Niklas Baldauf 1, Peter Stadler 1 and Alen Turnwald 2
+
+Abstract — This paper presents a safety-guaranteed, runtime-efficient imitation learning framework for spacecraft close proximity control. We leverage Control Barrier Functions (CBFs) for safety certificates and Control Lyapunov Functions (CLFs) for stability as unified design principles across data generation, training, and deployment. First, a nonlinear Model Predictive Control (NMPC) expert enforces CBF constraints to provide safe reference trajectories. Second, we train a neural policy with a novel CBF-CLF-informed loss and DA GGER -like rollouts with curriculum weighting, promoting data-efficiency and reducing future safety filter interventions. Third, at de-ployment a lightweight one-step CBF-CLF quadratic program minimally adjusts the learned control input to satisfy hard safety constraints while encouraging stability. We validate the approach for ESA-compliant close proximity operations, including fly-around with a spherical keep-out zone and final approach inside a conical approach corridor, using the Basilisk high-fidelity simulator with nonlinear dynamics and pertur-bations. Numerical experiments indicate stable convergence to decision points and strict adherence to safety under the filter, with task performance comparable to the NMPC expert while significantly reducing online computation. A runtime analysis demonstrates real-time feasibility on a commercial off-the-shelf processor, supporting onboard deployment for safety-critical on-orbit servicing. 
+
+I. I NTRODUCTION 
+
+With applications encompassing active debris removal, refueling, and in-orbit assembly, on-orbit servicing (OOS) is expected to play a central role in the next generation of space missions. Close proximity operations (CPO), in which a servicing spacecraft maneuvers near a target object, represent a safety-critical phase during an OOS mission. Given the substantial risks involved, space agencies, industry, and academia have developed comprehensive requirements for the design of safe CPO [1], [2], most recently exemplified by ESA’s guidelines for the ClearSpace-1 mission [3], [4]. Notably, these requirements pose complex challenges for the controller design with onboard autonomy considering safety zones, physical constraints, and the nature of nonlinear multi-input multi-output systems. Recent advances in Model Predictive Control (MPC) show promising results, as it enables the integration of the above challenges into a con-strained optimal control problem (OCP). For example, MPC                 
+
+> This work was supported by the Bavarian Ministry of Economic Affairs, Regional Development and Energy (grant no. MRF-2307-0009).
+> 1Alexander Meinert, Niklas Baldauf and Peter Stadler are with the Space Applications Group, e:fs TechHub GmbH, Gaimersheim, Germany.
+
+{Alexander.Meinert, Niklas.Baldauf, Peter.Stadler }@efs-techhub.com 
+
+> 2Alen Turnwald is with the Faculty of Electrical Engineering and Infor-mation Technology, Ingolstadt University of Applied Sciences, Germany.
+
+Alen.Turnwald@thi.de 
+
+has been successfully applied to space applications including spacecraft rendezvous [5] and attitude control [6]. However, the computational burden of solving nonlinear MPC (NMPC) problems on commercial off-the-shelf (COTS) space-grade processors has drawn attention to Imitation Learning (IL) as a runtime-efficient alternative, yet such data-driven controllers inherently lack safety and stability guarantees [7]. A growing line of research—safe learning control [8]— investigates the joint combination of learning-based con-trollers with subsequent safety and stability filters to certify hard constraint satisfaction. The main idea behind safety filters is to verify whether a preceding, e.g. learning-based, control input keeps the system within a forward invariant safe set and, if necessary, to minimally modify the control input to ensure the trajectory adheres to safety constraints. Among well-established methods, Control Barrier Functions (CBF) have proven to be computationally lightweight as they can be implemented through a one-step quadratic program (QP) [9]. Additionally, Control Lyapunov Functions (CLF) provide a means to enforce stability and can be combined with CBFs into a QP-based filter. While several studies regarding safety in learning-based controllers have been conducted in the fields of robotics [10] and autonomous driving [11], only few approaches have been published in the context of spacecraft CPO. Relevant works include [12], where a long short-term memory neural network (NN) is integrated into a learning-based time shift governor scheme to enforce safety constraints during the final approach of spacecraft rendezvous; however, keep out zones are not considered in this framework. In [13], the authors train a reinforcement learning agent for trajectory planning in proximity operations, yet only incorporate line-of-sight constraints through a soft-constrained reward function, thus missing hard safety guarantees. Another body of literature [14], [15] employs transformer-based neural networks to ini-tialize trajectory optimization problems, thereby improving computational efficiency and preserving constraint satisfac-tion. In contrast to the aforementioned prior work, our approach introduces two principal distinctions. First, we learn a direct state-to-control mapping, avoiding the need to predict entire MPC trajectories and thus eliminating the computational overhead of sequential models such as transformers. Second, and more fundamentally, our learning-based controller is deployed directly onboard, and paired with a CBF-CLF-filter to guarantee constraint satisfaction. Unlike existing methods [14], [15] that use neural networks merely to warm-start an optimal control solver, our framework enables real-
+
+> arXiv:2603.18910v1 [cs.RO] 19 Mar 2026
+
+time execution with minimal computational and memory requirements—limited to a single neural network inference and a lightweight quadratic program, rather than repeatedly solving a non-convex OCP. The present work is further motivated by evidence from [16] and [17], which underscore the importance of safety certificates for spacecraft control in future missions, explic-itly pointing out the demand for unified safety frameworks in learning-based settings. Briefly, our main contributions are:  
+
+> •
+
+A computationally efficient, learning-based control framework for spacecraft close proximity operations that understands safety as a unified design principle, incorporating CBF constraints across data generation, imitation learning training, and real-time deployment.  
+
+> •
+
+A novel formulation of a CBF-CLF-informed loss func-tion that integrates the safety and stability requirements of on-orbit servicing into data-efficient imitation learn-ing.  
+
+> •
+
+Robust validation of the control framework for the safety-critical rendezvous scenario—reflecting the re-quirements of the recently published ESA guidelines on safe CPO—using the high-fidelity astrodynamics sim-ulator Basilisk , including realistic orbital perturbations and nonlinear relative dynamics.  
+
+> •
+
+Demonstration of real-time feasibility on embedded COTS hardware, supporting onboard deployment. To the best of our knowledge, this is the first unified CBF-based safety-centric learning approach for spacecraft close proximity control, rigorously validated through simulation and real-time hardware demonstration. The rest of this paper is structured as follows: Section II presents the concept of operations relevant to the investigated CPO scenario. Section III introduces the proposed imitation learning framework and provides details on the integration of safety and stability guarantees. The control framework is validated in simulation and through a runtime analysis on an embedded system in Section IV, and finally key findings and an outlook on future work are summarized in Section V. II. C ONCEPT OF OPERATIONS 
+
+The concept of operations defines the mission-specific timeline and characteristics. We build upon the recently pub-lished ESA guidelines on safe CPO [3] that were validated in [4] with application to the ClearSpace-1 mission, where the aim is to capture and de-orbit an uncooperative target spacecraft. In this regard, the present work addresses the Close Rendezvous (CR) phase, in which the servicing space-craft perceives the client with its onboard relative navigation sensors and performs active forced motion control. As an extension to the general-purpose ESA guidelines, for a given OOS scenario with a robotic arm mounted on the servicer, the CR consists of two operations. First, starting inside the Approach Zone (AZ), the servicer performs a spherical fly-around to reach the decision point 
+
+GO for KOZ while safely avoiding the Keep Out Zone (KOZ). The GO for KOZ point serves as a designated hold point for station keeping since the servicer must synchronize its rotational motion before approaching the non-cooperative target along the angular momentum vector. The radius of the KOZ is chosen as the sum of the largest dimensions of the servicer’s and target’s cuboid clearance envelope, respectively, ensuring the minimum safety distance to avoid any potential collision. Second, the servicer enters the KOZ to reach the subsequent decision point GO for Capture while staying inside the Approach Corridor (AC) aligned with the target angular momentum vector. Figure 1 visualizes the concept of operations schematics. Assuming the client is in a circular orbit, the Clohessy-Wiltshire-Hill equations of rel-ative motion [18] are expressed in the Local-Vertical Local-Horizontal (LVLH) reference frame in state-space form as follows 
+
+
+
+˙x1
+
+˙x2
+
+˙x3
+
+¨x1
+
+¨x2
+
+¨x3
+
+ =
+
+
+
+0 0 0 1 0 00 0 0 0 1 00 0 0 0 0 13n2 0 0 0 2n 00 0 0 −2n 0 00 0 −n2 0 0 0
+
+
+
+x1
+
+x2
+
+x3
+
+˙x1
+
+˙x2
+
+˙x3
+
+ +
+
+
+
+0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 1 
+
+"u1
+
+u2
+
+u3
+
+#
+
+(1) where the states [x1 x2 x3 ˙x1 ˙x2 ˙x3]T are the relative distance and velocity components in R-bar, V-bar and H-bar direction, correspondingly, n denotes the mean orbital motion, and u1, u 2, u 3 are the input acceleration components. Note that we leverage the attitude controller from [19] to point the servicer onboard relative navigation sensors at the target throughout the entire CR phase. 
+
+2θlt         
+
+> ls
+> rKOZ
+> Fig. 1: Concept of operations for the Close Rendezvous mission phase in accordance with the ESA guidelines on safe CPO [3]. The servicer performs two operations requiring forced motion control with active safety regards within the Approach Zone. (1) Spherical fly-around to decision point GO for KOZ in order to align with the target angular momentum vector while avoiding the Keep Out Zone. (2) Final approach to decision point GO for Capture , where entry in KOZ is only permitted if the conical Approach Corridor bounds are satisfied. The radius of the KOZ rKOZ is the sum of the largest dimensions lsand ltof the servicer and target, respectively.
+
+III. M ETHOD 
+
+This section presents the main result of this work leading to the threefold, safe imitation learning framework, illustrated in Figure 2. The following subsections focus on the essential elements; the CBF and CLF design, the NMPC expert policy as well as the safety-aware learning and deployment including a safety filter. 
+
+A. Input Constrained Control Barrier Function Design 
+
+Consider the nonlinear control-affine system 
+
+˙x = f (x) + g(x) u (2) locally Lipschitz continuous in x, where x ∈ X ⊂ Rn
+
+denotes the state and u ∈ U ⊂ Rm the control input. In accordance with [20], we define S as the forward invariant safe set 
+
+S = {x ∈ Rn | h(x) ≥ 0} (3) where S is the zero-superlevel set of the continuously differentiable constraint function h(x). We refer to h(x) as a Control Barrier Function if there exists an extended class-K
+
+function α ∈ K such that the safety condition 
+
+sup 
+
+> u∈U
+
+[Lf h(x) + Lg h(x)u] ≥ − α(h(x)) (4) holds ∀x ∈ S . Safety is guaranteed by keeping the state trajectory inside the forward invariant safe set for any initial state x(0) ∈ S , since (4) ensures that the time derivative 
+
+˙h(x, u) is positive whenever h(x) = 0 , thereby driving the state back into S. However, satisfying the safety condition (4) and actuator constraints at the same time might lead to infeasibility in a NMPC or safety filter QP. Thus, for the inertia-based second-order dynamics (1), we leverage the results from [21] and formulate the input constrained CBF condition 
+
+sup 
+
+> u∈U
+
+H(x, u) = sup 
+
+> u∈U
+
+[Lf H(x) + Lg H(x)u + α(H(x))] ≥ 0
+
+(5) for a constraint function h(x) with relative degree ρ = 2 and 
+
+Lg h(x) = 0 , where 
+
+H(x) = h(x) + | ˙h(x)| ˙h(x)2umax 
+
+(6) 
+
+˙H(x, u) = ˙h(x) + | ˙h(x)|¨h(x, u)
+
+umax 
+
+. (7) In fact, (5) implies the existence of an inner safe set SH ⊂ S 
+
+that accounts for the simultaneous viability of safety and input constraints. We construct the following two CBFs for the CPO scenario outlined in Section II. 
+
+1) Spherical CBF for Keep Out Zone: The spherical KOZ safety constraint for the fly-around is characterized by 
+
+h1(x) = ∥p − po∥2 − r2 
+
+> KOZ
+
+≥ 0, (8) in which rKOZ is the radius of the KOZ, p = [ x1 x2 x3]T ,and po = [ xo yo zo]T represents the center of the KOZ aligned with the origin of the LVLH frame for the given scenario. 
+
+2) Conical CBF for Approach Corridor: For the final approach, we construct a conical safety constraint 
+
+h2(x) = pT d
+
+∥p∥ ∥ d∥ − cos( θ) ≥ 0, (9) where d is the cone axis direction aligned with the target angular momentum vector and θ denotes the half-cone angle. For both CBFs (8) and (9) expressed in the form of (5), we set α(H(x)) = γH (x), where γ is a design parameter indicating the notion how fast the state trajectory is allowed to approach the boundary of the safe set. 
+
+B. Control Lyapunov Function Design 
+
+Another desirable property is to certify the stabilizability of the control-affine system (2) to an equilibrium point xg ,e.g. a decision point in CPO. For that matter, a positive definite function V (x) is called a Control Lyapunov Function if, for every state x̸ = xg , there exists a control input such that 
+
+inf 
+
+> u∈U
+
+[Lf V (x) + Lg V (x)u] ≤ − β(V (x)) (10) for some class K function β [20]. This condition implies that each sublevel set of V (x) can be rendered forward invariant, leading to stabilizability of xg . For the proximity control problem, a quadratic CLF with relative degree 1 is designed as 
+
+V (x) = ( x − xg )T P (x − xg ), (11) where P is the solution to the discrete-time algebraic Riccati equation. Moreover, preliminary experiments revealed that the imitation learner encounters difficulties in achieving stationary accuracy at the decision points. In order to enforce stability in close-vicinity to xg through a safety filter— without interfering with the CBF safety constraints when far away from the decision point—(10) is rewritten such that           
+
+> inf
+> u∈U V(x,u) = inf
+> u∈U [LfV(x)+ LgV(x)u+ζ(x)V(x)] ≤0(12)
+
+with the state-dependent decay rate 
+
+ζ(x) = ζmin + ( ζmax − ζmin ) 11 + ej(∥x−xg ∥− c) (13) where j and c adjust the steepness and midpoint of the sigmoid function, respectively, and ζmin and ζmax represent the lower and upper bounds. 
+
+C. Nonlinear Model Predictive Control for Spacecraft CPO 
+
+A safe NMPC policy is employed to generate an expert dataset D used in the subsequent training of an imitation learner. The constrained finite time OCP, repeatedly solved at every time step via the IPOPT 1 solver, yields                                           
+
+> U∗
+> 0(x(t)) = argmin
+> U0
+> ∥¯xN∥2
+> P+
+> N−1X
+> k=0
+> ∥¯xk∥2
+> Q+∥uk∥2
+> R(14a) s.t. xk+1 =A x k+B u k(14b)
+> xk∈ X ,uk∈ U , k = 0 , ..., N −1(14c)
+> xN∈ X f(14d)
+> x0=x(t)(14e)
+> LfH(xk) + LgH(xk)uk+γH (xk)≥ϵ(14f)
+> 1https://github.com/coin-or/Ipopt Fig. 2: Overview of the threefold, safety-guaranteed imitation learning framework, which incorporates safety considerations at multiple stages. (1) Data generation: Safety is integrated during data collection, as the NMPC expert policy enforces CBF constraints within the optimal control problem. (2) Training: A tailored loss function augments the conventional imitation loss with CBF and CLF soft constraints, imposing physical safety and stability priors into the learning process. (3) Deployment: During online deployment, a runtime-efficient CBF-CLF-QP safety filter ensures stability and hard constraint satisfaction.
+
+where (14a) contains the quadratic cost function with the tracking error ¯x = x − xg and the weighting matrices 
+
+Q = QT ⪰ 0, P = P T ⪰ 0, and R = RT ≻ 0. The discretized system dynamics from (1) are given in (14b), the state and input box constraints are defined by (14c), the terminal state constraint is given in (14d), and the current state is used to initialize the predicted trajectory by (14e). Safety is ensured by the CBF constraint in (14f), while ϵ represents a discretization offset to the safe set boundary. Note that enforcing the CBF constraint—either based on the spherical KOZ or conical AC depending on the operation during the CR—results in a computationally expensive nonlinear program. The solution to (14) is the optimal input sequence 
+
+U ∗ 
+
+> 0
+
+, while only the first element is applied as the control input uNMPC (t) = u∗
+
+> 0
+
+(x(t)) to the system. 
+
+D. CBF-CLF-Informed Loss Function 
+
+Motivated by the objective to achieve a runtime-efficient controller, the expert policy in (14) is approximated using a supervised imitation learning strategy. While offline Behavior Cloning (BC), solely subject to the conventional imitation loss 
+
+Limit = Ex∼D 
+
+h
+
+∥πNN (x) − π∗(x)∥2i
+
+, (15) is prone to covariate shift—since the training data is sampled in areas where the expert policy leads to—we apply the on-policy DA GGER [22] algorithm. Here, a mixed policy consisting of the supervised trained NN and the expert is rolled out in simulation to gather new training data by eval-uating the NMPC expert critic. At every DA GGER iteration, the rollout policy’s weighting κ is shifted to rely more on the imitation-learned NN policy. In addition, we leverage the intent from physics-informed NN [17] and formulate a novel CBF-CLF-informed loss function (18) tailored to spacecraft close proximity control, hence incorporating the physical constraint knowledge into the training process. To do so, after an initial training phase based on the imitation loss, (15) is augmented by a CBF-specific loss 
+
+LCBF = Ex∼D
+
+max(0 , −H(x, π NN (x))) 2 (16) and a CLF-informed loss term 
+
+LCLF = Ex∼D
+
+max(0 , V(x, π NN (x))) 2 (17) that penalize the NN only if the CBF (5) or CLF (12) constraints are violated. Notably, curriculum learning is performed, increasing the weights λCBF and λCLF towards the soft-constrained safety (16) and stability (17) aware loss terms, accordingly, where the total loss function over the course of the DA GGER refinement culminates in 
+
+Ltotal = λimit Limit + λCBF LCBF + λCLF LCLF . (18) By introducing the loss function in (18), we aim at two goals; namely, (i) data-efficiency through less required data samples; (ii) minimal safety filter activation during the de-ployment stage. Algorithm 1 outlines the training procedure and parameter update rules. 
+
+E. Safety Filter Design 
+
+During the online deployment stage, hard safety guaran-tees are enforced through a minimally intrusive CBF-CLF-QP safety filter inspired by [20] that adjusts the learning-based control input such that the state trajectory is kept inside the forward invariant safe set. In contrast to the NMPC problem in (14), the safety filter 
+
+min  
+
+> uSF ,k ,δ k
+
+∥uSF ,k − uNN ,k ∥2 + p δ 2 
+
+> k
+
+(19a) s.t. H(x, uSF ,k ) ≥ ϵ (19b) 
+
+V(x, uSF ,k ) ≤ δk (19c) 
+
+uSF ,k ∈ U (19d) can be solved as a convex, one-step QP with limited com-putational cost. Besides the quadratic objective function (19a), the CBF safety constraint (19b), the CLF stability constraint (19c), and the input constraints (19d) are all linear in the decision variables. Note that the slack variable δ is introduced to ensure feasibility of (19) by prioritizing safety over stability; however, the state-dependent CLF decay rate in (13) is tuned considering less conflicts of the constraints. Algorithm 1 Safety-aware imitation learning from NMPC 
+
+Input: D, λimit , nepochs , niter , nrollout 
+
+Output: Trained policy πNN  
+
+> 1:
+
+for i = 1 to nepochs do  
+
+> 2:
+
+for each batch in D do  
+
+> 3:
+
+Train πNN using imitation loss (15)  
+
+> 4:
+
+end for  
+
+> 5:
+
+end for  
+
+> 6:
+
+Initialize λCBF , λCLF  
+
+> 7:
+
+for i = 1 to niter do  
+
+> 8:
+
+Update κ ← 1 − i/n iter  
+
+> 9:
+
+for j = 1 to nrollout do  
+
+> 10:
+
+Infer imitation policy πNN (x) 
+
+> 11:
+
+Query NMPC expert π∗(x) (14)  
+
+> 12:
+
+Compute πrollout (x) = κπ ∗(x) + (1 − κ)πNN (x) 
+
+> 13:
+
+Apply πrollout (x): x ← Simulate (x, π rollout (x))  
+
+> 14:
+
+Aggregate D ← D ∪ (x, π ∗(x))  
+
+> 15:
+
+end for  
+
+> 16:
+
+for each batch in D do  
+
+> 17:
+
+Train πNN using CBF-CLF-informed loss (18)  
+
+> 18:
+
+end for  
+
+> 19:
+
+Update λCBF ← 2λCBF , λCLF ← 2λCLF  
+
+> 20:
+
+end for  
+
+> 21:
+
+Return πNN 
+
+IV. N UMERICAL RESULTS 
+
+A. Scenario Setup 
+
+For validation purposes, the control framework is inte-grated into the high-fidelity astrodynamics simulator Basilisk 
+
+[23] that accommodates orbital perturbations and nonlinear-ities. The circular client’s orbit is at an altitude of 400 km ,a spherical AZ with radius 40 m , rKOZ = 10 m , θ = 3 ◦
+
+are given. The decision points are set as 15 m and 2.3 m 
+
+in V-bar direction relative to the target center of mass for both operations, respectively, while a safety distance of 
+
+2 m must be maintained. The actuator input is bounded by −0.082 ≤ u ≤ 0.082 m s −2 and Ts = 0 .1 s denotes the sample time. System parameters are given as Q = I6,
+
+R = 10 4 I3, N = 10 , γ1 = 0 .5, γ2 = 1 , ϵ = 0 .01 , p = 0 .001 ,
+
+j = 1 , c = 15 , ζmin = 0 .001 , ζmax = 0 .06 . A fully-connected feedforward NN with 4 layers, 256 neurons each and ReLU activation functions is trained using a learning rate of 10 −4,the AdamW optimizer, a batch size of 128, nepochs = 20 ,
+
+niter = 5 , nrollout = 5 and 81 , 027 initial training samples, while λimit = 100 , λCBF = 10 −7, λCLF = 10 −5 are designed to yield losses of similar order of magnitude. The layers are normalized before activation to stabilize the training, a dropout rate of 0.1 is employed to avoid overfitting, and gradients are clipped to ±0.5.
+
+B. Controller Ablation Study 
+
+An ablation study compares five control policies, namely, (i) NMPC with position avoidance constraints using (8) in-stead of (14f); (ii) LQR with safety filter; (iii) expert NMPC with integrated CBF constraints (14); (iv) conventional BC subject to pure imitation loss (15); (v) our proposed control 
+
+> (a) Comparison of closed-loop trajectories.
+> (b) Control input and CBF-CLF analysis.
+> Fig. 3: Simulation results and controller ablation study.
+
+framework. Figure 3 shows the simulation results starting from x = [ −3 −30 2 0 0 0]T and Table I compares the runtime, including the embedded implementation on an ESP32-S3-N16R8 microcontroller (Xtensa dual-core LX7, 240 MHz) with a setup analogous to [24]. Policy (i) becomes infeasible when satisfying the KOZ constraint and the input constraints at the same time, highlighting the need for relative degree 2 CBF constraints. The filter in (ii) guarantees safety, while yielding a primitive trajectory along the safe set boundary with vast filter interventions and input chattering, as the unconstrained LQR has no knowledge of the KOZ or AC. The expert (iii) provides an optimal trajectory regarding safety and input constraints according to (14). BC (iv) lacks stable convergence to decision points and violates the AC constraint. On the contrary, (v) provides a safe and stabilizing imitation of the expert policy. In terms of task performance, it follows a slightly longer trajectory; however, the substantial reduction in execution time renders this trade-off worthwhile. Table I reveals that the NMPC (iii) exceeds the sample time in simulation, while the proposed controller (v) is tractable for both simulation and onboard deployment. Figure 4 illustrates the influence of the loss function during DA GGER iterations on the magnitude of safety filter interven-tions during deployment. On the one hand, solely penalizing the imitation loss (15) also reduces the CBF loss in both TABLE I: Comparison of computation time in [ms]. On-device inference for ESP32 is executed without further optimization using LiteRT , requiring 246 kB flash memory and 13.6 kB RAM (https://ai.google.dev/edge/litert). Policy (i) (ii) (iii) (iv) (v, PC) (v, ESP32) Avg. time 10.3 4.2 14.3 1.3 5.8 28.1 
+
+Peak time 39.9 16.9 125.4 2.9 17.8 32.8 
+
+training phases, as the safety constraints are incoporated in the NMPC expert data. On the other hand, refining the ini-tially trained policy by the CBF-CLF-informed loss function (18) clearly minimizes the CBF violations. Crucially, this is reflected in a lower filter activation magnitude, thus proving its benefit within the safety-aware learning approach as our proposed policy internalizes the requirements more closely. While the conventional DA GGER subject to imitation loss might achieve a similar CBF loss with increasing number of iterations, modifying the loss function to (18) renders the training significantly more data-efficient. 
+
+Fig. 4: Impact of loss function on severity of safety filter interventions during deployment for 50 simulation runs. 
+
+V. C ONCLUSION 
+
+In this work, we proposed a safety-guaranteed imitation learning framework for spacecraft close proximity control with demonstrated real-time capability on COTS hardware. The presented approach can be tailored to a variety of spacecraft control problems to certify safety of learning-based flight software with onboard autonomy. Future work will focus on extending the concept of operations to investi-gate safety in subsequent OOS phases such as grasping and detumbling of the target. REFERENCES [1] NASA, ROSCOSMOS, JAXA, ESA, and CSA, “International Ren-dezvous System Interoperability Standards (IRSIS),” Tech. Rep., 3 2019, International Deep Space Interoperability Standards. [2] ISO24330, “Space systems - Rendezvous and Proximity Operations (RPO) and On Orbit Servicing (OOS) - Programmatic principles and practices,” 2022. [3] ESA, “ESA-TECSYE-TN-022522—Guidelines on Safe Close Prox-imity Operations,” Tech. Rep., 2024. [4] J. Vasconcelos, S. Gaggi, T. Amaral, C. Bakouche, A. Cotuna, and A. Friac ¸as, “Close-Proximity Operations Design, Analysis, and Validation for Non-Cooperative Targets with an Application to the ClearSpace-1 Mission,” Aerospace , vol. 12, 1 2025. [5] J. A. Rebollo, R. Vazquez, I. Alvarado, and D. Limon, “MPC for Tracking applied to rendezvous with non-cooperative tumbling targets ensuring stability and feasibility,” in 2024 IEEE 63rd Conference on Decision and Control (CDC) , 2024, pp. 8264–8269. [6] A. Turnwald and N. Baldauf, “Constraints-Aware Trajectory Tracking Control of Spacecraft Attitude using LPV and MPC,” in 2023 27th International Conference on Methods and Models in Automation and Robotics (MMAR) , 2023, pp. 139–144. [7] R. Reiter, J. Hoffmann, D. Reinhardt, F. Messerer, K. Baumg¨ artner, S. Sawant, J. B¨ odecker, M. Diehl, and S. Gros, “Synthesis of model predictive control and reinforcement learning: Survey and classifica-tion,” Annual Reviews in Control , vol. 61, p. 101045, 2026. [8] L. Brunke, M. Greeff, A. W. Hall, Z. Yuan, S. Zhou, J. Panerati, and A. P. Schoellig, “Safe Learning in Robotics: From Learning-Based Control to Safe Reinforcement Learning,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 5, pp. 411–444, 2022. [9] K. P. Wabersich, A. J. Taylor, J. J. Choi, K. Sreenath, C. J. Tomlin, A. D. Ames, and M. N. Zeilinger, “Data-Driven Safety Filters: Hamilton-Jacobi Reachability, Control Barrier Functions, and Predic-tive Methods for Uncertain Systems,” IEEE Control Systems , vol. 43, pp. 137–177, 9 2023. [10] S. Mamedov, R. Reiter, S. M. B. Azad, R. Viljoen, J. Boedecker, M. Diehl, and J. Swevers, “Safe Imitation Learning of Nonlinear Model Predictive Control for Flexible Robots,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2024, pp. 3613–3619. [11] R. K. Cosner, Y. Yue, and A. D. Ames, “End-to-End Imitation Learning with Safety Guarantees using Control Barrier Functions,” in 
+
+2022 IEEE 61st Conference on Decision and Control (CDC) , 2022, pp. 5316–5322. [12] T. Kim, R. I. Kee, I. Kolmanovsky, and A. Girard, “Constrained Con-trol for Autonomous Spacecraft Rendezvous: Learning-Based Time Shift Governor,” AIAA SCITECH 2025 Forum , 2025. [13] V. Chen, S. A. Phillips, and D. A. Copp, “Planning Autonomous Spacecraft Rendezvous and Docking Trajectories via Reinforcement Learning,” in Proceedings of the 45th Rocky Mountain AAS GN&C Conference , 2023. [14] T. Guffanti, D. Gammelli, S. D’Amico, and M. Pavone, “Trans-formers for Trajectory Optimization with Application to Spacecraft Rendezvous,” in 2024 IEEE Aerospace Conference , 2024, pp. 1–13. [15] D. Celestini, D. Gammelli, T. Guffanti, S. D’Amico, E. Capello, and M. Pavone, “Transformer-Based Model Predictive Control: Trajectory Optimization via Sequence Modeling,” IEEE Robotics and Automation Letters , vol. 9, pp. 9820–9827, 2024. [16] M. Mammarella, S. D’Amico, M. Pavone, R. Linares, M. J. Acheson, F. Ankersen, T. Sasaki, E. Ancona, J. DiMatteo, I. A. Spiegel, F. P. Azza, and M. Varile, “Controls for Space: a perspective to 2030s and beyond I,” in 2025 American Control Conference (ACC) , 2025, pp. 2286–2296. [17] J. Drgoˇ na, T. X. Nghiem, T. Beckers, M. Fazlyab, E. Mallada, C. Jones, D. Vrabie, S. L. Brunton, and R. Findeisen, “Safe Physics-informed Machine Learning for Dynamics and Control,” in 2025 American Control Conference (ACC) , 2025, pp. 591–606. [18] W. H. Clohessy and R. S. Wiltshire, “Terminal Guidance System for Satellite Rendezvous,” Journal of the Aerospace Sciences , vol. 27, pp. 653–658, 1960. [19] A. Meinert, N. Baldauf, and A. Turnwald, “Robust Spacecraft Attitude Reference Tracking using Tube-Based Model Predictive Control,” in 
+
+2024 28th International Conference on System Theory, Control and Computing (ICSTCC) , 10 2024, pp. 229–234. [20] A. D. Ames, S. Coogan, M. Egerstedt, G. Notomista, K. Sreenath, and P. Tabuada, “Control Barrier Functions: Theory and Applications,” in 
+
+2019 18th European Control Conference (ECC) , 2019, pp. 3420–3431. [21] J. Breeden and D. Panagou, “Robust Control Barrier Functions under high relative degree and input constraints for satellite trajectories,” 
+
+Automatica , vol. 155, p. 111109, 9 2023. [22] S. Ross, G. Gordon, and D. Bagnell, “A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning,” in 
+
+Proceedings of the Fourteenth International Conference on Artificial Intelligence and Statistics , vol. 15. PMLR, 9 2011, pp. 627–635. [23] P. W. Kenneally, S. Piggott, and H. Schaub, “Basilisk: A Flexible, Scalable and Modular Astrodynamics Simulation Framework,” Journal of Aerospace Information Systems , vol. 17, pp. 496–507, 2020. [24] A. Turnwald, J. Scharnagl, P. Stadler, and A. N. Peˇ cujli´ c, “Model pre-dictive attitude control for CubeSats: feasibility and requirements for in-orbit testing,” in Small Satellites Systems and Services Symposium (4S 2024) . SPIE, 3 2025, p. 141.

@@ -1,0 +1,589 @@
+Title: Speculative Policy Orchestration: A Latency-Resilient Framework for Cloud-Robotic Manipulation
+
+URL Source: https://arxiv.org/pdf/2603.19418v1
+
+Published Time: Mon, 23 Mar 2026 00:08:07 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Speculative Policy Orchestration: A Latency-Resilient Framework for Cloud-Robotic Manipulation 
+
+Chanh Nguyen ∗1, Shutong Jin ∗2, Florian T. Pokorny 2, Erik Elmroth 1
+
+Abstract — Cloud robotics enables robots to offload high-dimensional motion planning and reasoning to remote servers. However, for continuous manipulation tasks requiring high-frequency control, network latency and jitter can severely destabilize the system, causing command starvation and unsafe physical execution. To address this, we propose Speculative Policy Orchestration (SPO), a latency-resilient cloud-edge framework. SPO utilizes a cloud-hosted world model to pre-compute and stream future kinematic waypoints to a local edge buffer, decoupling execution frequency from network round-trip time. To mitigate unsafe execution caused by predictive drift, the edge node employs an 
+
+ϵ-tube verifier that strictly bounds kinematic execution errors. The framework is coupled with an Adaptive Horizon Scaling mechanism that dynamically expands or shrinks the speculative pre-fetch depth based on real-time tracking error. We evaluate SPO on continuous RLBench manipulation tasks under emulated network delays. Results show that even when deployed with learned models of modest accuracy, SPO reduces network-induced idle time by over 60% compared to blocking remote inference. Furthermore, SPO discards approximately 60% fewer cloud predictions than static caching baselines. Ultimately, SPO enables fluid, real-time cloud-robotic control while maintaining bounded physical safety. 
+
+I. INTRODUCTION The integration of deep neural networks [1], [2], [3] into robotic manipulation has enabled agents to perform increas-ingly complex, long-horizon tasks, shifting from rigid pre-programmed cycles toward flexible, embodied intelligence. While earlier paradigms abstracted these tasks into discrete semantic primitives (e.g., “reach” or “grasp”) [3], state-of-the-art visuomotor policies increasingly rely on continuous action chunking , i.e., predicting dense, high-frequency se-quences of kinematic targets to achieve fine-grained dexter-ity [4], [5]. Despite the algorithmic success of continuous, multi-task models like Hierarchical Diffusion Policy (HDP) [6] and Sequential Dexterity [7], these systems implicitly assume the availability of unconstrained, low-latency local computation capable of executing large Transformer and Diffusion-based networks in real-time. Scaling such architectures to industrial deployments motivates a cloud robotics paradigm, wherein heavy policy networks and predictive world models are offloaded to remote servers, allowing robots to leverage elastic computational resources.        
+
+> *These authors contributed equally to this work.
+> 1Chanh Nguyen and Erik Elmroth are with the Department of Com-puting Science, Ume˚ aUniversity, 90187 Ume˚ a, Sweden
+
+{chanh, elmroth }@cs.umu.se  
+
+> 2Shutong Jin and Florian T. Pokorny are with School of Electrical Engineering and Computer Science, KTH Royal Institute of Technology, 10044 Stockholm, Sweden
+
+{shutong, fpokorny }@kth.se 
+
+Existing cloud robotics frameworks [8], [9], [10] primarily support high-level Vision–Language–Action (VLA) models by transmitting discrete macro-goals (e.g., “pick up the apple” or “move to the red bin”), where network delays are negligible relative to task-level timescales. In contrast, modern visuomotor policies require continuous kinematic waypoints to be updated at high frequencies (e.g., 10 − 50 
+
+Hz) [4], [11] to achieve smooth, dexterous motion. While the lowest-level hardware torque servoing (e.g., 500 − 1000 
+
+Hz) [12], [13] safely remains on the robot’s embedded controller, offloading the 10 − 50 Hz kinematic trajectory generation to the cloud exposes a fundamental systems constraint: network latency [14], [15]. In real-world 5G or Wi-Fi deployments, link handovers and network congestion can cause delays ranging from hundreds of milliseconds to multiple seconds [16], [17]. When the network round-trip time exceeds the 20–100 ms control interval required for waypoint updates, the local torque controller experiences target starvation, resulting in discontinuous command updates, degraded motion smooth-ness, and accumulated tracking error. In contact-rich manip-ulation tasks, such disruptions can significantly compromise execution stability and task performance. In large language models and cloud gaming systems, com-munication and computation latency are mitigated through speculative techniques that proactively predict and execute future states, such as speculative decoding [18], [19], [20], [21] in autoregressive models and speculative execution 
+
+in computer architecture [22]. Inspired by these latency-masking mechanisms, we introduce Speculative Policy 
+
+Orchestration ( SPO ), a cloud-edge framework that bridges the latency gap in high-frequency continuous robotic control. Rather than proposing a new policy architecture, SPO oper-ates as a model-agnostic orchestration layer that coordinates cloud-hosted policies with edge-side execution. Instead of waiting for a completed physical motion to transmit a new observation, the remote cloud utilizes a forward world model to speculatively generate a dense trajectory of the next K
+
+kinematic waypoints. These state-action rollouts are streamed to the edge and buffered locally, thereby decoupling the kinematic planning frequency from network round-trip time while preserving a continuous Markov Decision Process (MDP) formulation. Crucially, low-level torque servoing remains strictly local to the robot’s embedded controller, ensuring real-time stability and preventing network-induced starvation. To ensure safe execution under speculative rollouts, SPO does not rely on potentially miscalibrated probabilistic con-
+
+> arXiv:2603.19418v1 [cs.RO] 19 Mar 2026
+
+fidence estimates from the neural policy. Instead, it enforces safety via an empirically defined kinematic error envelope, formalized as an ϵ-tube around the predicted trajectory. If the observed state deviates beyond this bound, speculative execution is invalidated and replanning is triggered. Further-more, SPO introduces an Adaptive Horizon Scaling (AHS) feedback mechanism that dynamically adjusts the speculative horizon depth based on real-time tracking error, allocating cache capacity proportionally to physical uncertainty. Fig-ure 1 depicts the SPO framework and its advantages over traditional macro-goal cloud robotics deployments. The key contributions of this paper are as follows:  
+
+> •
+
+A Continuous Speculative Framework : We introduce SPO, a model-agnostic cloud-edge architecture that masks network latency for high-frequency continuous robotic control without relying on discrete behavior primitives (Section IV).  
+
+> •
+
+Kinematic Stability Bounds : We formulate an edge-based ϵ-tube verification mechanism that mitigates un-safe speculative execution by bounding kinematic track-ing errors. The mechanism includes a zero-velocity hold 
+
+reflex to suspend unverified execution upon verification failure, bypassing the risks of miscalibrated neural prob-abilities (Section IV-C).  
+
+> •
+
+Adaptive Horizon Scaling : We propose an AHS logic that dynamically scales the pre-fetch horizon based on real-time tracking errors, allows the system to scale bandwidth and cache memory linearly ( O(K)) rather than exponentially, adapting to physical uncertainty in real-time (Section IV-B).  
+
+> •
+
+Empirical Validation : We conduct extensive evalua-tions on the RLBench benchmark [23] using a phys-ically distributed edge-cloud architecture subjected to an emulated network delay of 150 ms with a stochastic variation of 30 ms. Over tasks of varying complexity (StackBlocks , InsertOntoSquarePeg , PutAllGroceriesIn-Cupboard ), SPO reduces network-induced idle time by over 60% and optimizes resource utilization by decreas-ing wasted cloud predictions by 60% relative to static caching baselines, demonstrating robust execution even with learned models of modest accuracy (Section V). II. RELATED WORK 
+
+A. Cloud Robotics Platforms 
+
+The paradigm of cloud robotics has emerged to address the computational limitations of onboard robotic platforms by offloading resource-intensive tasks to remote servers. Frame-works such as DAvinCi [24], RoboEarth [25], Rapyuta [26], FogROS2 [27], KubeROS [28], tinyKube [29] provide com-munication and orchestration layers between robots at the edge and cloud infrastructure. However, these platforms primarily target perception and planning workloads and do not explicitly address the challenges of latency-sensitive closed-loop control required for continuous manipulation. 
+
+B. Policy Learning and Sequence Prediction 
+
+To manage complex manipulation tasks, early robot learn-ing approaches relied on predefined motion primitives to reduce the dimensionality of continuous action spaces [3], [30], [31], [32], [33], [34]. More recently, generative models such as Diffusion Policies [35], [36], [37] predict continu-ous action sequences directly from observations. Similarly, Action Chunking with Transformers [4] and MT-ACT [38] generate fixed-length macro-actions to improve temporal consistency and mitigate covariate shift. However, deploying these multi-step predictive models over a cloud-edge continuum exposes a critical systems-level vulnerability. Once an action sequence is dispatched over the network, its execution at the edge becomes effectively open-loop. As reported in MT-ACT [38], executing large static chunks (e.g., H = 40 steps) causes significant performance degradation due to the inability of the policy to correct compounding predictive errors once the chunk is dispatched. Our proposed SPO framework addresses this limitation by operating beneath these predictive models as a model-agnostic orchestration layer . Rather than treating sequences as rigid commands, SPO treats them as a speculative cache. By utilizing a local ϵ-tube verifier and adaptive horizon scaling, SPO safely bounds execution errors and masks network latency, dynamically collapsing the cache at the edge only when physical verification fails. 
+
+C. Latency-Resilient Control and Runtime Verification 
+
+The concept of predicting future trajectories and enforcing bounded tracking errors around nominal paths can also be observed in receding-horizon control frameworks such as Model Predictive Control (MPC) [39] and its robust variants (e.g., tube MPC) [40], [41]. These methods typically rely on explicit system models and solve an optimization problem at each control step. In contrast, SPO does not perform online trajectory optimization. Instead, it verifies cloud-generated policy rollouts at the edge and dynamically adjusts the speculative horizon based on observed tracking error. Recent efforts also explore compressing or distilling large visuomotor policies to enable low-latency local execu-tion [42], [43], [44]. SPO is orthogonal to these approaches: when policies can run locally, the speculative horizon natu-rally shrinks; when large policies remain cloud-hosted, SPO provides a latency-resilient execution layer that maintains continuous control despite network delays. III. PROBLEM FORMULATION 
+
+A. Continuous Manipulation as a Markov Decision Process 
+
+We consider a discrete-time robotic manipulation task modeled as a deterministic Markov Decision Process (MDP), defined by the tuple ⟨S , A, T ⟩ , where:  
+
+> •
+
+State space S ⊂ Rds : The continuous state st rep-resents the robot’s joint configuration, velocities, and task-relevant object poses.  
+
+> •
+
+Action space A ⊂ Rda : The action at corresponds to dense kinematic targets at the trajectory-generation layer (e.g., desired joint velocities ˙qt). Cloud (tier 1)     
+
+> Discrete
+> Macro-goals
+> Heavy VLA model
+> a) Current Deployment
+> Cloud (tier 1)
+> - Heavy VLA policy and World model
+> - Generates K-step speculative chunk
+> Edge Node 1 (tier 2)
+> - Local indusctrial PC or onboard computer
+> - Buffers chunks, run ϵ-tube verifier (50 Hz)
+> - Latency to Robot < 1 ms
+> Edge Node 2 (tier 2)
+> Single kinematic waypoint
+> (e.g., joint velocity) Single kinematic waypoint
+> (e.g., joint velocity)
+> Speculative
+> chunk
+> Robot/ Embedded Controller (tier 3)
+> - Physical arm and microcontrollers
+> - Run high-frequency PID torque loop
+> - Spins motors based on waypoints
+> - Local indusctrial PC or onboard computer
+> - Buffers chunks, run ϵ-tube verifier (50 Hz)
+> - Latency to Robot < 1 ms
+> b) Speculative Policy Orchestration Framework
+> - Wait for primitives
+> - And/or Heavy local compute
+> Robot
+
+Fig. 1: Comparison of traditional cloud robotics architectures with the proposed SPO framework. (a) Traditional deployments are bottlenecked by network latency, forcing them to rely on discrete macro-goals or expensive local compute. (b) SPO leverages a centralized World Model to proactively serve high-frequency, continuous kinematic chunks to a fleet of edge robots, enforcing kinematic safety limits via local ϵ-tube verifiers.  
+
+> •
+
+Transition dynamics T : The system evolves according to st+1 = T (st, a t), where T captures the underlying physical dynamics. Here, ds and da denote the dimensionality of the state and action vectors, respectively. At each time step t, the robot observes st and applies control input at, resulting in a new state st+1 .
+
+B. Cloud-Induced Delay and Open-Loop Vulnerability 
+
+In a standard cloud-based hierarchical control paradigm, the policy π : S → A is executed remotely. Consequently, the action selected at time t is applied after a network round-trip delay τnet > 0, inducing a delayed control system at =
+
+π(st−δ ) for t ≥ δ, where δ = ⌊τnet /∆t⌋ and ∆t denotes the local control interval. When τnet ≫ ∆t, the system operates under delayed feedback: actions are computed from stale state information 
+
+st−δ rather than the current state st. For high-frequency ma-nipulation (e.g., ∆t = 10 −20 ms), even moderate network delays ( τnet = 30 −100 ms) produce δ > 1, degrading closed-loop responsiveness and increasing tracking error. To mask this delay, existing remote deployments often transmit action chunks, i.e., finite sequences {at, . . . , a t+K }
+
+for local buffered execution [4], [5]. While chunking alle-viates command starvation, it transforms the system into a partially open-loop controller during chunk playback [38]. If unmodeled disturbances or contact events occur mid-chunk, the locally buffered trajectory may no longer be physically consistent with the true state evolution. Blindly executing this stale trajectory through unanticipated collisions can lead to dangerous force accumulations and task failure. Furthermore, fixing the speculative horizon K introduces a fundamental tradeoff, i.e., larger horizons improve latency masking but amplify the impact of model error, whereas shorter horizons reduce open-loop exposure but reintroduce network blocking. Consequently, horizon selection must adapt to evolving physical uncertainty. Speculative Rollout  
+
+> (World Model + Policy)
+> Cloud Node
+> AHS Module
+> (Scales Horizon K)
+> Determine K
+> Speculative Cache
+> (Store K waypoints)
+> Pop Waypoint
+> Robot Hardware
+> (High-frequency torque)
+> -tube Verifier
+> Cache hit : execute
+> Cache miss :Flush
+> and Feedback Error
+> to AHS
+> Network Transmission
+> Edge Node
+
+Fig. 2: Architecture of SPO. The cloud executes computa-tionally intensive speculative rollouts, adaptively scaled by the AHS module, while the edge enforces safety constraints using a lightweight ϵ-tube verifier. In the following section, we introduce SPO, a principled cloud-edge framework that compensates for network-induced delay while ensuring real-time physical validity and adaptive horizon regulation under dynamic uncertainty. IV. SPECULATIVE POLICY ORCHESTRATION Figure 2 presents the architecture of SPO, a cloud–edge design that decouples high-dimensional trajectory genera-tion from millisecond-scale physical actuation. The system consists of a remote Cloud World Model that performs speculative state–action rollouts and a local Edge Verifier that enforces safety and executes validated commands in real time. Algorithm 1 outlines the system-level execution flow of SPO. Note that while the logic is presented chronologically within a single temporal control loop over time t, the exe-cution is physically distributed. The Kinematic Verification phase (lines 5–19) evaluates strictly on the local Edge Node at high frequency. If a safety violation occurs, the edge node safely blocks, and the sequence transfers to the remote Cloud Server, which executes the AHS and Speculative Generation phase (lines 20–32) before transmitting the payload back to the edge to resume the loop. 
+
+A. Cloud-Side Autoregressive Generation 
+
+As defined in Section III, the environment evolves ac-cording to the true transition dynamics st+1 = T (st, a t).To mask the network latency τnet associated with remote offloading, the Cloud Server approximates these dynamics using a learned World Model Mϕ and a high-frequency policy πθ .Instead of waiting for the physical transition T to complete and transmit a new observation, the cloud generates a spec-ulative continuous trajectory of the next K kinematic steps. As shown in Algorithm 1 (lines 28–32), this is achieved via an autoregressive loop where the world model provides the necessary state feedback for subsequent policy queries: 
+
+ˆak = πθ (ˆ sk), ˆsk+1 = Mϕ(ˆ sk, ˆak)
+
+for k = 1, . . . , K , where ˆs1 is initialized with the most recent physical observation st. Each generated tuple 
+
+(ˆ sk+1 , ˆak) is appended to the trajectory cache C, thereby decoupling kinematic planning frequency from network-induced observation delay. 
+
+B. Adaptive Horizon Scaling (AHS) 
+
+A critical challenge in speculative orchestration is deter-mining the optimal pre-fetch horizon ( K). Static pre-fetching methods that cache deep, multi-second velocity plans without high-frequency validation risk catastrophic instability upon physical contact. Conversely, caching too few steps fails to mask network latency, leading to control starvation. To balance latency masking and execution safety, SPO replaces static caching with an AHS mechanism that dy-namically adjusts the speculative horizon based on real-time tracking errors. AHS acts as a lightweight feedback controller for cloud-side speculation, adapting the amount of pre-fetched trajectory to current physical conditions. As defined in Algorithm 1 (lines 20–25), AHS follows an Additive-Increase/Multiplicative-Decrease rule:  
+
+> •
+
+Free-Space Expansion: When tracking remains within the verification bound ( et ≤ ϵbase ), the horizon expands gradually K ← min( Kmax , K + β), where β is the additive horizon increment, allowing the system to progressively increase latency masking during stable execution.  
+
+> •
+
+Contact-Induced Contraction: When a divergence is detected ( emiss > 0), the horizon contracts according to K ← max( Kmin , ⌊K/ρ ⌋), where ρ = emiss /ϵ base .This limits speculative execution to short trajectory segments during contact-rich or highly dynamic phases. By construction, the horizon remains bounded within K ∈
+
+[Kmin , K max ], preventing unbounded algorithmic growth. Under sustained cache hits, K increases linearly and reaches 
+
+Kmax in at most (Kmax − Kmin )/β control cycles, while a) Stack Blocks  b) Insert Square Peg  c) Put Groceries in Cupboard 
+
+Fig. 3: RLBench tasks used in the evaluation. From left to right, the tasks represent increasing levels of manipulation complexity. verification failures trigger multiplicative contraction pro-portional to the observed error severity ρ. This asymmetric expansion-contraction behavior allows the speculative hori-zon to adapt to changes in tracking error while limiting excessive oscillations under transient disturbances such as contact events or network jitter. Short-lived disturbances may temporarily reduce K, but the additive expansion rule allows the horizon to recover gradually once nominal tracking resumes. 
+
+C. Continuous-State ϵ-Tube Verification 
+
+Executing an incorrect speculative trajectory on a physical robot can cause unsafe behavior. Traditional cache verifica-tion based on exact state matching is unsuitable in continuous environments due to friction, actuation noise, and sensor variance. SPO therefore employs a continuous-state Local Edge Verifier. At each control step, the edge node observes the current state st and compares it with the cached pre-dicted state ˆst using a normalized distance metric, et =p(st − ˆst)T W (st − ˆst), where W is a diagonal normaliza-tion matrix with elements defined as the inverse variance of each state component estimated from offline calibration data. Safety is enforced via a deterministic ϵ-tube around the predicted trajectory in this normalized state space. Because verification occurs at every control step, deviations are de-tected within a single control cycle. If et ≤ ϵbase (line 9–11), a Cache Hit is registered and the cached action at is executed immediately. Otherwise, a Cache Miss occurs, the edge node invalidates the cached trajectory, issues a zero-velocity hold 
+
+command to safely stop the robot, and requests synchronous replanning from the cloud (line 12–16). In summary, SPO jointly addresses execution safety and efficiency by enforcing bounded tracking error via an edge-based ϵ-tube and by adaptively scaling the speculative hori-zon according to real-time physical uncertainty. V. EXPERIMENTS Our experiments address four questions: i) Does SPO reduce idle and execution time under high network latency?; ii) Can the ϵ-tube verifier prevent error accumulation during contact-rich interactions?; iii) Does AHS balance bandwidth efficiency and responsiveness across tasks?; and iv) How does performance vary with world model accuracy? Algorithm 1 Speculative Policy Orchestration (SPO) 
+
+Require: Action Policy πθ , World Model Mϕ
+
+Require: Tolerance ϵbase , normalization matrix W , limits 
+
+Kmin , K max , expansion rate β 
+
+> 1:
+
+Initialize Edge Cache C ← ∅  
+
+> 2:
+
+Initialize horizon K ← Kmin  
+
+> 3:
+
+Initialize violation error emiss ← 0 
+
+> 4:
+
+for each control step t = 0 , 1, 2, . . . do  
+
+> 5:
+
+Observe actual physical state st
+
+// 1. Edge-Side Verification and Execution  
+
+> 6:
+
+if C is not empty then  
+
+> 7:
+
+Pop speculative tuple (ˆ st, ˆat) from head of C 
+
+> 8:
+
+et ← p(st − ˆst)T W (st − ˆst) 
+
+> 9:
+
+if et ≤ ϵbase then  
+
+> 10:
+
+Execute at ← ˆat ▷ Cache Hit  
+
+> 11:
+
+continue to next step t 
+
+> 12:
+
+else  
+
+> 13:
+
+emiss ← et 
+
+> 14:
+
+Flush Cache: C ← ∅ ▷ Safety Violation  
+
+> 15:
+
+Execute at ← SafeStop (st) ▷ Signal Tier-3 compliant deceleration  
+
+> 16:
+
+end if  
+
+> 17:
+
+else  
+
+> 18:
+
+Execute at ← SafeStop (st) ▷ Hold via local impedance control  
+
+> 19:
+
+end if 
+
+// 2. Cloud-Side Speculative Generation & AHS  
+
+> 20:
+
+if emiss > 0 then  
+
+> 21:
+
+Danger ratio: ρ ← emiss /ϵ base  
+
+> 22:
+
+K ← max( Kmin , ⌊K/ρ ⌋) 
+
+> 23:
+
+else  
+
+> 24:
+
+K ← min( Kmax , K + β) 
+
+> 25:
+
+end if  
+
+> 26:
+
+Reset error: emiss ← 0 
+
+> 27:
+
+Initialize speculative state ˆstemp ← st 
+
+> 28:
+
+for k = 1 to K do  
+
+> 29:
+
+Predict speculative action: ˆak ← πθ (ˆ sk) 
+
+> 30:
+
+Predict next state: ˆsk+1 ← M ϕ(ˆ sk, ˆak) 
+
+> 31:
+
+Append (ˆ sk+1 , ˆak) to C 
+
+> 32:
+
+end for  
+
+> 33:
+
+end for 
+
+A. Experimental Setup 1) Task Environments and MDP Configuration: We eval-uate SPO on three manipulation tasks from RLBench [23]. Each task is modeled as a continuous MDP with state space S containing robot proprioception (joint positions and velocities) and object poses, and an action space A
+
+defined as an 8D vector of 7-DOF joint velocities plus a discrete gripper command. The tasks cover increasing levels of contact complexity (see Fig. 3):  
+
+> •
+
+Stack Blocks (Low Complexity, ds = 148 ): Grasp a block and place it on a base block. This task mostly involves free-space motion and serves as a baseline for speculative execution. RLBench  -tube 
+
+> verifier
+> Speculative
+> Cache (C)
+> World
+> Model
+> Action
+> Policy
+> Payload Raw state-action
+> (4*(ds +da) bytes)
+> Payload Speculative Trajectory
+> (4*K(ds+da) bytes) Edge Node (Laptop)
+> Cloud Node (Desktop)
+> TCP/IP WAN Emulation
+> Base RTT: 150ms, +- 30ms stochasitc jitter
+
+Fig. 4: Distributed experimental setup where the edge runs RLBench and verification, while the cloud hosts the world model and policy. TABLE I: Experimental Configuration 
+
+Parameter Value 
+
+Network 
+
+Base round-trip delay ( τnet ) 150 ms Stochastic WAN jitter ( τjitter ) ±30 ms Control frequency ( fctrl ) 50 Hz 
+
+SPO Horizon 
+
+Min depth ( Kmin ) 2Max depth ( Kmax ) 10 Additive horizon increment ( β) 1
+
+Edge Safety 
+
+Distance metric Inverse-Variance Weighted 
+
+ϵ-tube tolerance ( ϵbase ) 20.0 State dimension ( ds) 141–295 
+
+Neural Models 
+
+Architecture 3-layer MLP Hidden units 512 Action dimension ( da) 8 (7 joints + gripper)  
+
+> •
+
+Insert Onto Square Peg (Medium Complexity, ds =141 ): Insert a square ring onto a peg with tight geo-metric tolerances, testing the ϵ-tube verifier’s ability to detect small alignment errors.  
+
+> •
+
+Put All Groceries In Cupboard (High Complexity, 
+
+ds = 295 ): A multi-stage pick-and-place task with mul-tiple objects and occlusions, stressing adaptive horizon scaling under complex interactions. 
+
+2) World Model and Policy: a) Oracle Policy and World Model: To isolate systems-level effects such as network latency, speculative caching, and verification, we instantiate the remote policy π and world model W using an algorithmic Oracle derived from RLBench expert demonstrations. Given a state st, the Oracle policy π∗ returns the optimal action sequence at:t+K , while the Oracle world model W∗ provides the corresponding ground-truth rollout ˆst+1: t+K . This perfect predictor ensures that any divergence detected by the ϵ-tube verifier results from execution drift rather than model error, enabling direct evaluation of AHS under network latency τnet .
+
+b) Learned Model Validation: To assess robustness un-der imperfect prediction, we additionally train a lightweight three-layer MLP on RLBench demonstrations to autore-gressively predict future states and actions. The resulting prediction drift allows us to evaluate how the verifier detects hallucinated rollouts and triggers safe cache invalidation. 3) Hardware and Distributed Network Setup: We deploy SPO across two TCP/IP-connected machines: an Edge Node running RLBench and the local verifier, and a Cloud Node hosting the neural models. To emulate WAN conditions, we inject a round-trip latency of τnet = 150 ms with ±30 ms jitter. Figure 4 shows the setup. Communication uses ZeroMQ 1 with an uncompressed byte-array format. Each predicted state-action pair contains 
+
+ds + da floats, requiring 4( ds + da) bytes. For example, in 
+
+Stack Blocks (ds = 148 , da = 8 ), each speculative step requires 624 bytes, yielding 624 × Kmax bytes per cached trajectory. 
+
+4) Baselines for Comparison: We compare SPO against three baseline control strategies representing fixed-horizon caching:  
+
+> •
+
+Synchronous Remote Inference (Blocking, K = 0 ): 
+
+The edge node sends state st to the cloud and waits for a single action before continuing. No trajectory cache is used ( C = ∅), so each step incurs the full network latency τnet . 
+
+> •
+
+Top-1 Speculative Caching (T1-SC, K = 1): 
+
+A minimal speculative strategy that pre-fetches one state–action pair for the next step.  
+
+> •
+
+Naive Full-Tree Caching (NFTC, K = 10 ): Astatic strategy that predicts a fixed trajectory of length 
+
+K = 10 . Longer open-loop horizons can accumulate prediction error, particularly in contact-rich phases [38]. 
+
+5) Performance Metrics: We evaluate SPO and the base-lines using the following metrics:  
+
+> •
+
+Task Success Rate (%): Percentage of trials where the task completes before the maximum allowed number of control steps ( max steps ).  
+
+> •
+
+Cumulative Idle Time (s): Total time the robot remains stationary while waiting for network responses or cloud inference.  
+
+> •
+
+Cache Hit Rate ( η): Fraction of control steps served from the speculative cache versus requiring cloud fall-back.  
+
+> •
+
+Mean Horizon Depth ( ¯K): Average speculative hori-zon during execution, reflecting the AHS controller’s adaptation to task dynamics. Unless otherwise specified, the control interval is 20 ms and the speculative horizon is bounded by Kmin = 2 and 
+
+Kmax = 10 . Additional parameters are listed in Table I. 
+
+B. Results and Discussion 1) Experiment Evaluation with Oracle Models: We first evaluate SPO using Oracle predictors to establish a theoret-ical performance upper bound under high latency ( 150 ±
+
+30 ms). As shown in Table II, SPO effectively bridges the network-control gap that renders synchronous baselines (Blocking) non-functional. 
+
+Efficiency and Task Success. In StackBlocks and Insert-SquarePeg, SPO achieves a 100% success rate, whereas Blocking and T1-SC baselines fail due to persistent network 
+
+> 1https://zeromq.org/
+
+TABLE II: Quantitative Results with Oracle models. Results represent the theoretical performance upper bound using ground-truth predictors under τnet = 150 ± 30 ms latency.                                                                                                              
+
+> Task Method SR (%) Steps Wall-time (s) Idle time (s)
+> Stack  Blocking 0600 17.3 ±0.1s 10.7 ±0.0 T1-SC 0600 17.3 ±0.1 9.7 ±0.1 NFTC 100 506.0 ±6.0 15.4 ±0.1s 4.5 ±0.1 SPO 100 518.8 ±3.7 15.7 ±0.1 4.8 ±0.1 Insert  Blocking 0600 17.3 ±0.0 10.7 ±0.0 T1-SC 0600 17.3 ±0.0 9.7 ±0.0 NFTC 100 280.4 ±1.7 10.8 ±0.0 2.5 ±0.0 SPO 100 291.4 ±5.2 11.0 ±0.1 2.7 ±0.1 Put  Blocking 03000 65.9 ±0.1 53.6 ±0.0 T1-SC 0 (1/7) 3000 66.3 ±0.0 48.4 ±0.1 NFTC 0 (6/7) 3000 65.8 ±0.0 56.5 ±0.0 SPO 0 (6/7) 3000 65.9 ±0.0 56.5 ±0.0
+
+stalls. Both SPO and NFTC saturate the speculative horizon at K = 10 (200 ms of temporal autonomy), achieving near-identical wall-clock times ( 15.7s for StackBlocks). This confirms SPO matches the theoretical speed of a static full-tree approach. In the complex PutAllGroceries task, while global success is 0% due to fixed-path fragility, SPO and NFTC both achieve high sub-goal completion (6/7 items), vastly outperforming synchronous methods. 
+
+Adaptive Scaling and Safety. The 10-step buffer ( K = 10 )at 50 Hz provides the necessary buffer to bridge the 150 ms RTT (Fig. 5). While NFTC remains statically pinned at K =10 , SPO’s AHS logic autonomously identifies this optimal depth while maintaining closed-loop verification. The divergence between methods is most evident in tracking fidelity (Fig. 6). During contact-rich phases in the PutAllGroceriesInCupboard task, NFTC exhibits significant error spikes, indicating that its open-loop execution can-not account for physical drift. Conversely, SPO utilizes a weighted verifier ( W ) to cap errors at the ϵbase threshold. By triggering safety flushes, SPO maintains the physical fidelity required for precise manipulation, whereas Blocking and T1-SC baselines fail to progress, showing high residual error long after SPO has finished. 
+
+2) Experimental Evaluation with Learned Models: We train both the policy and world models using expert demon-strations collected in RLBench for the InsertOntoSquarePeg 
+
+task. Each demonstration trajectory is processed to construct two datasets: (i) state–action pairs used for policy learning, and (ii) state trajectories used to train the world model that captures the task dynamics. As shown in Figure 7 for the InsertOntoSquarePeg task, SPO achieves near-optimal latency masking, reducing net-work idle time by over 60% compared to the Blocking baseline (Fig. 7a). Crucially, SPO achieves this efficiency while discarding approximately 60% fewer cloud predictions than the NFTC ( K = 10 ) baseline (Fig. 7b). The efficiency trade-off plot (Fig. 7c ) confirms that SPO is the only method that minimizes both idle time and computational waste, prov-ing that adaptive speculation is a resource-efficient necessity for cloud-native manipulation. It is worth noting that while our learned policy and world models achieve only modest 0 200 400 600 
+
+> Environment Step
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> Requested Actions (K)
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(a) StackBlocks 0 200 400 600  
+
+> Environment Step
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> Requested Actions (K)
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(b) InsertOntoSquarePeg 0 1000 2000 3000  
+
+> Environment Step
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> Requested Actions (K)
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(c) PutAllGroceriesInCupboard 
+
+Fig. 5: Adaptive Horizon Scaling Dynamics. 0 200 400 600 
+
+> Environment Step
+> 0
+> 2
+> 4
+> 6
+> Weighted Tracking Error
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(a) StackBlocks 0 200 400 600  
+
+> Environment Step
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> Weighted Tracking Error
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(b) InsertOntoSquarePeg 0 1000 2000 3000  
+
+> Environment Step
+> 0
+> 20
+> 40
+> 60
+> 80
+> Weighted Tracking Error
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(c) PutAllGroceriesInCupboard 
+
+Fig. 6: Tracking Fidelity and Safety Verification. accuracy, the SPO framework remains robust. 
+
+3) Deployment Guidelines: Deploying SPO in a new environment requires configuring three parameters: Kmax ,
+
+Kmin , and ϵbase . The maximum speculative horizon Kmax 
+
+is selected based on the target network latency τnet and the control interval ∆t, such that Kmax · ∆t ≥ τnet , ensuring sufficient buffering to mask network delay. The minimum horizon Kmin is set to a small constant (e.g., 1–2 steps) to preserve a minimal local buffer during disturbance-prone or contact-rich phases. Finally, the safety tolerance ϵbase is determined by task geometry and allowable tracking devi-ation. Tasks with tight clearances (e.g., insertion) require smaller tolerances, whereas free-space motions may admit larger bounds to improve cache utilization. 
+
+Remark on Hardware Deployment: Algorithm 1 uses a strict zero-velocity hold ( at = 0) to cleanly isolate network-induced idle time in simulation. However, commanding instantaneous zero velocity on physical robots causes severe mechanical stress and stick-slip artifacts during contact. In real-world deployments, this algorithmic reflex must map to a Tier-3 hardware safe stop (e.g., jerk-limited deceleration with impedance control) to safely dissipate kinetic energy. VI. CONCLUSIONS In this paper, we presented Speculative Policy Orches-tration (SPO), a cloud–edge framework for latency-resilient continuous robotic control. By combining speculative tra-jectory rollouts in the cloud with an edge-based ϵ-tube verifier, SPO decouples high-frequency physical execution from network round-trip delay while maintaining bounded kinematic deviation. Across multiple RLBench manipulation tasks spanning free-space and contact-rich scenarios, SPO reduced cumu-lative idle time relative to blocking remote inference and static fixed-horizon caching strategies. The Adaptive Horizon Scaling mechanism enabled dynamic adjustment of spec-ulative depth, balancing latency masking and bandwidth efficiency under varying physical uncertainty. Overall, SPO demonstrates that speculative orchestration can reconcile cloud-scale models with real-time robotic control constraints. Future work will investigate deployment on physical robotic platforms to evaluate robustness under sensor noise and sim-to-real dynamics gaps. We also plan to integrate larger-scale vision-language-action models within the SPO framework to study its applicability to foundation-model-driven manipulation systems. REFERENCES [1] Z. Xian, N. Gkanatsios, T. Gervet, T.-W. Ke, and K. Fragkiadaki, “Chaineddiffuser: Unifying trajectory diffusion and keypose predic-tion for robotic manipulation,” in 7th Annual Conference on Robot Learning , 2023. [2] J. Sun, A. Curtis, Y. You, Y. Xu, M. Koehle, Q. Chen, S. Huang, L. Guibas, S. Chitta, M. Schwager et al. , “Arch: Hierarchical hybrid learning for long-horizon contact-rich robotic assembly,” in 9th Annual Conference on Robot Learning , 2024. [3] T. Gao, S. Nasiriany, H. Liu, Q. Yang, and Y. Zhu, “Prime: Scaffolding manipulation tasks with behavior primitives for data-efficient imitation learning,” IEEE Robotics and Automation Letters , 2024. [4] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning fine-grained bimanual manipulation with low-cost hardware,” arXiv preprint arXiv:2304.13705 , 2023. [5] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , vol. 44, no. 10-11, pp. 1684–1704, 2025. Blocking T1-SC NFTC SPO 
+
+> Method
+> 0
+> 10
+> 20
+> 30
+> Idle Time (s)
+
+(a) Network idle time Blocking T1-SC NFTC SPO  
+
+> Method
+> 0
+> 50
+> 100
+> #Discarded States
+
+(b) Wasted cloud predictions 0 50 100  
+
+> Wasted Predictions
+> 10
+> 20
+> 30
+> Idle Time (s)
+> Blocking
+> T1-SC
+> NFTC
+> SPO
+
+(c) Efficiency trade-off 
+
+Fig. 7: Quantitative results for InsertOntoSquarePeg using learned models. 
+
+[6] X. Ma, S. Patidar, I. Haughton, and S. James, “Hierarchical diffu-sion policy for kinematics-aware multi-task robotic manipulation,” in 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 18 081–18 090. [7] Y. Chen, C. Wang, L. Fei-Fei, and K. Liu, “Sequential dexterity: Chaining dexterous policies for long-horizon manipulation,” in 7th Annual Conference on Robot Learning .[8] A. Brohan, Y. Chebotar, C. Finn, K. Hausman, A. Herzog, D. Ho, J. Ibarz, A. Irpan, E. Jang, R. Julian et al. , “Do as i can, not as i say: Grounding language in robotic affordances,” in Conference on robot learning . PMLR, 2023, pp. 287–318. [9] N. Tian, A. K. Tanwani, J. Chen, M. Ma, R. Zhang, B. Huang, K. Goldberg, and S. Sojoudi, “A fog robotic system for dynamic visual servoing,” in 2019 International Conference on Robotics and Automation (ICRA) . IEEE, 2019, pp. 1982–1988. [10] M. Ahn, D. Dwibedi, C. Finn, M. G. Arenas, K. Gopalakrishnan, K. Hausman, B. Ichter, A. Irpan, N. Joshi, R. Julian et al. , “Autort: Embodied foundation models for large scale orchestration of robotic agents,” arXiv preprint arXiv:2401.12963 , 2024. [11] X. Tu, J. Gai, and L. Tang, “Robust navigation control of a 4wd/4ws agricultural robotic vehicle,” Computers and Electronics in Agricul-ture , vol. 164, p. 104892, 2019. [12] J. Englsberger, A. Werner, C. Ott, B. Henze, M. A. Roa, G. Garofalo, R. Burger, A. Beyer, O. Eiberger, K. Schmid et al. , “Overview of the torque-controlled humanoid robot toro,” in 2014 IEEE-RAS International Conference on Humanoid Robots . IEEE, 2014, pp. 916–923. [13] P. M. Wensing, A. Wang, S. Seok, D. Otten, J. Lang, and S. Kim, “Proprioceptive actuator design in the mit cheetah: Impact mitigation and high-bandwidth physical interaction for dynamic legged robots,” 
+
+Ieee transactions on robotics , vol. 33, no. 3, pp. 509–522, 2017. [14] K. Black, M. Y. Galliker, and S. Levine, “Real-time execution of action chunking flow policies,” arXiv preprint arXiv:2506.07339 , 2025. [15] K. Chen, M. Wang, M. Gualtieri, N. Tian, C. Juette, L. Ren, J. Ich-nowski, J. Kubiatowicz, and K. Goldberg, “Fogros2-ls: A location-independent fog robotics framework for latency sensitive ros2 ap-plications,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 10 581–10 587. [16] Z. Liu, Q. Deng, Z. Tan, Z. Qian, X. Zhang, A. Swami, and S. V. Krishnamurthy, “M2ho: Mitigating the adverse effects of 5g handovers on tcp,” in Proceedings of the 30th Annual International Conference on Mobile Computing and Networking , 2024, pp. 1089–1103. [17] D. Xu, A. Zhou, X. Zhang, G. Wang, X. Liu, C. An, Y. Shi, L. Liu, and H. Ma, “Understanding operational 5g: A first measurement study on its coverage, performance and energy consumption,” in Proceedings of the Annual conference of the ACM Special Interest Group on Data Communication on the applications, technologies, architectures, and protocols for computer communication , 2020, pp. 479–494. [18] Y. Leviathan, M. Kalman, and Y. Matias, “Fast inference from transformers via speculative decoding,” in International Conference on Machine Learning . PMLR, 2023, pp. 19 274–19 286. [19] D. Xu, W. Yin, H. Zhang, X. Jin, Y. Zhang, S. Wei, M. Xu, and X. Liu, “Edgellm: Fast on-device llm inference with speculative decoding,” 
+
+IEEE Transactions on Mobile Computing , vol. 24, no. 4, pp. 3256– 3273, 2024. [20] M. Li, X. Chen, A. Holtzman, B. Chen, J. Lin, S. Yih, and V. Lin, “Nearest neighbor speculative decoding for llm generation and attri-bution,” Advances in Neural Information Processing Systems , vol. 37, pp. 80 987–81 015, 2024. [21] S. Kim, K. Mangalam, S. Moon, J. Malik, M. W. Mahoney, A. Gho-lami, and K. Keutzer, “Speculative decoding with big little decoder,” 
+
+Advances in Neural Information Processing Systems , vol. 36, pp. 39 236–39 256, 2023. [22] K. Lee, D. Chu, E. Cuervo, J. Kopf, Y. Degtyarev, S. Grizan, A. Wol-man, and J. Flinn, “Outatime: Using speculation to enable low-latency continuous interaction for mobile cloud gaming,” in Proceedings of the 13th Annual International Conference on Mobile Systems, Applications, and Services , 2015, pp. 151–165. [23] S. James, Z. Ma, D. R. Arrojo, and A. J. Davison, “Rlbench: The robot learning benchmark & learning environment,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 3019–3026, 2020. [24] R. Arumugam, V. R. Enti, L. Bingbing, W. Xiaojun, K. Baskaran, F. F. Kong, A. S. Kumar, K. D. Meng, and G. W. Kit, “Davinci: A cloud computing framework for service robots,” in 2010 IEEE international conference on robotics and automation . IEEE, 2010, pp. 3084–3089. [25] M. Waibel, M. Beetz, J. Civera, R. d’Andrea, J. Elfring, D. Galvez-Lopez, K. H¨ aussermann, R. Janssen, J. Montiel, A. Perzylo et al. ,“Roboearth,” IEEE Robotics & Automation Magazine , vol. 18, no. 2, pp. 69–82, 2011. [26] G. Mohanarajah, D. Hunziker, R. D’Andrea, and M. Waibel, “Rapyuta: A cloud robotics platform,” IEEE Transactions on Automation Science and Engineering , vol. 12, no. 2, pp. 481–493, 2014. [27] J. Ichnowski, K. Chen, K. Dharmarajan, S. Adebola, M. Danielczuk, V. Mayoral-Vilches, N. Jha, H. Zhan, E. LLontop, D. Xu et al. ,“Fogros2: An adaptive platform for cloud and fog robotics using ros 2,” in 2023 IEEE international conference on robotics and automation (ICRA) . IEEE, 2023, pp. 5493–5500. [28] Y. Zhang, C. Wurll, and B. Hein, “Kuberos: A unified platform for automated and scalable deployment of ros2-based multi-robot applications,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2023, pp. 9097–9103. [29] C. Nguyen, E. Seo, M. Zahid, O. Larsson, F. T. Pokorny, and E. Elm-roth, “tinykube: A middleware for dynamic resource management in cloud-edge platforms for large-scale cloud robotics,” in NOMS 2025-2025 IEEE Network Operations and Management Symposium . IEEE, 2025, pp. 1–8. [30] H. Chen, B. Sun, A. Zhang, M. Pollefeys, and S. Leutenegger, “Vidbot: Learning generalizable 3d actions from in-the-wild 2d human videos for zero-shot robotic manipulation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , June 2025, pp. 27 661–27 672. [31] K. Xu, H. Yu, Q. Lai, Y. Wang, and R. Xiong, “Efficient learning of goal-oriented push-grasping synergy in clutter,” IEEE Robotics and Automation Letters , vol. 6, no. 4, pp. 6337–6344, 2021. [32] B. Tang, M. Corsaro, G. Konidaris, S. Nikolaidis, and S. Tellex, “Learning collaborative pushing and grasping policies in dense clut-ter,” in 2021 IEEE International Conference on Robotics and Automa-tion (ICRA) . IEEE, 2021, pp. 6177–6184. [33] S. Nasiriany, H. Liu, and Y. Zhu, “Augmenting reinforcement learning with behavior primitives for diverse manipulation tasks,” in 2022 International Conference on Robotics and Automation (ICRA) . IEEE, 2022, pp. 7477–7484. [34] Y. Zhu, P. Stone, and Y. Zhu, “Bottom-up skill discovery from unsegmented demonstrations for long-horizon robot manipulation,” 
+
+IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 4126–4133, 2022. [35] Z. Wang, J. J. Hunt, and M. Zhou, “Diffusion policies as an expres-sive policy class for offline reinforcement learning,” arXiv preprint arXiv:2208.06193 , 2022. [36] M. Janner, Y. Du, J. Tenenbaum, and S. Levine, “Planning with diffusion for flexible behavior synthesis,” in International Conference on Machine Learning , 2022. [37] M. Reuss, M. Li, X. Jia, and R. Lioutikov, “Goal conditioned imitation learning using score-based diffusion policies,” in Robotics: Science and Systems , 2023. [38] H. Bharadhwaj, J. Vakil, M. Sharma, A. Gupta, S. Tulsiani, and V. Kumar, “Roboagent: Generalization and efficiency in robot ma-nipulation via semantic augmentations and action chunking,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) .IEEE, 2024, pp. 4788–4795. [39] B. Kouvaritakis and M. Cannon, “Model predictive control,” Switzer-land: Springer International Publishing , vol. 38, no. 13-56, p. 7, 2016. [40] D. Q. Mayne, M. M. Seron, and S. V. Rakovi´ c, “Robust model predic-tive control of constrained linear systems with bounded disturbances,” 
+
+Automatica , vol. 41, no. 2, pp. 219–224, 2005. [41] S. V. Rakovic, E. C. Kerrigan, K. I. Kouramas, and D. Q. Mayne, “Invariant approximations of the minimal robust positively invariant set,” IEEE Transactions on automatic control , vol. 50, no. 3, pp. 406– 410, 2005. [42] A. Prasad, K. Lin, J. Wu, L. Zhou, and J. Bohg, “Consistency policy: Accelerated visuomotor policies via consistency distillation,” in Robotics: Science and Systems , 2024. [43] C. Xu, Q. Li, J. Luo, and S. Levine, “Rldg: Robotic general-ist policy distillation via reinforcement learning,” arXiv preprint arXiv:2412.09858 , 2024. [44] Z. Wang, Z. Li, A. Mandlekar, Z. Xu, J. Fan, Y. Narang, L. Fan, Y. Zhu, Y. Balaji, M. Zhou et al. , “One-step diffusion policy: Fast visuomotor policies via diffusion distillation,” arXiv preprint arXiv:2410.21257 , 2024.
