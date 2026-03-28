@@ -6,71 +6,73 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-03-27
-- 运行时间：2026-03-27 20:07:59 UTC
+- 最新运行日期：2026-03-28
+- 运行时间：2026-03-28 20:03:58 UTC
 - 运行状态：成功
 - 本次总论文数：17
 - 精读区：6
 - 速读区：11
 
 ### 今日简报（AI）
-今日聚焦 17 篇机器人前沿进展，重点突破 VLA 模型在 3D 场景流先验与扩散生成领域的
-- 详情：[/202603/27/README](/202603/27/README)
+今日聚焦 VLA 模型效率优化与像素级推理，深度解析 17 篇机器人与多模态前沿进展。
+核心突破在于利用跨层秩一致性精简视觉动作模型，并实现从像素感知到复杂任务执行的直接推理。
+推荐关注柔性物体操作的数据生成系统及低成本远程操控方案，把握具身智能在复杂环境下的落地趋势。
+- 详情：[/202603/28/README](/202603/28/README)
 
 ### 精读区论文标签
-1. [LaMP: Learning Vision-Language-Action Policies with 3D Scene Flow as Latent Motion Prior](/202603/27/2603.25399v1-lamp-learning-vision-language-action-policies-with-3d-scene-flow-as-latent-motion-prior)  
+1. [Beyond Attention Magnitude: Leveraging Inter-layer Rank Consistency for Efficient Vision-Language-Action Models](/202603/28/2603.24941v1-beyond-attention-magnitude-leveraging-inter-layer-rank-consistency-for-efficient-vision-language-action-models)  
    标签：评分：10.0/10、query:rob-il
-   evidence：结合3D场景流的VLA机器人操纵框架
-2. [MMaDA-VLA: Large Diffusion Vision-Language-Action Model with Unified Multi-Modal Instruction and Generation](/202603/27/2603.25406v1-mmada-vla-large-diffusion-vision-language-action-model-with-unified-multi-modal-instruction-and-generation)  
-   标签：评分：10.0/10、query:rob-il
-   evidence：用于机器人操纵的原生预训练大型扩散视觉-语言-动作 (VLA) 模型
-3. [$π$, But Make It Fly: Physics-Guided Transfer of VLA Models to Aerial Manipulation](/202603/27/2603.25038v1--but-make-it-fly-physics-guided-transfer-of-vla-models-to-aerial-manipulation)  
+   evidence：用于机器人操纵的高效视觉-语言-动作模型
+2. [Pixelis: Reasoning in Pixels, from Seeing to Acting](/202603/28/2603.25091v1-pixelis-reasoning-in-pixels-from-seeing-to-acting)  
    标签：评分：9.0/10、query:rob-il
-   evidence：将VLA模型迁移至空中操纵任务
-4. [ThermoAct:Thermal-Aware Vision-Language-Action Models for Robotic Perception and Decision-Making](/202603/27/2603.25044v1-thermoactthermal-aware-vision-language-action-models-for-robotic-perception-and-decision-making)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：热感知的视觉-语言-动作模型用于机器人任务执行
-5. [LILAC: Language-Conditioned Object-Centric Optical Flow for Open-Loop Trajectory Generation](/202603/27/2603.25481v1-lilac-language-conditioned-object-centric-optical-flow-for-open-loop-trajectory-generation)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：用于机器人轨迹生成的基于流的视觉-语言-动作模型
-6. [Enhancing Vision-Based Policies with Omni-View and Cross-Modality Knowledge Distillation for Mobile Robots](/202603/27/2603.20679v1-enhancing-vision-based-policies-with-omni-view-and-cross-modality-knowledge-distillation-for-mobile-robots)  
+   evidence：通过模仿损失从动作后果中学习的像素空间智能体
+3. [DiSCo: Diffusion Sequence Copilots for Shared Autonomy](/202603/28/2603.22787v1-disco-diffusion-sequence-copilots-for-shared-autonomy)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于操纵任务的视觉策略以及模仿专家动作的知识蒸馏方法
+   evidence：用于机械臂共享自主控制的扩散策略
+4. [ELITE: Experiential Learning and Intent-Aware Transfer for Self-improving Embodied Agents](/202603/28/2603.24018v1-elite-experiential-learning-and-intent-aware-transfer-for-self-improving-embodied-agents)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：使用VLM处理复杂任务和经验学习的具身智能体框架
+5. [Knowledge-Guided Manipulation Using Multi-Task Reinforcement Learning](/202603/28/2603.24083v1-knowledge-guided-manipulation-using-multi-task-reinforcement-learning)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：通过场景图统一感知与策略的多任务机器人操纵
+6. [Towards Embodied AI with MuscleMimic: Unlocking full-body musculoskeletal motor learning at scale](/202603/28/2603.25544v1-towards-embodied-ai-with-musclemimic-unlocking-full-body-musculoskeletal-motor-learning-at-scale)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：双臂操纵的动作模仿学习
 
 ### 速读区论文标签
-1. [DexDrummer: In-Hand, Contact-Rich, and Long-Horizon Dexterous Robot Drumming](/202603/27/2603.22263v1-dexdrummer-in-hand-contact-rich-and-long-horizon-dexterous-robot-drumming)  
+1. [Towards Generalizable Robotic Data Flywheel: High-Dimensional Factorization and Composition](/202603/28/2603.25583v1-towards-generalizable-robotic-data-flywheel-high-dimensional-factorization-and-composition)  
    标签：评分：8.0/10、query:rob-il
-   evidence：涉及高频接触和长程控制的复杂机器人操纵任务
-2. [CaP-X: A Framework for Benchmarking and Improving Coding Agents for Robot Manipulation](/202603/27/2603.22435v1-cap-x-a-framework-for-benchmarking-and-improving-coding-agents-for-robot-manipulation)  
+   evidence：通过结构化数据分解实现可泛化的机器人模型
+2. [SoftMimicGen: A Data Generation System for Scalable Robot Learning in Deformable Object Manipulation](/202603/28/2603.25725v1-softmimicgen-a-data-generation-system-for-scalable-robot-learning-in-deformable-object-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：机器人操纵中编码代理和 VLA 方法的基准测试框架
-3. [CoMaTrack: Competitive Multi-Agent Game-Theoretic Tracking with Vision-Language-Action Models](/202603/27/2603.22846v1-comatrack-competitive-multi-agent-game-theoretic-tracking-with-vision-language-action-models)  
-   标签：评分：8.0/10、query:rob-il
-   evidence：用于具身视觉追踪的视觉-语言-动作模型
-4. [VLGOR: Visual-Language Knowledge Guided Offline Reinforcement Learning for Generalizable Agents](/202603/27/2603.22892v1-vlgor-visual-language-knowledge-guided-offline-reinforcement-learning-for-generalizable-agents)  
-   标签：评分：8.0/10、query:rob-il
-   evidence：视觉语言模型预测未来状态和动作
-5. [Speculative Policy Orchestration: A Latency-Resilient Framework for Cloud-Robotic Manipulation](/202603/27/2603.19418v1-speculative-policy-orchestration-a-latency-resilient-framework-for-cloud-robotic-manipulation)  
+   evidence：用于学习机器人操纵技能的可扩展数据生成
+3. [KUKAloha: A General, Low-Cost, and Shared-Control based Teleoperation Framework for Construction Robot Arm](/202603/28/2603.20129v1-kukaloha-a-general-low-cost-and-shared-control-based-teleoperation-framework-for-construction-robot-arm)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于云机器人操纵和高频控制的延迟弹性框架
-6. [GAPG: Geometry Aware Push-Grasping Synergy for Goal-Oriented Manipulation in Clutter](/202603/27/2603.21195v1-gapg-geometry-aware-push-grasping-synergy-for-goal-oriented-manipulation-in-clutter)  
+   evidence：建筑机器人操纵的遥操作与自主感知
+4. [Non-Adversarial Imitation Learning Provably Free of Compounding Errors: The Role of Bellman Constraints](/202603/28/2603.22713v1-non-adversarial-imitation-learning-provably-free-of-compounding-errors-the-role-of-bellman-constraints)  
    标签：评分：7.0/10、query:rob-il
-   evidence：面向目标的机器人操纵中几何感知的推抓协同
-7. [Closed-Loop Verbal Reinforcement Learning for Task-Level Robotic Planning](/202603/27/2603.22169v1-closed-loop-verbal-reinforcement-learning-for-task-level-robotic-planning)  
+   evidence：非对抗模仿学习中复合误差的理论分析
+5. [TRAP: Hijacking VLA CoT-Reasoning via Adversarial Patches](/202603/28/2603.23117v1-trap-hijacking-vla-cot-reasoning-via-adversarial-patches)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于任务规划的闭环语言强化学习
-8. [GIFT: Generalizing Intent for Flexible Test-Time Rewards](/202603/27/2603.22574v1-gift-generalizing-intent-for-flexible-test-time-rewards)  
+   evidence：VLA模型的安全与控制劫持
+6. [Event-Driven Proactive Assistive Manipulation with Grounded Vision-Language Planning](/202603/28/2603.23950v1-event-driven-proactive-assistive-manipulation-with-grounded-vision-language-planning)  
    标签：评分：7.0/10、query:rob-il
-   evidence：从用户演示中学习机器人任务的奖励函数
-9. [Safety-Guaranteed Imitation Learning from Nonlinear Model Predictive Control for Spacecraft Close Proximity Operations](/202603/27/2603.18910v1-safety-guaranteed-imitation-learning-from-nonlinear-model-predictive-control-for-spacecraft-close-proximity-operations)  
+   evidence：用于主动辅助操纵的视觉语言规划
+7. [Toward Generalist Neural Motion Planners for Robotic Manipulators: Challenges and Opportunities](/202603/28/2603.24318v1-toward-generalist-neural-motion-planners-for-robotic-manipulators-challenges-and-opportunities)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：复杂环境下机器人操纵器的神经运动规划器
+8. [FODMP: Fast One-Step Diffusion of Movement Primitives Generation for Time-Dependent Robot Actions](/202603/28/2603.24806v1-fodmp-fast-one-step-diffusion-of-movement-primitives-generation-for-time-dependent-robot-actions)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：用于机器人学习和运动原语的扩散策略
+9. [An Open Source Computer Vision and Machine Learning Framework for Affordable Life Science Robotic Automation](/202603/28/2603.20465v1-an-open-source-computer-vision-and-machine-learning-framework-for-affordable-life-science-robotic-automation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：利用NMPC专家的航天器控制模仿学习框架
-10. [AGILE: A Comprehensive Workflow for Humanoid Loco-Manipulation Learning](/202603/27/2603.20147v1-agile-a-comprehensive-workflow-for-humanoid-loco-manipulation-learning)  
+   evidence：用于菌落挑选等实验室自动化任务的机器人框架
+10. [Bayesian Active Object Recognition and 6D Pose Estimation from Multimodal Contact Sensing](/202603/28/2603.21410v1-bayesian-active-object-recognition-and-6d-pose-estimation-from-multimodal-contact-sensing)  
    标签：评分：6.0/10、query:rob-il
-   evidence：人形机器人移动操纵学习与部署的工作流
-11. [Learning Sidewalk Autopilot from Multi-Scale Imitation with Corrective Behavior Expansion](/202603/27/2603.22527v1-learning-sidewalk-autopilot-from-multi-scale-imitation-with-corrective-behavior-expansion)  
+   evidence：用于物体识别和位姿估计的多模态接触传感
+11. [CanViT: Toward Active-Vision Foundation Models](/202603/28/2603.22570v1-canvit-toward-active-vision-foundation-models)  
    标签：评分：6.0/10、query:rob-il
-   evidence：用于人行道导航和控制的模仿学习框架
+   evidence：用于顺序感知的动作视觉基础模型
 
 
 <div class="dpr-home-promo-card">
