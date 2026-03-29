@@ -1,0 +1,435 @@
+Title: MIRROR: Visual Motion Imitation via Real-time Retargeting and Teleoperation with Parallel Differential Inverse Kinematics
+
+URL Source: https://arxiv.org/pdf/2603.23995v1
+
+Published Time: Thu, 26 Mar 2026 00:50:16 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR MIRROR: Visual M MMMMMMMMMMMMMMMMotion I IIIIIIIIIIIIIIIImitation via R RRRRRRRRRRRRRRRReal-time R RRRRRRRRRRRRRRRRetargeting and TeleO OOOOOOOOOOOOOOOOpeR RRRRRRRRRRRRRRRRation with Parallel Differential Inverse Kinematics 
+
+Junheng Li, Lizhi Yang, and Aaron D. Ames  
+
+> Project Website: https://caltech-amber.github.io/mirror/
+
+Abstract — Real-time humanoid teleoperation requires inverse kinematics (IK) solvers that are both responsive and constraint-safe under kinematic redundancy and self-collision constraints. While differential IK enables efficient online retargeting, its locally linearized updates are inherently basin-dependent and often become trapped near joint limits, singularities, or active collision boundaries, leading to unsafe or stagnant behavior. We propose a GPU-parallelized, continuation-based differential IK that improves escape from such constraint-induced local minima while preserving real-time performance, promoting safety and stability. Multiple constrained IK quadratic pro-grams are evaluated in parallel, together with a self-collision avoidance control barrier function (CBF), and a Lyapunov-based progression criterion selects updates that reduce the final global task-space error. The method is paired with a visual skeletal pose estimation pipeline that enables robust, real-time upper-body teleoperation on the THEMIS humanoid robot hardware in real-world tasks. 
+
+I. I NTRODUCTION 
+
+Humanoid robots are increasingly expected to operate in human-centered environments, where intuitive teleoperation, demonstration-based control, and human motion imitation are essential for natural and human-like interaction [1]. The predominant teleoperation pipelines are typically wearable-equipment-based, such as VR headsets [2]–[4], motion-capture suits [5], and haptic feedback devices [6]–[8], al-lowing rich feedback and tailored interfaces. However, these systems require users to wear bulky hardware, undergo repeated calibration procedures, and are often limited to prepared lab environments. This is a bottleneck to the widespread deployment of teleoperated humanoids, and the data-generation pipeline they would enable. Recent advances in optical sensors have made it possible to extract reliable human pose data in real-time. He et al. [9] leverages a monocular camera for pose estimation and demonstrates the feasibility of real-time humanoid teleoper-ation with only RGB cameras. Lately, stereo cameras have made 3-D pose estimation more reliable at high frequency [10], creating new opportunities for perceptive humanoid retargeting and teleoperation with better pose depth esti-mation. However, deploying such a pipeline in real-world teleoperation remains challenging. The optical setup must be portable, low-latency, and robust to (partial) occlusion [11]. The whole-body kinematic retargeting pipeline must be 
+
+> Authors are with the Department of Mechanical and Civil Engineering, California Institute of Technology, Pasadena, USA. Email:
+
+{junhengl,lzyang,ames }@caltech.edu    
+
+> This work is in part supported by Technology Innovation Institute, The Dow Chemical Company project #227027AW, and Westwood Robotics.
+> Fig. 1: Real-time human-humanoid motion mirroring teleoperation. Full experiment videos https://youtu.be/LvwIwOTTu9g
+
+computationally lightweight, collision-aware, globally opti-mal, and capable of operating at control frequencies suitable for real-time whole-body humanoid control. In this paper, we present MIRROR, a hierarchical, self-contained, low-latency humanoid retargeting and teleoper-ation pipeline using stereo cameras and a novel GPU-accelerated differential inverse kinematics (IK) framework. Inverse kinematics (IK) underpins motion control and whole-body retargeting by mapping lower-dimensional task-space commands to higher-dimensional joint configurations. Classical global IK formulates this mapping as a nonlinear optimization over joint space, achieving accurate solutions but at substantial computational cost, making it more suitable for offline retargeting pipelines [11]–[13]. In contrast, differ-ential IK solves a constrained quadratic program (QP) over joint velocity increments, enabling high-frequency control and widespread adoption in humanoid whole-body frame-works [14], [15]. However, despite its efficiency, differential IK is inherently local and basin-dependent, often becoming trapped in local minima when task constraints are underdeter-mined or when commands deviate significantly from nominal configurations. Kobayashi and Jin [16] attempt to allow Jacobian-based IK to escape local minima via a heuristics-based ϵ-clamping. Giamou et al. [17] leverages iterations of lightweight low-rank convex optimization. Nonetheless, a good middle ground between global convergence and real-time feasibility is highly sought after. Recently, parallelization has been explored to accelerate optimization and planning. GPU-based optimization [18], [19], parallel sampling in model predictive control [20], [21], and parallelizable physics simulations [22] are examples where parallel computation improves robustness or speed in robotic control. In kinematic retargeting, however, popular toolkits still rely on single-instance differential IK solvers [15], [23]. CuRoBo [24] and HJCD-IK [25] attempt to solve         
+
+> arXiv:2603.23995v1 [cs.RO] 25 Mar 2026 Perception THEMIS Command
+> Continuation
+> GPU-accelerated Whole-body Kinematic Retargeting
+> Dist. IK QP 1
+> Dist. IK QP 2
+> ...
+> Stability and Progression
+> Selection
+> Lyapunov Progress
+> Certificate
+> Target Continuation
+> for
+> Self-collision D-CBFs Optimal joint
+> increment
+> 3-D Visual
+> Skeleton
+> Humanoid-Human
+> Target Scaling
+> Key Task-space
+> Target Extraction
+> Dist. IK QP KDemonstrator
+> Command
+> Smoothing
+> Pose Filtering
+> Robustification
+> LR
+> LR
+> LRFig. 2: MIRROR pipeline architecture.
+
+global IK via GPU parallelization for accelerated motion generation. IKFlow [26] leverages deep neural networks to produce a variety of IK solutions in real-time. While effective on lower-dimensional manipulators, extending these methods to high-DoF systems is challenging due to the increased complexity of the optimization landscape, where strong joint coupling and constraint interactions create narrow feasible manifolds and poorly conditioned local basins. Rather than merely improving computational efficiency, distributed op-timization decomposes the problem into smaller structured subspaces, reducing effective exploration complexity and limiting cross-joint interference. Such decompositions have shown improved robustness and solution quality under fixed time budgets in legged systems [27], [28]. This work addresses the fundamental tension between global optimality and real-time feasibility in motion retar-geting with modern GPU parallelism. While global IK can escape local minima, it is computationally too expensive for high-frequency control. Differential IK is fast but can become trapped in poor local solutions. We propose a GPU-accelerated Distributed Differential IK method that runs many parallel instances with task command continuation and has a higher probability of selecting the local-basin-escaping solution in real time with increased parallel samples. As a re-sult, the proposed method significantly improves robustness to local minima while maintaining real-time feasibility. The main contributions include:  
+
+> •
+
+We propose a self-contained, real-time humanoid re-targeting and teleoperation pipeline that uses stereo cameras and 3-D visual skeletal pose estimations.  
+
+> •
+
+We introduce an optimization-based, GPU-accelerated parallel IK scheme. We formalize and validate that the proposed parallel differential IK with the task-space continuation and Lyapunov-based certification encour-ages the escape from the local basin of attraction and pose stagnation, which has been an open challenge in traditional differential IK.  
+
+> •
+
+Our approach employs a dual-layer safety mechanism for self-collision avoidance: control barrier function (CBF) constraints are enforced within the IK optimiza-tion, while parallel evaluation further improves closed-loop safety by increasing the likelihood of selecting collision-free solutions.  
+
+> •
+
+We validate the proposed pipeline on hardware— specifically the THEMIS humanoid robot—with upper-body motion tracking from a human operator. The proposed low-latency pipeline enables stable motion tracking teleportation under realistic humanoid tasks. This paper, therefore, demonstrates end-to-end teleop-eration on humanoid robots through the use of parallel distributed differential IK—which includes the Lyapunov-like certificates for safety and stability, setting the stage for (principled) integration into broader autonomy stacks. II. P IPELINE AND APPROACH 
+
+We present a real-time motion retargeting and teleop-eration pipeline that transforms demonstrator observations into safe, task-consistent joint commands for humanoid robots. The proposed architecture, illustrated in Fig. 2, de-composes the pipeline into three modular stages, enabling high-frequency motion generation while maintaining explicit safety constraints and improving robustness to local basin trapping in constrained differential IK. 
+
+A. Perception and Pose Processing a) Visual Skeleton: The perception module estimates the demonstrator’s full-body skeletal structure from stereo perception. In particular, the front end runs the Stereolabs ZED 2i stereo camera and its Body Tracking module to extract Body38 3-D visual skeleton representation, using it to infer n key task-space targets P = {pt ∈ R3, t =0, 1, ..., n } relevant to humanoid motion retargeting. These include, but are not limited to, torso position, hand positions, elbow positions, and fingertip positions. The tracked key-points are converted into a local body frame by subtracting the estimated body reference point for a consistent coordinate system in downstream task extraction. 
+
+b) Pose Filtering and Robustification: Because vision-based keypoints can be intermittent and exhibit spurious outliers, we apply a lightweight filtering stage inside the perception module before publishing targets to the shared state. Specifically, each 3-D keypoint is processed by a low-pass filter with three robustness features: (i) confidence-based gating , (ii) jump rejection , and (iii) multi-body rejection . Confidence-based gating ensures both numerical integrity ( e.g. , NaNs) and tracker confidence. Jump rejection detects large frame-to-frame deviations using an ℓ2 threshold to suppress transient spikes. In the multi-body rejection module, candidate bodies are evaluated based on spatial proximity to the previously tracked target. The closest valid detection is selected as the current demonstrator, while other detections are rejected. This prevents identity switching in multi-person environments. Concretely, for a measured keypoint pt ∈ R3 with a filtered state ¯pt−1, we compute 
+
+¯pt =
+
+
+
+¯pt−1, if invalid ,λjr pt + (1 − λjr )¯ pt−1, if ∥pt − ¯pt−1∥ > τ jr ,αjr pt + (1 − αjr )¯ pt−1, otherwise ,
+
+(1) where τjr is the jump threshold and λjr ≪ αjr is a conserva-tive mixing coefficient used only during jump rejection. 
+
+B. Task-space Command Continuation a) Command Scaling: Directly solving inverse kine-matics to track P can lead to infeasible or unstable joint updates due to kinematic differences between the robot and the operator. Each key body-frame task-space command’s position part is then scaled by βt:
+
+xpos  
+
+> d
+
+= βt(pt − pc) + xc, (2) where pc denotes the skeleton body anchor position and xc
+
+denotes the robot torso CoM feedback. 
+
+b) Command Continuation: In practice, large task-space displacements may require joint motions that violate safety constraints or reach singularities, resulting in con-vergence to undesirable local solutions, which has been a challenge for traditional differential IK approaches. To mitigate this issue, we introduce a task-space continu-ation mechanism that gradually interpolates the desired task command from the current robot state via parallel solvers at each time step. For a humanoid whole-body configuration space q ∈ Rn, let x := x(q) denote the current task value and x(·) denote the forward kinematics map. For α ∈ [0 , 1] ,define the continuation target 
+
+xd(α) := (1 − α) x + α x d. (3) Then the intermediate displacement from the current task is 
+
+dx(α) := xd(α) − x(q) = α e (q). (4) We select a set of K +1 continuation parameters {αj }Kj=0 ⊂
+
+[0 , 1] . In our implementation, we use a deterministic grid 
+
+αj = j/K ; alternatively, one may sample αj randomly for probabilistic coverage guaranties (Sec. III-B). At each control step, we evaluate K candidate joint in-crements corresponding to different continuation parameters 
+
+α, thereby reducing the likelihood of constraint-dominated stagnation that arises when tracking xd directly. A detailed probabilistic basin-escape proof is presented in Sec. III. 
+
+C. GPU-accelerated Whole-body Kinematic Retargeting a) Self-collision CBFs: To enforce self-collision avoid-ance between upper limbs and torso/head (e.g., in [29]), we model the body as a set of bounding spheres with centers 
+
+co(q) ∈ R3 and radii Ro. For a tracked point xpos  
+
+> i
+
+(q) ∈ R3
+
+(e.g. , wrist or elbow), define the safety function 
+
+hi(q) = ∥xpos  
+
+> i
+
+(q) − co(q)∥2 − ρ2 
+
+> i
+
+, (5) where ρi = Ro + ri + m includes the sphere radius, limb thickness, and safety margin m. Safety requires hi(q) ≥ 0.Using first-order linearization, 
+
+hi(q + ∆ q) ≈ hi(q) + ∇hi(q)⊤∆q, 
+
+where 
+
+∇hi(q)⊤ = 2( xpos  
+
+> i
+
+− co)⊤ (Jxi (q) − Jco (q)) .
+
+A discrete-time Control Barrier Function (D-CBF) condi-tion is imposed [30] : 
+
+∇hi(q)⊤∆q ≥ − γ h i(q), γ > 0, (6) which ensures forward invariance of safe configurations under bounded increments. In this work, we embed 4 key locations (hands and elbows) w.r.t. 3 CBF spheres forming the robot’s upper body (shown in Fig. 1). 
+
+b) Family of Parallel QPs: For each αj , we solve in parallel the distributed convex QP for each arm chain 
+
+∆q(αj ) ∈ arg min 
+
+> ∆q
+
+12 ∥J(q)∆ q − αj e(q)∥2 
+
+> Wx
+
++ 12 ∥∆q∥2
+
+> Wq
+
+(7) s.t. ∇hi(q)⊤∆q ≥ − γh i(q), (8) 
+
+∆qmin ≤ ∆q ≤ ∆qmax , (9) 
+
+qmin ≤ q + ∆ q ≤ qmax , (10) where e(q) := xd − x(q) is the final-goal error, J(q) is the corresponding task Jacobian, and Wq ≻ 0, Wx ≻ 0
+
+are diagonal weighting matrices. The objective is strongly convex and each feasible QP admits a unique minimizer. 
+
+c) Lyapunov Progress Certificate and Selection: Given a desired target xd and error e(q), define a Lyapunov-like objective based on the global IK tracking goal 
+
+V (q) = 12 e(q)⊤W e (q). (11) Using first-order kinematics, 
+
+x(q + ∆ q) ≈ x(q) + J(q)∆ q, (12) the predicted next final-goal error is 
+
+ˆe+(∆ q) = xd −  x(q) + J(q)∆ q = e(q) − J(q)∆ q, (13) and the predicted next Lyapunov value is 
+
+ˆV +(∆ q) = 12 ˆe+(∆ q)⊤W ˆe+(∆ q). (14) We accept a candidate αj if it is feasible and yields sufficient predicted progress: 
+
+ˆV + ∆q(αj ) ≤ V (q) − η, (15) for some η > 0. We additionally require an escaping “re-verse” update away from QP convergence ( e.g. , ∥∆q(αj )∥ ≥ 
+
+εq when V (q) > ε V ). This encourages staying away from intermediate task goals to reduce the chances of getting stuck at a local basin of attraction. Among accepted candidates, we choose the largest continuation parameter: j⋆ = max 
+
+n
+
+j : ∆q(αj ) satisfies (8-10, 15) 
+
+o
+
+, (16) 
+
+q∗ = q+ = q + ∆ q(αj⋆ ), (17) 
+
+˙q∗ = ∆ q(αj⋆ )/dt. (18) 
+
+Remark 1. This selection yields the most aggressive (closest-to-target) continuation update that still satisfies a final-goal progress certificate, which filters candidate QP solutions based on whether they reduce the real nonlinear IK objective to avoid a local basin while still “staying close” to intermediate targets ( i.e. , local differential IK objective). This selection does not improve the intermediate tracking error significantly but strongly certifies progress towards the final goal and away from local minima, seen in Table I. 
+
+D. Robot Hardware 
+
+The final stage of the pipeline sends the selected joint-space commands to execute on the THEMIS humanoid platform from Westwood Robotics. These joint position and velocity commands are transmitted to the robot’s low-level Whole-body Control and joint-space PD control. This decou-ples perception-driven retargeting from hardware execution while preserving real-time safety and responsiveness. By maintaining a hierarchical structure, the framework ensures that kinematic retargeting remains agnostic to the robot’s low-level control, promoting modularity and adaptability. III. P ARALLEL DIFFERENTIAL INVERSE KINEMATICS 
+
+In this section, we formalize the basin-dependent behavior of standard differential inverse IK and introduce a parallel task continuation scheme. Specifically, we show that the iterates of differential IK remain confined to local basins of attraction and that evaluating multiple continuation targets in parallel increases the coverage of feasible descent directions within a fixed computation budget. Therefore, the probability of escaping a local basin of attraction ( e.g. , stagnation and CBF violations) will increase accordingly. 
+
+A. Local Basin Dependence of Differential IK 
+
+Lemma 1 (Differential IK as a Gauss–Newton step ). Con-sider the regularized nonlinear IK objective 
+
+F (q) = 12 ∥x(q) − xd∥2 
+
+> Wx
+
++ 12 ∥q − qref ∥2 
+
+> Wq
+
+, (19) At an iterate qk, we can linearize by eqn. (12). Then it yields the convex QP (7), which computes a Gauss–Newton step for minimizing F (q) at qk and has a global minimizer ∆qk for the local model. 
+
+Proposition 1 (Basin dependence of differential IK ). Assume 
+
+x(·) is twice continuously differentiable on an open set D
+
+and Ji(q) is locally Lipschitz on D. Consider the iterative differential IK update 
+
+qk+1 = qk + tk∆qk, (20) 
+
+where ∆qk is obtained by solving (7) and tk ∈ (0 , 1] may be chosen by a standard line-search or trust-region rule such that F (qk+1 ) ≤ F (qk) whenever qk ∈ D . Then every accumulation point of {qk} is a stationary point of F in D.Furthermore, suppose F has at least two isolated strict local minimizers q⋆ 
+
+> 1
+
+and q⋆ 
+
+> 2
+
+in D. Then there exist neighbor-hoods U1 of q⋆ 
+
+> 1
+
+and U2 of q⋆ 
+
+> 2
+
+such that if q0 ∈ Uj for some 
+
+j ∈ { 1, 2}, the sequence {qk} remains in Uj and converges to a stationary point in Uj (typically q⋆j ). In particular, the method cannot transition from the basin of attraction of one local minimizer to another without violating the descent condition (i.e., without increasing F at some iteration). 
+
+Remark 2. Since F (q) is generally nonconvex for humanoid kinematics and often admits multiple solution branches ( e.g. ,elbow up vs. down), Proposition 1 implies that differential IK is inherently basin-dependent and may converge to subopti-mal local minima dictated by initialization and regularization, known as ”basin-trapping”. 
+
+B. Basin Escape via Increased Coverage 
+
+The continuation strategy is designed to mitigate basin-trapping behavior that can arise when a single-shot update (i.e. , differential IK with α = 1 , t k = 1 only) repeatedly produces steps constrained by the same active set ( e.g. , joint locks, singularity, CBF facets), leading to stagnation. 
+
+a) Progress-certified Escape: Let F (q) denote the global regularized IK objective in (19). We define an objective-based escape event for a candidate step ∆q:
+
+E(q, ∆q) := {F (q + ∆ q) ≤ F (q) − ηF } , (21) with ηF > 0 above numerical tolerance. In our system, we additionally require the Lyapunov progress certificate (11) to avoid selecting constraint-dominated stagnant candidates; hence, we consider the progress-certified escape event 
+
+Epc (q, ∆q) := E(q, ∆q) ∩ P (q, ∆q). (22) 
+
+b) Escaping α-set: For a fixed q, define the set of continuation parameters that would yield a progress-certified escaping update: 
+
+Apc esc (q) := {α ∈ [0 , 1] : Epc (q, ∆q(α)) holds } . (23) Let ppc (q) := μ(Apc esc (q)) ∈ [0 , 1] be its Lebesgue measure [31]. Although our implementation uses a deterministic grid, it is useful to state a randomized continuation variant formal-izing the benefit of increasing the number of candidates K.
+
+Theorem 1 (Progress-certified escape probability increases with K). Fix a state q and draw α1, . . . , α K i.i.d. from 
+
+Unif[0 , 1] . If ppc (q) > 0, then the probability that at least one of the K candidates is progress-certified escaping satisfies 
+
+P
+
+
+
+∃k ≤ K : αk ∈ A pc esc (q)
+
+
+
+= 1 − (1 − ppc (q)) K , (24) 
+
+which strictly increases in K and converges to 1 as K → ∞ .Proof. Each αk lies in Apc esc (q) with probability ppc (q) under the uniform distribution. Independence yields P(∀k, α k /∈Apc esc (q)) = (1 − ppc (q)) K . Taking the complement gives the claim. 
+
+Remark 3. A deterministic grid αj = j/K does not yield the i.i.d. expression in Theorem 1, but it provides uniform coverage over [0 , 1] . Empirically, increasing K increases the Close gripper  Open gripper  Right hand up  Left hand up     
+
+> Cross arm Right arm reach Left arm reach Spread arm Fig. 3: Snapshots of real-time teleoperation. Pose mirroring and mimicking.
+
+likelihood of encountering different active-set regimes in the parametric QP solutions, improving basin-escape behavior. 
+
+C. Distributed QPs and Increased Escape Likelihood 
+
+We now contrast a whole-body IK-QP in Rn with a distributed formulation that solves multiple smaller subprob-lems. In our upper-body implementation, we solve two arm QPs with a substantially smaller variable dimension per QP. Let ∆qR ∈ Rd and ∆qL ∈ Rd denote the right and left arm decision variables, where d < n . The composed full update is 
+
+∆q = PR∆qR + PL∆qL, (25) where PR, P L are fixed embedding matrices. ( i.e. , with the floating base being shared, PR and PL overlap on those DOFs and resolve this by averaging.) Each subproblem solves a continuation QP (7) with the corresponding Jaco-bians and constraints for that segment. 
+
+1) Compute–coverage advantage: Lemma 2 (Escape probability increases with K). Assume each candidate has probability at least p of satisfying an escape certificate, and candidate trials are independent (or weakly dependent). Then the probability of obtaining at least one escaping candidate from K evaluations is at least 1 −
+
+(1 − p)K , which increases with K.Proof. Same as Theorem 1. Let C(m) denote the average compute cost of solving a constrained QP of dimension m. For many solvers, C(m)
+
+grows superlinearly with m (e.g. , cubic for dense factoriza-tions). Under a fixed wall-clock budget B,
+
+Kwhole ≈ BC(n) , Kdist ≈ BNs C(d) , (26) where Ns is the number of segments (here Ns = 2 arms). Since d < n, we typically have Kdist > Kwhole . By Lemma 2, this yields a principled compute–coverage advan-tage: distributed QPs enable more continuation candidates per cycle, which increases the likelihood of encountering an escaping candidate. 
+
+2) Dimensionality advantage: Assumption 1 (Local escape neighborhood) . At a given state 
+
+q, suppose there exists an escaping feasible increment ∆q⋆
+
+and r > 0 such that 
+
+Br (∆ q⋆) ∩ S ∆ ⊆ X esc , (27) 
+
+where S∆ is the feasible increment set and Xesc is the set of feasible escaping increments under (21) . An analogous assumption holds in each segment space. 
+
+Lemma 3 (Volume ratio decays exponentially with dimen-sion) . Let S ⊂ Rm be contained in a ball of radius R and suppose candidates are approximately spread over S. Then the probability of hitting an escaping neighborhood of radius 
+
+r is lower bounded by a volume ratio: 
+
+p ≳ vol( Br )vol( BR) =
+
+ rR
+
+m
+
+. (28) 
+
+Thus, for fixed r/R < 1, the hit probability decays exponen-tially with dimension m.Proof. Since S ⊆ BR, the probability of landing in Br (∆ q⋆)
+
+is at least its volume divided by the volume of an enclosing set. The m-dimensional ball volume scales as rm.Lemma 3 implies that if escaping updates occupy a small “tube” or neighborhood in increment space, then reaching them becomes dramatically harder as the dimension in-creases. Solving distributed QPs in Rd (with d < n ) increases the per-candidate chance of landing in an escaping region compared to a whole-body search in Rn.
+
+Remark 4. Combining the compute–coverage advantage (i.e. , more candidates per time step) and the dimensionality advantage ( i.e. , less needle-like escape regions) yields that distributed parallel continuation can increase the likelihood of producing an escaping candidate update within a fixed time budget, while ensuring constraint satifaction. IV. R ESULTS 
+
+In this section, we evaluate the proposed MIRROR frame-work in both simulation and hardware environments. 
+
+A. Validation Setup 
+
+All experiments are conducted using the full pipeline described in Sec. II. Simulation experiments are performed using the MuJoCo simulation backend. Hardware experi-ments are conducted on Westwood Robotics’ THEMIS V2 Pro humanoid robot with 40 actuated DOF. (a) Object transfer 1  (b) Object transfer 2            
+
+> (d) Dual -arm manipulation
+> (e) Hand -to -hand object transfer (f) Tennis
+> Grasp Transfer Place Grasp Transfer Drop
+> Move Throw
+> Left hand grasp Hand transfer Right hand grasp
+> Hold
+> (c)Partial Occlusion Fig. 4: Snapshots of useful real-world tasks through MIRROR teleoperation.
+
+The simulation testing platform is backed by a Ubuntu 22 desktop equipped with an Intel Ultra 9 285K and an NVIDIA RTX 5090. All CPU-based IK subproblems are formulated as constrained quadratic programs and solved using OSQP . The GPU-accelerated distributed batch implementation is realized via a customized ADMM solver for parallel evaluation in 
+
+PyTorch . The robot kinematics and dynamics evaluation uses a customized Python implementation of Spatial V2 [32]. 
+
+B. Robustness of Pose Estimation and Latency 
+
+We evaluate the perception front-end by comparing track-ing accuracy and smoothness against established motion cap-ture systems. Human hand trajectories are recorded simulta-neously using the proposed camera-based pipeline (Vision), a Meta Quest 3 VR headset (VR), and an OptiTrack system as ground truth, with task-space keypoints aligned in a common reference frame. As shown in Fig. 5, VR tracking closely follows OptiTrack with minor dropouts, while raw vision estimates exhibit higher-frequency noise. After filtering and robustification, the vision trajectories become substantially smoother and preserve overall motion trends and peak events, maintaining strong temporal consistency with the ground truth. These results indicate that the filtered vision pipeline provides relatively accurate and sufficiently smooth tracking for motion retargeting. Moreover, unlike the VR setup, which primarily tracks end-effectors, the vision-based approach supports full-body pose estimation in a lightweight fashion. 
+
+C. Inverse Kinematics Ablation Study 
+
+We compare the proposed continuation-based distributed parallel differential IK against several ablated baselines in simulation. We ablate key features, including parallel solver, task-space continuation, and Lyapunov-based progress cer-tificate. Table I evaluates IK variants over 50-step closed-loop tracking of moving hand targets for both arms across 250 randomized trials in simulation. While the global IK achieves −250        
+
+> 0
+> 250
+> 500
+> X (mm)
+> OptiTrack
+> VR
+> Vision
+> Vision (Filtered)
+> 250
+> 500
+> 750
+> Y (mm)
+> 40 45 50 55 60 65 70
+> Time (s)
+> −400
+> −200
+> 0
+> Z (mm)
+> Hand Location Tracking Comparison
+> Fig. 5: Comparison of motion capture devices tracking hand location.
+
+the lowest tracking error, its high computational cost ( ∼177 ms) makes it unsuitable for real-time control; in contrast, single-instance monolithic and distributed QPs are fast ( <1ms) but exhibit frequent self-collision, singularity violations, and stagnation due to basin trapping over long horizons. Although CBF constraints are explicit in QP, closed-loop invariance is not guaranteed, and self-collision can still arise in practice due to large step sizes, tracking performance, and controller delay. We also intentionally generate hand targets near or across CBF boundaries to stress-test the solver. On the other hand, parallel continuation substantially improves robustness without sacrificing millisecond-level performance ( ∼4 ms), and incorporating the Lyapunov-based progress certificate further reduces violations and stagnation, emphasizing a good trade-off between safety and accuracy. In the proposed approach, increasing the batch size K
+
+consistently reduces CBF violations and stagnation events, empirically confirming that evaluating more continuation candidates improves the likelihood of selecting a progress-TABLE I: Ablation study on differential IK solving methods over long-horizon hand tracking.                                                                                                                                                                             
+
+> Method Batch KηSolve Time [ms] ↓|| ¯ehand,l || [mm] ↓|| ¯efinal hand,l || [mm] ↓Self Collision ↓Singularity ↓Stagnation ↓
+> Global IK (SQP) 1–176 .57 ±4.20 12 .44 ±3.12 6.58 ±2.23 42 /250 0/250 0/250
+> Monolithic QP 1–0.58 ±0.05 18 .57 ±9.82 16 .23 ±4.12 135 /250 17 /250 44 /250
+> Distributed QP 1–0.94 ±0.06 17 .72 ±10 .68 10 .44 ±4.56 142 /250 19 /250 46 /250
+> Parallel Dist. QPs - Continuation ✓
+> -Vcertificate ×
+> 256 –4.28 ±0.14 16 .61 ±7.95 11 .45 ±3.34 68 /250 9/250 45 /250 4096 –4.08 ±0.06 16 .61 ±7.95 11 .45 ±3.34 68 /250 9/250 45 /250
+> Parallel Mono. QPs - Continuation ✓
+> -Vcertificate ✓
+> 256 0.0005 3.94 ±0.09 16 .61 ±7.86 10 .38 ±4.20 52 /250 9/250 45 /250 4096 0.0005 3.76 ±0.03 16 .78 ±7.33 10 .54 ±4.12 47 /250 7/250 31 /250
+> Parallel Dist. QPs
+> - Continuation ✓
+> -Vcertificate ✓
+> 256 0.0005 4.27 ±0.09 16 .63 ±7.88 10 .34 ±4.11 41 /250 9/250 28 /250
+> 4096 0.0005 4.10 ±0.04 16 .67 ±7.58 10 .30 ±4.45 18 /250 7/250 17 /250
+> 4096 0.005 4.12 ±0.07 18 .57 ±6.89 13 .52 ±5.86 10 /250 7/250 11 /250
+> 4096 0.001 4.14 ±0.07 22 .09 ±7.16 15 .65 ±4.41 3/250 5/250 7/250
+
+Lower is better ( ↓). Heavier shade means better results. Solve time is measured as the end-to-end duration of the entire IK problem, including Jacobian, CBF gradients, and batch overheads. Self-collision is determined based on CBF geometry in simulation instead of the actual robot geometry. Stagnation is counted when any joint reaches its joint limit and does not progress away from the joint limit ( i.e. , joint lock). OSQP setup: Max iter. = 500 , Tolerance eps abs = eps rel = 1 e-5, Warm-start On; Custom ADMM-QP setup: Max iter. = 50 , Tikhonov regularization σ = 1 e-6, Penalty ρ = 50 , Warm-start On. 
+
+certified escaping update, as outlined by Theorem 1. Mean-while, tuning the progress threshold η exposes a clear robust-ness–accuracy trade-off: larger η enforces stronger Lyapunov descent and improves safety and feasibility, but at the cost of increased tracking error due to more conservative updates. 
+
+D. Hardware Pipeline Latency 
+
+We measure the end-to-end system latency of the MIR-ROR pipeline on hardware with 3 setups. A latency break-down is presented in Fig. 6, where the total latency from the perception front-end to the robot receiving the joint-space commands averaged at 54.9 ms with the tethered desktop mode. The completely untethered setups with on-board computing units are also real-time feasible, with a tradeoff of perception robustness and batch number in IK. We also measured the true End-to-End latency from human motion to robot motion by decomposing camera frames from recorded experiment videos, yielding a consistent latency of ∼170 ms (tethered PD mode) and ∼250 ms (tethered WBC mode), which surpasses existing major camera-based (tethered) teleoperation systems such as H2O [9] ( ∼ 373 ms) and HumanPlus [33] ( ∼ 340 ms), and is comparable to other VR/MoCap-based pipelines, as reported in [34]. 
+
+E. Real-World Teleoperation Performance 
+
+Finally, we evaluate the proposed system in real-world teleoperation tasks using the THEMIS humanoid platform. The demonstrator performs a set of upper-body manipulation motions while the retargeted motions are executed in real time using the full pipeline, as shown in Fig. 3 and Fig. 4. We report task-space tracking errors of the left hand from a representative trial, as shown in Fig. 7. It is worth noting that tracking performance also depends on the underlying low-level controller; since MIRROR is agnostic to this layer, it can be paired with more advanced controllers to potentially achieve improved tracking performance. 
+
+Fig. 6: Latency breakdown with different hardware setups. Only the main components of each module are presented here; overhead and communication latencies are only counted in the ”Module Total” latencies. 0      
+
+> 100
+> 200
+> 300
+> X (mm)
+> Desired
+> Actual
+> 0
+> 200
+> 400
+> Y (mm)
+> 15 20 25 30 35 40 45
+> Time (s)
+> 1200
+> 1400
+> 1600
+> Z (mm)
+> Left Hand Tracking
+
+Fig. 7: Left hand tracking performance on hardware. Hardware is using an optimization-based whole-body controller to execute joint-level commands and balancing tasks. V. C ONCLUSION AND DISCUSSION 
+
+In this work, we presented MIRROR, a real-time visual motion imitation and teleoperation framework that integrates stereo-based full-body perception with a GPU-accelerated, continuation-based parallel differential IK solver. The pro-posed method improves robustness to basin-dependent stag-nation and constraint-induced trapping while preserving millisecond-level solve times, enabling stable, low-latency humanoid teleoperation in real-time. Although this work shows primarily upper-body motion retargeting, the distributed parallel formulation scales nat-urally to full-body by incorporating additional limb chains without additional computation and latency, thanks to par-allelism in distributed subproblems. However, coordination constraints may require additional coupling terms/consensus. REFERENCES [1] Z. Gu, J. Li, W. Shen, W. Yu, Z. Xie, S. McCrory, X. Cheng, A. Shamsah, R. Griffin, C. K. Liu, et al. , “Humanoid locomotion and manipulation: Current progress and challenges in control, planning, and learning,” arXiv preprint arXiv:2501.02116 , 2025. [2] S. Bertrand, L. Penco, D. Anderson, D. Calvert, V. Roy, S. McCrory, K. Mohammed, S. Sanchez, W. Griffith, S. Morfey, et al. , “High-speed and impact resilient teleoperation of humanoid robots,” in 
+
+2024 IEEE-RAS 23rd International Conference on Humanoid Robots (Humanoids) , pp. 189–196, IEEE, 2024. [3] T. He, Z. Luo, X. He, W. Xiao, C. Zhang, W. Zhang, K. Kitani, C. Liu, and G. Shi, “Omnih2o: Universal and dexterous human-to-humanoid whole-body teleoperation and learning,” arXiv preprint arXiv:2406.08858 , 2024. [4] Y. Li, Y. Lin, J. Cui, T. Liu, W. Liang, Y. Zhu, and S. Huang, “Clone: Closed-loop whole-body humanoid teleoperation for long-horizon tasks,” in 9th Annual Conference on Robot Learning , 2025. [5] Y. Ze, Z. Chen, J. P. Ara´ ujo, Z.-a. Cao, X. B. Peng, J. Wu, and C. K. Liu, “Twist: Teleoperated whole-body imitation system,” arXiv preprint arXiv:2505.02833 , 2025. [6] G. Colin, J. Byrnes, Y. Sim, P. M. Wensing, and J. Ramos, “Whole-body dynamic telelocomotion: A step-to-step dynamics approach to human walking reference generation,” in 2023 IEEE-RAS 22nd International Conference on Humanoid Robots (Humanoids) , pp. 1–8, IEEE, 2023. [7] A.-C. He, J. Li, J. Park, O. Kolt, B. Beiter, A. Leonessa, Q. Nguyen, and K. A. Hamed, “A novel telelocomotion framework with com estimation for scalable locomotion on humanoid robots,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) ,pp. 5615–5621, IEEE, 2025. [8] S. Dafarra, U. Pattacini, G. Romualdi, L. Rapetti, R. Grieco, K. Darvish, G. Milani, E. Valli, I. Sorrentino, P. M. Viceconte, et al. ,“icub3 avatar system: Enabling remote fully immersive embodiment of humanoid robots,” Science Robotics , vol. 9, no. 86, p. eadh3834, 2024. [9] T. He, Z. Luo, W. Xiao, C. Zhang, K. Kitani, C. Liu, and G. Shi, “Learning human-to-humanoid real-time whole-body teleoperation,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pp. 8944–8951, IEEE, 2024. [10] M. Zago, M. Luzzago, T. Marangoni, M. De Cecco, M. Tarabini, and M. Galli, “3d tracking of human motion using visual skeletonization and stereoscopic vision,” Frontiers in bioengineering and biotechnol-ogy , vol. 8, p. 181, 2020. [11] K. Darvish, L. Penco, J. Ramos, R. Cisneros, J. Pratt, E. Yoshida, S. Ivaldi, and D. Pucci, “Teleoperation of humanoid robots: A survey,” 
+
+IEEE Transactions on Robotics , vol. 39, no. 3, pp. 1706–1727, 2023. [12] L. Yang, X. Huang, Z. Wu, A. Kanazawa, P. Abbeel, C. Sferrazza, C. K. Liu, R. Duan, and G. Shi, “Omniretarget: Interaction-preserving data generation for humanoid whole-body loco-manipulation and scene interaction,” arXiv preprint arXiv:2509.26633 , 2025. [13] J. P. Araujo, Y. Ze, P. Xu, J. Wu, and C. K. Liu, “Retargeting matters: General motion retargeting for humanoid motion tracking,” 
+
+arXiv preprint arXiv:2510.02252 , 2025. [14] A. Del Prete, N. Mansard, O. E. Ramos, O. Stasse, and F. Nori, “Implementing torque control with high-ratio gear boxes and without joint-torque sensors,” International Journal of Humanoid Robotics ,vol. 13, no. 01, p. 1550044, 2016. [15] S. Caron, Y. De Mont-Marin, R. Budhiraja, S. H. Bang, I. Domrachev, S. Nedelchev, P. Du, A. Escande, J. Vaillant, B. Wingo, and S. Patapati, “Pink: Python inverse kinematics based on Pinocchio,” 2026. [16] T. Kobayashi and T. Jin, “Mirror-descent inverse kinematics with box-constrained joint space,” IFAC-PapersOnLine , vol. 56, no. 2, pp. 300– 305, 2023. [17] M. Giamou, F. Mari´ c, D. M. Rosen, V. Peretroukhin, N. Roy, I. Petrovi´ c, and J. Kelly, “Convex iteration for distance-geometric inverse kinematics,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 1952–1959, 2022. [18] A. L. Bishop, J. Z. Zhang, S. Gurumurthy, K. Tracy, and Z. Manch-ester, “Relu-qp: A gpu-accelerated quadratic programming solver for model-predictive control,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) , pp. 13285–13292, IEEE, 2024. [19] S. H. Jeon, S. Hong, H. J. Lee, C. Khazoom, and S. Kim, “Cusadi: A gpu parallelization framework for symbolic expressions and optimal control,” IEEE Robotics and Automation Letters , vol. 10, no. 2, pp. 899–906, 2024. [20] H. Xue, C. Pan, Z. Yi, G. Qu, and G. Shi, “Full-order sampling-based mpc for torque-level locomotion control via diffusion-style annealing,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , pp. 4974–4981, IEEE, 2025. [21] J. Alvarez-Padilla, J. Z. Zhang, S. Kwok, J. M. Dolan, and Z. Manch-ester, “Real-time whole-body control of legged robots with model-predictive path integral control,” in 2025 IEEE International Confer-ence on Robotics and Automation (ICRA) , pp. 14721–14727, IEEE, 2025. [22] E. Todorov, T. Erez, and Y. Tassa, “Mujoco: A physics engine for model-based control,” in 2012 IEEE/RSJ international conference on intelligent robots and systems , pp. 5026–5033, IEEE, 2012. [23] K. Zakka, “Mink: Python inverse kinematics based on MuJoCo,” Feb. 2026. [24] B. Sundaralingam, S. K. S. Hari, A. Fishman, C. Garrett, K. Van Wyk, V. Blukis, A. Millane, H. Oleynikova, A. Handa, F. Ramos, et al. ,“Curobo: Parallelized collision-free robot motion generation,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) ,pp. 8112–8119, IEEE, 2023. [25] C. Yasutake, Z. Kingston, and B. Plancher, “Hjcd-ik: Gpu-accelerated inverse kinematics through batched hybrid jacobian coordinate de-scent,” arXiv preprint arXiv:2510.07514 , 2025. [26] B. Ames, J. Morgan, and G. Konidaris, “Ikflow: Generating diverse inverse kinematics solutions,” IEEE Robotics and Automation Letters ,vol. 7, no. 3, pp. 7177–7184, 2022. [27] W.-L. Ma, N. Csomay-Shanklin, and A. D. Ames, “Coupled control systems: Periodic orbit generation with application to quadrupedal locomotion,” IEEE Control Systems Letters , vol. 5, no. 3, pp. 935– 940, 2020. [28] L. Amatucci, G. Turrisi, A. Bratta, V. Barasuol, and C. Semini, “Accelerating model predictive control for legged robots through distributed optimization,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pp. 12734–12741, IEEE, 2024. [29] C. Khazoom and S. Kim, “Humanoid arm motion planning for im-proved disturbance recovery using model hierarchy predictive control,” in 2022 International Conference on Robotics and Automation (ICRA) ,pp. 6607–6613, IEEE, 2022. [30] A. D. Ames, X. Xu, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs for safety critical systems,” IEEE Transactions on Automatic Control , vol. 62, no. 8, pp. 3861–3876, 2016. [31] R. G. Bartle, The elements of integration and Lebesgue measure . John Wiley & Sons, 2014. [32] R. Featherstone, Rigid body dynamics algorithms . Springer, 2014. [33] Z. Fu, Q. Zhao, Q. Wu, G. Wetzstein, and C. Finn, “Humanplus: Humanoid shadowing and imitation from humans,” arXiv preprint arXiv:2406.10454 , 2024. [34] Z. Xiong, L. Fang, J. Huang, K. Yamazaki, H. Zhang, and C. Gan, “Extremcontrol: Low-latency humanoid teleoperation with direct ex-tremity control,” arXiv preprint arXiv:2602.11321 , 2026.

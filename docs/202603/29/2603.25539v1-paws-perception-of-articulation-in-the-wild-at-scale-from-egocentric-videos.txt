@@ -1,0 +1,743 @@
+Title: PAWS: Perception of Articulation in the Wild at Scale from Egocentric Videos
+
+URL Source: https://arxiv.org/pdf/2603.25539v1
+
+Published Time: Fri, 27 Mar 2026 01:26:38 GMT
+
+Number of Pages: 32
+
+Markdown Content:
+# PAWS: Perception of Articulation in the Wild at Scale from Egocentric Videos 
+
+Yihao Wang 1,6,* ⋆, Yang Miao 2,* , Wenshuai Zhao 1,6 , Wenyan Yang 1,Zihan Wang 1, Joni Pajarinen 1, Luc Van Gool 2,3 , Danda Pani Paudel 2,Juho Kannala 1,7 , Xi Wang 3,4,5, †, and Arno Solin 1,6  
+
+> 1
+
+Aalto University 2 INSAIT, Sofia University 3 ETH Zurich  
+
+> 4
+
+TU Munich 5 MCML 6 ELLIS Institute Finland 7 University of Oulu 
+
+Abstract. Articulation perception aims to recover the motion and struc-ture of articulated objects ( e.g ., drawers and cupboards), and is funda-mental to 3D scene understanding in robotics, simulation, and animation. Existing learning-based methods rely heavily on supervised training with high-quality 3D data and manual annotations, limiting scalability and diversity. To address this limitation, we propose PAWS, a method that directly extracts object articulations from hand–object interactions in large-scale in-the-wild egocentric videos. We evaluate our method on the public data sets, including HD-EPIC and Arti4D data sets, achieving sig-nificant improvements over baselines. We further demonstrate that the extracted articulations benefit downstream tasks, including fine-tuning 3D articulation prediction models and enabling robot manipulation. See the project website at https://aaltoml.github.io/PAWS/ . 
+
+> (a) Egocentric Videos (b) Articulation Perception
+> Robot Manipulation
+> (c) Downstream Applications
+> Articulation Prediction
+> Zero-shot
+> Finetuned
+
++
+
+Fig. 1: PAWS : Articulation perception and localization from in-the-wild egocentric videos. (a) From raw videos of human interactions, (b) our method reconstructs the 3D scene and object articulations using hand cues, geometric recovery, and VLM reasoning. (c) These serve as annotations to improve downstream articulation prediction models via finetuning, while also providing 3D priors for real-world robotic manipulation.  
+
+> ⋆∗
+
+Equal contribution. †Co-advisor.  
+
+> arXiv:2603.25539v1 [cs.CV] 26 Mar 2026 2Y. Wang et al.
+
+# 1 Introduction 
+
+Interactions with articulated objects occur everywhere in daily life, from opening a fridge to get breakfast to opening a laptop in the office, and closing a bedside drawer before sleeping. While current scene understanding enables functional object segmentation [10, 62] and scene graph construction [20, 92], it remains insufficient for agents to reliably interact with articulated parts in the scene (e.g ., doors, drawers, and lids) and their interaction interfaces ( e.g ., knobs and handles). Studying scene-level articulation is therefore a crucial component of scene understanding, with broad applications in 3D animation and simulation [86], object generation [8, 27, 40, 44, 54], and robotic manipulation [2, 36, 55]. Recently, learning-based articulation prediction [31, 45, 73] and generation-based [42] methods have been proposed. These approaches are typically trained on data sets annotated with articulation information, requiring large-scale la-beled data to generalize to unseen objects and scenes. However, collecting and manually annotating such data sets is costly and labor-intensive. While sev-eral object-level articulation data sets have been introduced [17, 41], scene-level data sets remain limited in scale [12, 23, 56]. Other methods infer articulation from multi-view observations or temporal data, such as capturing start and end states from image pairs or 3D structure [32, 45], or leveraging demonstration videos containing articulated motion [4,34,67,82,91]. Most of these methods still rely on carefully collected data with multi-stage articulation observations, stable lighting conditions, limited occlusions, or additional sensing, such as depth [82], significantly hindering scalability and real-world deployment. In contrast, in-the-wild egocentric videos [18, 19, 64, 78] are highly diverse, large-scale, and naturally contain rich real human-object interaction informa-tion and object kinematic structure. Despite these advantages, leveraging in-the-wild egocentric videos for articulation understanding remains non-trivial. These videos are monocular, noisy, sometimes poorly illuminated, and unstructured, making conventional multi-view or temporal methods inapplicable. We address these limitations by introducing a training-free approach, PAWS, that infers scene-level articulation directly from in-the-wild monocular egocentric videos. Our key insight is that hand-object interactions provide strong physical cues. By integrating estimated 3D hand trajectories with reconstructed scene geom-etry, we recover plausible articulation motion and kinematic structure in real-world scenes. We further leverage foundation-model priors to improve robustness under the noise and occlusions, and validate the resulting annotations through extensive experiments and downstream robotic evaluation. 
+
+Our main contributions are as follows: 
+
+– We introduce a fully automatic, training-free pipeline for scene-level articula-tion perception from in-the-wild monocular RGB egocentric videos. 
+
+– We propose a foundation-model-driven approach that combines VLMs and LLMs priors to infer plausible articulation motion and structure without task-specific training. Perception of Articulation in the Wild at Scale from Egocentric Videos 3
+
+– We demonstrate through extensive experiments that our method consistently outperforms strong baselines, including Articulation3D and ArtiPoint. 
+
+– We validate the effectiveness and generalizability of the proposed pipeline across downstream 3D articulation prediction and real-world robotic manip-ulation tasks. 
+
+# 2 Related Work 
+
+Articulation Modeling from Static Input This research direction has seen growing research interest in recent years, since static observations comprise a substantial fraction of real-world visual data. Existing works have explored ar-ticulation prediction from 3D geometry, taking static point clouds as input and jointly predicting part segmentation and motion parameters at either the object level [13, 41, 43, 50, 80, 89] or the scene level [23]. [31, 73] infer articulation di-rectly from a single RGB(D) image by detecting openable parts and estimating motion parameters. A separate line of research investigates the generation of articulated 3D objects from image(s) [5, 40, 44, 54]. For instance, PhysX-3D [5] extends diffusion-based 3D generation frameworks [84] to produce simulation-ready articulated assets from a single image. While effective, these methods rely on articulation ground-truth annotations and/or high-fidelity 3D structures for training, which are expensive to obtain in unconstrained real-world envi-ronments. The limited availability of such data constrains their scalability and generalization. More fundamentally, methods based on static inputs inherently lack access to object motion cues and must rely on learned priors or category-level regularities. As a result, they struggle to reliably recover articulated motion and kinematic structure, particularly in the presence of complex geometries, oc-clusions, or novel object categories. In contrast, our approach leverages dynamic observations from in-the-wild egocentric videos, which naturally capture object motion and physical constraints induced by human–object interactions. 
+
+Articulation Modeling from Dynamic Input Recent work captures articu-lations from dynamic inputs using 3D structures [45], RGB images [24,29,30,34, 37,67,71,74,85,93], or RGB-D images [4,14,21,26,52,81,82,90,91]. RSRD [34] uti-lizes a hand model to assist articulated object reconstruction, but its reliance on multi-view image inputs is difficult to satisfy in practice. Tracking-based meth-ods [21, 51, 82, 91] reconstruct articulation through explicit tracking of openable object parts, which degrades under occlusion, low texture, and motion blur. An-other line of work models human–object interactions [24, 35, 59, 85], leveraging parametric human body models [53] as constraints for articulation reasoning. However, these approaches often suffer from reduced reliability due to frequent self-occlusions introduced by the human body during interactions. In contrast, our method exploits hand information as auxiliary interaction cues, enabling ro-bust 3D articulation perception from unconstrained, in-the-wild egocentric RGB videos. Tab. 1 provides a comparison between our approach and prior work. 
+
+Hand/Hand-Object Interaction Reconstruction Early work in this area primarily focused on hand detection [15], segmentation [58], or contact state 4 Y. Wang et al. 
+
+Table 1: Comparison to prior art. We summarize related articulation perception methods by input modality, articulation perception strategy (SL: supervised learning; SSL: self-supervised learning), supervision format, and output format. PC denotes point clouds, which correspond to high-fidelity scanned meshes in [23].                            
+
+> Method Input Supervision Output
+> Articulation3D [67] RGBs SL, 3D anno. 3D planes OPDMulti [73] RGB SL, 2D masks 2D masks USDNet [23] PC SL, 3D anno. PC RSRD [34] RGBs SSL, RGBs Meshes Articulate-Anything [40] RGBs Transfer Learning Meshes iTACO [63] RGB-Ds Transfer Learning Meshes ArtiPoint [82] RGB-Ds Transfer Learning 3D joints PAWS (ours) RGBs Transfer Learning 3D joints
+
+recognition from 2D images [70,96]. Cheng et al. [9] extended this line of research to multi-object contact segmentation. Recently, [69] have investigated hand-object reconstruction in 3D, typically representing the hand using the MANO hand model. Hand meshes can be estimated from a single image [61, 66] or from consecutive video sequences [94]. There has also been work on joint hand-object reconstruction in 3D, where objects are represented either as meshes [75,88] or as point clouds [7]. In addition, several recent approaches leverage hand information for zero-shot transfer from human demonstrations to robot control [6, 39, 55, 87, 91]. Our task focuses on reconstructing object articulation from RGB videos of natural interactions involving both hands and articulated furniture. 
+
+Articulated Objects Data sets Prior work has focused on object-level mo-tion annotations and part mobility benchmarks [17, 47, 57, 80]. Scene-level data sets capture articulated environments with rich spatial context [12, 23, 56, 73]. Some recent efforts also incorporate human-object interaction data with object and articulation labels [35, 82, 85]. Despite recent progress, the overall volume of articulated data remains limited, as acquiring detailed part geometry ( e.g ., via RGB-D scanning or 3D mesh reconstruction) and annotating articulation param-eters are both costly and labor-intensive. In contrast to existing data sets, which mostly require controlled sensors or structured environments, our approach re-covers 3D articulation directly from monocular egocentric RGB videos. This for-mulation enables scalable articulation annotation from large-scale, unstructured real-world data without requiring curated 3D scans or explicit 3D supervision. 
+
+# 3 Method 
+
+Problem Formulation An articulated object consists of multiple rigid parts interconnected by joints. Both organic ( e.g ., the human body) and human-made objects ( e.g ., drawers) can exhibit articulation [46]. In this work, we focus on the articulation of human-made objects and simplify each joint as having one degree of freedom (DoF). Following previous benchmarks [12, 23, 56], we represent each articulated joint ϕi by three motion parameters: motion type ci, motion axis ai,and motion origin oi
+
+ϕi = {ci, a i, o i}. (1) Perception of Articulation in the Wild at Scale from Egocentric Videos 5Dynamic Interaction Perception (Sec. 3.1) Ego centric 
+
+Videos 
+
+Scene Geometry Recovery  (Sec. 3.2)    
+
+> N images from
+> global views
+> "open  the  cupboard"
+> Revolute
+> Prismatic
+> VLM Selection
+> (Sec. 3.3)
+> Coarse Localisation
+> Hand Pose Estimator View Reselection Condition Clustering Manhattan Axis Filtered Lines
+> Hand-Object Interaction ... ... ...
+> MANO Hand
+> High Confidence Voxels
+> Vision-
+> Language
+> Models
+> Revolute/ Prismatic
+> Local views one-arm length K images in given description
+> Motion Type
+> Analysis (Sec. 3.3)
+> ... Processed Hand Trajectory
+
+Joint Inference 
+
+(Sec. 3.4) 
+
+> Articulation
+
+Fig. 2: Overall pipeline. Given a full in-the-wild egocentric video and a language description as input, our pipeline consists of four parts: (1) Dynamic Interaction Perception: We first segment the video based on the language description and ex-tract interactive frames (referred to as "local views"), 3D hand trajectories, motion types, and coarse object localizations. (2) Geometric Structure Recovery: Based on the object’s location, we select "global views" from the full video. Depending on the motion type, we recover the scene geometry using different flows. (3) VLM-guided Reasoning: The VLM first infers the motion type to provide a prior for global view selection, and then identifies plausible articulation axes during the geometry recovery stage. (4) Joint Articulation Inference: We integrate 3D hand trajectories and the recovered geometry to infer the final articulations. 
+
+The motion type is defined as ci ∈ { prismatic , revolute }. The motion axis de-scribes the rotation axis for revolute motion or the translation direction for prismatic motion, denoted as ai ∈ R3, while the motion origin oi ∈ R3 defines the pivot point for revolute motion. 
+
+Objective We aim to estimate the articulation parameters ϕ from untrimmed, in-the-wild egocentric RGB videos V ∈ RT ×H×W ×3 and a set of action descrip-tions L = {l1, l 2, . . . , l M } across the whole video. Here, lj ∈ L represents a spe-cific action description ( e.g ., open the door”, close the fridge”) and its correspond-ing temporal boundaries τ (j) 
+
+> start
+
+: τ (j) 
+
+> end
+
+in the video. The language descriptions can be obtained either from manual annotations or from grounding model infer-ences.The articulation estimation includes the object-level articulation ϕobj =
+
+Φ(V, l j ) and the aggregated scene-level articulation ϕscene = Φ(V, L). The op-erator Φ(·) encapsulates the overall articulation estimation process. 6 Y. Wang et al. 
+
+Algorithm 1 Static Geometry Recovery Pipeline 
+
+Require: Video frames V, camera poses P, intrinsics K, number of sampled views N
+
+1: Is ← SelectViews (V, P, N ) ▷ Sample representative views 2: for each view In ∈ I s do 
+
+3: (Dn, Nn) ← MoGe (In) ▷ Estimate metric depth and surface normals 4: end for 
+
+5: L3D ← ∅ ▷ Triangulated 3D lines 6: L2D ← DetectLines (Is)
+
+7: for each line correspondence across views do 
+
+8: P3D ← Triangulate (L2D , {Dn}, K, P)
+
+9: L3D ← L 3D ∪ P3D
+
+10: end for 
+
+11: 11: C ← ClusterDirections (L3D )
+
+12: for each cluster c ∈ C do 
+
+13: ac ← LO-RANSAC (lines in c) ▷ Revolute motion axis candidates 14: end for 
+
+15: N ← S 
+
+> In∈I s
+
+SampleNormals (Nn)
+
+16: M ← ClusterNormals (N )
+
+17: {m1, m2, m3} ← ManhattanAxes (M) ▷ Prismatic motion axis candidates 
+
+Pipeline Our framework is illustrated in Fig. 2. It infers articulation types and parameters through the following core components: (1) The Dynamic Inter-action Perception module utilizes specific interaction sequences to provide 3D hand motion cues, coarse interacted object locations, and motion types, which are essential for anchoring the motion origin oi and subsequent geometry recov-ery (Sec. 3.1); (2) The Static Scene Geometry Recovery module reconstructs the scene structure and generates candidate articulation axes, serving as geomet-ric priors for ai (Sec. 3.2); (3) The VLM-Aided Motion Reasoning stage infers the motion type ci and selects physically plausible revolute axes from the geo-metric candidates (Sec. 3.3); and (4) The Joint Articulation Inference process integrates all acquired information to output the final articulation parameters (Sec. 3.4). We emphasize that the VLM is employed to assist in dynamic interac-tion and static structure analysis as an integrated reasoning component, rather than being treated as a decoupled module. By design, our pipeline is robust to scale variations and uses a single set of hyperparameters across all data sets. Implementation details and hyperparameter settings are provided in Sec. B. 
+
+3.1 Dynamic Interaction Perception 
+
+Given the complete video sequence V and a language description lj of a single action, we first segment the temporal sub-sequence vj = V[τ (j) 
+
+> start
+
+: τ (j)
+
+> end
+
+] of the interaction based on its temporal boundaries. We denote that there are K RGB frames inside this segment vj , and we obtain the dynamic hand trajectory and the object’s coarse localization from them. Perception of Articulation in the Wild at Scale from Egocentric Videos 7
+
+Metric-Aware 3D Hand Reconstruction We first apply a frame-based 3D hand reconstruction method [66, 94] to identify frames containing visible hands and to reconstruct the MANO [69] hand pose for each selected frame. Hands may be occluded or move out of view in certain frames; thus, we obtain K′
+
+hand poses, where K′ ≤ K. According to grasp statistics from [3,76], we use the thumb, index, and middle fingertip landmarks across the K′ frames to represent the hand trajectories {zt ∈ R3}K′ 
+
+> t=1
+
+at observed timestamps {t}K′
+
+> t=1
+
+. Unlike prior approaches that lift 2D hand keypoints to 3D using relative depth information (e.g ., [6]), our method directly estimates the 3D hand pose and thus avoids explicit reliance on depth scaling. 
+
+Stochastic Hand Trajectories Refinement The raw hand trajectory {zt}
+
+across a video is typically noisy, as it may include hand motions before, during, and after object contact, alongside errors introduced by the hand pose estima-tion model. In addition, unconstrained human motion introduces further uncer-tainty. During the active interaction phase, the hand theoretically remains in contact with the object surface, physically bound to a rigid kinematic manifold (e.g ., a straight line or a circular arc). Human motor control in such constrained manipulation tasks naturally exhibits mean-reverting properties. Therefore, we integrate Ornstein-Uhlenbeck (OU) approach and Rauch–Tung–Striebel (RTS) smoothing to obtain the articulation-related trajectories {ˆpt ∈ R3}, which are crucial for determining the final motion origin oi. Please refer to Sec. A.2 for more details. 
+
+Object Coarse Localization We first estimate a coarse geometric proxy of the indoor scene to localize the interacted object. We use 3D reconstruction approach [33] reconstruct a coarse scene representation from the interaction clip 
+
+vj and discretize the resulting point cloud into a 3D voxel grid V. Each voxel 
+
+v ∈ V is associated with an observation count nv , defined as the number of camera views in which the voxel is consistently observed. A subset of high-confidence voxels is then extracted as Vconf = {v ∈ V | nv > T conf }, which corresponds to spatial regions that are likely to belong to the manipulated object. This coarse localization step provides a robust spatial prior Vconf that is resilient to occlusions and hand-induced motion. 
+
+3.2 Static Scene Geometry Recovery 
+
+Egocentric videos typically exhibit limited viewpoint variation, as the camera motion is constrained to within arm’s length during human–object interactions. At the same time, frequent hand motion and self-occlusions significantly com-plicate the geometric reconstruction of articulated objects. As a result, directly recovering geometry from per-frame depth estimates or 2D tracking alone [51,82] often leads to unstable and inconsistent results in in-the-wild scenarios. To ad-dress these challenges, PAWS adopts a coarse-to-fine geometric recovery strategy that integrates camera view reselection and multi-view geometry reconstruction. Following [23], we utilize motion type priors and reconstruct revolute and pris-8 Y. Wang et al. 
+
+matic candidate axes ai using different geometric strategies. The full algorithmic details of geometry recovery are provided in Algorithm 1. 
+
+Frustum Intersection and View Reselection Given the coarse object lo-calization represented by the high-confidence voxel region Vconf , we sample a subset of N global camera views Is = {I1, . . . , I N } from the full egocentric video for multi-view geometry reconstruction. We first retain frames whose cam-era frustums intersect Vconf .Among these candidates, we apply farthest point sampling over camera positions to select a subset of views that maximizes spa-tial coverage. Finally, we refine the selected views using object-specific semantic masks [38, 49, 68] M ∈ { 0, 1}N ×H×W , segmented using the object description lj
+
+or a foundation model, ensuring consistent object localization across views. 
+
+Multi-View Line Triangulation for Revolute Priors To generate candi-date axis proposals for revolute motion, we draw inspiration from the line match-ing paradigm in [48]. For each selected camera view In ∈ I s, we first detect a set of 2D line segments L2D using [60]. For each detected 2D line segment l2D ∈ L 2D ,we densely sample a set of pixel coordinates Sl2D = {um = ( um, v m)}. To avoid the scale ambiguity inherent to traditional monocular depth estimation, we es-timate a metric-scale depth map Dn using a monocular geometry model [79]. Instead of performing explicit multi-view epipolar triangulation, the sampled 2D pixels um are directly unprojected to 3D camera coordinates using the cam-era intrinsic matrix K and their corresponding metric depth Dn(um). These points are subsequently transformed into world coordinates using the camera-to-world pose Pn to form a 3D point set Pl2D . By aggregating the metric 3D point sets Pl2D across multiple views based on 2D line correspondences, we ob-tain dense 3D point tracks. Finally, we apply LO-RANSAC to robustly fit a 3D line model—parameterized by a direction vector and an origin point—to these tracks, generating the discrete set of candidate revolute axis proposals 
+
+L3D = {l(1) 3D , l (2) 3D , . . . }.
+
+Manhattan Spatial Priors for Prismatic Motion To better describe pris-matic motion, we adopt the Manhattan-world assumption [11]. We estimate the Manhattan coordinate system {m1, m2, m3} using the metric depth maps 
+
+{Dn}Nn=1 and surface normal maps {Nn}Nn=1 predicted by the geometry esti-mation model [79]. Specifically, we aggregate and cluster the surface normals 
+
+N = SNn=1 Nn across the N sampled images to extract the dominant orthogonal directions. These vectors serve as our candidate set for prismatic motion axes. Detailed descriptions are provided in Sec. A.5. 
+
+3.3 Vision-Language Guided Motion Reasoning 
+
+While humans intuitively infer motion types and articulation axes from visual cues, this remains a significant challenge for vision-based algorithms due to noisy hand trajectories and dense geometric candidates. To address this, we leverage a Vision-Language Model (VLM) through a two-stage Visual Question Answer-ing (VQA) pipeline, with each stage targeting a distinct kinematic reasoning objective. Perception of Articulation in the Wild at Scale from Egocentric Videos 9In the given image, which lines are possible axes? Lines 2 and 4 are the possible axes.  
+
+> [Image 1/5] In the given image, which object you observe? Is motion is better to be described as "revolute" or "prismatic"? It is a cupboard with revolute motion.
+> (a) (b)
+> sparse
+> uniform sample
+
+Fig. 3: Illustration of VLM Reasoning. (a) Temporal Motion Type Classification. 
+
+(b) Spatial Axis Grounding via Set-of-Marks VQA. 
+
+Temporal Motion Type Classification The first stage classifies the mo-tion type of the articulated joint i as either revolute or prismatic , denoted as 
+
+ci ∈ { revolute , prismatic }. In-the-wild hand trajectories are inherently noisy; for example, after pulling a drawer, a user’s hand may slide across the surface, creat-ing geometric ambiguity. To provide coarse temporal context while maintaining efficiency, we follow a sparse sampling strategy. Given the interaction clip vj ,we uniformly sample K frames {f1, f 2, . . . , f K } at fixed temporal indices. For each sampled frame, the VLM is queried to identify the interacted object and its frame-level motion type. These per-frame predictions are then aggregated by an LLM to produce a robust global motion type decision ci, effectively filtering out transient noise or post-interaction artifacts. 
+
+Spatial Axis Grounding via Set-of-Marks VQA In the second stage, we identify the most plausible articulation axis from the set of reconstructed 3D line candidates L3D . While our geometric module proposes candidates within the Manhattan coordinate system, many represent irrelevant static structures, such as table corners or appliance edges. To bridge the gap between continuous 3D space and VLM reasoning, we reformulate axis selection as a constrained multiple-choice VQA problem. For a selected camera view, we project the 3D line candidates back into the 2D image plane. To ensure relevance, we filter these projections using the semantic mask M generated by the grounding model, such that Lfiltered = {l3D ∈ L 3D | proj (l3D ) ∩ M̸ = ∅} . From this subset, we select the 
+
+Ncand most prominent candidates ( e.g ., Ncand = 4 based on segment length) and overlay them as numbered visual prompts (Set-of-Marks). The VLM is prompted to select the index k that best represents the semantic articulation hinge based on physical commonsense. This yields a semantically verified candidate subset 
+
+L∗ 
+
+> 3D
+
+⊂ L 3D that guides the final multi-view geometric consistency refinement. 
+
+3.4 Joint Articulation Inference 
+
+After inferring the motion type ci ∈ { prismatic , revolute } via VLM reasoning, we estimate the final articulation parameters by jointly leveraging the dynamic 10 Y. Wang et al. 
+
+hand-object interaction information from Sec. 3.1 and the static geometric struc-ture Sec. 3.2. Articulation can be inferred from a single interaction clip or ag-gregated across multiple clips within the same scene. The PCA and RANSAC are used to obtain final the robust articulation parameters ϕi = {ci, a i, o i} For more details, please refer to Sec. A.7. 
+
+# 4 Experiments 
+
+We evaluate the effectiveness and versatility of our articulation perception pipeline through a series of experiments. Specifically, we demonstrate that: (1) Our method significantly outperforms strong baselines on the articulation percep-tion task using in-the-wild egocentric RGB videos. (2) Key components of our pipeline, including hand-object interaction cues and VLM guidance, are criti-cal to achieving strong performance. (3) The articulation labels extracted by our pipeline improve the performance of existing articulation prediction models through downstream fine-tuning. (4) The recovered articulation parameters can be directly applied to real-world robotic manipulation tasks. 
+
+4.1 Accuracy of Articulation Perception Data Sets To evaluate our method, we utilize the HD-EPIC [64], Arti4D [82], and Epic-Fields [78] data sets, where videos are segmented into temporal clips based on provided language descriptions. The original videos span several min-utes, and for the HD-EPIC and Epic-Fields data sets, they include a vast range of background actions unrelated to our task ( e.g ., washing hands or holding small rigid objects). To ensure a focused evaluation, we curate a specific subset by selecting clips where the language descriptions explicitly indicate hand-object interactions with articulated furniture. This process yields 313 annotated inter-action clips involving 80 furniture instances across 9 scenes for HD-EPIC, and over 6,000 selected clips spanning 34 scenes for Epic-Fields. Because Arti4D is natively designed for scene-level articulated interactions, we utilize its standard evaluation splits without additional filtering. While Arti4D and HD-EPIC serve as the basis for both our quantitative and qualitative analyses, we utilize Epic-Fields primarily for large-scale qualitative evaluation. 
+
+Baselines We compare our approach against Articulation3D [67], Articulate-Anything [40] (AA), ArtiPoint [82], and iTACO [63]. We reimplement two Articulation3D-based variants. The original Articulation3D assumes a static camera and consistent object motion, assumptions that are severely violated in in-the-wild egocentric settings. Therefore, we incorporate moving camera poses into the temporal optimization, denoted as Articulation3D ∗. We further relax the regression-based temporal filtering, which assumes constant motion velocity, resulting in Articulation3D ∗∗ . For both variants, we use the per-frame predicted 2D masks and articulation axes provided by Articulation3D, lifting them to 3D using the predicted metric depth from the monocular geometry model [79]. For ArtiPoint [82] and iTACO [63], we use the ground-truth camera poses from the Perception of Articulation in the Wild at Scale from Egocentric Videos 11 
+
+Table 2: Quantitative results on articulation estimation accuracy. Our method achieves higher accuracy on the HD-Epic [64] and Arti4D [82] data sets, outperform-ing the RGB-D–based articulation extraction baseline. Note that in the HD-Epic data set, since not every articulable fixture involves hand interaction, we evaluate only the actually interactive fixtures. The evaluated pairs means the actual evaluated articula-tion. We denote PAWS-s as aggregated articulation estimates at the scene level. Since the scene configuration varies across videos in the Arti4D data set, we do not report aggregated results for this data set.                                                                           
+
+> HD-EPIC [64] Arti4D [82]
+> Methods Match ( %)MMA MAO M†MA †MAO †Match ( %)MMA MAO M†MA †MAO †
+> Articulation3D ∗[67] 22.68 0.24 0.12 0.08 0.95 0.48 0.35 45.07 0.32 0.03 0.02 0.70 0.07 0.05 Articulation3D ∗∗ [67] 42.22 0.34 0.15 0.11 0.81 0.37 0.27 84.29 0.53 0.06 0.03 0.62 0.07 0.04 ArtiPoint [82] 70.66 0.47 0.06 0.00 0.72 0.09 0.01 85.02 0.63 0.52 0.47 0.75 0.61 0.56 PAWS 55.38 0.52 0.36 0.20 0.96 0.66 0.35 48.02 0.47 0.37 0.34 1.00 0.80 0.75
+> PAWS-s 71.43 0.71 0.46 0.36 0.98 0.63 0.48 –––––––
+
+data sets instead of those estimated by visual odometry [63,77]. This is to isolate and evaluate the pure performance of the tracking-based articulation extraction and ensure a fair comparison. Regarding depth inputs for 3D lifting, we use predicted metric depth [79] for experiments on HD-EPIC [64], and utilize the natively provided depth sensor information for experiments on Epic-Fields [78] and Arti4D [82]. In this part, we focus on the results of the experiment on Ar-ticulation3D and ArtiPoint. Further implementation specifics and experiment results are provided in Sec. B. 
+
+Metrics We adopt the articulation motion evaluation metrics from prior work [12, 23, 31, 73]. Each predicted articulation instance is matched to its cor-responding ground-truth instance. To quantify articulation perception accuracy, we report the average accuracy corresponding to the components of our es-timated articulation formulation ϕi = {ci, a i, o i} under three criteria: motion type ci (M), motion type combined with motion axis ai (MA ), and motion type combined with both motion axis and motion origin oi (MAO ). Because artic-ulation recognition may inherently fail due to upstream errors in hand–object interaction detection or object tracking, we report results under two evaluation settings to comprehensively reflect inference capability: (i) conditioned solely on successfully detected articulation instances, and (ii) unconditionally over all video clips, thereby penalizing missed detections. All results are averaged across scenes. Consistent with our kinematic formulation, the motion origin oi is evaluated exclusively for revolute motions. Following standard protocols, an axis prediction is considered correct if the angular error is within 15 ◦ (evaluated via a cosine distance threshold of 1 − cos(15 ◦)), and an origin prediction is considered correct if the Euclidean distance error is within 0.25m . Note that while existing static 3D benchmarks typically evaluate articulation based on the volumetric IoU of predicted openable regions, our task focuses dynamically on articulation extrac-tion from unconstrained egocentric videos; therefore, we evaluate these metrics strictly on a per-interaction basis. 12 Y. Wang et al. 
+
+Comparison on HD-EPIC Data Set [64] As shown in Tab. 2, our method consistently outperforms all baselines on the HD-EPIC [64] data set. We ob-serve that Articulation3D succeeds on only a small subset of clips and fails on most in-the-wild egocentric videos. A key reason is the domain gap: Articu-lation3D is pre-trained on Internet videos with relatively sufficient viewpoint coverage, whereas egocentric videos often contain incomplete observations of the articulated object and rapidly changing viewpoints. These factors degrade both per-frame openable-part prediction and subsequent temporal optimization. The higher accuracy of Articulation3D ∗∗ further illustrates that its assumption of consistent object motion is frequently violated in real-world egocentric interac-tions, where objects may move at varying speeds or even reverse direction. ArtiPoint [82] performs well when hand–object interactions are clearly ob-servable and tracking succeeds. However, actions in in-the-wild data sets are often fast, resulting in a limited number of usable frames for reliable track-ing. Moreover, rapid viewpoint changes and low-texture furniture surfaces ( e.g ., white cupboards) further increase tracking difficulty. Finally, monocular depth prediction errors from [79] introduce additional bias during 3D lifting on HD-EPIC [64]. In contrast, our method leverages hand estimation and global geo-metric constraints to robustly address these challenges in in-the-wild egocentric settings. 
+
+Comparison on Arti4D Data Set [82]. On the Arti4D data set, our ap-proach achieves performance comparable to that on HD-EPIC. However, we observe that ArtiPoint performs substantially better on Arti4D than on HD-EPIC. This improvement can be attributed to the characteristics of the Arti4D data set, which contains more textured furniture surfaces and visual markers, as well as more stable hand and camera motion during interactions. Consequently, Arti4D is more suitable for object tracking–based methods than in-the-wild set-tings. In addition, the availability of accurate depth information further reduces the uncertainty of 3D lifting for ArtiPoint. Articulation3D-based baselines also perform better on Arti4D than on HD-EPIC, as failures in openable object de-tection in in-the-wild scenarios can lead to incorrect object associations and disrupt subsequent optimization. Despite these differences, among successfully detected articulations, our approach still achieves competitive performance. 
+
+4.2 Ablation Study 
+
+To analyze the contribution of individual components in our pipeline, we conduct a series of ablation experiments. All ablations are evaluated on the HD-EPIC data set [64] and shown in Tab. 3. While we instantiate our pipeline using [79] for geometry and GPT-4o for semantic reasoning due to their current state-of-the-art performance, our formulation is agnostic to the specific choice of foundational models. We also provide the robustness analysis for different VLM model usage and other foundation models in Sec. C. 
+
+Impact of Hand Contact Constraints When hand interaction cues are removed, the method relies solely on VLM-based axis proposals, which are in-Perception of Articulation in the Wild at Scale from Egocentric Videos 13 
+
+Table 3: Ablation study. Component-wise ablation demonstrating the necessity of the Manhattan Geometric Filter and the GPT-4o reasoning engine. 
+
+Ablation Type Model / Configuration Variant M MA MAO 
+
+Architecture Components w/o Filter, w/o GPT-4o (Heuristic) 0.46 0.28 0.13 w/ Filter, w/o GPT-4o 0.45 0.30 0.15 w/o Filter, w/ GPT-4o 0.47 0.32 0.18 Full PAWS (Filter + GPT-4o) 0.46 0.33 0.18 Table 4: Quantitative results on articulation prediction using the EgoArti benchmark. The results before and after fine-tuning on our data set demonstrate the effectiveness of our benchmark. MS refers to the average accuracy of predictions with correct motion type and correct object mask prediction (IoU larger than 50 %), similar cases for MSA and MSAO . We evaluate different fine-tuning strategies across multiple data sets.                       
+
+> HD-Epic [64] Arti4D [82]
+> Methods MMS MSA MSAO MMA MAO
+> Articulate3D (Zero-shot) 0.46 0.02 0.02 0.02 0.41 0.14 0.12 Articulate3D (Finetuned) 0.58 0.13 0.08 0.05 0.48 0.22 0.17
+
+sufficient to reliably determine object articulation. As shown in Tab. 3, incorpo-rating hand trajectory smoothing and contact-based filtering leads to a slightly improvement in accuracy. This improvement arises because trajectory smoothing reduces noise introduced by the hand motion estimator [94], while the hand con-tact detector [9] effectively filters out trajectory points that do not correspond to actual object interaction. 
+
+Impact of VLM Reasoning Incorporating VLM-based reasoning improves articulation accuracy compared to geometry-only inference. Specifically, apply-ing the VLM filter increases performance from 0.30 to 0.33 in MA and from 0.15 to 0.18 in MAO (see Tab. 3), indicating that language-guided reasoning helps select more plausible articulation axes. However, VLM-based geometry fil-tering alone is insufficient to fully determine articulation. In ambiguous cases, such as low-texture furniture where multiple edges appear visually similar ( e.g ., white cupboards), VLM predictions may be unreliable, highlighting the neces-sity of grounding articulation inference in physical hand-object interaction cues. Table 4 presents the performance gains obtained after fine-tuning with our an-notated data. 
+
+4.3 Downstream Applications Cross-Data Set Generalization We evaluate the effectiveness of PAWS for improving scene-level articulation prediction by finetuning USDNet [23] using data automatically extracted by our pipeline. Specifically, we generate articula-tion annotations on the HD-Epic [64] data set using PAWS, and use them to augment the original USDNet training set. We refer the new data set EgoArti. 14 Y. Wang et al.      
+
+> “cupboard: rotation” “drawer: rotation”
+> Fig. 4: PAWS for robot manipulation. Left: Spot closes the cupboard. Right: Spot opens the drawer. Insets show egocentric videos of hand-object interactions and the reconstructed 3D articulations.
+
+For each scene in EgoArti, we aggregate articulation predictions across all ego-centric trajectories to obtain a unified scene-level articulation representation. Semantic masks for each articulated object are obtained from the digital twin provided by [64]. We finetune USDNet on the EgoArti data set and evaluate the model before and after finetuning on both EgoArti (in-domain) and Arti4D data set (cross-data set). As shown in Table 4, the model finetuned with PAWS-labeled data significantly outperforms the zero-shot baseline across both data sets, demonstrating that our automatic labeling pipeline produces high-quality supervision that improves in-domain performance and cross-data set generaliza-tion. 
+
+Robotic Manipulation We validate the effectiveness of our approach in real-world settings using a Boston Dynamics Spot robot. The robot is positioned in front of an IKEA toy kitchen and record the RGB-D egocentric video. After processing human demonstration videos, our pipeline successfully extracts artic-ulation parameters for the furniture, including cupboards and drawers. We do not perform additional view selection on the input videos, as the human-recorded demonstrations exhibit limited viewpoint variation. Given the extracted artic-ulation model and estimated motion direction, the Spot robot infers (1) the opening orientation and (2) suitable contact points on the target object. This information is used to parameterize a Dynamic Movement Primitive (DMP) [28] that encodes the corresponding manipulation behavior. The robot then executes this motion primitive in an open-loop fashion to perform the desired opening or closing action, as illustrated in Fig. 4. 
+
+# 5 Conclusion 
+
+We introduced PAWS, a novel articulation extraction framework that jointly leverages hand–object interaction cues and geometric information from in-the-wild egocentric videos. Our VLM-based reasoning pipeline exploits the common-sense knowledge embedded in foundation models to infer motion types, inter-acted objects, and plausible revolute joints. To facilitate systematic benchmark-ing, we extend an existing in-the-wild egocentric video data set of real-world 3D indoor environments with 3D articulation annotations. Extensive experiments on this data set and other public benchmarks demonstrate that our method Perception of Articulation in the Wild at Scale from Egocentric Videos 15 
+
+consistently outperforms prior approaches in in-the-wild egocentric settings. We further show that the extracted articulations generalize well to downstream ap-plications, including articulation prediction, and real-worldrobotic manipulation. Overall, our results indicate that rich hand–object interaction information from large-scale egocentric videos can effectively support articulation understanding, without relying on high-fidelity 3D reconstruction or task-specific supervised training. 
+
+# Acknowledgements 
+
+AS acknowledges funding from the Research Council of Finland (grants 339730 and 362408). JK acknowledges funding from the Research Council of Finland (grants 352788, 353138, and 362407). We acknowledge CSC – IT Center for Sci-ence, Finland, and the Aalto Science-IT project for the computational resources. We thank Qilin Chen and Haishan Wang for helpful discussions. 
+
+# References 
+
+1. Anderson, S., Barfoot, T.D., Tong, C.H., Särkkä, S.: Batch nonlinear continuous-time trajectory estimation as exactly sparse Gaussian process regression. Au-tonomous Robots 39 (3), 221–238 (Oct 2015) 2. Bahl, S., Mendonca, R., Chen, L., Jain, U., Pathak, D.: Affordances from Human Videos as a Versatile Representation for Robotics. In: CVPR (2023) 3. Brahmbhatt, S., Tang, C., Twigg, C.D., Kemp, C.C., Hays, J.: ContactPose: A dataset of grasps with object contact and hand pose. In: ECCV (August 2020) 4. Buchanan, R., Röfer, A., Moura, J., Valada, A., Vijayakumar, S.: Online estimation of articulated objects with factor graphs using vision and proprioceptive sensing. In: ICRA. pp. 16111–16117 (2024) 5. Cao, Z., Chen, Z., Pan, L., Liu, Z.: Physx-3d: Physical-grounded 3d asset genera-tion. In: NeurIPS (2025) 6. Chen, H., Sun, B., Zhang, A., Pollefeys, M., Leutenegger, S.: VidBot: Learn-ing Generalizable 3D Actions from In-the-Wild 2D Human Videos for Zero-Shot Robotic Manipulation. In: CVPR (2025) 7. Chen, Z., Potamias, R.A., Chen, S., Schmid, C.: HORT: Monocular Hand-held Ob-jects Reconstruction with Transformers. arXiv preprint arXiv:2503.21313 (2025) 8. Chen, Z., Walsman, A., Memmel, M., Mo, K., Fang, A., Vemuri, K., Wu, A., Fox, D., Gupta, A.: URDformer: A Pipeline for Constructing Articulated Simulation Environments from Real-World Images. arXiv preprint arXiv:2405.11656 (2024) 9. Cheng, T., Shan, D., Hassen, A., Higgins, R., Fouhey, D.: Towards a Richer 2D Understanding of Hands at Scale. In: NeurIPS. vol. 36, pp. 30453–30465 (2023) 10. Corsetti, J., Giuliari, F., Fasoli, A., Boscaini, D., Poiesi, F.: Functionality under-standing and segmentation in 3d scenes. In: CVPR (2025) 11. Coughlan, J., Yuille, A.L.: The Manhattan World Assumption: Regularities in Scene Statistics which Enable Bayesian Inference. In: NeurIPS. vol. 13 (2000) 12. Delitzas, A., Takmaz, A., Tombari, F., Sumner, R., Pollefeys, M., Engelmann, F.: SceneFun3D: Fine-Grained Functionality and Affordance Understanding in 3D Scenes. In: CVPR. pp. 14531–14542 (2024) 16 Y. Wang et al. 13. Deng, C., Lei, J., Shen, W.B., Daniilidis, K., Guibas, L.J.: Banana: Banach fixed-point network for pointcloud segmentation with inter-part equivariance. In: NeurIPS. vol. 36, pp. 34139–34152. Curran Associates, Inc. (2023) 14. Dharmarajan, K., Huang, W., Wu, J., Fei-Fei, L., Zhang, R.: Dream2flow: Bridging video generation and open-world manipulation with 3d object flow. arXiv preprint arXiv:2512.24766 (2025) 15. Fouhey, D.F., Kuo, W.c., Efros, A.A., Malik, J.: From lifestyle vlogs to everyday interactions. In: CVPR (June 2018) 16. Furukawa, Y., Curless, B., Seitz, S.M., Szeliski, R.: Manhattan-world stereo. In: CVPR. pp. 1422–1429 (2009). https://doi.org/10.1109/CVPR.2009.5206867 
+
+17. Geng, H., Xu, H., Zhao, C., Xu, C., Yi, L., Huang, S., Wang, H.: GAPartNet: Cross-Category Domain-Generalizable Object Perception and Manipulation via Generalizable and Actionable Parts. In: CVPR (2023) 18. Grauman, K., Westbury, A., Byrne, E., Chavis, Z., Furnari, A., Girdhar, R., Ham-burger, J., Jiang, H., Liu, M., Liu, X., et al.: Ego4D: Around the World in 3,000 Hours of Egocentric Video. In: CVPR. pp. 18995–19012 (2022) 19. Grauman, K., Westbury, A., Torresani, L., Kitani, K., Malik, J., Afouras, T., Ashutosh, K., Baiyya, V., Bansal, S., Boote, B., et al.: Ego-Exo4D: Understanding Skilled Human Activity from First- and Third-Person Perspectives. In: CVPR. pp. 19383–19400 (2024) 20. Gu, Q., Kuwajerwala, A., Morin, S., Jatavallabhula, K.M., Sen, B., Agarwal, A., Rivera, C., Paul, W., Ellis, K., Chellappa, R.: ConceptGraphs: Open-Vocabulary 3D Scene Graphs for Perception and Planning. In: ICRA. pp. 5021–5028 (2024) 21. Gu, Q., Sheng, Y., Yu, J., Tang, J., Shan, X., Shen, Z., Yi, T., Liang, X., Chen, X., Wang, Y.: ArtiSG: Functional 3d scene graph construction via human-demonstrated articulated objects manipulation (2025) 22. Guo, H., Peng, S., Lin, H., Wang, Q., Zhang, G., Bao, H., Zhou, X.: Neural 3d scene reconstruction with the manhattan-world assumption. In: CVPR (2022) 23. Halacheva, A.M., Miao, Y., Zaech, J.N., Wang, X., Gool, L.V., Paudel, D.P.: Holis-tic Understanding of 3D Scenes as Universal Scene Description. In: ICCV (2025) 24. Haresh, S., Sun, X., Jiang, H., Chang, A.X., Savva, M.: Articulated 3d human-object interactions from rgb videos: An empirical analysis of approaches and chal-lenges. In: 2022 International Conference on 3D Vision (3DV). IEEE (2022) 25. Hartikainen, J., Särkkä, S.: Kalman filtering and smoothing solutions to temporal gaussian process regression models. In: IEEE International Workshop on Machine Learning for Signal Processing. pp. 379–384 (2010) 26. Heppert, N., Migimatsu, T., Yi, B., Chen, C., Bohg, J.: Category-independent articulated object tracking with factor graphs. In: IROS. pp. 3800–3807. IEEE (2022) 27. Huang, Z., Sun, B., Delitzas, A., Chen, J., Pollefeys, M.: REACT3D: Recovering articulations for interactive physical 3d scenes (2025) 28. Ijspeert, A.J., Nakanishi, J., Hoffmann, H., Pastor, P., Schaal, S.: Dynamical move-ment primitives: learning attractor models for motor behaviors. Neural computa-tion 25 (2), 328–373 (2013) 29. Jain, A., Giguere, S., Lioutikov, R., Niekum, S.: Distributional depth-based esti-mation of object articulation models. In: Faust, A., Hsu, D., Neumann, G. (eds.) CoRL. Proceedings of Machine Learning Research, vol. 164, pp. 1611–1621. PMLR (08–11 Nov 2022) 30. Jain, A., Lioutikov, R., Chuck, C., Niekum, S.: ScrewNet: Category-independent articulation model estimation from depth images using screw theory. In: ICRA. pp. 13670–13677 (2021) Perception of Articulation in the Wild at Scale from Egocentric Videos 17 31. Jiang, H., Mao, Y., Savva, M., Chang, A.X.: OPD: Single-View 3D Openable Part Detection. In: ECCV. pp. 410–426. Springer (2022) 32. Jiang, Z., Hsu, C.C., Zhu, Y.: DITTO: Building Digital Twins of Articulated Ob-jects from Interaction. In: CVPR (2022) 33. Keetha, N., Müller, N., Schönberger, J., Porzi, L., Zhang, Y., Fischer, T., Knapitsch, A., Zauss, D., Weber, E., Antunes, N., Luiten, J., Lopez-Antequera, M., Bulò, S.R., Richardt, C., Ramanan, D., Scherer, S., Kontschieder, P.: MapA-nything: Universal feed-forward metric 3D reconstruction. In: International Con-ference on 3D Vision (3DV). IEEE (2026) 34. Kerr, J., Kim, C.M., Wu, M., Yi, B., Wang, Q., Goldberg, K., Kanazawa, A.: Robot see robot do: Imitating articulated object manipulation with monocular 4d reconstruction. In: CoRL (2024) 35. Kim, J., Kim, J., Na, J., Joo, H.: ParaHome: Parameterizing Everyday Home Activities Towards 3D Generative Modeling of Human-Object Interactions. In: CVPR. pp. 1816–1828 (2025) 36. Kim, M.J., Pertsch, K., Karamcheti, S., Xiao, T., Balakrishna, A., Nair, S., Rafailov, R., Foster, E., Lam, G., Sanketi, P.: OpenVLA: An Open-Source Vision-Language-Action Model. In: CoRL (2024) 37. Kim, S., Ha, J., Kim, Y.H., Lee, Y., Park, F.C.: ScrewSplat: An End-to-End Method for Articulated Object Recognition. In: CoRL (2025) 38. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A.C., Lo, W.Y., Dollár, P., Girshick, R.: Segment Anything. In: ICCV (2023) 39. Kuang, Y., Ye, J., Geng, H., Mao, J., Deng, C., Guibas, L., Wang, H., Wang, Y.: RAM: Retrieval-Based Affordance Transfer for Generalizable Zero-Shot Robotic Manipulation. In: CoRL (2024) 40. Le, L., Xie, J., Liang, W., Wang, H.J., Yang, Y., Ma, Y.J., Vedder, K., Krishna, A., Jayaraman, D., Eaton, E.: Articulate-Anything: Automatic Modeling of Artic-ulated Objects via a Vision-Language Foundation Model. In: ICLR (2025) 41. Li, X., Wang, H., Yi, L., Guibas, L., Abbott, A.L., Song, S.: Category-Level Ar-ticulated Object Pose Estimation. In: CVPR (2020) 42. Li, Z., Zhang, C., Li, Z., Howard-Jenkins, H., Lv, Z., Geng, C., Wu, J., Newcombe, R., Engel, J., Dong, Z.: Art: Articulated reconstruction transformer. arXiv preprint arXiv:2512.14671 (2025) 43. Liu, G., Sun, Q., Huang, H., Ma, C., Guo, Y., Yi, L., Huang, H., Hu, R.: Semi-weakly supervised object kinematic motion prediction. In: CVPR (2023) 44. Liu, J., Iliash, D., Chang, A.X., Savva, M., Mahdavi-Amiri, A.: Singapo: Single image controlled generation of articulated parts in objects. In: ICLR (2025) 45. Liu, J., Mahdavi-Amiri, A., Savva, M.: Paris: Part-level reconstruction and motion analysis for articulated objects. In: ICCV. pp. 352–363 (2023) 46. Liu, J., Savva, M., Mahdavi-Amiri, A.: Survey on modeling of human-made artic-ulated objects. In: Computer Graphics Forum. p. e70092. Wiley Online Library (2025) 47. Liu, L., Xu, W., Fu, H., Qian, S., Yu, Q., Han, Y., Lu, C.: AKB-48: A Real-World Articulated Object Knowledge Base. In: CVPR. pp. 14809–14818 (2022) 48. Liu, S., Yu, Y., Pautrat, R., Pollefeys, M., Larsson, V.: 3d line mapping revisited. In: CVPR (2023) 49. Liu, S., Zeng, Z., Ren, T., Li, F., Zhang, H., Yang, J., Li, C., Yang, J., Su, H., Zhu, J., et al.: Grounding DINO: Marrying DINO with Grounded Pre-Training for Open-Set Object Detection. In: ECCV (2024) 18 Y. Wang et al. 50. Liu, X., Zhang, J., Hu, R., Huang, H., Wang, H., Yi, L.: Self-Supervised Category-Level Articulated Object Pose Estimation with Part-Level SE(3) Equivariance. In: ICLR (2023) 51. Liu, Y., Jia, B., Lu, R., Gan, C., Chen, H., Ni, J., Zhu, S.C., Huang, S.: Videoartgs: Building digital twins of articulated objects from monocular video (2025) 52. Liu, Y., Jia, B., Lu, R., Ni, J., Zhu, S.C., Huang, S.: Building interactable replicas of complex articulated objects via Gaussian splatting. In: ICLR (2025) 53. Loper, M., Mahmood, N., Romero, J., Pons-Moll, G., Black, M.J.: SMPL: A skinned multi-person linear model. ACM Trans. Graphics (Proc. SIGGRAPH Asia) 
+
+34 (6), 248:1–248:16 (Oct 2015) 54. Lu, R., Liu, Y., Tang, J., Ni, J., Wang, Y., Wan, D., Zeng, G., Chen, Y., Huang, S.: Dreamart: Generating interactable articulated objects from a single image. In: SIGGRAPH Asia Conference Proceedings (2025) 55. Luo, H., Feng, Y., Zhang, W., Zheng, S., Wang, Y., Yuan, H., Liu, J., Xu, C., Jin, Q., Lu, Z.: Being-h0: Vision-language-action pretraining from large-scale human videos. arXiv preprint arXiv:2507.15597 (2025) 56. Mao, Y., Zhang, Y., Jiang, H., Chang, A.X., Savva, M.: MultiScan: Scalable RGBD Scanning for 3D Environments with Articulated Objects. In: NeurIPS (2022) 57. Mo, K., Zhu, S., Chang, A.X., Yi, L., Tripathi, S., Guibas, L.J., Su, H.: PartNet: A large-scale benchmark for fine-grained and hierarchical part-level 3D object un-derstanding. In: CVPR (June 2019) 58. Narasimhaswamy, S., Wei, Z., Wang, Y., Zhang, J., Nguyen, M.H.: Contextual attention for hand detection in the wild. In: ICCV. pp. 9566–9575 (2019). https: //doi.org/10.1109/ICCV.2019.00966 
+
+59. Nie, N., Gadre, S.Y., Ehsani, K., Song, S.: Structure from action: Learning inter-actions for articulated object 3d structure discovery. arxiv (2022) 60. Pautrat, R., Barath, D., Larsson, V., Oswald, M.R., Pollefeys, M.: Deeplsd: Line segment detection and refinement with deep image gradients. In: CVPR (2023) 61. Pavlakos, G., Shan, D., Radosavovic, I., Kanazawa, A., Fouhey, D., Malik, J.: Reconstructing hands in 3D with transformers. In: CVPR (2024) 62. Peng, S., Genova, K., Jiang, C.M., Tagliasacchi, A., Pollefeys, M., Funkhouser, T.: Openscene: 3d scene understanding with open vocabularies. In: CVPR (2023) 63. Peng, W., Lv, J., Lu, C., Savva, M.: iTACO: Interactable Digital Twins of Ar-ticulated Objects from Casually Captured RGBD Videos (Nov 2025). https: //doi.org/10.48550/arXiv.2506.08334 , http://arxiv.org/abs/2506.08334 ,arXiv:2506.08334 [cs] 64. Perrett, T., Darkhalil, A., Sinha, S., Emara, O., Pollard, S., Parida, K., Liu, K., Gatti, P., Bansal, S., Flanagan, K.: HD-EPIC: A Highly-Detailed Egocentric Video Dataset. arXiv preprint arXiv:2502.04144 (2025) 65. Popovic, N., Paudel, D.P., Van Gool, L.: Surface normal clustering for implicit representation of manhattan scenes. In: ICCV (2023) 66. Potamias, R.A., Zhang, J., Deng, J., Zafeiriou, S.: WiLoR: End-to-End 3D Hand Localization and Reconstruction In-the-Wild. In: CVPR. pp. 12242–12254 (2025) 67. Qian, S., Jin, L., Rockwell, C., Chen, S., Fouhey, D.F.: Understanding 3d object articulation in internet videos. In: CVPR (2022) 68. Ren, T., Liu, S., Zeng, A., Lin, J., Li, K., Cao, H., Chen, J., Huang, X., Chen, Y., Yan, F., Zeng, Z., Zhang, H., Li, F., Yang, J., Li, H., Jiang, Q., Zhang, L.: Grounded sam: Assembling open-world models for diverse visual tasks (2024) 69. Romero, J., Tzionas, D., Black, M.J.: Embodied hands: Modeling and capturing hands and bodies together. ACM Transactions on Graphics, (Proc. SIGGRAPH Asia) 36 (6) (Nov 2017) Perception of Articulation in the Wild at Scale from Egocentric Videos 19 70. Shan, D., Geng, J., Shu, M., Fouhey, D.: Understanding human hands in contact at internet scale. In: CVPR (2020) 71. Shen, L., Zhang, S., Li, H., Yang, P., Huang, Z., Zhang, Z., Zhao, H.: GaussianArt: Unified Modeling of Geometry and Motion for Articulated Objects. arXiv preprint arXiv:2508.14891 (2025) 72. Straub, J., Freifeld, O., Rosman, G., Leonard, J.J., Fisher, J.W.: The manhattan frame model—manhattan world inference in the space of surface normals. IEEE transactions on pattern analysis and machine intelligence 40 (1), 235–249 (2017) 73. Sun, X., Jiang, H., Savva, M., Chang, A.X.: OPDmulti: Openable Part Detection for Multiple Objects. arXiv preprint arXiv:2303.14087 (2023) 74. Swaminathan, A., Gupta, A., Gupta, K., Maiya, S.R., Agarwal, V., Shrivastava, A.: Leia: Latent view-invariant embeddings for implicit 3d articulation. In: ECCV (2024) 75. Swamy, A., Leroy, V., Weinzaepfel, P., Franco, J.S., Rogez, G.: Host3r: Keypoint-free hand-object 3d reconstruction from rgb images (2025) 76. Taheri, O., Ghorbani, N., Black, M.J., Tzionas, D.: GRAB: A dataset of whole-body human grasping of objects. In: ECCV (2020), https://grab.is.tue.mpg.de 
+
+77. Teed, Z., Deng, J.: DROID-SLAM: Deep Visual SLAM for Monocular, Stereo, and RGB-D Cameras. In: NeurIPS. vol. 34, pp. 16558–16569 (2021) 78. Tschernezki, V., Darkhalil, A., Zhu, Z., Fouhey, D., Larina, I., Larlus, D., Damen, D., Vedaldi, A.: EPIC Fields: Marrying 3D Geometry and Video Understanding. In: NeurIPS (2023) 79. Wang, R., Xu, S., Dong, Y., Deng, Y., Xiang, J., Lv, Z., Sun, G., Tong, X., Yang, J.: Moge-2: Accurate monocular geometry with metric scale and sharp details (2025) 80. Wang, X., Zhou, B., Shi, Y., Chen, X., Zhao, Q., Xu, K.: Shape2Motion: Joint Analysis of Motion Parts and Attributes from 3D Shapes. In: CVPR. pp. 8876– 8884 (2019) 81. Weng, Y., Wen, B., Tremblay, J., Blukis, V., Fox, D., Guibas, L., Birchfield, S.: Neural implicit representation for building digital twins of unknown articulated objects. In: CVPR (2024) 82. Werby, A., Buechner, M., Roefer, A., Huang, C., Burgard, W., Valada, A.: Artic-ulated Object Estimation in the Wild. In: CoRL (2025) 83. Xiang, F., Qin, Y., Mo, K., Xia, Y., Zhu, H., Liu, F., Liu, M., Jiang, H., Yuan, Y., Wang, H., Yi, L., Chang, A.X., Guibas, L.J., Su, H.: SAPIEN: A simulated part-based interactive environment. In: CVPR (2020) 84. Xiang, J., Lv, Z., Xu, S., Deng, Y., Wang, R., Zhang, B., Chen, D., Tong, X., Yang, J.: Structured 3d latents for scalable and versatile 3d generation. In: CVPR (2025) 85. Xu, X., Joo, H., Mori, G., Savva, M.: D3d-hoi: Dynamic 3d human-object interac-tions from videos. arXiv preprint arXiv:2108.08420 (2021) 86. Yang, J., Zuo, X., Wang, S., Yu, Z., Li, X., Ni, B., Gong, M., Cheng, L.: Object wake-up: 3d object rigging from a single image. In: ECCV (2022) 87. Yang, R., Yu, Q., Wu, Y., Yan, R., Li, B., Cheng, A.C., Zou, X., Fang, Y., Yin, H., Liu, S., Han, S., Lu, Y., Wang, X.: Egovla: Learning vision-language-action models from egocentric human videos (2025) 88. Ye, Y., Li, J., Rong, R., Liu, C.K.: Whole: World-grounded hand-object lifted from egocentric videos. CVPR Findings (2026) 89. Yu, Q., Wang, J., Liu, W., Hao, C., Liu, L., Shao, L., Wang, W., Lu, C.: GAMMA: Generalizable Articulation Modeling and Manipulation for Articulated Objects. In: ICRA (2024) 20 Y. Wang et al. 90. Yu, Q., Yuan, X., jiang, Y., Chen, J., Zheng, D., Hao, C., You, Y., Chen, Y., Mu, Y., Liu, L., Lu, C.: Artgs:3d gaussian splatting for interactive visual-physical modeling and manipulation of articulated objects (2025) 91. Yuan, C., Wen, C., Zhang, T., Gao, Y.: General flow as foundation affordance for scalable robot learning. arXiv preprint arXiv:2401.11439 (2024) 92. Zhang, C., Delitzas, A., Wang, F., Zhang, R., Ji, X., Pollefeys, M., Engelmann, F.: Open-Vocabulary Functional 3D Scene Graphs for Real-World Indoor Spaces. arXiv preprint arXiv:2503.19199 (2025) 93. Zhang, H., Christen, S., Fan, Z., Zheng, L., Hwangbo, J., Song, J., Hilliges, O.: ArtiGrasp: Physically plausible synthesis of bi-manual dexterous grasping and ar-ticulation. In: International Conference on 3D Vision (3DV) (2024) 94. Zhang, J., Deng, J., Ma, C., Potamias, R.A.: HaWoR: World-Space Hand Motion Reconstruction from Egocentric Videos. In: CVPR (2025) 95. Zhang, J., Herrmann, C., Hur, J., Jampani, V., Darrell, T., Cole, F., Sun, D., Yang, M.H.: MonST3R: A Simple Approach for Estimating Geometry in the Presence of Motion. In: ICLR (2025) 96. Zhang, L., Zhou, S., Stent, S., Shi, J.: Fine-Grained Egocentric Hand-Object Seg-mentation: Dataset, Model, and Applications. In: ECCV. pp. 127–145 (2022) 97. Zrporz: Autoseg-sam2 (2024), https://github.com/zrporz/AutoSeg-SAM2 , auto-mated image segmentation tool based on Segment Anything Model (SAM) Perception of Articulation in the Wild at Scale from Egocentric Videos 1
+
+# Appendices 
+
+Contents 
+
+A Additional Methods Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 A.1 Notations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 A.2 Hand Trajectory Extraction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 A.3 Sparse Localization . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3 A.4 Geometry Reconstruction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3 A.5 Manhattan Frame Extraction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4 A.6 VLM Settings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4 A.7 Joint Inference . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4 
+
+B Additional Experiment Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6 B.1 Hyperparameters . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6 B.2 Ground Truth Data Annotations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6 B.3 Benchmark List Selection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7 B.4 Adaptation of Baselines . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7 
+
+C Additional Experimental Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .9 C.1 Qualitative Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9 C.2 Scene-level Aggregation Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10 
+
+D Limitations and Failure Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10 
+
+# A Additional Methods Description 
+
+A.1 Notations 
+
+For convenience, Tab. A5 summarizes the key mathematical notation used throughout PAWS. 
+
+A.2 Hand Trajectory Extraction Fingertip landmark aggregation As noted in Sec. 3.1, we represent the hand contact point zt as the mean of the thumb, index, and middle fingertip landmarks in 3D world coordinates: zt = 13 (pthumb  
+
+> t
+
++ pindex  
+
+> t
+
++ pmiddle  
+
+> t
+
+). This equal weighting is justified by grasp contact statistics [3, 76], which report near-uniform contact likelihoods ( ≈100% , 96% , 92% ) for the thumb, index, and middle fingers, while ring and pinky fingers contribute substantially less. An equal-weighted mean thus provides a stable, unbiased estimate of the grasp centroid without requiring force-based priors. 
+
+Trajectory smoothing After obtaining the hand trajectories zt, we leverage hand-object contact detection [9] to further remove trajectory segments corre-sponding to pre- and post-interaction motions. We then model them using a 2 Y. Wang et al. 
+
+Table A5: Summary of key mathematical notations used in PAWS. 
+
+Notation Definition 
+
+System Input & Temporal Sets 
+
+V Egocentric RGB video ( ∈ RT ×H×W ×3) with T frames 
+
+L, l j , M Set of M action descriptions; lj is a single action 
+
+vj Temporal clip for action lj
+
+K Frames sparsely sampled from vj
+
+K′ Frames with visible hands for MANO estimation 
+
+N Views sampled for geometry recovery 
+
+Dynamic Interaction Perception (Motion Analysis) 
+
+zt Noisy fingertip observation at time t
+
+xt Hand kinematic state [xt, v xt , y t, v yt , z t, v zt ]⊤ ∈ R6
+
+ˆpt RTS-smoothed hand position after contact filtering 
+
+V, v, n v Voxel grid, voxel v, and its multi-view count 
+
+Vconf High-confidence voxels for coarse object localization 
+
+Static Scene Geometry & Kinematic Priors 
+
+Is, I n N representative views; In is the n-th image 
+
+K, Pn Intrinsics and camera-to-world pose for In
+
+Dn, Nn Depth and normal maps for In
+
+L2D , l 2D Detected 2D line segments; l2D is one segment 
+
+Sl2D , um Sampled pixels um=( um, v m) on l2D
+
+Pl2D Unprojected 3D points ( ⊂ R3) for line l2D
+
+L3D , l 3D Triangulated 3D line candidates; l3D is one line 
+
+{m1, m2, m3} Manhattan-world orthogonal directions (prismatic candidates) 
+
+Output Kinematics 
+
+ϕobj , ϕ scene Object- and scene-level articulation parameters 
+
+ϕi = {ci, a i, o i} Articulation parameters for joint ici Motion type ( ∈ { prismatic , revolute }) via VLM 
+
+ai Motion axis ( ∈ R3)
+
+oi Pivot point for revolute joints ( ∈ R3)
+
+linear Gaussian state-space model with an integrated Ornstein-Uhlenbeck (OU) motion prior. The latent kinematic state of the hand at time t is defined as 
+
+xt = [ xt, v xt , y t, v yt , z t, v zt ]⊤ ∈ R6, (2) where (xt, y t, z t) denotes the 3D position and (vxt , v yt , v zt ) denotes the correspond-ing velocity. Following [1], for each time interval ∆t , the state dynamics are given by 
+
+xt = F(∆t )xt−1 + ϵt, (3) where ϵt ∼ N (0, Q(∆t )) , and the matrices F(·) and Q(·) are obtained from the exact discretization of the continuous-time OU process. The noisy observations Perception of Articulation in the Wild at Scale from Egocentric Videos 3MANO Hand Extraction Landmark Selection 
+
+> Contact Points Filtering Outlier Points Filtering
+> With Contact
+> Trajectory Smoothing
+> Gating Test
+> ❌❌
+
+Fig. A5: Illustration of the hand filtering pipeline. Starting from noisy MANO fingertip observations zt, we apply contact-based trimming, forward Kalman filtering with χ2
+
+outlier rejection and RTS smoothing to obtain the refined trajectories {ˆpt} used for articulation parameter estimation. 
+
+follow 
+
+zt = Hx t + ηt, (4) where H selects the position components and ηt ∼ N (0, σ 2obs I). We perform a forward Kalman filtering pass [25] and reject outliers using a χ2 gating test based on the squared Mahalanobis distance of the innovation. Subsequently, we apply Rauch–Tung–Striebel (RTS) smoothing to obtain refined position esti-mates {ˆpt}K′
+
+> t=1
+
+. This leaves the effective smoothed articulation-related trajecto-ries {ˆpt ∈ R3}, which are crucial for determining the final motion origin oi. A detailed illustration is shown in Fig. A5. 
+
+A.3 Sparse Localization 
+
+Each interaction clip vj typically spans 30 to 100 frames, from which we se-lect 5 local frames that are inferred to contain active human–object interaction. GroundedSAM is further used to filter out point cloud regions that do not be-long to the interacted object. The selected local frames are then used to identify high-confidence voxels (as defined in Sec. 3.1). Next, we search over the full set of global camera frames and select 50 frames based on the visibility of the high-confidence voxels and furthest point sampling over camera positions (see Sec. 3.2). 
+
+A.4 Geometry Reconstruction 
+
+We recover a static scene reconstruction per data set. For HD-EPIC [64], we run 
+
+Map-Anything [33] on a filtered subset of frames, excluding narrated interac-tion segments and frames with visible hands to retain only static observations. Approximately 50-100 filtered frames with ground-truth camera poses are fed into the model to produce a dense 3D point cloud. For Epic-Fields [78] and Arti4D [82], we directly use the provided scene mesh or point cloud. In all cases, the reconstruction is voxelized at 0.05 m resolution for downstream sparse local-ization. 4 Y. Wang et al. 
+
+A.5 Manhattan Frame Extraction 
+
+Indoor scenes exhibit strong structural regularity, with room layouts and furni-ture surfaces aligned to a few dominant orthogonal directions — the Manhattan World Assumption [11,16]. Recent methods [22,65] extend this from room struc-tures to object-level components such as cabinets and tables, providing natural priors for prismatic articulation axes. Following [65, 72], we estimate a global Manhattan frame from the view set 
+
+Is. For each frame, per-pixel surface normals and metric depth are computed using [79] and clustered via k-means. The centroid of the largest cluster gives the first dominant direction m1; two further orthogonal directions are obtained by solving: 
+
+min 
+
+> cs,ct
+
+|c⊤ 
+
+> s
+
+m1| + |m⊤ 
+
+> 1
+
+ct| + |c⊤ 
+
+> s
+
+ct|,
+
+where cs, ct are k-means cluster centroids. The per-frame axes are transformed to world coordinates via the camera pose and aggregated across all frames via mean-shift clustering, yielding the global orthogonal basis {m1, m2, m3} used to constrain prismatic axis estimation (see Sec. 3.4). 
+
+A.6 VLM Settings 
+
+For both VLM tasks, we use OpenAI GPT-4o. For dynamic interaction percep-tion, we uniformly sample 10 frames from each interaction clip and present them to the VLM in temporal order. The prompt for VLM-based motion reasoning is shown in Fig. A6 and Fig. A7. For axis selection, we use the 50 global-view frames obtained from view reselection. After multi-view line triangulation and grounding-mask filtering, we retain the four longest projected line segments and query the VLM using the prompt shown in Fig. A8. 
+
+A.7 Joint Inference 
+
+Using the refined hand trajectories from Sec. 3.1 and the geometric estimates from Sec. 3.2, we associate the smoothed hand trajectory {ˆpt}K′ 
+
+> t=1
+
+with the inter-acted object. For prismatic motion (ci = prismatic), the articulation axis ai
+
+is estimated by selecting the dominant Manhattan direction m ∈ { m1, m2, m3}
+
+that best aligns with the primary hand motion direction vh:
+
+ai = arg max  
+
+> m∈{ m1,m2,m3}
+
+|v⊤ 
+
+> h
+
+m|. (5) We set the motion origin oi for prismatic joints to the initial hand contact point 
+
+oi = ˆ p1. For revolute motion (ci = revolute), we evaluate the semantically verified 3D axis proposals l3D ∈ L ∗ 
+
+> 3D
+
+obtained from the VLM grounding step. We parameterize each line l3D by a unit direction vector ul and a point ql on the line. The orthogonal distance from a hand point ˆpt to the line is computed Perception of Articulation in the Wild at Scale from Egocentric Videos 5You are given a single frame from an egocentric (first-person) video clip. 
+
+IMPORTANT CONTEXT: – This frame depicts an indoor kitchen/office scene captured from an egocentric (first-person) video. 
+
+– A human is interacting with a piece of furniture or fixture (such as a cupboard door, drawer, or fridge). 
+
+– {total_frames} images are chosen from this video clip. This image is frame 
+
+{frame_idx}/{total_frames} .
+
+– The frame may correspond to one of three stages: before interaction (approach-ing), during interaction (motion occurring), or after interaction (motion com-pleted). 
+
+LANGUAGE AND PRIOR CUE: – The language description corresponding to this frame is: “ {narration_text} ”. 
+
+– Use the language description as a strong cue for the following task. 
+
+– The closest furniture detected from the hand trajectory in the 3D scene with semantic labels is: “ {fixture} ”. 
+
+– The closest furniture may be incorrect due to noise or bias in the hand trajec-tory. 
+
+TASK: 
+
+1. Determine the furniture that the hand is interacting with. 2. Determine the motion type of the furniture being interacted with in this frame. 
+
+GUIDELINES: – If the human is only approaching or the interaction has already finished and you cannot confidently determine the motion type, answer unknown for both the motion type and furniture name. 
+
+– You may infer the motion type from the language description, from hand move-ment, the relative position of the furniture parts, or contextual visual cues in the scene. 
+
+– Possible furniture names include: cupboard, cabinet, drawer, fridge, refrigerator, oven, cooker, dishwasher, microwave, freezer, washmachine . It may also be other furniture in the scene. 
+
+– Output the furniture name (not the part). For example, if interacting with a cabinet door, answer cabinet (not door ). 
+
+– Motion type mapping (if visible / inferable): 
+
+• Rotation → hinged motion ( e.g ., door, lid, or oven door). 
+
+• Translation → linear motion ( e.g ., sliding drawer). 
+
+Fig. A6: Prompt for dynamic interaction perception. 
+
+as dt(l3D ) = ∥(ˆ pt − ql) × ul∥. We select the optimal rigid axis ai by evaluat-ing its geometric consistency with the dynamic hand trajectory, specifically by 6 Y. Wang et al. 
+
+RESPONSE FORMAT: Respond with only :
+
+furniture_name:motion_type 
+
+where motion_type is one of rotation, translation, unknown .
+
+EXAMPLES: – If the narration says “open the cupboard door”, the closest fixture is cupboard ,and the hand is near the handle → cupboard:rotation .
+
+– If the narration says “slide out the drawer”, and the drawer is partially extended 
+
+→ drawer:translation .
+
+– If you cannot determine the furniture being interacted with →
+
+unknown:unknown .
+
+– If you cannot determine the motion type → cupboard:unknown or 
+
+unknown:unknown .
+
+Fig. A7: Prompt for dynamic interaction perception (cont’d). 
+
+minimizing the variance of this distance to enforce a consistent rotation radius: 
+
+ai = arg min  
+
+> l3D∈L ∗
+> 3D
+
+1
+
+K′
+
+> K′
+
+X
+
+> t=1
+
+(dt(l3D ) − ¯rl)2 , (6) where ¯rl = 1
+
+> K′
+
+PK′ 
+
+> t=1
+
+dt(l3D ) represents the mean radius of rotation for that can-didate axis. The motion origin oi is defined as the 3D hand–object contact pivot. We estimate it by computing the orthogonal projection of the hand trajectory centroid ¯p = 1
+
+> K′
+
+PK′ 
+
+> t=1
+
+ˆpt onto the selected axis ai:
+
+oi = qai +  (¯ p − qai )⊤uai
+
+ uai . (7) This yields the final articulation parameters ϕi = {ci, a i, o i}.
+
+# B Additional Experiment Details 
+
+B.1 Hyperparameters 
+
+We summarize the key hyperparameters of the PAWS pipeline in Tab. A6. 
+
+B.2 Ground Truth Data Annotations 
+
+To evaluate articulation perception accuracy, we annotate ground-truth artic-ulations using a custom annotation tool built on Open3D for interactive point selection. We initialize the articulation origin by selecting points from the re-constructed SLAM point cloud, and specify the articulation axis direction using mesh vertices. Manual corrections are applied in post-processing to ensure an-notation accuracy. Annotated examples are shown in Fig. A9. Perception of Articulation in the Wild at Scale from Egocentric Videos 7You are given an indoor scene captured from an egocentric (first-person) video. Your task is to identify the possible rotation axes of furniture parts based on the provided image. 
+
+IMPORTANT CONTEXT: – The image shows a realistic indoor scene with various furniture and fixtures such as cupboards, drawers, ovens, or dishwashers. 
+
+– The image may contain four or fewer yellow line segments labeled with numbers 
+
+1, 2, 3, and 4.
+
+– Each line is drawn in bold yellow with a white numeric label. 
+
+– These lines represent candidate axes; your goal is to determine which of them plausibly correspond to a rotation axis of a movable furniture part. 
+
+TASK: 
+
+1. Carefully examine the image and identify whether any numbered yellow line aligns with a hinge or rotation axis of a furniture part. 2. Consider the furniture geometry and prior knowledge of common kitchen mechanisms ( e.g ., doors rotate, drawers translate). 3. If none of the lines correspond to a rotation axis, answer none .
+
+RESPONSE FORMAT: Please respond with one of the following: 
+
+– The line number(s) that represent rotation axes ( e.g ., 1 or 1, 3 ) and the cor-responding furniture part name. 
+
+– none , if no line represents a rotation axis. 
+
+EXAMPLE RESPONSE: 
+
+Line 2: cupboard door hinge 
+
+Fig. A8: Prompt for selecting plausible rotation axes. 
+
+B.3 Benchmark List Selection 
+
+From the full HD-EPIC [64] and Epic-Fields [78] data sets, we construct 
+
+EgoArti , a benchmark of over 300 interaction clips spanning more than 50 articulated object categories. Clips are selected based on their language descrip-tions: we retain narrations containing an interactable furniture noun and an articulation verb ( e.g ., “open” or “close”). An example of the benchmark list is shown in Fig. A10. The full list is included in our supplementary files. 
+
+B.4 Adaptation of Baselines Articulation3D [67] Articulation3D is built upon Mask R-CNN; we follow the official implementation and resize all inputs to 640 × 480 to preserve its original performance. The pipeline predicts a 2D plane mask, a 2D articulation axis, and 3D plane parameters (normal and offset). In our adaptation, we replace the plane-parameter prediction head with metric depth from [79], as accurate depth 8 Y. Wang et al. 
+
+Table A6: Key hyperparameters of the PAWS pipeline. 
+
+Module Parameter Value 
+
+Hand Trajectory Smoothing Length scale ℓ 10 .0 mObservation noise σobs 0.05 mProcess noise std q 0.01 m
+
+χ2 gating p-value ( df=3 ) 0.05 
+
+Scene Reconstruction & Localization Voxel size 0.05 mMin. views for high-confidence voxel 4
+
+Local interaction frames ( Nℓ) 5
+
+Global views for geometry ( Ng ) 50 
+
+VLM Queries Frames for motion type ( K) 10 
+
+Top candidate lines per view 4
+
+Temperature 0.5
+
+Top-p 0.3
+
+Revolute Axis Fitting Torus tolerance ratio 0.15 
+
+Min. torus tolerance 0.015 mMax. torus tolerance 0.050 mMax. rotation radius 1.0 mPrismatic Axis Fitting Distance tolerance 0.02 mMin. inlier rate 0.3
+
+Fig. A9: Visualization of annotated scenes in extended HD-EPIC [64] data set. 
+
+is required to lift 2D predictions into 3D space. We further incorporate ground-truth camera poses into the temporal optimization, modifying the objective to: 
+
+r(α, t ) = IoU 
+
+
+
+M(t), KT −1
+
+> tgt
+
+Tref [Rα, tα] Π
+
+
+
+,
+
+which accounts for camera motion between frames. 
+
+ArtiPoint [82] The original ArtiPoint enforces a minimum interaction duration of 30 frames (one second at 30 fps) to filter spurious hand detections. However, many clips in HD-EPIC [64] involve significantly shorter interactions, causing a large fraction of valid clips to be discarded under the default setting. We therefore relax this temporal constraint and treat an interaction as valid upon any hand detection, allowing the method to operate on the short, in-the-wild interactions present in our benchmark. 
+
+Articulate-Anything (AA) [40] Articulate-Anything is an object-level ar-ticulated reconstruction and generation method. For in-the-wild inputs, it de-Perception of Articulation in the Wild at Scale from Egocentric Videos 9 
+
+> "P01-20240202-110250-1": "cupboard.009", "P01-20240202-110250-60": "drawer.006", "P01-20240202-161948-8": "drawer.003", "P01-20240202-171220-115": "cupboard.008", "P01-20240202-195538-209": "cupboard.008", "P01-20240203-150506-24": "oven.001"
+> Fig. A10: An example of the benchmark list.
+
+tects the object category via a VLM and retrieves a matching mesh from the PartNet-Mobility data set [83]. Since the original implementation does not align the retrieved object’s articulation to world coordinates, a direct quantitative comparison is not feasible. We therefore include only qualitative results for this baseline. 
+
+iTACO [63] We adapt iTACO to use ground-truth camera poses, as the object segmentation mask is often unreliable in our setting, which degrades the down-stream LoFTR-based pose estimation used in iTACO’s coarse joint estimation stage. Additionally, iTACO’s AutoSeg-SAM2 [97] segmentation performs best when the video begins from an open state; under in-the-wild conditions where the interaction includes both opening and closing phases, this assumption fre-quently fails. We therefore provide only the opening phase of each interaction for iTACO inference in our qualitative evaluation. For prismatic joints, iTACO outputs only the motion direction; we use the ground-truth motion origin as the start position for visualization. Finally, as iTACO relies on a scanned mesh for 3D digital twin reconstruction, which is unavailable in in-the-wild settings, we report only the estimated joint parameters. 
+
+# C Additional Experimental Results 
+
+C.1 Qualitative Results 
+
+In this section, we provide additional qualitative results on the HD-EPIC [64] and Arti4D [82] data sets (see Figure A12). Specifically, the first two columns ("cupboard" and "drawer") feature examples from the HD-EPIC data set, while the latter two columns ("microwave" and "cabinet") feature examples from the Arti4D data set. 
+
+Articulate-Anything [40]: This method generally performs well for object simulation and accurately identifies the interacted object in most scenarios. How-ever, it is sensitive to lighting conditions; for example, it misclassifies the object in the dark "drawer" sequence as a box (Fig. A12). Furthermore, its data set 10 Y. Wang et al. 
+
+retrieval approach fundamentally limits its ability to recover accurate, instance-specific dimensions. 
+
+ArtiPoint [82]: This baseline struggles on the HD-EPIC [64] data set due to depth estimation errors, a lack of robust tracking points, and heavy occlusions of openable parts. As shown in the "cupboard" and "cabinet" cases, it tracks incor-rect keypoints, leading to inaccurate articulation extraction. Even when tracking succeeds, such as in the "drawer" case, underlying depth errors compromise the final graph-based extraction. 
+
+iTACO [63]: The performance of iTACO is bottlenecked by its heavy reliance on pre-processing, and therefore failed in our qualitative results. Specifically, MonST3R [95] frequently fails to cleanly segment dynamic and static masks in our real-world settings, resulting in less plausible articulations. 
+
+Ours: In contrast, our approach demonstrates more consistent performance across challenging real-world scenarios. By effectively utilizing hand trajectory cues, our method accurately captures the interaction intent. While minor de-viations exist ( e.g . a slight triangulation error in the "cabinet" sequence) our extracted articulations are visibly more accurate than those of the baselines and are directly suitable for downstream simulation. 
+
+C.2 Scene-level Aggregation Results 
+
+In the HD-EPIC [64] and Epic-Fields [78] datasets, the same interaction ( e.g ., “open the cupboard A”) may occur multiple times. This allows us to aggregate multiple hand trajectories to obtain a more accurate estimate of the articulation. For the HD-EPIC dataset, we group video clips corresponding to the same object based on the distance between the hand trajectory and the object mesh. For Epic-Fields, we associate clips by computing the IoU between high-confidence voxelizations. A visualization of this aggregation is shown in Fig. A11. 
+
+# D Limitations and Failure Analysis 
+
+Our framework has two limitations. First, articulation inference depends on the reliability of the underlying foundation models. Visually ambiguous objects, such as a fridge that resembles a cupboard when closed (Fig. A13(a, b)), can cause both the VLM and the grounding model to misidentify the object category, leading to incorrect axis estimation. Second, under in-the-wild conditions, the hand may appear in very few frames during an interaction, providing insufficient trajectory points for robust articulation inference. This is especially common in the ’close’ action, because humans tend to shift their gaze to the next action when closing the previous object. (Fig. A13(c, d)). This is a common challenge for all trajectory-based methods. We leave addressing these limitations as future work. Perception of Articulation in the Wild at Scale from Egocentric Videos 11 
+
+Fig. A11: Scene-level aggregation. Multiple articulated object instances (high-lighted by bounding boxes) are localized and annotated within the same reconstructed 3D scene, enabling scene-level aggregation of articulation estimates across repeated interactions.       
+
+> Failed
+> Failed Failed Failed Failed
+> Cupboard Drawer Microwave Cabinet
+> Input AA [40] ArtiPoint [82] Ours
+
+Fig. A12: Qualitative comparison of articulation prediction. We compare our method against Articulate-Anything [40] and ArtiPoint [82] across four articulation tasks. The yellow arrows denote the predicted articulation. Where applicable, we also visualize the object and hand trajectories. 12 Y. Wang et al.    
+
+> (a) (b) (c) (d)
+
+Fig. A13: Failure Case Examples. (a, b) A fridge may be misclassified as a “cup-board” due to its visually ambiguous exterior, causing both VLM reasoning and ground-ing to fail. (c, d) Examples where the interacting hand does not appear in the frame throughout the entire sequence, leading to tracking failures.
