@@ -1,0 +1,872 @@
+Title: Beyond Viewpoint Generalization: What Multi-View Demonstrations Offer and How to Synthesize Them for Robot Manipulation?
+
+URL Source: https://arxiv.org/pdf/2603.26757v1
+
+Published Time: Tue, 31 Mar 2026 00:06:39 GMT
+
+Number of Pages: 30
+
+Markdown Content:
+# Beyond Viewpoint Generalization: What Multi-View Demonstrations Offer and How to Synthesize Them for Robot Manipulation? 
+
+Boyang Cai 1,2,* Qiwei Liang 1,2,* Jiawei Li 2,* Shihang Weng 2,* Zhaoxin Zhang 2,* 
+
+Tao Lin 3 Xiangyu Chen 1 Wenjie Zhang 1 Jiaqi Mao 4 Weisheng Xu 1
+
+Bin Yang 1 Jiaming Liang 1,2 Junhao Cai 2 Renjing Xu 1, † 
+
+> 1
+
+The Hong Kong University of Science and Technology (Guangzhou)  
+
+> 2
+
+Shenzhen University 3 Beijing Jiaotong University 4 The Chinese University of Hong Kong, Shenzhen    
+
+> *Equal contribution †Corresponding author
+> Project Page
+
+Abstract 
+
+Does multi-view demonstration truly improve robot manipulation, or merely enhance cross-view robustness? We present a systematic study quantifying the performance gains, scaling behavior, and underlying mechanisms of multi-view data for robot manipulation. Controlled experiments show that, under both fixed and randomized backgrounds, multi-view demonstrations consistently improve single-view policy success and generalization. Performance varies non-monotonically with view coverage, revealing effective regimes rather than a simple “more is better” trend. Notably, multi-view data breaks the scaling limitation of single-view datasets and continues to raise performance ceilings after saturation. Mechanistic analysis shows that multi-view learning promotes manipulation-relevant visual representations, better aligns the action head with the learned feature distribution, and reduces overfitting. Motivated by the importance of multi-view data and its scarcity in large-scale robotic datasets, as well as the difficulty of collecting additional viewpoints in real-world settings, we propose RoboNVS, a geometry-aware self-supervised framework that synthesizes novel-view videos from monocular inputs. The generated data consistently improves downstream policies in both simulation and real-world environments. 
+
+## 1 Introduction 
+
+Robot manipulation policies are typically trained from demonstrations captured under fixed and carefully controlled camera setups [ 12 , 58 , 63 , 66 ]. However, in real-world deployment scenarios, camera viewpoints often differ significantly from those observed during training, introducing non-trivial distribution shifts that can substantially degrade policy performance and generalization ability [ 26 , 30 , 35 , 41 , 56 ]. To mitigate this issue, prior work commonly incorporates multi-view demonstrations [ 16 , 59 ], allowing the policy to observe the same manipulation process from diverse perspectives and thereby reducing reliance on view-specific appearance cues or spurious correlations. Most existing explanations attribute the value of multi-view demonstrations primarily to improved cross-view robustness and invariance [ 26 , 46 ]. Under this commonly accepted view, the advantage of multi-view supervision should largely diminish or even disappear when evaluation is conducted under the same viewpoint as used during training. This naturally raises a fundamental and underexplored question: 1
+
+> arXiv:2603.26757v1 [cs.RO] 23 Mar 2026
+
+does viewpoint diversity merely improve robustness to camera shifts, or can it fundamentally enhance the manipulation capability of learned policies itself? In other words, can multi-view supervision lead to intrinsically better policies even when evaluation is strictly restricted to the original training viewpoint? Answering this question is critically important for guiding data collection strategies in robot learning. Improving policy performance typically relies on collecting demonstrations across diverse backgrounds, object configurations, and scene variations [ 32 , 44 ], which is often expensive, labor-intensive, and time-consuming in practice. In contrast, capturing synchronized additional viewpoints of the same demonstration requires relatively little extra effort once a multi-camera setup is available. If multi-view supervision can improve manipulation capability even under fixed-view evaluation, it may provide a significantly more efficient and scalable strategy for expanding robot learning datasets. To investigate this hypothesis in a controlled manner, we conduct a systematic empirical study that explicitly isolates the role of viewpoint diversity. Across all experiments, we keep the policy architecture and training procedure strictly fixed while only varying the viewpoint coverage of demonstrations. All policies are evaluated using a single canonical camera, ensuring that any observed improvements cannot arise from additional viewpoints at test time. We further consider both clean environments and randomized environments, and carefully analyze how performance varies with the number of viewpoints as well as the number of demonstrations per view. Our results reveal three consistent and non-trivial observations. First, multi-view demonstrations improve manipulation success rates even when policies are evaluated from the exact same viewpoint used during training. Second, the benefit of additional viewpoints is not strictly monotonic: moderate viewpoint diversity yields the most significant improvements, while excessively large viewpoint variations can instead degrade performance. Third, multi-view supervision continues to provide measurable gains as dataset size increases, even in regimes where single-view training begins to saturate and shows diminishing returns. To better understand the underlying source of these improvements, we further analyze the internal behavior and representations of the learned policies. Our analysis suggests that multi-view supervision encourages representations that focus more strongly on manipulation-relevant regions of the scene while reducing unnecessary dependence on background appearance. In addition, it improves the robustness of the action prediction head and leads to more stable and efficient policy optimization during training. Despite these advantages, large-scale multi-view demonstrations remain scarce in existing robotic datasets [ 28 , 40 , 54 ], limiting their broader applicability. To address this limitation, we propose RoboNVS ,a geometry-aware self-supervised framework that synthesizes novel-view videos from monocular demon-strations. By leveraging a High-Fidelity Depth-Guided Masking mechanism together with a Bi-directional Masking strategy, RoboNVS generates physically consistent and diverse viewpoints that can effectively augment imitation learning datasets. 
+
+Contributions. We make four contributions: (1) we show that multi-view demonstrations can improve robot manipulation performance even under fixed single-view evaluation; (2) we provide a systematic analysis of how viewpoint diversity interacts with the number of demonstrations and identify practical regimes where multi-view data yields the largest gains; (3) we analyze the mechanisms underlying these improvements through representation analysis, action-head robustness, and training dynamics; and (4) we introduce RoboNVS, a geometry-aware framework that synthesizes multi-view demonstrations from a monocular video to scale viewpoint diversity for robot manipulation. 
+
+## 2 Understanding Multi-View Gains in Robot Learning 
+
+Observing actions from multiple viewpoints has been shown to facilitate human skill acquisition in motor learning studies [ 5, 42 , 52 ]. This raises a natural question for robot learning: can robots also benefit from multi-view demonstrations, even when evaluated from a fixed viewpoint? We first introduce the experimental setup (section 2.1), then analyze when multi-view helps (section 2.2), how performance scales with viewpoint diversity and demonstrations (section 2.3), and finally examine the mechanisms underlying these improvements (section 2.4). 2-60 -50 -30 -20 -40 -10 +10 0 +20 +50 +30 +40 +60  
+
+> 11k Textures
+> Clean Random
+
+Figure 1. Experimental setup overview. Camera layout, example multi-view observations, and the Clean/Random environment modes. 
+
+## 2.1 Experimental Setup 
+
+Camera Configuration. Cameras are placed on the upper hemisphere centered at the task workspace. Each camera maintains a fixed distance of 1.70 m and an elevation of 45 ◦, forming a viewing cone. Along the iso-elevation arc, azimuth angles are sampled every 10 ◦ within ±60 ◦, producing evenly spaced viewpoints. 
+
+Demonstrations. Unless otherwise specified, each task contains 50 demonstrations per viewpoint. Single-view training uses demonstrations from the canonical 0◦ camera, while multi-view training augments the dataset with synchronized viewpoints captured at additional azimuth angles. 
+
+Environment Modes. We consider two environment settings. “Clean" uses a uniform white background, where variation mainly arises from object poses. “Random" samples tabletop textures from an 11k-texture pool at each rollout, introducing substantial appearance variation. 
+
+Policy Architectures. We evaluate two representative paradigms. Diffusion Policy is trained using a ResNet-18 visual backbone and a three-frame observation window. Vision-Language-Action (VLA) fine-tunes a pretrained Pi0 [3] model with LoRA [21] for 5,000 steps on multi-task simulation data. 
+
+Platform and Tasks. Experiments are conducted in Robotwin2.0 [ 11 ] with two embodiments: Franka (Diffusion Policy) and Aloha (VLA). We evaluate 12 manipulation tasks (AB, BBH, CA, CB, OL, MCP, MPA, SB, SBH, PCP, PS, PEC), reporting success rate over 50 evaluation rollouts. Figure 1 provides a concise overview of the overall experimental setup and key components. Additional implementation details and training configurations are provided in the appendix for completeness. 
+
+## 2.2 When Do Multi-View Demonstrations Help? 
+
+Manipulation policies operate in both controlled workspaces and visually diverse environments. To understand when multi-view supervision is most beneficial, We compare single-view and multi-view training under two modes: Clean and Random . Single-view training uses demonstrations from the canonical 0◦
+
+camera, while multi-view training augments them with synchronized viewpoints at ±10 ◦. All policies are evaluated using only the 0◦ camera to isolate the effect of multi-view supervision during training. AB BBH CA CB MPA SBH          
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> Success Rate (%)
+> 0.28
+> 0.50 0.54
+> 0.40
+> 0.02
+> 0.48
+> 0.36
+> 0.64 0.62
+> 0.48
+> 0.08
+> 0.50
+> Clean
+> AB BBH CA CB MPA SBH
+> 0.08
+> 0.14
+> 0.24
+> 0.04 0.00
+> 0.36
+> 0.42
+> 0.22
+> 0.36
+> 0.20
+> 0.10
+> 0.74
+> Random
+> Single-view Multi-view
+
+Figure 2. Comparison between single-view and multi-view training under clean and random settings. Multi-view training improves performance across tasks, with stronger gains under the random setting. 
+
+3Finding 1: Multi-view training improves manipulation performance, especially under visual diversity. As shown in Fig. 2, multi-view supervision improves success rates even under single-view evaluation, indicating benefits beyond viewpoint mismatch. The gains are larger in the random setting, where stronger appearance variation increases reliance on view-specific cues. 
+
+Table 1. Multi-view supervision improves performance of a multi-task VLA model on both seen and unseen tasks.                                                
+
+> Setting Seen Tasks Unseen Tasks Average
+> BBH CA MCP MPA OL PCP PS SBH SHB CB PEC Seen Unseen Overall Single-view 16 46 16 10 24 40 24 64 68 48 030.0 38.7 32.4 Multi-view 28 40 30 14 28 52 34 72 80 50 837.2 (+7.2) 46.0 (+7.3) 39.6 (+7.2)
+
+Finding 2: The benefit transfers to pretrained VLA models and multi-task training. Table 1 reports results for a multi-task VLA model. For seen tasks , the model is trained jointly on multiple tasks, while for unseen tasks it is fine-tuned and transferred to tasks not used during multi-task training. Multi-view supervision improves the average success rate by +7.2 on seen tasks and +7.3 on unseen tasks, demonstrating that the advantage extends to large pretrained models and realistic multi-task pipelines. 
+
+## 2.3 Scaling Behavior of Views and Demonstrations 
+
+Multi-view supervision introduces two key factors: the number of viewpoints and the number of demonstra-tions per view. Since both affect data collection cost, we study how policy performance scales with these quantities and identify regimes where multi-view data is most beneficial. All experiments evaluate policies using the fixed 0◦ camera. We perform four controlled experiments. First, starting from the frontal 0◦ view, we progressively expand the view set symmetrically (e.g., 0, 0 + {± 10 ◦}, 0 + {± 10 ◦, ±20 ◦}, up to ±60 ◦) and measure success rates for VA and VLA (Fig. 3). Second, we isolate the effect of viewpoint magnitude by training with {0◦, +𝑘 ◦, −𝑘 ◦}
+
+where 𝑘 ∈ { 10 , 20 , 30 , 40 , 50 , 60 } (Tab. 2). Third, fixing each task to its best-performing angle, we increase demonstrations per added view from 10 to 50 (Fig. 4). Finally, we scale the overall data budget: single-view demonstrations grow from 10 to 640 , while multi-view training augments 0◦ with the best-performing view configuration and assigns the same number of demonstrations to each view (Fig. 5). 0 2 4 6 8 10 12       
+
+> Number of Added Views
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Success Rate (%)
+> AB
+> BBH
+> CA
+> CB
+> VA
+> 0246810 12
+> Number of Added Views
+> 40
+> 60
+> 80
+> Success Rate (%)
+> PS
+> BBH
+> SBH
+> SB
+> VLA
+
+Figure 3. Scaling behavior under increasing viewpoint diversity. Both VA and VLA exhibit performance gains under moderate multi-view augmentation, while excessive view expansion does not yield monotonic improvement. 
+
+Finding 3: Performance is non-monotonic with view expansion; moderate diversity works best. 
+
+Figure 3 shows that adding a few nearby viewpoints improves performance, but further expansion does not yield monotonic gains. Across tasks, peak performance typically appears in an intermediate regime (roughly 4–8 additional views). This suggests that moderate view diversity provides useful geometric cues, while overly large viewpoint ranges may introduce unnecessary appearance variation. 
+
+Finding 4: Viewpoint magnitude matters; moderate offsets are consistently effective. Table 2 shows that viewpoints within ±10 ◦–±40 ◦ consistently yield strong and stable improvements across different tasks, whereas larger offsets ( ±50 ◦–±60 ◦) often degrade performance noticeably. Moderate offsets enrich geometric cues while remaining visually consistent with the canonical view, providing complementary 4Table 2. Success rate (%) evaluated at the fixed 0 ◦ test view when augmenting training data with additional viewpoints. Dark gray shading marks the best angle per task; light gray shading marks the second-best. 
+
+Task Origin 10 ° 20 ° 30 ° 40 ° 50 ° 60 ° Task Origin 10 ° 20 ° 30 ° 40 ° 50 ° 60 °
+
+AB 8 42 80 66 74 56 68 CB 4 20 20 32 58 18 8
+
+BBH 14 22 32 22 20 12 8 MPA 0 10 8 6 16 14 8
+
+CA 24 36 52 48 64 14 10 SBH 36 74 40 18 66 46 52         
+
+> Angle Mean Origin 14.3 10 °34.0 20 °38.7 30 °32.0 40 °49.7
+> 50 °26.7 60 °25.7
+
+information without introducing excessive distribution shift. In contrast, large viewpoint shifts introduce substantial appearance changes that may make policy optimization more difficult. 10 20 30 40 50                          
+
+> Demonstrations per View
+> 0
+> 23
+> 46
+> 70
+> 93
+> Success Rate (%)
+> AB
+> Origin
+> 10 20 30 40 50
+> Demonstrations per View
+> 10
+> 16
+> 23
+> 30
+> 36 BBH
+> Origin
+> 10 20 30 40 50
+> Demonstrations per View
+> 17
+> 30
+> 44
+> 58
+> 71 CA
+> Origin
+> 10 20 30 40 50
+> Demonstrations per View
+> 0
+> 17
+> 34
+> 51
+> 68 CB
+> Origin
+> 10 20 30 40 50
+> Demonstrations per View
+> 0
+> 5
+> 10
+> 15
+> 20 MPA
+> Origin
+> 10 20 30 40 50
+> Demonstrations per View
+> 29
+> 42
+> 55
+> 68
+> 81 SBH
+> Origin
+
+Figure 4. Scaling behavior of multi-view demonstrations under fixed 0 ◦ evaluation. Each subplot shows success rate versus demonstrations per added view ( 10 → 50 ) for one task. The black dashed line indicates the single-view baseline trained on origin view. 
+
+Finding 5: Multi-view gains scale with additional demonstrations. With the optimal viewpoint fixed, increasing demonstrations per added view from 10 to 50 steadily improves performance (Fig. 4), indicating that multi-view supervision continues to benefit from additional data without early saturation. 10 20 40 80 160 320 640 
+
+Demonstrations per View 
+
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Success Rate (%)
+
+BBH       
+
+> 10 20 40 80 160 320 640
+
+Demonstrations per View 
+
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Success Rate (%)
+
+CA  
+
+> Single-view Multi-view
+
+Figure 5. Scaling laws of single-view vs. multi-view training on two manipulation tasks. Multi-view data continues to improve performance when single-view training saturates, achieving comparable or higher performance with substantially less scene diversity. 
+
+Finding 6: Multi-view training breaks single-view saturation. Figure 5 shows that single-view performance plateaus as demonstrations increase, whereas multi-view training continues to improve. Scaling single-view data requires collecting demonstrations across new scenes, while synchronized multi-view capture adds viewpoints with negligible extra time per demonstration. Together, these results reveal a consistent pattern: moderate viewpoint diversity yields the strongest gains, multi-view benefits continue to grow with additional demonstrations, and multi-view supervision can overcome single-view scaling saturation. This suggests that balanced multi-view collection offers a practical and cost-efficient strategy for scaling robot learning datasets. 
+
+## 2.4 Dissecting the Mechanisms 
+
+Multi-view supervision improves manipulation performance even when evaluation uses the original camera view. This raises a key question: what changes inside the model? To investigate this, we analyze three aspects of the policy: (1) the visual encoder, (2) the policy head, and (3) optimization dynamics. 5Representation Quality. We first examine how multi-view supervision reshapes visual representations. Multi-view training uses 0◦ together with symmetric ±40 ◦ views, while evaluation remains fixed at 0◦.Single 
+
+Multi 
+
+Grad-CAM Input-Gradient 
+
+Figure 6. Grad-CAM and input-gradient analysis under fixed 0◦ evaluation. Multi-view supervision ( 0◦ + ± 40 ◦) shifts attention toward the end-effector and manipulated objects, while single-view models exhibit stronger background sensitivity. 
+
+Gradient attribution. To analyze spatial sensitivity, we compute Grad-CAM and input gradients with respect to predicted action magnitudes. Specifically, we backpropagate the mean absolute pose change across all DoFs of the predicted action chunk to the visual encoder. Grad-CAM highlights feature-level importance, while input gradients measure pixel-level sensitivity. As shown in Fig. 6, multi-view models concentrate attention on the end-effector and manipulated objects, whereas single-view models exhibit stronger background dependence. 
+
+Table 3. Linear probing results ( 𝑅 2) for end-effector (E) and object (O) pose prediction under fixed 0◦ evaluation ( ↓
+
+lower indicates weaker linear decodability).                                          
+
+> Adjust Bottle (AB) ↓Beat Block Hammer (BBH) ↓Click Bell (CB) ↓
+> Setting Clean-E Clean-O Random-E Random-O Clean-E Clean-O Random-E Random-O Clean-E Clean-O Random-E Random-O Single-view 0.510 0.502 0.061 0.035 0.816 0.678 0.731 0.555 0.930 0.952 0.683 0.610
+> Multi-view -0.116 -0.116 0.017 -0.037 0.668 0.540 0.090 0.049 0.595 0.736 0.480 0.412
+
+Linear probing. To evaluate linear decodability, we train linear regressors on frozen visual features to predict end-effector and object poses. Performance is measured by the coefficient of determination: 
+
+𝑅 2 = 1 −
+
+Í𝑖 (𝑦 𝑖 − ˆ𝑦 𝑖 )2
+
+Í𝑖 (𝑦 𝑖 − ¯𝑦 )2 , (1) where lower values indicate weaker linear predictability. Results in Tab. 3 show that multi-view features consistently yield lower 𝑅 2, sometimes negative, indicating poorer linear pose decoding. This suggests that multi-view gains are unlikely to arise from improved linear pose estimation, but rather from richer nonlinear representations that better support downstream policy learning. 
+
+Table 4. Policy head MSE loss under frozen DINOv2 features ( ↓ lower is better). 
+
+Random ↓ Clean ↓
+
+Task Single Multi Single Multi BBH 0.0128 0.0070 0.0104 0.0067 CA 0.0133 0.0087 0.0082 0.0074 
+
+Policy Head Robustness. To isolate the contribution of the action head, we freeze a pretrained DINOv2 [ 39 ]encoder and train only the policy head. Single-view training uses demonstrations from the canonical 0◦
+
+camera, while multi-view training combines 0◦ with symmetric ±40 ◦ views. All evaluations are conducted under the fixed 0◦ view. Tab. 4 shows that multi-view supervision consistently reduces test MSE in both clean and random settings, with larger improvements under random backgrounds. This indicates that multi-view training improves the robustness of the mapping from visual features to actions. 
+
+Optimization Dynamics. Finally, we analyze training trajectories. Figure 7 shows success rates over training steps for both settings. Single-view training often exhibits unstable peaks at intermediate checkpoints, 62k 3k 4k 5k         
+
+> Training Steps
+> 0
+> 20
+> 40
+> 60
+> 80
+> Success Rate (%)  Single-view Training
+> 2k 3k 4k 5k
+> Training Steps
+> Multi-view Training
+> BBH CA MCP OL PCP SBH
+
+Figure 7. Training dynamics of a multi-task VLA model under single-view (left) and multi-view (right) supervision. Success rates are reported over training steps (2k–5k) across six tasks. Best checkpoints are highlighted. 
+
+whereas multi-view supervision yields smoother improvements and higher final performance. These results suggest that multi-view data improves optimization stability and sample efficiency, leading to policies that generalize more reliably. 
+
+## 3 Multi-View Augmentation via Novel View Synthesis 3.1 Problem Formulation 
+
+Given a monocular robot manipulation video 𝑉 = {𝐼 𝑡 }𝑇 𝑡 =1 captured from a fixed camera, our goal is to synthesize a video sequence ˆ𝑉 = { ˆ𝐼 𝑡 }𝑇 𝑡 =1 corresponding to a target camera trajectory {𝐺 𝑡 }𝑇 𝑡 =1. The synthesized video should preserve scene geometry while maintaining temporal consistency of robot motion. This task is challenging because most robotic manipulation datasets contain only monocular demonstrations without synchronized multi-view supervision. Direct end-to-end video generation often produces geometric distortions or hallucinated robot structures due to the lack of explicit 3D constraints [ 1 , 47 ]. We therefore propose RoboNVS , a geometry-aware self-supervised framework that synthesizes novel-view robotic videos from monocular demonstrations using depth-guided rendering and diffusion-based video completion. 
+
+## 3.2 Method Overview 
+
+Figure 8 illustrates the overall pipeline. Given an input video, RoboNVS first reconstructs scene geometry using monocular depth estimation. The resulting depth maps are converted into a watertight mesh that can be rendered under arbitrary camera trajectories. Rendering produces partially visible RGB frames together with occlusion masks that indicate regions requiring synthesis. If you wonder how the self-supervised training data in the RoboNVS pipeline is constructed, please see Appendix Sec. C.2. These geometry-aware priors condition a diffusion-based video model to complete the missing regions and generate the novel-view video. Video Depth  
+
+> Estimation Model
+> 3D Geometry
+> Foundation Model
+> Input Video
+> Aligned
+> Depth Map
+> Camera Pose
+> 3D
+> Mesh
+> Point
+> Cloud
+> Rendered Video Mask Video
+> Bi-directional Masking
+> VAE
+> VAE
+> Projector
+> First Frame
+> Patchified
+> Noise
+> Video Diffusion Model
+> apply the occlusion mask to the source video
+> DiT Block
+> LoRA
+> DiT Block
+> LoRA
+> Output
+
+Figure 8. Pipeline of RoboNVS. A monocular video is first converted into a temporally consistent 3D representation via aligned depth estimation. The watertight mesh is rendered under target camera trajectories to produce RGB projections and occlusion masks. These geometric priors guide a diffusion-based video inpainting model to synthesize geometrically consistent novel-view videos. 
+
+73.3 Depth Alignment 
+
+Accurate geometry is crucial for reliable view synthesis. We combine two complementary depth estimation models. DepthCrafter [ 23 ] produces temporally consistent relative depth maps that preserve fine structure but lack metric scale, while the 3D foundation model DA3 [ 33 ] predicts camera poses and metric depth aligned with the global coordinate system. To merge their strengths, we align the relative depth from DepthCrafter with the metric depth from DA3 using a global scale–shift transformation in inverse depth space, defined by an optimal scale factor 𝛼 and shift bias 𝛽 :
+
+𝛼, 𝛽 = arg min 
+
+> 𝛼,𝛽
+
+∑︁ 𝑡 
+
+𝑑 −1 
+
+> 𝑡
+
+−
+
+
+
+𝛼 ˜𝑑 −1 
+
+> 𝑡
+
++ 𝛽 
+
+ 22 , (2) where ˜𝑑 𝑡 is the relative depth from DepthCrafter and 𝑑 𝑡 is the metric depth from DA3. The resulting depth maps retain temporal smoothness while remaining consistent with camera geometry. For subsequent rendering, these aligned depths are converted into a simplified DW-Mesh [ 22 ] to provide geometric priors for video completion, though the mesh itself is not the focus of our method. 
+
+## 3.4 Diffusion-based Video Completion 
+
+To synthesize missing regions under novel viewpoints, we employ a video diffusion model trained with a flow-matching objective. Let 𝑉 = {𝐼 𝑡 } denote the input RGB video and 𝑀 = {𝑀 𝑡 } the occlusion mask sequence produced by mesh rendering. We first apply the masks to the original video to obtain masked frames 
+
+˜𝐼 𝑡 = 𝐼 𝑡 ⊙ ( 1 − 𝑀 𝑡 ), (3) where ⊙ denotes element-wise multiplication. The masked video ˜𝑉 = { ˜𝐼 𝑡 } and mask sequence 𝑀 are encoded into latent space using a frozen Wan2.1 [ 49 ]VAE encoder. Their latent features are then projected through a learnable adapter to match the input dimension of the diffusion transformer. The first frame 𝐼 1 of the input video is additionally used as a reference conditioning signal to preserve appearance consistency. We adopt Wan2.1-14B, a DiT-based video diffusion model, as the generation backbone and insert LoRA adapters for parameter-efficient fine-tuning. During training, a noisy latent variable 𝑧 𝑡 is sampled along the diffusion trajectory at timestep 𝑡 . The model then predicts the corresponding velocity field 𝑣 𝜃 (𝑧 𝑡 , 𝑐, 𝑡 )
+
+conditioned on 
+
+𝑐 = {𝐼 1, ˜𝑉, 𝑀, 𝑝 }, (4) where ˜𝑉 denotes the masked video and 𝑝 represents the fixed text prompt. The model is optimized using a flow-matching objective. 
+
+L = E𝑡 ,𝑧 𝑡 
+
+∥𝑣 𝜃 (𝑧 𝑡 , 𝑐, 𝑡 ) − 𝑣 ∗ (𝑧 𝑡 , 𝑡 )∥ 22
+
+ , (5) where 𝑣 ∗ (𝑧 𝑡 , 𝑡 ) denotes the target velocity field defined by the flow trajectory. This formulation enables the model to reconstruct missing regions while preserving geometric structure provided by the masks. 
+
+## 3.5 Bi-directional Masking Strategy 
+
+A key challenge in self-supervised training is the mismatch between training masks and those encountered at inference. In standard inpainting setups, masks often correspond to foreground objects such as the robot body. However, viewpoint changes typically produce occlusions in peripheral regions instead. As a result, the model may encounter mask patterns at inference that are rarely observed during training, leading to artifacts such as blurred completions or hallucinated robot textures. To address this issue, we introduce a Bi-directional Masking strategy . For each mask 𝑀 𝑡 , we construct its complementary mask 8¯𝑀 𝑡 = 1 − 𝑀 𝑡 . (6) The model is trained with both masks. Using 𝑀 𝑡 encourages reconstruction of occluded robot structures, while ¯𝑀 𝑡 requires completion of surrounding background regions. This complementary supervision increases mask diversity during training. Since robotic manipulation datasets typically use static cameras, rendered masks often appear in similar spatial locations. The complementary mask therefore acts as a regularizer that exposes the model to unseen occlusion patterns and improves robustness to viewpoint changes. 
+
+## 3.6 Inference 
+
+At inference time, the same geometric pipeline is applied without mask inversion. Given a monocular video, we estimate aligned depth maps according to Sec. 3.3 and construct the DW-Mesh representation. The mesh is rendered under the target camera trajectory to obtain projected RGB frames and occlusion masks. These rendered frames, together with the reference frame from the source video, are fed into the diffusion model to complete the masked regions and generate the final novel-view frames. The resulting sequence forms a geometrically consistent video that can serve as additional demonstrations for policy learning. 
+
+## 4 Experiments 4.1 Implementation 
+
+Datasets. To evaluate the generalization of RoboNVS across diverse robotic settings, we construct a large-scale manipulation dataset by aggregating multiple public repositories. Our collection primarily builds upon the Open X-Embodiment (OXE) [ 40 ] meta-dataset, from which we select high-quality subsets including Droid [ 28 ] and RT-1 [ 6 ]. We further incorporate several additional manipulation datasets such as RH20T [ 15 ], Robotwin [ 11 ], and RoboCoin [ 55 ]. In total, the dataset contains approximately 10,000 video sequences covering diverse robotic embodiments and environments. Detailed dataset statistics and robot platforms are provided in the Appendix. 
+
+Training Details. We fine-tune the Wan2.1-14B text-to-video foundation model using LoRA with rank 
+
+𝑟 = 16 . All videos are resized to a spatial resolution of 320 × 192 with a temporal length of 49 frames. The model is optimized using the AdamW optimizer with a learning rate of 2 × 10 −5.The model is trained on a high-performance compute cluster equipped with 8× NVIDIA H200 (141GB) GPUs. To accommodate the significant memory requirements of the 14B model and high-resolution video latents, we set a batch size of 1 per GPU, resulting in a total effective batch size of 8. Under this configuration, the entire fine-tuning process on our aggregated dataset takes approximately one week to reach convergence. 
+
+Evaluation Metrics. We evaluate synthesized videos using standard metrics for spatial fidelity, perceptual quality, and temporal consistency, including PSNR, SSIM, LPIPS [ 64 ], FID [ 19 ], and FVD [ 20 ]. We additionally report results using VBench [25] to assess perceptual quality across multiple video attributes. 
+
+Baselines. We compare RoboNVS with state-of-the-art generative approaches. One-stage end-to-end models include ReCamMaster [ 1] and ZeroNVS [ 43 ], where ZeroNVS is fine-tuned on the Droid dataset, as in VISTA [ 46 ], for fair robotic comparison. Two-stage inpainting-based methods include EX-4D [ 22 ], TrajectoryCrafter [ 61 ], and CogNVS [ 8 ]. We also evaluate an ablation variant of RoboNVS trained without the proposed bi-directional masking strategy. 
+
+Inference. During inference we adopt a 25-step denoising schedule. On a single NVIDIA RTX 4090 GPU(48G), RoboNVS generates a 49-frame video at 320 × 192 resolution in approximately 50 seconds. 
+
+## 4.2 Quantitative Comparison 
+
+We evaluate all methods on a held-out test set of 50 videos randomly sampled from Droid, BridgeData V2 [ 48 ], and RoboCoin, ensuring none of the sequences appear in training data. Table 5 reports visual metrics of all models. RoboNVS consistently achieves state-of-the-art performance, outperforming baselines in pixel-level reconstruction (PSNR, SSIM) and perceptual alignment (LPIPS), while producing more realistic and temporally coherent videos (FID, FVD). The average VBench score further confirms improved perceptual quality and aesthetic consistency. These results show RoboNVS generates high-fidelity novel-view videos suitable for downstream robotic tasks. 9Table 5. Visual quality comparison of baseline and RoboNVS models. ↑ higher is better, ↓ lower is better. 
+
+Method PSNR ↑ SSIM ↑ LPIPS ↓ FID ↓ FVD ↓ VBench ↑
+
+ZeroNVS-ft 10.03 0.331 0.527 138.36 64.59 0.578 ReCamMaster 12.57 0.387 0.451 154.89 68.16 0.585 CogNVS 11.88 0.403 0.502 234.37 76.87 0.593 TrajectoryCrafter 12.41 0.385 0.411 167.99 48.42 0.579 EX-4D 12.72 0.401 0.406 150.18 42.66 0.588 RoboNVS (ablation) 13.59 0.427 0.369 138.19 35.90 0.593 RoboNVS (ours) 14.07 0.459 0.337 122.21 31.40 0.597 ZeroNVS-ft ReCamMaster RoboNVS(ours) RoboNVS-Ablation EX-4D TrajectoryCrafter CogNVS 
+
+> 20 °
+> 20 °
+> 10 °
+> Source view
+
+Figure 9. Qualitative comparison with state-of-the-art generative baselines. RoboNVS produces more geometrically consistent and temporally stable novel-view videos, while other methods exhibit artifacts such as object duplication or structural distortion. 
+
+## 4.3 Qualitative Comparison 
+
+Figure 9 shows qualitative comparisons with generative baselines. Inpainting-based methods like EX-4D, TrajectoryCrafter, and CogNVS often suffer geometric distortions due to inaccurate depth, while camera-guided models such as ReCamMaster may produce semantic hallucinations (e.g., duplicated objects). In contrast, RoboNVS preserves stronger geometric consistency via depth-guided DW-Mesh rendering. Comparison with RoboNVS-Ablation further highlights the importance of our Bi-directional Masking strategy, reducing ghosting and structural artifacts from mask distribution shift. Overall, RoboNVS produces more realistic and temporally stable novel-view videos. 
+
+## 5 Real-World Evaluation 5.1 Experimental Setup 
+
+To validate simulation findings in real settings, we evaluate on a 7-DoF Franka Panda with a top-down RealSense D435 camera (Fig. 10). Three representative manipulation tasks are used (Fig. 10): Bell Pushing ,
+
+Fruit Pick-and-Place , and Lego Pick-and-Place . Each task has 30 expert trajectories as the base 0◦ monocular dataset, and all evaluations are conducted under this base 0◦ viewpoint; object positions are randomly perturbed at evaluation. Success rates are measured over 20 trials. We compare three data augmentation configurations: (1) EX-4D , (2) EX-4D w/ Depth Alignment 
+
+(EX-4D w/ DA), and (3) RoboNVS . All models generate four synthetic views ( {− 20 ◦, −10 ◦, 10 ◦, 20 ◦}) and 10 RealSense      
+
+> D435
+> Franka Arm
+> Bell Pushing Fruit Pick-and-Place Lego Pick-and-Place
+> (b) Task 1 (c) Task 2 (d) Task 3 (a) Real-world setup
+
+Figure 10. Real-world setup and the three manipulation tasks. RoboNVS EX-4EX-4D w/ D A D
+
+10°
+
+## Source view
+
+Figure 11. Qualitative comparison of RoboNVS and EX-4D variants in real-world tasks, showing more complete mask filling and corrected geometric distortions. 
+
+Table 6. Policy success rates on real-world tasks (20 trials). Highest values in bold .
+
+Method Bell Pushing Fruit Pick-and-Place Lego Pick-and-Place 
+
+Baseline (Monocular only) 5/20 (25%) 2/20 (10%) 1/20 (5%) EX-4D 8/20 (40%) 7/20 (35%) 6/20 (30%) EX-4D w/ DA 10/20 (50%) 8/20 (40%) 8/20 (40%) 
+
+RoboNVS (Ours) 14/20 (70%) 12/20 (60%) 13/20 (65%) 
+
+train a diffusion policy on the augmented datasets. Detailed robot specifications, simulation settings, and task videos are provided in the Appendix. 
+
+## 5.2 Qualitative Results 
+
+Figure 11 shows visual comparisons. Our Enhanced Depth improves geometric plausibility of target-view masks (green), while original EX-4D depth often distorts objects (red). RoboNVS also surpasses EX-4D w/ DA in mask inpainting (blue vs. orange), reconstructing robotic arm structures and end-effectors more completely. This confirms that depth refinement and bi-directional masking improve real-world visual fidelity and temporal stability. 
+
+## 5.3 Quantitative Results 
+
+Across all tasks, policies trained with RoboNVS-augmented data outperform baselines, confirming that synthetic multi-view supervision provides crucial geometric and spatial priors. Task success correlates with the fidelity and physical consistency of the generated data: the policy trained on RoboNVS handles delicate manipulations more reliably, reaching 65% on the most challenging Lego task, versus 30% for EX-4D and 5% for the monocular baseline. 
+
+## 6 Conclusion 
+
+We show that multi-view supervision can directly improve robot manipulation capability, beyond enhancing viewpoint robustness or camera invariance. Multi-view data also provides an efficient and scalable form 11 of augmentation, delivering consistent gains with minimal additional collection cost compared to scaling single-view datasets. To address the scarcity of multi-view demonstrations, we propose RoboNVS , a geometry-aware framework that synthesizes physically consistent novel-view videos from monocular demonstrations and improves downstream policy learning. Future work will focus on improving generation fidelity and combining RoboNVS with additional augmentation strategies to build richer and more scalable robotic manipulation datasets. 12 A Appendix Reading Guide 
+
+This appendix provides additional details and extended experiments to support the results in the main paper. To help readers quickly locate specific information, we organize the appendix in a question-oriented format. 
+
+Training details of RoboNVS. If you wonder about the datasets used to train RoboNVS, please refer to Sec. C.1. If you are interested in how the self-supervised training data in the RoboNVS pipeline (Fig. 8 in the main paper) is constructed, please see Sec. C.2. 
+
+Experimental setup in RoboTwin. If you wonder about the detailed policy architectures and key hyperparameters used in the RoboTwin experiments (Sec. 2 in the main paper), including the configurations of DP and Pi0, please refer to Sec. C.3. Details about environment randomization during evaluation and the full list of manipulation tasks (including task definitions and visualizations) can be found in Sec. C.4 and Sec. C.5. 
+
+Robustness of the multi-view learning results. If you wonder whether the multi-view learning improvement reported in Sec. 2 of the main paper depends on the specific policy architecture or camera configuration, we provide additional validations. We reproduce the experiments using the ACT policy (Sec. D.1) and test alternative base viewpoints (Sec. D.2). We further evaluate policy performance under unseen viewpoints to demonstrate improved generalization from multi-view training (Sec. D.3). 
+
+Extension to other observation modalities. If you wonder whether the benefits of multi-view augmenta-tion extend beyond RGB observations, we repeat the experiments using point cloud inputs and the DP3 policy; see Sec. E. 
+
+Video generation for data augmentation in RoboTwin. If you wonder how different video generation models affect policy learning, we compare RoboNVS with several generative baselines in the RoboTwin simulation environment. Specifically, generated videos are used to augment the original demonstrations collected from the base view, and the resulting policies are evaluated by their task success rates. Quantitative and qualitative comparisons of these data augmentation results can be found in Sec. F. 
+
+Pure generation quality comparisons. If you are interested in the intrinsic generation capability of RoboNVS compared with other mask-based video inpainting models, we provide controlled comparisons where all methods are given the same masked inputs. The resulting generation quality comparisons are presented in Sec. G.1. 
+
+Depth estimation analysis. If you wonder why we adopt the DepthCrafter + DA3 depth estimation pipeline instead of alternatives such as VDA or Pi3, we provide detailed DW-Mesh rendering comparisons across different depth models in Sec. G.2. 
+
+## B Supplementary Related Work 
+
+Visual Augmentation for Imitation Learning. Visual augmentation is widely used to improve the generalization of visuomotor policies trained from demonstrations. Beyond standard image perturbations, recent works explore viewpoint augmentation by synthesizing observations from different camera poses. For example, VISTA [ 46 ] and RoVi-Aug [ 9 ] augment demonstration datasets using image-based novel view synthesis models such as ZeroNVS [ 43 ] to generate additional viewpoints. Other approaches leverage 3D Gaussian Splatting [ 59 ] but require high-fidelity scene reconstruction, or focus on state-based inputs [ 27 , 38 ]and wrist-camera observations [ 34 , 65 ]. However, image-based novel view synthesis methods typically generate frames independently, which may introduce temporal inconsistency and unrealistic robot motion in synthesized videos. In contrast, our method RoboNVS generates temporally consistent multi-view robot videos from monocular demonstrations, providing more reliable visual augmentation for imitation learning. 
+
+Video Diffusion Models. Recent years have witnessed rapid progress in video generation, evolving from early autoregressive or GAN-based approaches to powerful diffusion-based architectures. Early systems such as Make-A-Video [ 14 ] and Gen-1 [ 45 ] demonstrated the feasibility of text-driven video synthesis but often suffered from limited motion realism and temporal instability. Diffusion-based video models have since substantially improved generation quality and temporal coherence by modeling spatiotemporal dynamics in a denoising framework. Representative models such as SVD [ 4] and VideoCrafter [ 7] leverage latent diffusion with temporal modules to improve motion consistency and long-range dynamics. More recently, large-scale video foundation models, including Hunyuan Video [ 29 ], CogVideoX [ 60 ], and Wan 2.1 [ 50 ], adopt 13 Table 7. Selected subsets from the Open X-Embodiment dataset used in our training data.    
+
+> Category Datasets
+> Large-scale robot datasets Droid [28], RT-1 [6], BridgeData V2 [48] Specialized manipulation datasets mimicplay [51], ucsd_kitchen [57], ur5_columbia_cairlab_pusht_real [12], utokyo_xarm_pick_and_place [37], nyu_franka_play_dataset [13], HYDRA [2]
+
+Table 8. Robotic embodiments and platforms in the aggregated dataset.    
+
+> Category Robot Embodiments
+> Standard Arms Franka Panda, UR5, Sawyer, Xarm, WidowX Multi-purpose / Dual-arm AgilexCobotMagic, AgilexSplitALOHA, Mobile Aloha, Galaxea R1 Lite, Google Robot, Unitree G1 edu-u3, AIRBOT_MMK2, A1X, alpha_bot_2
+
+transformer-based architectures and are trained on massive video corpora, enabling stronger spatiotemporal modeling and more coherent long-duration synthesis. Despite these advances, generating videos under significant viewpoint changes remains challenging because existing models primarily learn appearance priors rather than explicit scene geometry. Our RoboNVS framework builds upon the generative capability of Wan 2.1 while introducing geometry-aware conditioning to enable robust extreme-view video synthesis. 
+
+Novel View Synthesis and Camera Control. Controlling camera motion in generative video models has recently attracted increasing attention. Some approaches explicitly condition video generation on camera parameters or trajectory embeddings, such as CameraCtrl [ 17 ]. Others leverage intermediate 3D representations to guide camera motion and novel-view synthesis, including TrajectoryCrafter [ 61 ] and CogNVS [ 8]. While these methods improve geometric consistency, they often suffer from reconstruction artifacts, depth noise, or temporal instability. ReCamMaster [ 1] further enables camera control in video diffusion models but relies on synchronized multi-camera training data.Our work builds upon EX-4D [22 ], which introduces the Depth Watertight Mesh (DW-Mesh) representation as a geometry-aware prior for video generation. By explicitly modeling both visible surfaces and occluded boundaries, DW-Mesh provides watertight masks that maintain geometric consistency even under large viewpoint changes. However, EX-4D is primarily designed for dynamic camera trajectory generation (e.g., smoothly rotating from 0◦ to 90 ◦) and is trained on general in-the-wild video data, which limits its effectiveness in robotic manipulation scenarios. In contrast, RoboNVS adapts this framework to robotic demonstrations by synthesizing temporally consistent videos from a fixed target viewpoint and tailoring the generation process to the structure of manipulation scenes. 
+
+Video Depth Estimation. Estimating temporally consistent depth from monocular videos has been widely studied and serves as an important component for geometry-aware video synthesis. One line of work focuses on enforcing temporal consistency in video depth prediction. For example, VDA [ 10 ] and DepthCrafter [ 23 ]leverage transformer or video diffusion models to generate temporally coherent depth sequences. Another line of research directly predicts per-frame depth and camera parameters using large-scale 3D-aware models such as DA3 [ 33 ], MegaSAM [ 31 ], Pi3 [ 53 ], and ViPE [ 24 ]. While these methods have achieved strong performance, diffusion-based approaches typically produce only relative depth, whereas feedforward models provide metric depth but may suffer from temporal instability and low spatial resolution. To address this limitation, RoboNVS combines the temporal smoothness of diffusion-based depth models DepthCrafter with the metric accuracy of large-scale 3D foundation models DA3, and further applies global scale-shift alignment to obtain reliable geometry for downstream novel-view video synthesis. 
+
+## C Additional Implementation Details C.1 Detailed Dataset Statistics 
+
+To evaluate the generalization of RoboNVS across diverse robotic settings, we construct a large-scale manipulation dataset by aggregating multiple public repositories.Our collection primarily builds upon the 
+
+Open X-Embodiment (OXE) [ 40 ] meta-dataset. From this resource, we select several high-quality subsets covering diverse manipulation scenarios and robotic embodiments. The selected datasets are summarized in Table 7. We further incorporate additional manipulation datasets including RH20T [15 ], Robotwin [ 11 ], and 
+
+RoboCoin [ 55 ]. In total, the dataset contains approximately 10,000 video sequences covering diverse robotic embodiments and environments. The Droid dataset constitutes approximately 70% of our training 14 Open X-Embodiment 
+
+> 82%
+> Droid (70%)
+> RT-1 (5%)
+> BridgeData V2 (2%)
+> Other Subsets (5%)
+> RH20T (3%)
+> Robotwin (5%)
+> RoboCOIN (10%)
+
+Training Dataset Distribution Figure 12. Dataset composition used for training RoboNVS .
+
+corpus. This is mainly because Droid contains diverse manipulation scenes with relatively fewer repeated demonstrations in the same environment, whereas many other datasets repeatedly collect demonstrations in limited scenes. Using a large amount of Droid data allows RoboNVS to learn a broader range of robotic manipulation environments. Detailed dataset composition used for training our model RoboNVS are shown in Figure 12. Detailed dataset statistics and the robot platforms involved are summarized in Table 8. 
+
+## C.2 Self-supervised Data Generation for training in RoboNVS framework 
+
+Given a robot manipulation video {𝐼 𝑡 }𝑇 𝑡 =1 captured by a static camera, we construct self-supervised training pairs without requiring multi-view supervision. We first estimate depth maps for each frame and reconstruct a dynamic mesh M using the DW-Mesh method from the EX-4D framework. To simulate novel-view observations, we sample a rotation angle 
+
+𝜃 ∼ U (± 20 ◦, ±60 ◦) around the depth center of the first frame and place a virtual camera at the resulting pose. The camera remains fixed for the entire sequence, mimicking the viewpoint change encountered during inference. Rendering the mesh under the new viewpoint produces a visibility mask 𝑀 𝑡 for each frame. The mask is then projected back to the original frame to construct a masked input 
+
+˜𝐼 𝑡 (𝑢, 𝑣 ) =
+
+(
+
+𝐼 𝑡 (𝑢, 𝑣 ), 𝑀 𝑡 (𝑢, 𝑣 ) = 1,
+
+0, 𝑀 𝑡 (𝑢, 𝑣 ) = 0, (7) where pixels outside the visible region are masked out to simulate occlusions caused by viewpoint changes. The original frame 𝐼 𝑡 serves as the reconstruction target. We further apply the Bi-directional Masking Strategy described in Sec. 3.5 of the main paper to generate complementary masked inputs, which increases mask diversity during training. 
+
+## C.3 Policy Architectures and Training Configurations 
+
+This section provides additional details on the policy architectures and training configurations used in the experiments presented in Section 2 of the main paper. Specifically, we evaluate two representative visuomotor policies: Diffusion Policy (DP) [ 12 ] and Pi0 [ 3]. For DP, we adopt the standard diffusion-based 15 Table 9. Key training hyperparameters for Diffusion Policy (DP). 
+
+Diffusion Policy (DP) Training Setup 
+
+Observation modality head_camera + agent_pos Image encoder ResNet18 Image resolution 256 × 192 Batch size 128 Observation steps ( 𝑛 obs ) 3 Optimizer AdamW Prediction horizon 8 Learning rate 1 × 10 −4
+
+Executed actions ( 𝑛 action ) 6 LR schedule cosine decay Diffusion type DDPM Weight decay 1 × 10 −6
+
+Training diffusion steps 100 EMA decay 0.99 UNet channels [256, 512, 1024] Time embedding dim 128 
+
+Table 10. Key training hyperparameters for Pi0. 
+
+Pi0 Training Setup 
+
+Backbone VLM PaliGemma 2B + LoRA Precision bfloat16 Vision encoder SigLIP Parallelization FSDP (4 GPUs) Action expert Gemma 300M + LoRA Optimizer AdamW Peak learning rate 2.5 × 10 −5 Final learning rate 2.5 × 10 −6
+
+LR schedule cosine decay Warmup steps 1000 Batch size 32 Gradient clipping 1.0 
+
+𝛽 1, 𝛽 2 (0.9, 0.95) Weight decay 1 × 10 −10 
+
+Training steps 5k AB 
+
+> BBH
+> CA
+> CB
+
+Figure 13. Visualization of stochastic initializations for four representative tasks. Each row represents a specific task, while columns show different randomized initializations, showcasing variations in object poses and background textures. 
+
+action generation framework with a ResNet-18 [ 18 ] visual encoder and a three-frame observation window. The temporal horizon is set to 8, with 3 observation steps and 6 predicted action steps. These settings are kept consistent across both RoboTwin 2.0 simulation and real-world Franka Panda experiments to ensure standardized evaluation. For Pi0, we follow the official architecture design based on a PaliGemma-2B 
+
+vision-language backbone with SigLIP visual encoding and a Gemma-300M action expert, trained with 
+
+LoRA for efficient adaptation. To facilitate reproducibility, the key architectural choices and training hyperparameters for both policies are summarized in Table 9 and Table 10. 16 AB BBH CA CB MPA SB      
+
+> MCP OL PCP PEC PS SBH Figure 14. Visualization of the 12 manipulation tasks in RoboTwin.
+
+## C.4 Initialization Protocols for RoboTwin Experiments 
+
+To ensure a rigorous evaluation and prevent the policy from overfitting to fixed spatial configurations, we implement a stochastic initialization protocol across all tasks. For each new evaluation rollout, the initial poses of the manipulated objects are randomly perturbed within a predefined range. Furthermore, in the 
+
+Random environment mode, tabletop textures are stochastically resampled for every session, introducing substantial appearance variation. This high degree of environmental stochasticity ensures that the agent cannot succeed by simply memorizing fixed trajectories or relying on static state information; instead, it must generalize across varying object placements and visual backgrounds. Figure 13 illustrates the initial frames of four representative tasks across five randomized evaluation rollouts, showcasing the diversity in object initialization and environment appearance. 
+
+## C.5 Detailed Specification of RoboTwin Manipulation Tasks 
+
+This section defines the 12 manipulation tasks from RoboTwin 2.0. Task Definitions: AB (Adjust Bottle): 
+
+Adjust the bottle to an upright pose; BBH (Beat Block Hammer): Pick up a hammer and strike a block; CA (Click Alarm Clock): Precise clicking of alarm clock; CB (Click Bell): Locating and clicking service bell; 
+
+MPA (Move Playing Card Away): Sliding card across table; MCP (Move Can Pot): Placing can into pot; 
+
+OL (Open Laptop): Operating laptop hinge; PCP (Place Container Plate): Placing container on plate; 
+
+PS (Press Stapler): Operating a stapler; PEC (Place Empty Cup): Cup placement; SB(Shake Bottle): 
+
+Shake a bottle; SBH (Shake Bottle Horizontally): Vertically shake the bottle. Detailed visualization of the 12 manipulation tasks are shown in Figure 14. 
+
+Task Categorization: (1) Precise Interaction: CA, CB, PS, PEC. (2) Bimanual/Dynamic: BBH, SB, SBH. (3) Pick-and-Place/Relocation: AB, MCP, PCP, MPA. (4) Articulated Object: OL. 
+
+Experimental Task Allocation: VA Experiment (Fig. 2 in the main paper): Evaluated on Adjust Bottle (AB), Beat Block Hammer (BBH), Click Alarm Clock (CA), Click Bell (CB), Move Playing Card Away (MPA), and Shake Bottle Horizontally (SBH) . VLA Experiment (Table 1 in the main paper): Seen Tasks include Beat Block Hammer (BBH), Click Alarm Clock (CA), Move Can Pot (MCP), Move Playing Card Away (MPA), Open Laptop (OL), Place Container Plate (PCP), Press Stapler (PS), and Shake Bottle Horizontally (SBH) . Unseen Tasks include Shake Bottle (SB), Click Bell (CB), and Place Empty Cup (PEC) .17 Table 11. Key architectural and training hyperparameters for the ACT policy. 
+
+ACT Policy Configuration 
+
+Backbone ResNet-18 Hidden dim 512 Encoder layers 4 Decoder layers 7Attention heads 8 Feedforward dim 3200 Dropout 0.1 Position embedding sine Batch size 16 Training epochs 6000 Learning rate 1 × 10 −5 Backbone LR 1 × 10 −5
+
+Weight decay 1 × 10 −4 Gradient clip 0.1 Chunk size 50 KL weight 10 0 2 4 6     
+
+> Number of Added Views
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> AB BBH CAC SBH MPA CB
+> Success rates of ACT policies across six tasks
+
+Figure 15. Success rate comparison of ACT policies under multi-view vs. single-view training. We evaluate the ACT policy across six manipulation tasks, comparing models trained with multi-view demonstrations against those trained solely on canonical 0◦ data. All policies are evaluated under the fixed 0◦ viewpoint. The results indicate that multi-view training consistently yields higher success rates compared to the single-view baseline, even for fixed-viewpoint evaluation. Notably, the peak performance for ACT generally occurs when the training set is augmented with moderate viewpoint offsets, specifically at ±20 ◦.
+
+## D Extended Investigations on Multi-view Learning in RoboTwin D.1 Generalization to Alternative Policy Architectures: Validation on ACT 
+
+To verify that our findings are not specific to the Diffusion Policy (DP) architecture, we replicate our core experiments using the Action Chunking with Transformers (ACT [ 66 ]) framework. The key architectural and training configurations of the ACT policy used in our experiments are summarized in Table 11. To ensure a strictly controlled comparison, we utilize the exact same demonstration dataset as used for the DP training. Specifically, we reproduce the view augmentation protocol from Fig. 3 in the main paper. Starting from the frontal 0◦ view, we progressively construct the same view sets: 0, 0 + {± 10 ◦},
+
+0 + {± 10 ◦, ±20 ◦}, and 0 + {± 10 ◦, ±20 ◦, ±30 ◦}. Demonstrations collected from these viewpoints are merged with the original 0◦ data for training, while policy evaluation is consistently conducted under the canonical 
+
+0◦ view. Crucially, both the training and evaluation phases for the ACT policies are conducted within the Random 
+
+environment mode of RoboTwin 2.0. In this setting, tabletop textures are randomly sampled from a large-scale pool to introduce substantial visual diversity, preventing the policy from relying on static background cues. 
+
+Figure 15 presents the success rates of the ACT policy across multiple manipulation tasks. As shown in the results, multi-view training consistently improves the manipulation success rate compared to policies trained only on single-view ( 0◦) data. Notably, this improvement remains evident even though evaluation is performed exclusively from the fixed 0◦ viewpoint. These results align with our observations for DP(Fig. 3(left) in the main paper), indicating that the benefits of multi-view supervision are largely 18 40°             
+
+> 90°
+> 0246
+> Number of Added Views
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Using 40 degree as the base view
+> 0246
+> Number of Added Views
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Using 90 degree as the base view
+> (a) (b)
+> AB BBH CAC SBH MPA CB
+
+Figure 16. Evaluation of view augmentation under alternative base viewpoints. (a) Scenes of the two base views used in this study. (b) Task success rates of policies trained with multi-view demonstrations across six tasks. The left plot uses 40 ◦ as the base view, while the right plot uses 90 ◦ as the base view. All evaluations are conducted under the 
+
+0◦ viewpoint. 
+
+architecture-agnostic and consistently enhance visuomotor policy learning. 
+
+## D.2 View Augmentation with Alternative Base Viewpoints 
+
+In the main paper, all experiments use the frontal 0◦ camera as the base view for view augmentation. Starting from this view, additional cameras are progressively added symmetrically (e.g., 0, 0 + {± 10 ◦},
+
+0 + {± 10 ◦, ±20 ◦}, up to ±60 ◦), and the collected demonstrations from these viewpoints are merged to train the policy. Evaluation is always conducted under the original 0◦ view. In this appendix, we investigate whether the same conclusion holds when the base view is changed. Specifically, we repeat the same experimental protocol by treating the 40 ◦ and 90 ◦ viewpoints as the new base views. Detailed scenes of these two base views as shown in Fig. 16 (a). These correspond to a diagonal view and a side view of the robot, respectively. For each base view, we evaluate the same four augmentation settings used in the main experiments: single-view ( 0◦), 0 + {± 10 ◦}, 0 + {± 10 ◦, ±20 ◦}, and 0 + {± 10 ◦, ±20 ◦, ±30 ◦}. As shown in Fig. 16 (b), policies trained with multi-view demonstrations consistently achieve higher success rates than those trained with only a single view across all tasks. This observation holds for both 40 ◦ and 90 ◦ base viewpoints, indicating that the benefits of multi-view training are not specific to the frontal camera but generalize to other viewing angles. 
+
+## D.3 Enhancing Cross-View Robustness through Multi-View Data Augmentation 
+
+While our primary analysis focuses on fixed-viewpoint evaluation, a direct and significant benefit of multi-view training is the enhancement of policy robustness against camera viewpoint shifts. To quantify this effect, we conduct a comparative study across six representative manipulation tasks. We evaluate two distinct training configurations: (1) a multi-view policy trained on demonstrations spanning a range of [− 20 ◦, 20 ◦],and (2) a single-view baseline trained exclusively on 0◦ data. Both models are subsequently tested across four diverse unseen or off-center viewpoints: −20 ◦, −10 ◦, 10 ◦, and 20 ◦.As presented in Figure 17, the results demonstrate a substantial performance gap. The multi-view policy consistently achieves significantly higher success rates across all test viewpoints compared to the single-view baseline. This finding underscores a fundamental challenge in robot learning: policies trained on limited perspectives are highly susceptible to distribution shifts caused by camera movement.This investigation highlights the practical value of our proposed RoboNVS framework. By synthesizing physically consistent novel-view videos from monocular inputs , RoboNVS serves as a powerful self-supervised data augmentation tool. It effectively enables the scaling of viewpoint diversity in existing robotic datasets without the prohibitive cost of multi-camera real-world collection. Consequently, RoboNVS directly contributes to building more versatile manipulation policies that remain robust under diverse observational perspectives. 19 AB BBH CA CB MPA SBH                
+
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Success Count / 50
+> 0
+> 46
+> 0
+> 32
+> 6
+> 56
+> 0
+> 32
+> 0
+> 12
+> 20
+> 38
+> Eval Angle: -20°
+> 0° Only
+> Multi-Angle
+> AB BBH CA CB MPA SBH
+> Success Count / 50
+> 2
+> 40
+> 2
+> 30
+> 6
+> 58
+> 4
+> 40
+> 0
+> 8
+> 16
+> 36
+> Eval Angle: -10°
+> AB BBH CA CB MPA SBH
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Success Count / 50
+> 0
+> 36
+> 4
+> 22
+> 8
+> 56
+> 0
+> 40
+> 0
+> 10
+> 14
+> 40
+> Eval Angle: +10°
+> AB BBH CA CB MPA SBH
+> Success Count / 50
+> 0
+> 42
+> 0
+> 18
+> 8
+> 52
+> 2
+> 42
+> 0
+> 10
+> 16
+> 46
+> Eval Angle: +20°
+> DP Policy: 0° Only vs Multi-Angle Training
+> (6 Tasks × 4 Evaluation Angles)
+
+Figure 17. Cross-view robustness evaluation across diverse test viewpoints. We compare the performance of policies trained with multi-view data (covering the range of [− 20 ◦, 20 ◦]) against those trained solely on single-view (0◦) demonstrations across six manipulation tasks. The success rates are reported at four off-center evaluation angles: −20 ◦, −10 ◦, 10 ◦, and 20 ◦. It is evident that the multi-view policies consistently and significantly outperform the single-view baseline at all tested perspectives. This substantial performance gain demonstrates that multi-view supervision functions as a highly effective data augmentation strategy, successfully mitigating the performance degradation typically caused by camera distribution shifts. 
+
+## E Extending View Augmentation to 3D Point Cloud Policies 
+
+In the main paper, the view augmentation (VA) experiments on RobotWin (Fig. 3(left) in main) are conducted using the Diffusion Policy (DP) with RGB image inputs. To further examine whether the benefit of multi-view data augmentation generalizes to policies with 3D observations, we repeat the same experimental protocol using DP3 [62] , where the visual input is replaced by point clouds. Specifically, starting from the frontal 0◦ view, we construct the same progressive view sets used in the main experiments: 0, 0 + {± 10 ◦}, 0 + {± 10 ◦, ±20 ◦}, and 0 + {± 10 ◦, ±20 ◦, ±30 ◦}. Demonstrations collected from these viewpoints are merged with the original 0◦ data for training, while policy evaluation is consistently performed under the 0◦ view. Fig. 18(a) shows example point cloud observations of the six tasks captured from the frontal 0◦ viewpoint. As shown in Fig. 18(b), policies trained with multi-view demonstrations consistently achieve higher success rates than those trained with only the single 0◦ view across all six tasks. These results indicate that synchronized multi-view data augmentation not only improves policies trained with RGB inputs, but also benefits policies operating on 3D point cloud observations. This suggests that the advantage of view augmentation stems from richer data coverage rather than a specific observation modality. The detailed architectural and training configurations of the DP3 policy used in our experiments are summarized in Table 12. 
+
+## F Comparative Analysis of Generative Models for Multi-View Data Augmentation in RoboTwin 
+
+This section provides a quantitative evaluation of different generative models as data augmentation tools for novel-view synthesis within the RoboTwin simulation environment. Our objective is to verify the superiority of RoboNVS by comparing the improvements in task success rates achieved using augmented data generated by various models. 20 AB CA MPA            
+
+> BBH CB SBH
+> 0246
+> Number of Added Views
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Success rates of DP3 policies across six tasks
+> AB BBH CA CB MPA SBH
+> (a) (b)
+
+Figure 18. View augmentation results with DP3 using point cloud observations. (a) Example point cloud observations of the six tasks captured from the frontal 0◦ viewpoint. (b) Success rates of policies trained with progressively added viewpoints across the six tasks. All evaluations are conducted under the 0◦ viewpoint. 
+
+Table 12. Key architectural and training hyperparameters for DP3 used in our experiments. 
+
+Policy Architecture Training Setup 
+
+Policy Type DP3 (DDIM Diffusion) Optimizer AdamW Point Cloud Encoder PointTransformer Learning Rate 1 × 10 −4
+
+Transformer Layers 2 Batch Size 16 Attention Heads 2 Training Epochs 3000 Encoder Output Dim 128 Weight Decay 1 × 10 −6
+
+UNet Channels [512, 1024, 2048] LR Schedule Cosine 
+
+Observation and Action Setup 
+
+Point Cloud Input 1024 points (XYZ) Action Dim 16 Observation Steps 3 Horizon 8Action Steps 6 Latency Steps 0
+
+Experimental Setup. We select two representative manipulation tasks CA (Click Alarm Clock) and CB (Click Bell) , each containing 50 expert demonstration videos captured from the 0◦ viewpoint. Utilizing predefined camera poses, we employ RoboNVS (ours) , EX-4D, TrajectoryCrafter, CogNVS, and ZeroNVS-ft, where ZeroNVS is fine-tuned on the simulation dataset Mimicgen [ 36 ], as in VISTA [ 46 ], for fair robotic comparison. to generate novel-view data at −20 ◦, −10 ◦, 10 ◦, and 20 ◦. These generated datasets are combined with the original 0◦ data to train the evaluation policies, which are then tested under a fixed 0◦
+
+viewpoint to isolate the performance gains derived purely from multi-view data augmentation. Additionally, to evaluate generative fidelity, we utilize single-view expert demonstrations from two tasks as inputs. Each generative model synthesizes novel-view sequences at the same four camera offsets ( ±10 ◦, ±20 ◦). These generated videos are compared against the simulator’s Ground Truth (GT) videos from the corresponding viewpoints. We report the average values across these tasks and viewpoints for five standard metrics: PSNR, SSIM, LPIPS [64], FID [19], and FVD [20]. 
+
+Qualitative Analysis. Figure 19 illustrates the visual quality of the synthesized frames at a +20 ◦ rotation offset. For these simulation-based evaluations, we leverage the Ground Truth (GT) depth provided by the RoboTwin environment to construct the DW-Mesh and subsequent occlusion masks. This approach is adopted because monocular depth estimation models often perform poorly in the RoboTwin simulation environment and typically lack reliable metric scale. To ensure a fair comparison of inpainting capabilities, RoboNVS (ours) , CogNVS, TrajectoryCrafter, and EX-4D are all provided with these identical GT-derived masks 
+
+as the conditioning input for video generation. As observed in the results, while baselines such as EX-4D and CogNVS exhibit geometric distortions, joint misalignments, or blurred textures under extreme camera shifts, RoboNVS maintains superior structural integrity and temporal stability. Existing models, primarily optimized for general dynamic camera movements, often encounter a distribution shift when processing the 21 Source view RoboNVS( ours) EX-4D ZeroNVS-ft Trajectorycrafter CogNVS 
+
+> 20 °
+> 20 °
+> GroundTruth
+
+Figure 19. Qualitative comparison of generative models under a +20 ◦ rotation in RoboTwin. All models are conditioned on identical masks derived from simulation Ground Truth (GT) depth to ensure a fair comparison of inpainting performance. RoboNVS (ours) demonstrates superior geometric consistency and clearer robotic joint reconstruction compared to EX-4D, TrajectoryCrafter, CogNVS, and ZeroNVS-ft. 
+
+Table 13. Quantitative comparison of generative video synthesis quality in RoboTwin. 
+
+Model PSNR (dB) ↑ SSIM ∼ 1 LPIPS ↓ FID ↓ FVD ↓
+
+Cog_NVS 17.154 0.7169 0.3621 245.13 47.36 EX-4D 17.031 0.6703 0.4331 248.26 79.26 TrajectoryCrafter 16.480 0.6687 0.4714 217.33 68.47 ZeroNVS-ft 14.350 0.7065 0.5465 215.58 86.18 
+
+RoboNVS (ours) 18.839 0.7575 0.3018 132.87 33.28 
+
+Table 14. Policy success rates after multi-view data augmentation using different generative models, evaluated at the RoboTwin 0◦ viewpoint. Each result is reported over 50 evaluation trials. 
+
+Training Data Configuration Click Alarmclock Click Bell 
+
+Single-view Baseline ( 0◦ original data) 19/50 (38%) 5/50 (10%) EX-4D + 0◦ 36/50 (72%) 9/50 (18%) TrajectoryCrafter + 0◦ 28/50 (56%) 9/50 (18%) CogNVS + 0◦ 34/50 (68%) 35/50 (70%) ZeroNVS-ft + 0◦ 22/50 (44%) 6/50 (12%) 
+
+RoboNVS (ours) + 0◦ 40/50 (80%) 38/50 (76%) 
+
+specific occlusion patterns of robotic manipulators. In contrast, our depth-guided bi-directional masking strategy effectively reconstructs the robot’s end-effector and complex object geometries, providing the policy with more physically consistent visual priors. 
+
+Quantitative Results and Generative Fidelity The generative quality results summarized in Table 13 
+
+reveal that RoboNVS significantly outperforms all baselines across every dimension. Specifically, it achieves the highest PSNR ( 18 .839 ) and SSIM ( 0.7575 ), indicating superior pixel-level reconstruction and structural accuracy. Moreover, the substantially lower FID ( 132 .87 ) and FVD ( 33 .28 ) scores confirm that our framework generates videos with significantly higher visual realism and temporal consistency compared to models like CogNVS or EX-4D. Combined with the success rate results in Table 14 , these metrics demonstrate a clear correlation: the physically consistent and high-fidelity novel-view data provided by 
+
+RoboNVS leads to more stable and significant performance improvements for robot learning. This evidence solidifies its potential as a robust and effective data augmentation tool. 22 20 °        
+
+> 20 °
+> 20 °
+> RoboNVS Source view EX-4D TrajectoryCrafter CogNVS Figure 20. Qualitative comparison of mask-based generative inpainting. We evaluate the pure synthesis performance of RoboNVS (ours) , EX-4D, TrajectoryCrafter, and CogNVS by providing identical mask sequences as inputs. The results demonstrate that RoboNVS achieves significantly higher generation fidelity in complex robotic manipulation scenarios. Compared to existing baselines, our framework produces fewer geometric distortions and more accurately reconstructs scenes consistent with the real-world environment
+
+## G Extended Visualizations and Comparisons G.1 Qualitative Comparison of Mask-Based Video Inpainting under Identical Masks 
+
+As illustrated in Fig. 20, we provide a qualitative comparison between RoboNVS (ours) and several state-of-the-art mask-based, geometry-aware generative models, including EX-4D, TrajectoryCrafter, and CogNVS. By utilizing identical mask sequences across all models, we isolate and evaluate their core inpainting capabilities within robotic manipulation scenarios. The visual results indicate that existing baselines frequently produce inaccurate completions, manifested as distorted robotic joints, ghosting artifacts, and significant geometric distortions. In some instances, these models fail to fill the masked regions entirely. We attribute these failures to two primary factors: (1) a lack of domain-specific robotic manipulation data during their training phases, and (2) their optimization for general dynamic camera movements, which results in a distribution shift when encountering the specific occlusion patterns of robot arms. In contrast, RoboNVS synthesizes novel-view videos that are significantly more consistent with real-world scenes. Benefiting from our Bi-directional Masking strategy and depth-guided rendering, our framework reconstructs robotic structures that are complete, sharp, and virtually free of distortions. These improvements confirm that RoboNVS is better suited for generating high-fidelity demonstrations for downstream policy learning. 23 G.2 Rendering Comparisons of DW-Mesh via Diverse Depth Prediction Models 
+
+Fig. 21 presents qualitative comparisons of DW-Mesh renderings constructed from depth predictions of seven representative methods. Specifically, we evaluate two temporally consistent video depth estimators producing relative depth (DepthCrafter and VDA), three 3D-aware models predicting metric depth and camera parameters (Pi3, ViPE, and DA3), and two depth alignment strategies combining temporal and metric depth (VDA w/ DA3 and DepthCrafter w/ DA3(ours)). For each method, depth maps are converted to point clouds and reconstructed into DW-Mesh, rendered from a camera viewpoint to visualize geometric consistency and artifacts. 24 Source 
+
+## views 
+
+## Depthcrafter 
+
+## VDA 
+
+## DA3 
+
+## Pi3 
+
+## ViPE 
+
+## VDA 
+
+## w/ DA3 
+
+## Depthcrafter 
+
+## w/ DA3 (ours) Figure 21. Qualitative comparison of DW-Mesh renderings constructed from different video depth prediction methods. The first row shows the source views of three example manipulation scenes. For each column, depth maps predicted by seven methods are converted into point clouds and further reconstructed into DW-Mesh representations, which are rendered from the same camera viewpoint for comparison. Brown boxes highlight differences between temporally consistent depth methods (DepthCrafter vs. VDA), red boxes compare metric depth models (Pi3, ViPE, DA3), and yellow boxes illustrate the advantage of our aligned depth strategy (DepthCrafter w/ DA3). 
+
+Comparing the two temporally consistent depth methods, DepthCrafter produces noticeably more stable and geometrically plausible renderings than VDA. As highlighted by the brown boxes in Fig. 21, meshes derived from DepthCrafter exhibit more reasonable object scales and fewer artifacts around depth 25 discontinuities such as object boundaries. In contrast, the DW-Mesh constructed from VDA often shows distorted object shapes and pronounced boundary artifacts. Since DW-Mesh geometry is directly determined by the predicted depth, these results indicate that DepthCrafter provides more reliable monocular video depth estimation. Therefore, we adopt DepthCrafter as the temporal depth estimator in our pipeline. We further compare three 3D foundation models that predict metric depth and camera parameters. As indicated by the red boxes, ViPE shows the most severe geometric distortions and unrealistic object scales, while Pi3 suffers from noticeable surface artifacts and irregular mesh structures. In contrast, DA3 produces more consistent object scales and cleaner surface structures, for example around the paper cup and the robot arm base in the second column and the blue cup in the third column. Moreover, the meshes reconstructed from DA3 contain significantly fewer spurious spikes or boundary artifacts. These observations motivate our choice of DA3 as the 3D foundation model for metric depth prediction. Finally, we compare two depth alignment strategies that combine temporal depth with metric depth. The comparison highlighted by the yellow boxes shows that DepthCrafter w/ DA3 (ours) yields significantly cleaner geometry than VDA w/ DA3. Because DepthCrafter produces fewer depth artifacts and more stable temporal predictions than VDA, the aligned depth obtained from DepthCrafter w/ DA3 results in meshes with more accurate object scale and fewer boundary artifacts. This provides more reliable geometric masks for the subsequent inpainting-based video generation stage. Comparing DepthCrafter w/ DA3 with its individual components further illustrates the complementary strengths of the two models. DepthCrafter contributes temporally coherent depth predictions with rich structural details (e.g., the text on the robot arm)., while DA3 provides accurate camera intrinsics and metric scale. Their combination therefore preserves the temporal stability and fine geometry of DepthCrafter while aligning the depth with physically meaningful camera geometry, leading to higher-quality DW-Mesh renderings for downstream view synthesis. 
+
+## References 
+
+[1] Jianhong Bai, Menghan Xia, Xiao Fu, Xintao Wang, Lianrui Mu, Jinwen Cao, Zuozhu Liu, Haoji Hu, Xiang Bai, Pengfei Wan, et al. Recammaster: Camera-controlled generative rendering from a single video. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 2025. [2] Suneel Belkhale, Yuchen Cui, and Dorsa Sadigh. Hydra: Hybrid robot actions for imitation learning. In Proceedings of the 7th Conference on Robot Learning (CoRL) , 2023. [3] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. 𝜋 0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. [4] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi, Zion English, Vikram Voleti, Adam Letts, et al. Stable video diffusion: Scaling latent video diffusion models to large datasets. arXiv preprint arXiv:2311.15127 , 2023. [5] Jean-Michel Boucheix, Perrine Gauthier, Jean-Baptiste Fontaine, and Sandrine Jaffeux. Mixed camera viewpoints improve learning medical hand procedure from video in nurse training? Computers in Human Behavior , 2018. [6] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakrishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al. Rt-1: Robotics transformer for real-world control at scale. arXiv preprint arXiv:2212.06817 , 2022. [7] Haoxin Chen, Menghan Xia, Yingqing He, Yong Zhang, Xiaodong Cun, Shaoshu Yang, Jinbo Xing, Yaofang Liu, Qifeng Chen, Xintao Wang, et al. Videocrafter1: Open diffusion models for high-quality video generation. arXiv preprint arXiv:2310.19512 , 2023. [8] Kaihua Chen, Tarasha Khurana, and Deva Ramanan. Reconstruct, inpaint, test-time finetune: Dynamic novel-view synthesis from monocular videos. arXiv preprint arXiv:2507.12646 , 2025. 26 [9] Lawrence Yunliang Chen, Chenfeng Xu, Karthik Dharmarajan, Muhammad Zubair Irshad, Richard Cheng, Kurt Keutzer, Masayoshi Tomizuka, Quan Vuong, and Ken Goldberg. Rovi-aug: Robot and viewpoint augmentation for cross-embodiment robot learning. arXiv preprint arXiv:2409.03403 , 2024. [10] Sili Chen, Hengkai Guo, Shengnan Zhu, Feihu Zhang, Zilong Huang, Jiashi Feng, and Bingyi Kang. Video depth anything: Consistent depth estimation for super-long videos. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22831–22840, 2025. [11] Tianxing Chen, Zanxin Chen, Baijun Chen, Zijian Cai, Yibin Liu, Zixuan Li, Qiwei Liang, Xianliang Lin, Yiheng Ge, Zhenyu Gu, et al. Robotwin 2.0: A scalable data generator and benchmark with strong domain randomization for robust bimanual robotic manipulation. arXiv preprint arXiv:2506.18088 ,2025. [12] Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin Burchfiel, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. In Robotics: Science and Systems (RSS) , 2023. [13] Zichen Jeff Cui, Yibin Wang, Nur Muhammad Mahi Shafiullah, and Lerrel Pinto. From play to policy: Conditional behavior generation from uncurated robot data. arXiv preprint arXiv:2210.10047 , 2022. [14] Patrick Esser, Johnathan Chiu, Parmida Atighehchian, Jonathan Granskog, and Anastasis Germanidis. Structure and content-guided video synthesis with diffusion models, 2023. URL https://arxiv. org/abs/2302.03011 .[15] Hao-Shu Fang, Hongjie Fang, Zhenyu Tang, Jirong Liu, Chenxi Wang, Junbo Wang, Haoyi Zhu, and Cewu Lu. Rh20t: A comprehensive robotic dataset for learning diverse skills in one-shot. arXiv preprint arXiv:2307.00595 , 2023. [16] Ankit Goyal, Jie Xu, Yijie Guo, Valts Blukis, Yu-Wei Chao, and Dieter Fox. Rvt: Robotic view transformer for 3d object manipulation. In Conference on Robot Learning , 2023. [17] Hao He, Yinghao Xu, Yuwei Guo, Gordon Wetzstein, Bo Dai, Hongsheng Li, and Ceyuan Yang. Cameractrl: Enabling camera control for text-to-video generation. arXiv preprint arXiv:2404.02101 ,2024. [18] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Identity mappings in deep residual networks. In European conference on computer vision , pages 630–645. Springer, 2016. [19] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp Hochreiter. Gans trained by a two time-scale update rule converge to a local nash equilibrium. Advances in neural information processing systems , 30, 2017. [20] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp Hochreiter. Gans trained by a two time-scale update rule converge to a local nash equilibrium, 2018. URL 
+
+https://arxiv.org/abs/1706.08500 .[21] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Liang Wang, Weizhu Chen, et al. Lora: Low-rank adaptation of large language models. Iclr , 2022. [22] Tao Hu, Haoyang Peng, Xiao Liu, and Yuewen Ma. Ex-4d: Extreme viewpoint 4d video synthesis via depth watertight mesh. arXiv preprint arXiv:2506.05554 , 2025. [23] Wenbo Hu, Xiangjun Gao, Xiaoyu Li, Sijie Zhao, Xiaodong Cun, Yong Zhang, Long Quan, and Ying Shan. Depthcrafter: Generating consistent long depth sequences for open-world videos. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2025. 27 [24] Jiahui Huang, Qunjie Zhou, Hesam Rabeti, Aleksandr Korovko, Huan Ling, Xuanchi Ren, Tianchang Shen, Jun Gao, Dmitry Slepichev, Chen-Hsuan Lin, et al. Vipe: Video pose engine for 3d geometric perception. arXiv preprint arXiv:2508.10934 , 2025. [25] Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si, Yuming Jiang, Yuanhan Zhang, Tianxing Wu, Qingyang Jin, Nattapol Chanpaisit, et al. Vbench: Comprehensive benchmark suite for video generative models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21807–21818, 2024. [26] Tianchong Jiang, Jingtian Ji, Xiangshan Tan, Jiading Fang, Anand Bhattad, Vitor Guizilini, and Matthew R Walter. Do you know where your camera is? view-invariant policy learning with camera conditioning. arXiv preprint arXiv:2510.02268 , 2025. [27] Liyiming Ke, Yunchu Zhang, Abhay Deshpande, Siddhartha Srinivasa, and Abhishek Gupta. Ccil: Continuity-based data augmentation for corrective imitation learning. arXiv preprint arXiv:2310.12972 ,2023. [28] Alexander Khazatsky, Karl Pertsch, Suraj Nair, Ashwin Balakrishna, Sudeep Dasari, Siddharth Karamcheti, Soroush Nasiriany, Mohan Kumar Srirama, Lawrence Yunliang Chen, Kirsty Ellis, et al. Droid: A large-scale in-the-wild robot manipulation dataset. arXiv preprint arXiv:2403.12945 , 2024. [29] Weijie Kong, Qi Tian, Zijian Zhang, Rox Min, Zuozhuo Dai, Jin Zhou, Jiangfeng Xiong, Xin Li, Bo Wu, Jianwei Zhang, et al. Hunyuanvideo: A systematic framework for large video generative models. arXiv preprint arXiv:2412.03603 , 2024. [30] Zheng Li, Pei Qu, Yufei Jia, Shihui Zhou, Haizhou Ge, Jiahang Cao, Jinni Zhou, Guyue Zhou, and Jun Ma. Manivid-3d: Generalizable view-invariant reinforcement learning for robotic manipulation via disentangled 3d representations. IEEE Robotics and Automation Letters , 2026. [31] Zhengqi Li, Richard Tucker, Forrester Cole, Qianqian Wang, Linyi Jin, Vickie Ye, Angjoo Kanazawa, Aleksander Holynski, and Noah Snavely. Megasam: Accurate, fast and robust structure and motion from casual dynamic videos. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10486–10496, 2025. [32] Fanqi Lin, Yingdong Hu, Pingyue Sheng, Chuan Wen, Jiacheng You, and Yang Gao. Data scaling laws in imitation learning for robotic manipulation. In The Thirteenth International Conference on Learning Representations , 2024. [33] Haotong Lin, Sili Chen, Junhao Liew, Donny Y Chen, Zhenyu Li, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth anything 3: Recovering the visual space from any views. arXiv preprint arXiv:2511.10647 ,2025. [34] I Liu, Chun Arthur, Jason Chen, Gaurav Sukhatme, and Daniel Seita. D-coda: Diffusion for coordinated dual-arm data augmentation. arXiv preprint arXiv:2505.04860 , 2025. [35] Zeyi Liu, Shuang Li, Eric Cousineau, Siyuan Feng, Benjamin Burchfiel, and Shuran Song. Geometry-aware 4d video generation for robot manipulation. arXiv preprint arXiv:2507.01099 , 2025. [36] Ajay Mandlekar, Soroush Nasiriany, Bowen Wen, Iretiayo Akinola, Yashraj Narang, Linxi Fan, Yuke Zhu, and Dieter Fox. Mimicgen: A data generation system for scalable robot learning using human demonstrations. arXiv preprint arXiv:2310.17596 , 2023. [37] Tatsuya Matsushima, Hiroki Furuta, Yusuke Iwasawa, and Yutaka Matsuo. Weblab xarm dataset, 2023. [38] Peter Mitrano and Dmitry Berenson. Data augmentation for manipulation. arXiv preprint arXiv:2205.02886 , 2022. 28 [39] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning robust visual features without supervision. arXiv preprint arXiv:2304.07193 , 2023. [40] Abby O’Neill, Abdul Rehman, Abhiram Maddukuri, Abhishek Gupta, Abhishek Padalkar, Abraham Lee, Acorn Pooley, Agrim Gupta, Ajay Mandlekar, Ajinkya Jain, et al. Open x-embodiment: Robotic learning datasets and rt-x models: Open x-embodiment collaboration 0. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , 2024. [41] Jing-Cheng Pang, Nan Tang, Kaiyuan Li, Yuting Tang, Xin-Qiang Cai, Zhen-Yu Zhang, Gang Niu, Masashi Sugiyama, and Yang Yu. Learning view-invariant world models for visual robotic manipulation. In Conference on Robot Learning , 2025. [42] Philipp Rosendahl and Ingo Wagner. 360 videos in education–a systematic literature review on application areas and future potentials. Education and Information Technologies , 2024. [43] Kyle Sargent, Zizhang Li, Tanmay Shah, Charles Herrmann, Hong-Xing Yu, Yunzhi Zhang, Eric Ryan Chan, Dmitry Lagun, Li Fei-Fei, Deqing Sun, et al. Zeronvs: Zero-shot 360-degree view synthesis from a single image. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024. [44] Modi Shi, Li Chen, Jin Chen, Yuxiang Lu, Chiming Liu, Guanghui Ren, Ping Luo, Di Huang, Maoqing Yao, and Hongyang Li. Is diversity all you need for scalable robotic manipulation? arXiv preprint arXiv:2507.06219 , 2025. [45] Uriel Singer, Adam Polyak, Thomas Hayes, Xi Yin, Jie An, Songyang Zhang, Qiyuan Hu, Harry Yang, Oron Ashual, Oran Gafni, et al. Make-a-video: Text-to-video generation without text-video data. arXiv preprint arXiv:2209.14792 , 2022. [46] Stephen Tian, Blake Wulfe, Kyle Sargent, Katherine Liu, Sergey Zakharov, Vitor Campagnolo Guizilini, and Jiajun Wu. View-invariant policy learning via zero-shot novel view synthesis. In Conference on Robot Learning , 2025. [47] Basile Van Hoorick, Rundi Wu, Ege Ozguroglu, Kyle Sargent, Ruoshi Liu, Pavel Tokmakov, Achal Dave, Changxi Zheng, and Carl Vondrick. Generative camera dolly: Extreme monocular dynamic novel view synthesis. In European Conference on Computer Vision , 2024. [48] Homer Rich Walke, Kevin Black, Tony Z Zhao, Quan Vuong, Chongyi Zheng, Philippe Hansen-Estruch, Andre Wang He, Vivek Myers, Moo Jin Kim, Max Du, et al. Bridgedata v2: A dataset for robot learning at scale. In Conference on Robot Learning , 2023. [49] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. [50] Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, Jianyuan Zeng, et al. Wan: Open and advanced large-scale video generative models. 
+
+arXiv preprint arXiv:2503.20314 , 3(4):6, 2025. [51] Chen Wang, Linxi Fan, Jiankai Sun, Ruohan Zhang, Li Fei-Fei, Danfei Xu, Yuke Zhu, and Anima Anandkumar. Mimicplay: Long-horizon imitation learning by watching human play. arXiv preprint arXiv:2302.12422 , 2023. [52] Huixiang Wang, Kapil Sugand, Simon Newman, Gareth Jones, Justin Cobb, and Edouard Auvinet. Are multiple views superior to a single view when teaching hip surgery? a single-blinded randomized controlled trial of technical skill acquisition. PloS one , 2019. 29 [53] Yifan Wang, Jianjun Zhou, Haoyi Zhu, Wenzheng Chang, Yang Zhou, Zizun Li, Junyi Chen, Jiangmiao Pang, Chunhua Shen, and Tong He. 𝜋 3: Permutation-equivariant visual geometry learning. arXiv preprint arXiv:2507.13347 , 2025. [54] Kun Wu, Chengkai Hou, Jiaming Liu, Zhengping Che, Xiaozhu Ju, Zhuqin Yang, Meng Li, Yinuo Zhao, Zhiyuan Xu, Guang Yang, et al. Robomind: Benchmark on multi-embodiment intelligence normative data for robot manipulation. arXiv preprint arXiv:2412.13877 , 2024. [55] Shihan Wu, Xuecheng Liu, Shaoxuan Xie, Pengwei Wang, Xinghang Li, Bowen Yang, Zhe Li, Kai Zhu, Hongyu Wu, Yiheng Liu, et al. Robocoin: An open-sourced bimanual robotic data collection for integrated manipulation. arXiv preprint arXiv:2511.17441 , 2025. [56] Youguang Xing, Xu Luo, Junlin Xie, Lianli Gao, Hengtao Shen, and Jingkuan Song. Shortcut learning in generalist robot policies: The role of dataset diversity and fragmentation. arXiv preprint arXiv:2508.06426 , 2025. [57] Ge Yan, Kris Wu, and Xiaolong Wang. UCSD Kitchens Dataset. August 2023. [58] Ge Yan, Jiyue Zhu, Yuquan Deng, Shiqi Yang, Ri-Zhao Qiu, Xuxin Cheng, Marius Memmel, Ranjay Krishna, Ankit Goyal, Xiaolong Wang, et al. Maniflow: A general robot manipulation policy via consistency flow training. arXiv preprint arXiv:2509.01819 , 2025. [59] Sizhe Yang, Wenye Yu, Jia Zeng, Jun Lv, Kerui Ren, Cewu Lu, Dahua Lin, and Jiangmiao Pang. Novel demonstration generation with gaussian splatting enables robust one-shot manipulation. arXiv preprint arXiv:2504.13175 , 2025. [60] Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xiaohan Zhang, Guanyu Feng, et al. Cogvideox: Text-to-video diffusion models with an expert transformer. arXiv preprint arXiv:2408.06072 , 2024. [61] Mark Yu, Wenbo Hu, Jinbo Xing, and Ying Shan. Trajectorycrafter: Redirecting camera trajectory for monocular videos via diffusion models. In Proceedings of the IEEE/CVF international conference on computer vision , 2025. [62] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan Wang, and Huazhe Xu. 3d diffusion policy: Generalizable visuomotor policy learning via simple 3d representations. arXiv preprint arXiv:2403.03954 , 2024. [63] Qinglun Zhang, Zhen Liu, Haoqiang Fan, Guanghui Liu, Bing Zeng, and Shuaicheng Liu. Flowpolicy: Enabling fast and robust 3d flow-based policy via consistency flow matching for robot manipulation. In Proceedings of the AAAI Conference on Artificial Intelligence , 2025. [64] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman, and Oliver Wang. The unreasonable effectiveness of deep features as a perceptual metric. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 586–595, 2018. [65] Xiaoyu Zhang, Matthew Chang, Pranav Kumar, and Saurabh Gupta. Diffusion meets dagger: Supercharging eye-in-hand imitation learning. arXiv preprint arXiv:2402.17768 , 2024. [66] Tony Z. Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manipulation with low-cost hardware. In Robotics: Science and Systems (RSS) , 2023. 30
