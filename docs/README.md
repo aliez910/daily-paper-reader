@@ -6,73 +6,46 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-04-01
-- 运行时间：2026-04-01 19:45:30 UTC
+- 最新运行日期：2026-04-02
+- 运行时间：2026-04-02 20:05:28 UTC
 - 运行状态：成功
-- 本次总论文数：17
-- 精读区：6
-- 速读区：11
+- 本次总论文数：8
+- 精读区：5
+- 速读区：3
 
 ### 今日简报（AI）
-今日聚焦 17 篇机器人前沿论文，深度探索离散流匹配与世界模型在动作精炼及策略学习中的核心突破。
-DFM-VLA 通过迭代优化显著提升操控精度，而 World-Action Model 揭示了世界模型对强化学习效能的巨大增益。
-建议重点关注视觉触觉仿真与类人控制的跨域迁移，探索生成式合成在复杂动态任务中的应用潜力。
-- 详情：[/202604/01/README](/202604/01/README)
+今日聚焦机器人模仿学习与长程任务控制，深度解析多视角缩放与通用奖励机制。
+满分论文揭示了多相机视角缩放对数据效率的巨大提升，而通用稠密奖励则有效破解了长程操作难题。
+建议优先研读多视角模仿学习方案，掌握以低成本数据实现稳健
+- 详情：[/202604/02/README](/202604/02/README)
 
 ### 精读区论文标签
-1. [DFM-VLA: Iterative Action Refinement for Robot Manipulation via Discrete Flow Matching](/202604/01/2603.26320v2-dfm-vla-iterative-action-refinement-for-robot-manipulation-via-discrete-flow-matching)  
+1. [Multi-Camera View Scaling for Data-Efficient Robot Imitation Learning](/202604/02/2604.00557v1-multi-camera-view-scaling-for-data-efficient-robot-imitation-learning)  
    标签：评分：10.0/10、query:rob-il
-   evidence：用于机器人操纵的视觉-语言-动作 (VLA) 模型
-2. [Enhancing Policy Learning with World-Action Model](/202604/01/2603.28955v1-enhancing-policy-learning-with-world-action-model)  
-   标签：评分：10.0/10、query:rob-il
-   evidence：在 CALVIN 基准上用于操纵任务的世界-动作模型
-3. [DIAL: Decoupling Intent and Action via Latent World Modeling for End-to-End VLA](/202604/01/2603.29844v1-dial-decoupling-intent-and-action-via-latent-world-modeling-for-end-to-end-vla)  
-   标签：评分：10.0/10、query:rob-il
-   evidence：连接高层决策与底层执行的端到端VLA
-4. [CLaD: Planning with Grounded Foresight via Cross-Modal Latent Dynamics](/202604/01/2603.29409v1-clad-planning-with-grounded-foresight-via-cross-modal-latent-dynamics)  
+   evidence：用于高效数据机器人模仿学习的多摄像头视图缩放
+2. [Generalizable Dense Reward for Long-Horizon Robotic Tasks](/202604/02/2604.00055v1-generalizable-dense-reward-for-long-horizon-robotic-tasks)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于操纵中视觉到动作规划的跨模态潜空间动力学
-5. [CoMaTrack: Competitive Multi-Agent Game-Theoretic Tracking with Vision-Language-Action Models](/202604/01/2603.22846v2-comatrack-competitive-multi-agent-game-theoretic-tracking-with-vision-language-action-models)  
+   evidence：利用 VLM 提供的稠密奖励改进基于模仿学习的基础策略
+3. [DreamControl-v2: Simpler and Scalable Autonomous Humanoid Skills via Trainable Guided Diffusion Priors](/202604/02/2604.00202v1-dreamcontrol-v2-simpler-and-scalable-autonomous-humanoid-skills-via-trainable-guided-diffusion-priors)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于具身视觉追踪和规划的视觉-语言-动作模型
-6. [Efficient Camera Pose Augmentation for View Generalization in Robotic Policy Learning](/202604/01/2603.29192v1-efficient-camera-pose-augmentation-for-view-generalization-in-robotic-policy-learning)  
+   evidence：复杂的交互丰富型操纵任务
+4. [SMASH: Mastering Scalable Whole-Body Skills for Humanoid Ping-Pong with Egocentric Vision](/202604/02/2604.01158v1-smash-mastering-scalable-whole-body-skills-for-humanoid-ping-pong-with-egocentric-vision)  
    标签：评分：8.0/10、query:rob-il
-   evidence：利用3D高斯泼溅进行视觉运动策略学习以实现视角泛化
+   evidence：用于全身技能的板载自我中心视觉
+5. [Functional Force-Aware Retargeting from Virtual Human Demos to Soft Robot Policies](/202604/02/2604.01224v1-functional-force-aware-retargeting-from-virtual-human-demos-to-soft-robot-policies)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：通过人类演示教学机器人手部动作
 
 ### 速读区论文标签
-1. [Tele-Catch: Adaptive Teleoperation for Dexterous Dynamic 3D Object Catching](/202604/01/2603.28427v1-tele-catch-adaptive-teleoperation-for-dexterous-dynamic-3d-object-catching)  
-   标签：评分：8.0/10、query:rob-il
-   evidence：将远程操作信号融合到扩散策略中以实现灵巧操纵的共享自主框架
-2. [Heracles: Bridging Precise Tracking and Generative Synthesis for General Humanoid Control](/202604/01/2603.27756v2-heracles-bridging-precise-tracking-and-generative-synthesis-for-general-humanoid-control)  
+1. [BAT: Balancing Agility and Stability via Online Policy Switching for Long-Horizon Whole-Body Humanoid Control](/202604/02/2604.01064v1-bat-balancing-agility-and-stability-via-online-policy-switching-for-long-horizon-whole-body-humanoid-control)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于通用人形机器人控制和运动跟踪的状态条件扩散中间件
-3. [Tac2Real: Reliable and GPU Visuotactile Simulation for Online Reinforcement Learning and Zero-Shot Real-World Deployment](/202604/01/2603.28475v1-tac2real-reliable-and-gpu-visuotactile-simulation-for-online-reinforcement-learning-and-zero-shot-real-world-deployment)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：用于机器人操纵任务的视触觉仿真
-4. [Feel Robot Feels: Tactile Feedback Array Glove for Dexterous Manipulation](/202604/01/2603.28542v1-feel-robot-feels-tactile-feedback-array-glove-for-dexterous-manipulation)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：用于收集高质量机器人操纵演示的触觉反馈手套系统
-5. [SuperGrasp: Single-View Object Grasping via Superquadric Similarity Matching, Evaluation, and Refinement](/202604/01/2603.29254v1-supergrasp-single-view-object-grasping-via-superquadric-similarity-matching-evaluation-and-refinement)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：通过相似性匹配和细化的单视图物体抓取
-6. [IMPASTO: Integrating Model-Based Planning with Learned Dynamics Models for Robotic Oil Painting Reproduction](/202604/01/2603.29315v1-impasto-integrating-model-based-planning-with-learned-dynamics-models-for-robotic-oil-painting-reproduction)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：机器人油画创作的端到端视觉运动学习
-7. [Hybrid Framework for Robotic Manipulation: Integrating Reinforcement Learning and Large Language Models](/202604/01/2603.30022v1-hybrid-framework-for-robotic-manipulation-integrating-reinforcement-learning-and-large-language-models)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：结合强化学习与大语言模型进行机器人操纵任务
-8. [ROSClaw: An OpenClaw ROS 2 Framework for Agentic Robot Control and Interaction](/202604/01/2603.26997v1-rosclaw-an-openclaw-ros-2-framework-for-agentic-robot-control-and-interaction)  
+   evidence：结合模仿学习和强化学习进行长程任务的人形机器人全身控制
+2. [Where-to-Learn: Analytical Policy Gradient Directed Exploration for On-Policy Robotic Reinforcement Learning](/202604/02/2603.27317v2-where-to-learn-analytical-policy-gradient-directed-exploration-for-on-policy-robotic-reinforcement-learning)  
    标签：评分：6.0/10、query:rob-il
-   evidence：智能机器人控制与多模态观测归一化
-9. [An End-to-end Flight Control Network for High-speed UAV Obstacle Avoidance based on Event-Depth Fusion](/202604/01/2603.27181v1-an-end-to-end-flight-control-network-for-high-speed-uav-obstacle-avoidance-based-on-event-depth-fusion)  
+   evidence：机器人控制的策略梯度引导探索
+3. [Probe-to-Grasp Manipulation Using Self-Sensing Pneumatic Variable-Stiffness Joints](/202604/02/2603.27808v1-probe-to-grasp-manipulation-using-self-sensing-pneumatic-variable-stiffness-joints)  
    标签：评分：6.0/10、query:rob-il
-   evidence：通过模仿学习实现端到端飞行控制
-10. [Which Reconstruction Model Should a Robot Use? Routing Image-to-3D Models for Cost-Aware Robotic Manipulation](/202604/01/2603.27797v1-which-reconstruction-model-should-a-robot-use-routing-image-to-3d-models-for-cost-aware-robotic-manipulation)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：用于机器人操纵任务的3D网格重建
-11. [Reducing Oracle Feedback with Vision-Language Embeddings for Preference-Based RL](/202604/01/2603.28053v1-reducing-oracle-feedback-with-vision-language-embeddings-for-preference-based-rl)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：视觉语言嵌入用于机器人奖励生成
+   evidence：探测到抓取的操纵框架
 
 
 <div class="dpr-home-promo-card">
