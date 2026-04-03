@@ -6,46 +6,67 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-04-02
-- 运行时间：2026-04-02 20:05:28 UTC
+- 最新运行日期：2026-04-03
+- 运行时间：2026-04-03 20:06:13 UTC
 - 运行状态：成功
-- 本次总论文数：8
+- 本次总论文数：15
 - 精读区：5
-- 速读区：3
+- 速读区：10
 
 ### 今日简报（AI）
-今日聚焦机器人模仿学习与长程任务控制，深度解析多视角缩放与通用奖励机制。
-满分论文揭示了多相机视角缩放对数据效率的巨大提升，而通用稠密奖励则有效破解了长程操作难题。
-建议优先研读多视角模仿学习方案，掌握以低成本数据实现稳健
-- 详情：[/202604/02/README](/202604/02/README)
+今日精选 15 篇机器人前沿论文，深度聚焦高效移动操控与视触觉自适应融合技术。
+满分论文 AnchorVLA 实现了端到端移动操控的效率突破，而视触觉融合研究则揭示了机器人感知环境的新范式。
+建议优先研读扩散模型在移动端的部署优化，并关注强化学习在复杂交互场景下的稳定性表现。
+- 详情：[/202604/03/README](/202604/03/README)
 
 ### 精读区论文标签
-1. [Multi-Camera View Scaling for Data-Efficient Robot Imitation Learning](/202604/02/2604.00557v1-multi-camera-view-scaling-for-data-efficient-robot-imitation-learning)  
+1. [AnchorVLA: Anchored Diffusion for Efficient End-to-End Mobile Manipulation](/202604/03/2604.01567v1-anchorvla-anchored-diffusion-for-efficient-end-to-end-mobile-manipulation)  
    标签：评分：10.0/10、query:rob-il
-   evidence：用于高效数据机器人模仿学习的多摄像头视图缩放
-2. [Generalizable Dense Reward for Long-Horizon Robotic Tasks](/202604/02/2604.00055v1-generalizable-dense-reward-for-long-horizon-robotic-tasks)  
+   evidence：用于高效端到端移动操纵的扩散VLA策略
+2. [Learning When to See and When to Feel: Adaptive Vision-Torque Fusion for Contact-Aware Manipulation](/202604/03/2604.01414v1-learning-when-to-see-and-when-to-feel-adaptive-vision-torque-fusion-for-contact-aware-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：利用 VLM 提供的稠密奖励改进基于模仿学习的基础策略
-3. [DreamControl-v2: Simpler and Scalable Autonomous Humanoid Skills via Trainable Guided Diffusion Priors](/202604/02/2604.00202v1-dreamcontrol-v2-simpler-and-scalable-autonomous-humanoid-skills-via-trainable-guided-diffusion-priors)  
+   evidence：基于扩散策略的触觉感知操纵中的视觉-扭矩融合
+3. [Boosting Vision-Language-Action Finetuning with Feasible Action Neighborhood Prior](/202604/03/2604.01570v1-boosting-vision-language-action-finetuning-with-feasible-action-neighborhood-prior)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：利用可行动作邻域先验提升机器人操纵的VLA微调
+4. [Bridging Large-Model Reasoning and Real-Time Control via Agentic Fast-Slow Planning](/202604/03/2604.01681v1-bridging-large-model-reasoning-and-real-time-control-via-agentic-fast-slow-planning)  
    标签：评分：8.0/10、query:rob-il
-   evidence：复杂的交互丰富型操纵任务
-4. [SMASH: Mastering Scalable Whole-Body Skills for Humanoid Ping-Pong with Egocentric Vision](/202604/02/2604.01158v1-smash-mastering-scalable-whole-body-skills-for-humanoid-ping-pong-with-egocentric-vision)  
+   evidence：通过VLM将语义意图映射到实时控制
+5. [Posterior Optimization with Clipped Objective for Bridging Efficiency and Stability in Generative Policy Learning](/202604/03/2604.01860v1-posterior-optimization-with-clipped-objective-for-bridging-efficiency-and-stability-in-generative-policy-learning)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于全身技能的板载自我中心视觉
-5. [Functional Force-Aware Retargeting from Virtual Human Demos to Soft Robot Policies](/202604/02/2604.01224v1-functional-force-aware-retargeting-from-virtual-human-demos-to-soft-robot-policies)  
-   标签：评分：8.0/10、query:rob-il
-   evidence：通过人类演示教学机器人手部动作
+   evidence：通过离线到在线强化学习实现机器人操纵的生成式策略学习
 
 ### 速读区论文标签
-1. [BAT: Balancing Agility and Stability via Online Policy Switching for Long-Horizon Whole-Body Humanoid Control](/202604/02/2604.01064v1-bat-balancing-agility-and-stability-via-online-policy-switching-for-long-horizon-whole-body-humanoid-control)  
+1. [D-SPEAR: Dual-Stream Prioritized Experience Adaptive Replay for Stable Reinforcement Learning in Robotic Manipulation](/202604/03/2603.27346v2-d-spear-dual-stream-prioritized-experience-adaptive-replay-for-stable-reinforcement-learning-in-robotic-manipulation)  
    标签：评分：7.0/10、query:rob-il
-   evidence：结合模仿学习和强化学习进行长程任务的人形机器人全身控制
-2. [Where-to-Learn: Analytical Policy Gradient Directed Exploration for On-Policy Robotic Reinforcement Learning](/202604/02/2603.27317v2-where-to-learn-analytical-policy-gradient-directed-exploration-for-on-policy-robotic-reinforcement-learning)  
+   evidence：用于接触密集型机器人操纵的稳定强化学习
+2. [Deep Reinforcement Learning for Robotic Manipulation under Distribution Shift with Bounded Extremum Seeking](/202604/03/2604.01142v1-deep-reinforcement-learning-for-robotic-manipulation-under-distribution-shift-with-bounded-extremum-seeking)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：用于推挤和取放等机器人操纵任务的强化学习
+3. [AffordTissue: Dense Affordance Prediction for Tool-Action Specific Tissue Interaction](/202604/03/2604.01371v1-affordtissue-dense-affordance-prediction-for-tool-action-specific-tissue-interaction)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：用于手术动作自动化的视觉-语言-动作模型
+4. [MorphoGuard: A Morphology-Based Whole-Body Interactive Motion Controller](/202604/03/2604.01517v1-morphoguard-a-morphology-based-whole-body-interactive-motion-controller)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：高维机器人系统的全身交互运动控制器
+5. [Tex3D: Objects as Attack Surfaces via Adversarial 3D Textures for Vision-Language-Action Models](/202604/03/2604.01618v1-tex3d-objects-as-attack-surfaces-via-adversarial-3d-textures-for-vision-language-action-models)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：针对操纵任务中视觉-语言-动作（VLA）模型的对抗性3D纹理
+6. [Cross-Modal Visuo-Tactile Object Perception](/202604/03/2604.02108v1-cross-modal-visuo-tactile-object-perception)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：用于自主机器人操纵的视触觉物体感知
+7. [Where-to-Learn: Analytical Policy Gradient Directed Exploration for On-Policy Robotic Reinforcement Learning](/202604/03/2603.27317v1-where-to-learn-analytical-policy-gradient-directed-exploration-for-on-policy-robotic-reinforcement-learning)  
    标签：评分：6.0/10、query:rob-il
-   evidence：机器人控制的策略梯度引导探索
-3. [Probe-to-Grasp Manipulation Using Self-Sensing Pneumatic Variable-Stiffness Joints](/202604/02/2603.27808v1-probe-to-grasp-manipulation-using-self-sensing-pneumatic-variable-stiffness-joints)  
+   evidence：用于机器人强化学习控制的解析策略梯度
+8. [Match or Replay: Self Imitating Proximal Policy Optimization](/202604/03/2603.27515v1-match-or-replay-self-imitating-proximal-policy-optimization)  
    标签：评分：6.0/10、query:rob-il
-   evidence：探测到抓取的操纵框架
+   evidence：利用过去高奖励状态-动作对的自我模仿算法
+9. [How to Train your Tactile Model: Tactile Perception with Multi-fingered Robot Hands](/202604/03/2604.00744v1-how-to-train-your-tactile-model-tactile-perception-with-multi-fingered-robot-hands)  
+   标签：评分：6.0/10、query:rob-il
+   evidence：多指机器人手操纵中的触觉感知
+10. [Bridging Discrete Planning and Continuous Execution for Redundant Robot](/202604/03/2604.02021v1-bridging-discrete-planning-and-continuous-execution-for-redundant-robot)  
+   标签：评分：6.0/10、query:rob-il
+   evidence：连接冗余机器人操纵器的离散规划与连续执行
 
 
 <div class="dpr-home-promo-card">
