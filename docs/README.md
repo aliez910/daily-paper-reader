@@ -6,58 +6,67 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-04-05
-- 运行时间：2026-04-05 19:44:46 UTC
+- 最新运行日期：2026-04-06
+- 运行时间：2026-04-06 20:27:56 UTC
 - 运行状态：成功
-- 本次总论文数：12
-- 精读区：1
-- 速读区：11
+- 本次总论文数：15
+- 精读区：5
+- 速读区：10
 
 ### 今日简报（AI）
-今日聚焦具身智能与交互感知，深度解析了通过跨图像动作对齐提升物体可供性预测的 RAAP 框架。
-技术前沿集中在利用检索增强实现精准交互预测，以及在野外场景下对手物 3D 建模与第一视角模拟的突破。
-建议优先研读 RAAP 论文以掌握跨图像学习技巧，并关注 EgoSim 等模拟器在具身任务中的应用。
-- 详情：[/202604/05/README](/202604/05/README)
+今日深度解析 15 篇前沿论文，重点攻克 VLA 模型的投机验证与多视角视频扩散策略。
+满分论文揭示了“开环规划+闭环验证”架构及 3D 时空感知模型在提升机器人操作精度上的巨大潜力。
+建议优先研读两篇 10 分佳作，掌握
+- 详情：[/202604/06/README](/202604/06/README)
 
 ### 精读区论文标签
-1. [RAAP: Retrieval-Augmented Affordance Prediction with Cross-Image Action Alignment](/202604/05/2603.29419v1-raap-retrieval-augmented-affordance-prediction-with-cross-image-action-alignment)  
+1. [Open-Loop Planning, Closed-Loop Verification: Speculative Verification for VLA](/202604/06/2604.02965v1-open-loop-planning-closed-loop-verification-speculative-verification-for-vla)  
+   标签：评分：10.0/10、query:rob-il
+   evidence：操纵任务中VLA模型的闭环验证
+2. [Multi-View Video Diffusion Policy: A 3D Spatio-Temporal-Aware Video Action Model](/202604/06/2604.03181v1-multi-view-video-diffusion-policy-a-3d-spatio-temporal-aware-video-action-model)  
+   标签：评分：10.0/10、query:rob-il
+   evidence：用于机器人操纵的多视图视频扩散策略
+3. [Learning Structured Robot Policies from Vision-Language Models via Synthetic Neuro-Symbolic Supervision](/202604/06/2604.02812v1-learning-structured-robot-policies-from-vision-language-models-via-synthetic-neuro-symbolic-supervision)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：通过视觉语言模型将多模态观测映射到机器人行为
+4. [The Compression Gap: Why Discrete Tokenization Limits Vision-Language-Action Model Scaling](/202604/06/2604.03191v1-the-compression-gap-why-discrete-tokenization-limits-vision-language-action-model-scaling)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：视觉语言动作模型中离散标记化的分析
+5. [F2F-AP: Flow-to-Future Asynchronous Policy for Real-time Dynamic Manipulation](/202604/06/2604.02408v1-f2f-ap-flow-to-future-asynchronous-policy-for-real-time-dynamic-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于精细机器人交互的检索增强示能性预测
+   evidence：具有视觉特征对齐的实时动态操纵
 
 ### 速读区论文标签
-1. [Falcon Perception](/202604/05/2603.27365v1-falcon-perception)  
+1. [Differentiable SpaTiaL: Symbolic Learning and Reasoning with Geometric Temporal Logic for Manipulation Tasks](/202604/06/2604.02643v1-differentiable-spatial-symbolic-learning-and-reasoning-with-geometric-temporal-logic-for-manipulation-tasks)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于感知和任务建模的统一Transformer
-2. [SHOW3D: Capturing Scenes of 3D Hands and Objects in the Wild](/202604/05/2603.28760v1-show3d-capturing-scenes-of-3d-hands-and-objects-in-the-wild)  
+   evidence：用于操纵任务的几何时序逻辑
+2. [Behavior-Constrained Reinforcement Learning with Receding-Horizon Credit Assignment for High-Performance Control](/202604/06/2604.03023v1-behavior-constrained-reinforcement-learning-with-receding-horizon-credit-assignment-for-high-performance-control)  
    标签：评分：7.0/10、query:rob-il
-   evidence：操纵过程中人手和物体的 3D 理解
-3. [EgoSim: Egocentric World Simulator for Embodied Interaction Generation](/202604/05/2604.01001v1-egosim-egocentric-world-simulator-for-embodied-interaction-generation)  
+   evidence：行为约束强化学习在演示基础上进行改进
+3. [ARM: Advantage Reward Modeling for Long-Horizon Manipulation](/202604/06/2604.03037v1-arm-advantage-reward-modeling-for-long-horizon-manipulation)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于具身交互生成的闭环世界模拟器
-4. [CReF: Cross-modal and Recurrent Fusion for Depth-conditioned Humanoid Locomotion](/202604/05/2603.29452v2-cref-cross-modal-and-recurrent-fusion-for-depth-conditioned-humanoid-locomotion)  
+   evidence：长程机器人操纵任务的奖励建模
+4. [FSUNav: A Cerebrum-Cerebellum Architecture for Fast, Safe, and Universal Zero-Shot Goal-Oriented Navigation](/202604/06/2604.03139v1-fsunav-a-cerebrum-cerebellum-architecture-for-fast-safe-and-universal-zero-shot-goal-oriented-navigation)  
+   标签：评分：7.0/10、query:rob-il
+   evidence：用于端到端机器人导航控制的视觉语言模型
+5. [Energy-Aware Imitation Learning for Steering Prediction Using Events and Frames](/202604/06/2603.28008v1-energy-aware-imitation-learning-for-steering-prediction-using-events-and-frames)  
    标签：评分：6.0/10、query:rob-il
-   evidence：从原始深度图中学习特征的深度调节类人机器人运动
-5. [SceneTeract: Agentic Functional Affordances and VLM Grounding in 3D Scenes](/202604/05/2603.29798v1-sceneteract-agentic-functional-affordances-and-vlm-grounding-in-3d-scenes)  
+   evidence：自动驾驶中视觉到动作映射的模仿学习
+6. [CReF: Cross-modal and Recurrent Fusion for Depth-conditioned Humanoid Locomotion](/202604/06/2603.29452v1-cref-cross-modal-and-recurrent-fusion-for-depth-conditioned-humanoid-locomotion)  
    标签：评分：6.0/10、query:rob-il
-   evidence：验证具身智能体动作的 3D 场景功能和示能性
-6. [HapCompass: A Rotational Haptic Device for Contact-Rich Robotic Teleoperation](/202604/05/2603.30042v1-hapcompass-a-rotational-haptic-device-for-contact-rich-robotic-teleoperation)  
+   evidence：用于足式运动的深度图条件视觉到动作映射
+7. [Tune to Learn: How Controller Gains Shape Robot Policy Learning](/202604/06/2604.02523v1-tune-to-learn-how-controller-gains-shape-robot-policy-learning)  
    标签：评分：6.0/10、query:rob-il
-   evidence：用于接触密集型机器人遥操作的触觉设备
-7. [EgoFlow: Gradient-Guided Flow Matching for Egocentric 6DoF Object Motion Generation](/202604/05/2604.01421v1-egoflow-gradient-guided-flow-matching-for-egocentric-6dof-object-motion-generation)  
+   evidence：机器人操纵策略学习中的控制器增益
+8. [ExploreVLA: Dense World Modeling and Exploration for End-to-End Autonomous Driving](/202604/06/2604.02714v1-explorevla-dense-world-modeling-and-exploration-for-end-to-end-autonomous-driving)  
    标签：评分：6.0/10、query:rob-il
-   evidence：从第一视角视频预测物体运动以进行具身交互
-8. [DriveDreamer-Policy: A Geometry-Grounded World-Action Model for Unified Generation and Planning](/202604/05/2604.01765v1-drivedreamer-policy-a-geometry-grounded-world-action-model-for-unified-generation-and-planning)  
+   evidence：基于行为克隆的端到端自动驾驶VLA架构
+9. [OMNI-PoseX: A Fast Vision Model for 6D Object Pose Estimation in Embodied Tasks](/202604/06/2604.02759v1-omni-posex-a-fast-vision-model-for-6d-object-pose-estimation-in-embodied-tasks)  
    标签：评分：6.0/10、query:rob-il
-   evidence：连接视觉-语言-动作与规划的世界动作模型
-9. [Not All Tokens See Equally: Perception-Grounded Policy Optimization for Large Vision-Language Models](/202604/05/2604.01840v1-not-all-tokens-see-equally-perception-grounded-policy-optimization-for-large-vision-language-models)  
+   evidence：具身任务中物体位姿估计的视觉模型
+10. [Hierarchical Planning with Latent World Models](/202604/06/2604.03208v1-hierarchical-planning-with-latent-world-models)  
    标签：评分：6.0/10、query:rob-il
-   evidence：优化大型视觉语言模型中多模态推理的视觉落地步骤
-10. [A3R: Agentic Affordance Reasoning via Cross-Dimensional Evidence in 3D Gaussian Scenes](/202604/05/2604.01882v1-a3r-agentic-affordance-reasoning-via-cross-dimensional-evidence-in-3d-gaussian-scenes)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：3D场景中用于动作预测的可操作性推理
-11. [CompassAD: Intent-Driven 3D Affordance Grounding in Functionally Competing Objects](/202604/05/2604.02060v1-compassad-intent-driven-3d-affordance-grounding-in-functionally-competing-objects)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：杂乱场景下意图驱动机器人操纵的 3D 示能性定位
+   evidence：基于潜空间世界模型的分层规划控制
 
 
 <div class="dpr-home-promo-card">
