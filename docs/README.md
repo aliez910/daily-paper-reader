@@ -6,67 +6,76 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-04-06
-- 运行时间：2026-04-06 20:27:56 UTC
+- 最新运行日期：2026-04-07
+- 运行时间：2026-04-07 20:32:50 UTC
 - 运行状态：成功
-- 本次总论文数：15
-- 精读区：5
-- 速读区：10
+- 本次总论文数：18
+- 精读区：10
+- 速读区：8
 
 ### 今日简报（AI）
-今日深度解析 15 篇前沿论文，重点攻克 VLA 模型的投机验证与多视角视频扩散策略。
-满分论文揭示了“开环规划+闭环验证”架构及 3D 时空感知模型在提升机器人操作精度上的巨大潜力。
-建议优先研读两篇 10 分佳作，掌握
-- 详情：[/202604/06/README](/202604/06/README)
+今日聚焦具身智能前沿，深度解析 VLA 模型的数据高效学习与安全遗忘机制。
+重点关注结合先验知识的神经符号模仿学习，以及首个针对具身大模型的 VLA-Forget 遗忘学习框架。
+建议优先研读两篇满分论文，掌握如何通过多模态引导提升机器人操作的泛化性与安全性。
+- 详情：[/202604/07/README](/202604/07/README)
 
 ### 精读区论文标签
-1. [Open-Loop Planning, Closed-Loop Verification: Speculative Verification for VLA](/202604/06/2604.02965v1-open-loop-planning-closed-loop-verification-speculative-verification-for-vla)  
+1. [Build on Priors: Vision--Language--Guided Neuro-Symbolic Imitation Learning for Data-Efficient Real-World Robot Manipulation](/202604/07/2604.03759v1-build-on-priors-vision--language--guided-neuro-symbolic-imitation-learning-for-data-efficient-real-world-robot-manipulation)  
    标签：评分：10.0/10、query:rob-il
-   evidence：操纵任务中VLA模型的闭环验证
-2. [Multi-View Video Diffusion Policy: A 3D Spatio-Temporal-Aware Video Action Model](/202604/06/2604.03181v1-multi-view-video-diffusion-policy-a-3d-spatio-temporal-aware-video-action-model)  
+   evidence：视觉语言引导的神经符号模仿学习用于操纵
+2. [VLA-Forget: Vision-Language-Action Unlearning for Embodied Foundation Models](/202604/07/2604.03956v1-vla-forget-vision-language-action-unlearning-for-embodied-foundation-models)  
    标签：评分：10.0/10、query:rob-il
-   evidence：用于机器人操纵的多视图视频扩散策略
-3. [Learning Structured Robot Policies from Vision-Language Models via Synthetic Neuro-Symbolic Supervision](/202604/06/2604.02812v1-learning-structured-robot-policies-from-vision-language-models-via-synthetic-neuro-symbolic-supervision)  
+   evidence：操纵任务中视觉-语言-动作 (VLA) 模型的遗忘挑战
+3. [Adaptive Action Chunking at Inference-time for Vision-Language-Action Models](/202604/07/2604.04161v1-adaptive-action-chunking-at-inference-time-for-vision-language-action-models)  
+   标签：评分：10.0/10、query:rob-il
+   evidence：视觉-语言-动作（VLA）模型的自适应动作分块
+4. [E-VLA: Event-Augmented Vision-Language-Action Model for Dark and Blurred Scenes](/202604/07/2604.04834v1-e-vla-event-augmented-vision-language-action-model-for-dark-and-blurred-scenes)  
+   标签：评分：10.0/10、query:rob-il
+   evidence：用于操纵任务的事件增强型视觉-语言-动作（VLA）模型
+5. [Optimizing Neurorobot Policy under Limited Demonstration Data through Preference Regret](/202604/07/2604.03523v1-optimizing-neurorobot-policy-under-limited-demonstration-data-through-preference-regret)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过视觉语言模型将多模态观测映射到机器人行为
-4. [The Compression Gap: Why Discrete Tokenization Limits Vision-Language-Action Model Scaling](/202604/06/2604.03191v1-the-compression-gap-why-discrete-tokenization-limits-vision-language-action-model-scaling)  
+   evidence：从有限数据中学习复杂行为的自我模仿框架
+6. [Drift-Based Policy Optimization: Native One-Step Policy Learning for Online Robot Control](/202604/07/2604.03540v1-drift-based-policy-optimization-native-one-step-policy-learning-for-online-robot-control)  
    标签：评分：9.0/10、query:rob-il
-   evidence：视觉语言动作模型中离散标记化的分析
-5. [F2F-AP: Flow-to-Future Asynchronous Policy for Real-time Dynamic Manipulation](/202604/06/2604.02408v1-f2f-ap-flow-to-future-asynchronous-policy-for-real-time-dynamic-manipulation)  
-   标签：评分：8.0/10、query:rob-il
-   evidence：具有视觉特征对齐的实时动态操纵
+   evidence：用于机器人操纵的一步生成式策略
+7. [CRAFT: Video Diffusion for Bimanual Robot Data Generation](/202604/07/2604.03552v1-craft-video-diffusion-for-bimanual-robot-data-generation)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：用于双臂机器人模仿学习数据的视频扩散生成
+8. [Human-Robot Copilot for Data-Efficient Imitation Learning](/202604/07/2604.03613v1-human-robot-copilot-for-data-efficient-imitation-learning)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：针对特定任务技能的人机协作模仿学习
+9. [Learning from Imperfect Demonstrations via Temporal Behavior Tree-Guided Trajectory Repair](/202604/07/2604.04225v1-learning-from-imperfect-demonstrations-via-temporal-behavior-tree-guided-trajectory-repair)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：修复用于模仿学习的次优轨迹
+10. [Veo-Act: How Far Can Frontier Video Models Advance Generalizable Robot Manipulation?](/202604/07/2604.04502v1-veo-act-how-far-can-frontier-video-models-advance-generalizable-robot-manipulation)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：用于通用机器人操纵和视觉到动作映射的视频生成模型
 
 ### 速读区论文标签
-1. [Differentiable SpaTiaL: Symbolic Learning and Reasoning with Geometric Temporal Logic for Manipulation Tasks](/202604/06/2604.02643v1-differentiable-spatial-symbolic-learning-and-reasoning-with-geometric-temporal-logic-for-manipulation-tasks)  
+1. [VA-FastNavi-MARL: Real-Time Robot Control with Multimedia-Driven Meta-Reinforcement Learning](/202604/07/2604.03998v1-va-fastnavi-marl-real-time-robot-control-with-multimedia-driven-meta-reinforcement-learning)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：多媒体驱动的统一潜表示实时机器人控制
+2. [Learning Dexterous Grasping from Sparse Taxonomy Guidance](/202604/07/2604.04138v1-learning-dexterous-grasping-from-sparse-taxonomy-guidance)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：基于稀疏引导的灵巧操纵控制
+3. [ROSClaw: A Hierarchical Semantic-Physical Framework for Heterogeneous Multi-Agent Collaboration](/202604/07/2604.04664v1-rosclaw-a-hierarchical-semantic-physical-framework-for-heterogeneous-multi-agent-collaboration)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：用于操纵和长程任务的VLA系统
+4. [AnyUser: Translating Sketched User Intent into Domestic Robots](/202604/07/2604.04811v1-anyuser-translating-sketched-user-intent-into-domestic-robots)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：通过多模态输入实现家政机器人控制的视觉-动作映射
+5. [Learning Additively Compositional Latent Actions for Embodied AI](/202604/07/2604.03340v1-learning-additively-compositional-latent-actions-for-embodied-ai)  
    标签：评分：7.0/10、query:rob-il
-   evidence：用于操纵任务的几何时序逻辑
-2. [Behavior-Constrained Reinforcement Learning with Receding-Horizon Credit Assignment for High-Performance Control](/202604/06/2604.03023v1-behavior-constrained-reinforcement-learning-with-receding-horizon-credit-assignment-for-high-performance-control)  
+   evidence：从具身智能的视觉转换中学习潜动作
+6. [Primitive-based Truncated Diffusion for Efficient Trajectory Generation of Differential Drive Mobile Manipulators](/202604/07/2604.04166v1-primitive-based-truncated-diffusion-for-efficient-trajectory-generation-of-differential-drive-mobile-manipulators)  
    标签：评分：7.0/10、query:rob-il
-   evidence：行为约束强化学习在演示基础上进行改进
-3. [ARM: Advantage Reward Modeling for Long-Horizon Manipulation](/202604/06/2604.03037v1-arm-advantage-reward-modeling-for-long-horizon-manipulation)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：长程机器人操纵任务的奖励建模
-4. [FSUNav: A Cerebrum-Cerebellum Architecture for Fast, Safe, and Universal Zero-Shot Goal-Oriented Navigation](/202604/06/2604.03139v1-fsunav-a-cerebrum-cerebellum-architecture-for-fast-safe-and-universal-zero-shot-goal-oriented-navigation)  
-   标签：评分：7.0/10、query:rob-il
-   evidence：用于端到端机器人导航控制的视觉语言模型
-5. [Energy-Aware Imitation Learning for Steering Prediction Using Events and Frames](/202604/06/2603.28008v1-energy-aware-imitation-learning-for-steering-prediction-using-events-and-frames)  
+   evidence：使用扩散模型为移动操作机器人生成轨迹
+7. [Vision-Based End-to-End Learning for UAV Traversal of Irregular Gaps via Differentiable Simulation](/202604/07/2604.02779v1-vision-based-end-to-end-learning-for-uav-traversal-of-irregular-gaps-via-differentiable-simulation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：自动驾驶中视觉到动作映射的模仿学习
-6. [CReF: Cross-modal and Recurrent Fusion for Depth-conditioned Humanoid Locomotion](/202604/06/2603.29452v1-cref-cross-modal-and-recurrent-fusion-for-depth-conditioned-humanoid-locomotion)  
+   evidence：基于视觉的端到端控制指令学习
+8. [OpenRC: An Open-Source Robotic Colonoscopy Framework for Multimodal Data Acquisition and Autonomy Research](/202604/07/2604.03781v1-openrc-an-open-source-robotic-colonoscopy-framework-for-multimodal-data-acquisition-and-autonomy-research)  
    标签：评分：6.0/10、query:rob-il
-   evidence：用于足式运动的深度图条件视觉到动作映射
-7. [Tune to Learn: How Controller Gains Shape Robot Policy Learning](/202604/06/2604.02523v1-tune-to-learn-how-controller-gains-shape-robot-policy-learning)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：机器人操纵策略学习中的控制器增益
-8. [ExploreVLA: Dense World Modeling and Exploration for End-to-End Autonomous Driving](/202604/06/2604.02714v1-explorevla-dense-world-modeling-and-exploration-for-end-to-end-autonomous-driving)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：基于行为克隆的端到端自动驾驶VLA架构
-9. [OMNI-PoseX: A Fast Vision Model for 6D Object Pose Estimation in Embodied Tasks](/202604/06/2604.02759v1-omni-posex-a-fast-vision-model-for-6d-object-pose-estimation-in-embodied-tasks)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：具身任务中物体位姿估计的视觉模型
-10. [Hierarchical Planning with Latent World Models](/202604/06/2604.03208v1-hierarchical-planning-with-latent-world-models)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：基于潜空间世界模型的分层规划控制
+   evidence：机器人结肠镜检查中的闭环研究与VLA范式
 
 
 <div class="dpr-home-promo-card">
