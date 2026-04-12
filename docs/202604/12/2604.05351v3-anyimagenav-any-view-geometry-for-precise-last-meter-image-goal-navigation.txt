@@ -1,0 +1,534 @@
+Title: AnyImageNav: Any-View Geometry for Precise Last-Meter Image-Goal Navigation
+
+URL Source: https://arxiv.org/pdf/2604.05351v3
+
+Published Time: Fri, 10 Apr 2026 00:25:56 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# AnyImageNav : Any-View Geometry for Precise Last-Meter Image-Goal Navigation 
+
+Yijie Deng ⋆ 1,2,3,4, Shuaihang Yuan ∗1,2,4, Yi Fang ⋆⋆ 1,2,3,4 
+
+> 1
+
+NYUAD Center for Artificial Intelligence and Robotics (CAIR), Abu Dhabi, UAE  
+
+> 2
+
+New York University Abu Dhabi, Electrical Engineering, Abu Dhabi 129188, UAE  
+
+> 3
+
+New York University, Electrical & Computer Engineering Dept., Brooklyn, NY 11201, USA.  
+
+> 4
+
+Embodied AI and Robotics (AIR) Lab, NYU Abu Dhabi, UAE. Target Image (Goal) Current Observation 
+
+> Final View
+> (Success!)
+> Pre-Locate
+> Last-Meter Localization
+> Navigate to Goal
+> Highly Relevant
+> with Relevance Map
+> with Any-View Geometry
+> Target Pose
+> Pose-Accurate Goal Reached!
+> with Looped Pose Verification
+
+Fig. 1: AnyImageNav overview. A BEV relevance map identifies highly relevant re-gions and guides the agent toward the goal vicinity ( Pre-Locate ). Once a highly rel-evant region is detected, any-view geometry registers the goal image with previous observations to recover a precise target pose ( Last-Meter Localization ). The agent then navigates to the pose that closely matches the goal viewpoint ( Navigate to Goal ). 
+
+Abstract. Image Goal Navigation (ImageNav) is evaluated by a coarse success criterion—the agent must stop within 1 m of the target, which is sufficient for finding objects but falls short for downstream tasks such as grasping that require precise positioning. We introduce AnyImageNav ,a training-free system that pushes ImageNav toward this more demand-ing setting. Our key insight is that the goal image can be treated as a 
+
+geometric query : any photo of an object, a hallway, or a room corner can be registered to the agent’s observations via dense pixel-level correspon-dences, enabling recovery of the exact 6-DoF camera pose. Our method realizes this through a semantic-to-geometric cascade: a semantic rele-vance signal guides exploration and acts as a proximity gate, invoking a 3D multi-view foundation model only when the current view is highly relevant to the goal image; the model then self-certifies its registration in a loop for an accurate recovered pose. Our method sets state-of-the-art  
+
+> ⋆
+
+Equal contribution.  
+
+> ⋆⋆
+
+Corresponding author: Yi Fang yfang@nyu.edu.                  
+
+> arXiv:2604.05351v3 [cs.RO] 9 Apr 2026 2Y. Deng et al. navigation success rates on Gibson ( 93.1% ) and HM3D ( 82.6% ), and achieves pose recovery that prior methods do not provide: a position er-ror of 0.27 m and heading error of 3.41 °on Gibson, and 0.21 m /1.23 °
+> on HM3D, a 5–10 ×improvement over adapted baselines. Our project website: https://yijie21.github.io/ain/
+> Keywords: Image Goal Navigation ·6-DoF Pose Recovery ·Any-View Geometry ·Training-Free Navigation
+
+## 1 Introduction 
+
+Consider a household robot given a reference photo of an object on a shelf, asked to retrieve it. Modern Image Goal Navigation agents can reliably bring a robot to within 1 m of a visual goal. But when that goal is a reference photo for a downstream manipulation task, proximity alone is not enough, because the robot must also know precisely where and from which direction the photo was taken to act on what it sees. This last-meter gap is not merely a precision shortcoming; it is the boundary between navigation and action, between finding and doing. Closing it requires the agent to recover the exact 6-DoF camera pose of the goal image, not just its approximate vicinity. Image Goal Navigation, including general image goal navigation [42] and instance image goal navigation [11], asks an agent to reach a target viewpoint in an unknown environment guided only by a single photograph. Recent modular and end-to-end methods have pushed success rates to impressive levels across diverse indoor environments [1, 4, 6, 11, 15, 16, 19, 20, 30, 39]. However, today’s success criterion is coarse: the agent must stop within 1.0 m of the goal, with the goal being oracle-visible by turning or looking up and down. This is sensible for navigation, since being within arm’s reach and having the target in view is meaningful. Yet for downstream manipulation, this last meter is critical. A household robot asked to grasp an object depicted in a reference photo must reach the exact position where the photo was taken and face the object correctly. We therefore emphasize the last-meter problem of image goal navigation and seek to recover accurate 6-DoF poses, not merely proximity. We identify two structural reasons why current methods cannot close this gap. Modular methods [15, 16, 20] compare rendered or sampled viewpoints to the goal image and stop when a semantic similarity score exceeds a threshold. Because they reason about appearance rather than geometry, they can deter-mine that the agent is near the goal but not precisely where or how the goal camera was oriented. The closest prior work to our aim, GauScoreMap [6], does reason about 6-DoF pose but requires a pre-built Gaussian Splatting representa-tion of the environment, a costly, environment-specific reconstruction step that must be repeated for every new scene. End-to-end methods [19, 30] learn direct observation-to-action mappings; during early exploration, when the current view shares little visual content with the goal, the learned signal degrades and the policy must rely on blind exploration. At a deeper level, both families treat lo-calization as a semantic problem: they rely on recognizable object categories, Abbreviated paper title 3
+
+visual landmarks, or learned appearance embeddings. This works coarsely, but semantics cannot recover an accurate camera pose. This paper asks: what if we treat the goal image as a geometric query rather than a semantic one once the agent is in close proximity? Modern 3D multi-view foundation models [18, 31, 33] discover dense pixel-level correspondences across arbitrary image collections and recover relative camera poses in a single forward pass, with no scene reconstruction, no object recognition, and no environment-specific training. Crucially, these models operate at a finer granularity than the category-level matching used in prior navigation methods [6, 15, 16], and they have only recently matured to the reliability needed for autonomous navigation commitment. We show that this capability is the right primitive for precise viewpoint recovery, bridging the gap between coarse proximity navigation and manipulation-ready localization. To fill this gap, we propose AnyImageNav , a training-free system that treats any goal image as a geometric query, with the overview shown in Figure 1. Its core is a semantic-to-geometric cascade that unifies exploration and localization around a single shared representation. A pixel-level relevance signal between the current observation and the goal image is computed at every step; it serves both as a frontier scoring cue and as a proximity sensor that gates the 3D foundation model. When triggered, the foundation model self-certifies its registration con-fidence from its internal cross-frame features before the agent commits to the estimated 6-DoF pose, turning the model’s intrinsic correspondence quality into a navigation decision signal. Our contributions are as follows: 
+
+– Pose-precision Image Goal Navigation. We extend image goal naviga-tion to a stricter precision regime and introduce a complementary evalua-tion protocol measuring position and heading direction errors, exposing the quantitative gap between proximity-based success and manipulation-ready localization that the standard criterion conceals. 
+
+– Any-view geometric correspondence for navigation. We show that the internal across-frame correspondence confidence, an incidental byproduct of the 3D multi-view foundation model’s inference, can be directly repurposed as a navigation commitment signal: it reliably indicates whether the agent has entered the visual neighborhood of any goal image, without semantic labels, object categories, or additional learned classifiers. 
+
+– State-of-the-art results on both tasks. AnyImageNav achieves state-of-the-art navigation success rates on both benchmarks: 93.1% on Gibson for general image goal navigation and 82.6% on HM3D for instance image goal navigation. It simultaneously delivers 6-DoF pose recovery that prior methods do not provide, achieving a position error of 0.27 m and a heading error of 3.41 ° on Gibson, and 0.21 m / 1.23 ° on HM3D, a 5–10 × improve-ment over adapted baselines and establishing the first strong baseline for precision-oriented image goal navigation. 4 Y. Deng et al. 
+
+## 2 Related Work 
+
+2.1 Image-Goal and Instance-Image-Goal Navigation 
+
+Image Goal Navigation (ImageNav) [42, 43] requires an agent to navigate to the viewpoint from which a goal photograph was taken. Instance-Image Goal Nav-igation (IIN) [12] narrows this to images that depict a specific object instance, requiring the agent to both find and discriminate among visually similar objects. This paper addresses both settings within a unified framework. 
+
+End-to-end methods train a policy to map visual observations directly to actions. Early work [1, 36, 37, 43] relied on reinforcement or imitation learn-ing with CNN or recurrent encoders. FGPrompt [30] conditions the policy on fine-grained goal prompts to improve goal-directed attention, and RegNav [17] incorporates region-level representations to improve goal grounding. While ef-fective at coarse navigation, end-to-end methods produce no explicit goal pose estimate and provide no principled mechanism for precise last-meter localization: the policy’s implicit representation of goal proximity degrades as the observa-tion diverges from the goal image, which is common outside the immediate goal vicinity. 
+
+Modular methods decompose the pipeline into mapping, exploration, and goal-matching stages. Topological methods [10, 26] construct graph-based mem-ory structures for long-range navigation. Renderable memory [13] synthesizes novel viewpoints to bridge the appearance gap between observation and goal. Wasserman et al . [34] specifically target the last-meter problem by refining po-sition estimates through careful feature matching, though they do not recover full 6-DoF poses. IGL-Nav [7] and SplatSearch [20] leverage Gaussian Splatting for view synthesis and render-and-compare matching. For IIN, IEVE [16] pro-poses an exploration-verification-exploitation framework, and UniGoal [39] uni-fies multiple goal-conditioned navigation tasks under a single zero-shot policy. Despite strong success rates, all these methods stop when a semantic similarity score exceeds a threshold, providing only approximate positioning—they can-not answer where exactly the goal camera was pointing, which is the question 
+
+AnyImageNav is designed to answer. 
+
+Gaussian Splatting-based methods represent the scene as a collection of 3D Gaussians [9] to support textured render-and-compare matching. Gauss-Nav [15] builds a semantic Gaussian map during a dedicated exploration episode and matches rendered views to the goal image in subsequent episodes. GauS-coreMap [6] extends this to hierarchical scoring, using CLIP-derived relevance fields for coarse candidate selection and local Gaussian geometry for fine pose es-timation. While GauScoreMap can in principle output a precise 6-DoF pose, both methods require either a pre-built scene representation that must be completed before any navigation begins, or a dedicated first-pass reconstruction episode. This is a fundamental limitation: constructing a full Gaussian scene scales poorly to large environments and is inapplicable in single-episode settings. AnyImage-Nav , by contrast, requires no pre-built representation and recovers precise poses Abbreviated paper title 5
+
+from the observations gathered during the navigation episode itself, using a single forward pass of a 3D multi-view foundation model. 
+
+2.2 Visual Localization and Pose Estimation 
+
+Place recognition [3] and visual localization [25] are classical computer vision tasks closely related to our localization stage. Hierarchical localization [23] chains a coarse retrieval stage using global descriptors with a fine geometric verification stage using local feature matching, a design that achieves state-of-the-art accu-racy on large-scale benchmarks. AnyImageNav follows an analogous two-stage design within a navigation loop: the semantic proximity score Srelev provides coarse screening, and the 3D multi-view foundation model provides fine geomet-ric registration, preventing expensive geometric computation during the bulk of exploration. Local feature matching methods [24, 29] establish dense correspondences be-tween image pairs and are used in classical localization pipelines as the fine-matching stage. Our approach goes further: rather than matching the goal image to a database of pre-mapped images, we register it directly against the agent’s accumulated observations in a single feed-forward pass, without a pre-built scene database or iterative optimization. 
+
+2.3 3D Multi-View Foundation Models 
+
+Recent work has produced feed-forward models that jointly estimate camera poses and 3D structure from unordered image collections. DUSt3R [32] intro-duced the paradigm of treating pairwise 3D reconstruction as a regression prob-lem solvable by a transformer. VGGT [31] extends this to sets of images with a single-pass multi-view architecture that outputs per-pixel depth, camera poses, and point clouds simultaneously. Pi3 [33] and Depth-Anything-3 [18] further scale this paradigm with larger training sets and stronger generalisation to in-the-wild images. RobustVGGT [8] extends VGGT with an outlier-filtering mech-anism based on cross-image correspondence confidence, which AnyImageNav 
+
+repurposes as a navigation commitment signal. These models were designed for offline 3D reconstruction tasks, not for em-bodied navigation. AnyImageNav is the first to exploit their capability as an 
+
+online localization primitive: by treating the goal image as an unposed view to be registered against the agent’s keyframe history, we inherit their correspondence-level precision without requiring scene reconstruction, pre-built maps, or seman-tic recognition of the goal content. This makes our approach the only ImageNav method that achieves precise 6-DoF goal pose recovery without any scene-specific preprocessing. 6 Y. Deng et al. (a) (b) (c)            
+
+> Compute
+> Relevance
+> Image Goal Observation
+> Frontier
+> Selection
+> Relevance Map
+> BEV Relevance Map
+> Mapping
+> [max( ) > 𝐀 ]Local
+> Policy
+> Frontier Exploration
+> Image Goal Short Memory
+> +
+> 𝐀 𝐀 𝐀 𝐀 −2,𝐀 −1,𝐀
+> Compute
+> Geometric Confidence
+> Accept
+> Reject
+> 𝐀 −𝐀
+> (Ref)
+> 𝐀 −𝐀 𝐀 𝐀
+> (Tgt)
+> 1.0
+> 𝐀
+> Geometric Verification
+> Relevant?
+> Confident ?
+> Image Goal Long Memory
+> +
+> 3D Foundation Model
+> Predicted Camera Poses
+> Mapped
+> Last-Meter Localization
+> Yes
+> No
+> Yes
+> No
+> Update
+> Pose
+
+Fig. 2: AnyImageNav pipeline. (a) Frontier Exploration: The dense relevance map between the current observation and the goal image Ig is projected onto a BEV map, scoring candidate frontiers and yielding the proximity score Srelev . (b) Geomet-ric Verification: When Srelev > θ , a short memory window and Ig are passed to a 3D multi-view foundation model; the model’s internal correspondence confidence Sconf 
+
+gates the transition to localization. (c) Last-Meter Localization: Upon acceptance, the full long-memory cache is registered with Ig in a single forward pass; the recovered goal pose is aligned to the agent’s map via Sim(3)+orientation correction and contin-uously refined as confidence improves. 
+
+## 3 Method 
+
+3.1 Task Setting 
+
+At each timestep t the agent receives an RGB image It, a depth map Dt, and its camera-to-world pose Tt ∈ SE (3) , forming the observation ot = ( It, D t, Tt). The agent must navigate to the target image Ig taken from an unknown pose Tg in the same environment. Beyond the standard proximity criterion ∥ˆp−pg ∥2 < 1 m, we introduce two pose-precision metrics: 
+
+ϵpos = ∥ˆp − pg ∥2, ϵhead = | ˆψ − ψg |180 , (1) where ˆp, pg ∈ R2 are the 2D positions of the agent’s final pose and the goal pose projected onto the ground plane, and ˆψ, ψ g ∈ [0 , 360) are the corresponding yaw angles; | · | 180 is the minimum angular difference modulo 180 .
+
+3.2 System Overview 
+
+AnyImageNav is built around a semantic-to-geometric cascade (Figure 2). At every step, a dense pixel-level relevance map between It and Ig is computed and projected onto a top-down BEV relevance map. This shared representation Abbreviated paper title 7Compute      
+
+> Relevance
+> Image Goal
+> Observation
+> Frustum-Aware
+> Projection
+> Relevance Map
+> 2D Cone Mask Depth-Contoured
+> 2D Cone Mask Confidence Cone
+> +
+> BEV Relevance Map
+> Map
+> Depth Map
+> =⨀
+> ⨀
+> Low High
+> Relevance Cone Depth-Contoured
+> Relevance Cone
+
+Fig. 3: BEV Relevance Map Construction. A dense pixel-level relevance map between the current observation and the goal image is calculated per step. Then a frustum-aware projection then maps the relevance map onto the top-down BEV grid: a 2D cone mask is combined with depth-contoured truncation to prevent relevance from bleeding through obstacles, and element-wise multiplied with a confidence cone that attenuates rays toward the field-of-view boundary. The resulting per-step relevance cone is accumulated into a persistent global BEV relevance map. 
+
+serves a dual role: it scores candidate frontiers for the Frontier Exploration 
+
+policy, and its peak value Srelev (t) acts as a proximity trigger. Once Srelev (t) ex-ceeds a threshold θ, the agent is likely in the visual neighborhood of the goal, and 
+
+Geometric Verification is invoked on a short-memory cache to test whether reliable registration is possible. The geometry model self-certifies its output cam-era pose for Ig via its correspondence confidence Sconf ; if Sconf > τ , Last-Meter Localization uses a wider long-memory cache for precise 6-DoF recovery, and the agent navigates to the recovered pose, continuously refining it as confidence improves. If verification rejects, control returns to Frontier Exploration until the cascade is triggered again. 
+
+3.3 Frontier Exploration 
+
+BEV Relevance Map. We show the construction of BEV relevance map in Figure 3. At each step we extract DINOv2 [21] features ϕ(It) ∈ RH×W ×d and compute a per-pixel relevance map against the goal: 
+
+S(i,j ) 
+
+> t
+
+= ϕ(It)(i,j ) · ϕ(Ig )(i,j )
+
+∥ϕ(It)(i,j )∥ ∥ ϕ(Ig )(i,j )∥ , i = 1 , . . . , H, j = 1 , . . . , W.  (2) To project St onto the BEV occupancy map M, we compress it to a W -dimensional ray vector aligned with the agent’s viewing frustum. Pixels near the optical center carry the most reliable signal, so each row is weighted by a Gaussian centered on the image midpoint, W(i,j ) ∝ exp  − (i−H/ 2) 2
+
+> 2σ2
+> H
+
+, and the weighted maximum is taken along the height dimension: 
+
+s(j) 
+
+> t
+
+= max 
+
+> i
+
+ W ⊙ St
+
+(i,j ). (3) 8 Y. Deng et al. 
+
+Each ray is further attenuated toward the field-of-view boundary by an angular mask 
+
+m(φ) = cos 2
+
+ φθfov /2 · π
+
+2
+
+
+
+, (4) where φ is the angle between the ray and the optical axis. To prevent relevance from bleeding through obstacles, each ray is truncated at the maximum observed depth for that column, d(j) 
+
+> t
+
+= max i D(i,j ) 
+
+> t
+
+. The per-step BEV relevance map is: 
+
+Rt(p) = m(φ(p)) s(j(p))  
+
+> t
+
+1
+
+
+
+ρ(p) ≤ d(j(p)) 
+
+> t
+
+
+
+, (5) where ρ(p) is the radial distance of BEV cell p from the camera centre. Rt is accumulated into a persistent global map G via the weighted-averaging scheme of VLFM [40]. 
+
+Frontier Selection. Given G, candidate frontiers are scored using four factors: semantic relevance S, geodesic distance D, heading deviation H, and information gain E (unexplored pixel ratio within a fixed radius). The key design insight is that the relative importance of these factors must be adaptive: when a frontier shows strong semantic evidence, the agent should commit to it regardless of distance or heading cost; when no frontier stands out semantically, the agent should explore efficiently. This motivates a gated weight-ing scheme. Efficiency factors are normalised via Norm( x) = 12 + 12 tanh 
+
+ x−E(x)Std( x)
+
+
+
+,which avoids the pathology of min-max normalisation on near-uniform distribu-tions. The relevance score is capped as Snorm = min( S/θ relev , 1) so that below-threshold frontiers remain proportionally ranked. The remaining factors are nor-malised as Dnorm = Norm(1 /D ), Hnorm = Norm(1 − A/ 180) where A is the heading deviation angle, and Enorm = Norm( E). The composite frontier score is: 
+
+score( f ) = ws · Snorm 
+
+| {z }
+
+> semantic pull
+
++ (1 − Snorm ) wd · Dnorm + wh · Hnorm 
+
+| {z }
+
+> efficiency (suppressed near goal)
+
++ we · Enorm 
+
+| {z }
+
+> coverage
+
+,
+
+(6) with defaults ws = 0 .60 , wd = 0 .55 , wh = 0 .35 , we = 0 .10 . The (1 − Snorm ) coupling is the core mechanism: when Snorm → 1 the efficiency terms vanish and the agent commits to the semantically prominent frontier unconditionally; when Snorm ≈ 0
+
+the score reduces to a pure efficiency objective. 
+
+Local Policy. The selected frontier is pursued via an occlusion-aware Fast Marching Method (FMM) [28]. Standard FMM selects the short-term waypoint as the cell minimising the geodesic distance field, but is agnostic to obstacle clearance, which can trap the agent in narrow passages. We augment it with a two-tier clearance mechanism derived from a local Euclidean Distance Trans-form (EDT). A hard exclusion zone of radius ragent unconditionally removes any candidate cell whose EDT value falls below ragent , since the agent cannot physi-cally traverse a gap narrower than its own body. A graded clearance bonus then Abbreviated paper title 9
+
+reduces the effective distance cost of remaining candidates in proportion to their obstacle clearance: 
+
+˜d(c) = d(c) − wobs · min(EDT( c), r safe )
+
+rsafe 
+
+, (7) where d(c) is the FMM geodesic distance and ˜d(c) the clearance-adjusted cost. Cells beyond rsafe receive the full bonus, preventing the planner from sacrificing goal progress for unnecessary clearance. 
+
+3.4 Geometric Verification 
+
+Invoking the geometry model at every step is wasteful; registration is mean-ingless before any visual overlap with the goal exists. We gate invocation with the semantic proximity score: Srelev (t) = max i,j S(i,j ) 
+
+> t
+
+. The geometry model is invoked only when Srelev (t) > θ for the sake of system efficiency, and θ is set default as 0.0014 from empirical experience. When triggered, a short-memory window Hshort = {It−m+1 , . . . , I t} of m
+
+recent frames, together with Ig , is passed to VGGT [31]. The temporally central frame is placed first in the input sequence as the reference Iref : as the frame with maximum average overlap with all others in the window, it provides the most stable anchor for relative pose estimation. Following RobustVGGT [8], we repurpose VGGT’s final-layer cross-attention activations and ℓ2-normalised feature similarities as proximity confidence signals. For each frame Ik ∈ H short ∪{ Ig }, we compute a raw attention score ratt  
+
+> k→ref
+
+(mean cross-attention from Ik to Iref ) and a raw feature similarity score rfeat  
+
+> k→ref
+
+(mean cosine similarity of final-layer feature maps). Both score lists are independently min-max normalised across the m + 1 frames: 
+
+ˆratt  
+
+> k
+
+= ratt  
+
+> k→ref
+
+− min j ratt 
+
+> j→ref
+
+max j ratt  
+
+> j→ref
+
+− min j ratt 
+
+> j→ref
+
+, (8) and analogously for ˆrfeat  
+
+> k
+
+. The confidence score for the goal image Ig is then: 
+
+Sconf = wα · ˆratt  
+
+> g
+
++ wf · ˆrfeat  
+
+> g
+
+, wα = wf = 0 .5, (9) where ˆratt  
+
+> g
+
+and ˆrfeat  
+
+> g
+
+denote the normalised attention and feature scores of Ig
+
+specifically. Sconf is not an external classifier: it is the model’s own internal mea-sure of whether Ig is geometrically-correspondent with the recent observations, repurposed here as a navigation commitment signal. If Sconf > τ , verification ac-cepts and triggers Last-Meter LocaliZation; otherwise it rejects and the cascade returns to Frontier Exploration. 
+
+3.5 Last-Meter Localization 
+
+Upon acceptance, the agent switches from the short-memory verification window to the long-memory cache Hlong = {It−K+1 , . . . , I t} of K frames whose recorded positions pt−K+1 , ...p t span at at least three different positions to enable a well-conditioned Sim(3) alignment. 10 Y. Deng et al. 
+
+Pose Estimation. We assemble I = Hlong ∪ { Ig } and pass it to a multi-view 3D foundation model in a single forward pass, obtaining estimated camera poses 
+
+{ ˆT1, . . . , ˆTK , ˆTg } in the model’s canonical coordinate frame, where ˆTg is the estimated pose of Ig . We use Pi3 [33] for this stage, as its architecture handles long-sequence inputs more reliably than VGGT [31]. 
+
+Coordinate Alignment. We align the estimated trajectory to the agent’s global coordinate system in three steps. 
+
+Step 1: Sim(3) position alignment. Let Xk and Yk denote the camera centres extracted from the predicted and reference (agent-recorded) poses respectively. We solve for scale s, rotation R, and translation t via Umeyama’s closed-form Sim(3) estimator: 
+
+(s∗, R∗, t∗) = arg min 
+
+> s, R,t
+> K
+
+X
+
+> k=1
+
+Yk − (s R Xk + t) 2. (10) 
+
+Step 2: Orientation correction. Sim(3) aligns positions but can leave a resid-ual rotation between predicted and reference frame orientations. We compute an additional rotation Ror that minimises the mean angular difference between Sim(3)-aligned and reference rotations. This correction is applied as a rotation 
+
+around the centroid ¯Y = 1
+
+> K
+
+P 
+
+> k
+
+Yk of the reference cameras, preventing camera positions from drifting away from the reference cluster: 
+
+X(3)  
+
+> k
+
+← Ror (X(2)  
+
+> k
+
+− ¯Y ) + ¯Y ,  (11) where X(2)  
+
+> k
+
+denotes the position after Step 1. 
+
+Step 3: Apply to the target pose. The composed transform (s∗, R∗, t∗, Ror ) is applied identically to ˆTg , yielding the aligned goal pose T∗ 
+
+> g
+
+= ( s∗, Ror R∗, t∗)· ˆTg .We extract the 2D goal position p∗ 
+
+> g
+
+and heading ψ∗ 
+
+> g
+
+as the navigation target. 
+
+Confidence-Monitored Refinement. The pose estimate at the moment of first acceptance may carry residual error if the agent was at the boundary of the goal’s visual neighborhood. As the agent navigates toward T∗ 
+
+> g
+
+, Sconf is re-evaluated at every step. Whenever Sconf exceeds its running maximum Sbest conf , the agent re-invokes localization with the updated long-memory cache: 
+
+T∗ 
+
+> g
+
+← T∗ 
+
+> t
+
+· ˆT(t) 
+
+> g
+
+if Sconf (t) > Sbest conf . (12) This refinement is motivated by a geometric observation: as the agent approaches the goal, the photometric overlap between Hlong and Ig generally increases, im-proving correspondence quality and therefore pose accuracy. Rather than com-mitting to a fixed estimate at a single decision point, AnyImageNav contin-uously accumulates the best estimate it encounters during approach, ensuring that the final committed pose reflects maximum registration confidence. Abbreviated paper title 11 Goal Image (HM3D) Observation Occupancy Map Relevance Map Observation Occupancy Map Relevance Map     
+
+> t=0 t=70
+> t=111 t=139
+> Goal Image ( Gibson)
+> t=0 t=70
+> t=135 t=151
+
+Fig. 4: Navigation examples on HM3D (top) and Gibson (bottom). In both episodes, the BEV relevance map directs the agent toward goal-relevant regions well before the target is reached (shown at t = 70 ). At t = 111 (HM3D) and t = 135 
+
+(Gibson), the target pose is accurately recovered while the agent is still approaching, and the agent subsequently navigates to the estimated goal position with high precision. 
+
+## 4 Experiment 
+
+4.1 Experimental Setup Tasks and datasets. We evaluate on two benchmarks in the Habitat [27] sim-ulator. For ImageNav , we use the Gibson [35] dataset with the 14-scene, 4.2k-episode evaluation split from Chaplot et al. [4]. For InstanceImageNav , we use the HM3D [38] validation set with the 36-scene, 1000-episode split from Krantz et al. [11]. 
+
+Evaluation metrics. We report Success Rate ( SR ) and Success weighted by Path Length ( SPL ) [2] for both tasks. In addition, we introduce two pose-precision metrics not reported by prior methods: mean BEV position error ϵpos 
+
+and mean yaw error ϵhead (Section 3), computed at the stop position over all episodes to directly measure manipulation readiness independent of the 1 m prox-imity threshold. We evaluate these 2 metrics on open-sourced methods. 
+
+4.2 Main Results Image Goal Navigation (Gibson). Table 1 compares AnyImageNav against prior learning-based methods on Gibson. AnyImageNav achieves the highest success rate ( 93.1% ), surpassing the previous best REGNav [17] by 0.2% , and reduces ϵpos from 0.50 m to 0.27 m and ϵhead from 10.22 ° to 3.41 °. The SPL is 12 Y. Deng et al. 
+
+Table 1: ImageNav results. ↑ means higher is better; ↓ means lower is better. 
+
+Bold : best result; underline: second best.                                        
+
+> Method SR ↑SPL ↑Pose Precision
+> ϵpos ↓(m) ϵhead ↓(°)ZER [1] 0.292 0.216 4.84 30.02 ZSON [19] 0.369 0.280 3.61 26.89 OVRL [37] 0.542 0.270 --OVRL-v2 [36] 0.820 0.587 --FGPrompt-MF [30] 0.907 0.621 0.71 13.17 FGPrompt-EF [30] 0.904 0.665 0.75 13.21 REGNav [17] 0.929 0.671 0.50 10.22
+> AnyImageNav 0.931 0.410 0.27 3.41
+
+Table 2: InsImageNav results. ↑ means higher is better; ↓ means lower is better. 
+
+Bold : best result; underline: second best.                                            
+
+> Method SR ↑SPL ↑Pose Precision
+> ϵpos ↓(m) ϵhead ↓(°)RL Baseline [12] 0.083 0.035 6.84 47.27 OVRL-v2 IIN [36] 0.248 0.118 --Mod-IIN [11] 0.561 0.233 --UniGoal [39] 0.602 0.237 3.89 25.74 IEVE Mask RCNN [16] 0.684 0.241 2.46 20.31 IEVE InternImage [16] 0.702 0.252 --GaussNav [15] 0.725 0.578 --GauScoreMap [6] 0.784 0.605 --
+> AnyImageNav 0.826 0.259 0.21 1.23
+
+lower than the top learning-based methods because Gibson scenes are compact and some goals are near the start: to accumulate sufficient long-memory diversity for a well-conditioned Sim(3) alignment, the agent must travel further before committing, incurring path overhead on these short episodes. 
+
+Instance Image Goal Navigation (HM3D). Table 2 compares AnyIm-ageNav against prior methods on HM3D. Despite being training-free, Any-ImageNav achieves the highest success rate ( 82.6% ), surpassing the previous best GauScoreMap [6] by 4.2% . Notably, both GauScoreMap and GaussNav [15] achieve substantially higher SPL by exploiting pre-built Gaussian Splatting maps that provide shortest-path access to the goal once localized; AnyImageNav nav-igates without any such prior and still outperforms them on the success rate, demonstrating stronger goal-discovery capability in unknown environments. On pose precision, AnyImageNav achieves 0.21 m and 1.23 °, a 10–30 × improve-ment over methods for which these metrics can be computed. We provide two navigation examples on both HM3D and Gibson scenes in the Habitat simulator shown in Figure 4. 
+
+4.3 Ablation Study 
+
+We ablate the key design choices of AnyImageNav in two groups and evaluate on the HM3D validation set, results are in Table 3. 
+
+Frontier Exploration. Every single-factor scoring variant underperforms the full combination: relevance S alone reaches the goal vicinity but lacks effi-ciency pressure; distance D alone ignores goal-directed semantics; information gain G alone biases toward open space. The adaptive weighting is therefore neces-sary for both SR and pose precision. Replacing the safety-augmented FMMPlan-ner with a standard planner causes a 3.9% SR drop from narrow-passage entrap-ments. For the relevance gate threshold θ, lowering it to 0.0010 gives a marginal SR gain (+ 0.2% ) at the cost of more frequent (and expensive) geometry-model invocations; raising it to 0.0018 causes a 6.2% SR drop as valid goal-adjacent views are suppressed. Replacing DINOv2 with CLIP degrades SR by 6.9% , since CLIP’s global image-level features lack the fine-grained details needed for dense per-pixel BEV projection. Abbreviated paper title 13 
+
+Table 3: Ablation study on HM3D val set. Each row removes or replaces one component.                                                                         
+
+> Configuration SR ↑SPL ↑ϵpos (m)↓ϵhead (◦)↓
+> Full AnyImageNav 0.826 0.259 0.21 1.23
+> Frontier Exploration ablations
+> score with only relevance score S0.786 0.231 0.42 2.07 score with only geodesic distance D0.751 0.239 0.91 2.95 score with only information gain G0.749 0.244 1.13 1.98 w/o safe FMMPlanner (plain FMMPlanner) 0.787 0.233 0.54 2.16 relevance threshold θ= 0 .0010 0.828 0.261 0.20 1.19
+> relevance threshold θ= 0 .0018 0.764 0.221 1.01 1.78 replace DINOv2 [21] with CLIP [22] visual encoder 0.757 0.217 1.08 2.96
+> Geometric Verification and Localization ablations
+> confidence threshold τ= 0 .05 0.815 0.254 0.68 1.37 confidence threshold τ= 0 .15 0.807 0.250 1.01 1.88 short memory length |H short |= 2 0.724 0.221 1.76 3.01 short memory length |H short |= 6 0.761 0.227 1.31 2.24 w/o Confidence-Monitored Refinement 0.772 0.230 1.25 2.65
+
+Table 4: Failure case statistics on all 1000 HM3D validation episodes. 
+
+Failure reason Nf ail Rf ail 
+
+Wrong pose estimation 55 31.6% Goal not found 46 26.4% Agent stuck 34 19.5% Premature acceptance 26 15.0% Correct region rejected 13 7.5% Total 174 100% 
+
+Geometric Verification and Localization. Over-rejection ( τ = 0 .15 ) hurts SR more than premature acceptance ( τ = 0 .05 ): −1.9% vs. −1.1% in SR, re-flecting that a falsely rejected view permanently diverts the agent, whereas a prematurely accepted estimate can be partially corrected by the refinement loop. Both a shorter ( |H short | = 2 ) and a longer ( |H short | = 6 ) short-memory window degrade SR ( −10 .2% and −6.5% respectively): two frames provide in-sufficient viewpoint diversity; six frames dilute temporal locality and reduce overlap with the goal image. Removing confidence-monitored refinement causes a −5.4% SR drop and substantially worsens pose errors, confirming that the looped confidence-monitored pose refinement is essential for precision. 
+
+4.4 Failure Case Analysis 
+
+We analyze the 174 failed episodes on the HM3D validation set and categorize them into five failure modes, reported in Table 4. 
+
+Wrong pose estimation (31.6%) is the most frequent failure mode. These episodes reach the correct vicinity and pass geometric verification, but the re-covered 6-DoF pose is inaccurate. This occurs either because the long-memory frames provide insufficient viewpoint diversity for a well-conditioned Sim(3) alignment, or because the foundation model produces unreliable pose estimates. 
+
+Goal not found (26.4%) covers episodes where neither the semantic prox-imity threshold θ nor the confidence threshold τ is exceeded within the episode step budget. This occurs in large-scale scenes where the agent exhausts its steps traversing or revisiting explored regions but does not find semantically-relevant or geometrically-confident regions. 
+
+Agent stuck (19.5%) refers to episodes where the agent enters a narrow passage or dead-end from which the local planner cannot recover. Although the safety-augmented FMMPlanner substantially reduces this failure mode relative to the standard planner (Table 3), a residual fraction persists in environments with particularly tight geometry where the hard exclusion zone radius is insuf-ficient to prevent entrapment. 14 Y. Deng et al. 
+
+Premature acceptance (15.0%) occurs when Sconf exceeds τ while the agent is still outside the true goal neighborhood. The foundation model estab-lishes spurious correspondences between the goal image and a visually similar but geometrically incorrect location, most commonly in environments with re-peated structural patterns such as symmetric furniture layouts or identically decorated rooms. 
+
+Correct region rejected (7.5%) is the complementary failure: the agent reaches the true goal vicinity but Sconf remains below τ . This affects goals in structurally confined spaces such as toilets and plants in walls, where the ge-ometry model finds too few reliable correspondences to exceed the confidence threshold. 
+
+## 5 Discussion 
+
+AnyImageNav advances image goal navigation toward manipulation-ready pre-cision while remaining training-free. We discuss three limitations and the direc-tions they motivate. 
+
+Dependence on depth and odometry. The system relies on depth and odometry sensors for BEV map construction. Streaming multi-view foundation models [5, 14, 41, 44] could in principle enable robotic agents free from depth and odometry sensors with purely RGB-derived trajectories, but we have tested them, only to find they all suffer from temporal pose drift over the episode lengths typical of navigation tasks. Consequently, developing a robust and effi-cient 3D foundation model remains an open challenge for sensor-light image-goal navigation. 
+
+Exploration under sparse semantic signal. The 26.4% of failures due to 
+
+Goal not found reflects a fundamental limitation: when no semantically promi-nent frontier exists, the scoring function degrades to a pure efficiency objective with no directional bias toward the goal. Incorporating scene-level priors such as room-layout estimates or object co-occurrence statistics could provide a useful signal during the semantically silent phase of exploration. 
+
+Fixed thresholds. Roughly 22% of failures stem from τ being either too permissive (15.0%) or too conservative (7.5%). While our default hyperparame-ters generalize well across both benchmarks without per-scene tuning, replacing fixed thresholds with adaptive counterparts calibrated to scene texture density or learned from navigation experience could further balance the two complemen-tary failure modes. 
+
+## 6 Conclusion 
+
+We presented AnyImageNav , a training-free system that advances Image Goal Navigation from coarse proximity to pose-precise localization. By treating the goal image as an unposed geometric query and registering it against the agent’s accumulated observations via a 3D multi-view foundation model, our method recovers the exact camera pose of the goal, a capability that prior semantic Abbreviated paper title 15 
+
+matching methods cannot provide. The semantic-to-geometric cascade ensures efficiency by invoking the geometry model only when meaningful visual overlap exists, with no scene reconstruction, task-specific training or explicit semantic label prediction required. AnyImageNav achieves state-of-the-art success rates on both benchmarks: 93.1% on Gibson and 82.6% on HM3D, while reducing position error to 0.27 m and heading error to 3.41 ° on Gibson, and 0.21 m and 1.23 ° on HM3D. These results suggest that pose-accurate visual localization can serve as a reliable bridge between image goal navigation and downstream manipulation tasks, enabling robots to act on image-specified goals rather than merely arrive near them. 
+
+## References 
+
+1. Al-Halah, Z., Ramakrishnan, S.K., Grauman, K.: Zero experience required: Plug & play modular transfer learning for semantic visual navigation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 17031–17041 (2022) 2, 4, 12 2. Anderson, P., Chang, A., Chaplot, D.S., Dosovitskiy, A., Gupta, S., Koltun, V., Kosecka, J., Malik, J., Mottaghi, R., Savva, M., et al.: On evaluation of embodied navigation agents. arXiv preprint arXiv:1807.06757 (2018) 11 3. Arandjelovic, R., Gronat, P., Torii, A., Pajdla, T., Sivic, J.: Netvlad: Cnn ar-chitecture for weakly supervised place recognition. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 5297–5307 (2016) 5 4. Chaplot, D.S., Salakhutdinov, R., Gupta, A., Gupta, S.: Neural topological slam for visual navigation. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 12875–12884 (2020) 2, 11 5. Chen, X., Chen, Y., Xiu, Y., Geiger, A., Chen, A.: Ttt3r: 3d reconstruction as test-time training. arXiv preprint arXiv:2509.26645 (2025) 14 6. Deng, Y., Yuan, S., Bethala, G.C.R., Tzes, A., Liu, Y.S., Fang, Y.: Hierarchi-cal scoring with 3d gaussian splatting for instance image-goal navigation. arXiv preprint arXiv:2506.07338 (2025) 2, 3, 4, 12 7. Guo, W., Xu, X., Yin, H., Wang, Z., Feng, J., Zhou, J., Lu, J.: Igl-nav: Incre-mental 3d gaussian localization for image-goal navigation. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 6808–6817 (2025) 48. Han, J., Hong, S., Jung, J., Jang, W., An, H., Wang, Q., Kim, S., Feng, C.: Emergent outlier view rejection in visual geometry grounded transformers. arXiv preprint arXiv:2512.04012 (2025) 5, 9 9. Kerbl, B., Kopanas, G., Leimkühler, T., Drettakis, G., et al.: 3d gaussian splatting for real-time radiance field rendering. ACM Trans. Graph. 42 (4), 139–1 (2023) 4 10. Kim, N., Kwon, O., Yoo, H., Choi, Y., Park, J., Oh, S.: Topological semantic graph memory for image-goal navigation. In: Conference on Robot Learning. pp. 393–402. PMLR (2023) 4 11. Krantz, J., Gervet, T., Yadav, K., Wang, A., Paxton, C., Mottaghi, R., Batra, D., Malik, J., Lee, S., Chaplot, D.S.: Navigating to objects specified by images. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 10916–10925 (2023) 2, 11, 12 16 Y. Deng et al. 12. Krantz, J., Lee, S., Malik, J., Batra, D., Chaplot, D.S.: Instance-specific image goal navigation: Training embodied agents to find object instances. arXiv preprint arXiv:2211.15876 (2022) 4, 12 13. Kwon, O., Park, J., Oh, S.: Renderable neural radiance map for visual navigation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 9099–9108 (2023) 4 14. Lan, Y., Luo, Y., Hong, F., Zhou, S., Chen, H., Lyu, Z., Yang, S., Dai, B., Loy, C.C., Pan, X.: Stream3r: Scalable sequential 3d reconstruction with causal transformer. arXiv preprint arXiv:2508.10893 (2025) 14 15. Lei, X., Wang, M., Zhou, W., Li, H.: Gaussnav: Gaussian splatting for visual nav-igation. IEEE Transactions on Pattern Analysis and Machine Intelligence 47 (5), 4108–4121 (2025) 2, 3, 4, 12 16. Lei, X., Wang, M., Zhou, W., Li, L., Li, H.: Instance-aware exploration-verification-exploitation for instance imagegoal navigation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 16329–16339 (2024) 2, 3, 4, 12 17. Li, P., Wu, K., Fu, J., Zhou, S.: Regnav: Room expert guided image-goal navigation. In: Proceedings of the AAAI Conference on Artificial Intelligence. vol. 39, pp. 4860– 4868 (2025) 4, 11, 12 18. Lin, H., Chen, S., Liew, J., Chen, D.Y., Li, Z., Shi, G., Feng, J., Kang, B.: Depth anything 3: Recovering the visual space from any views. arXiv preprint arXiv:2511.10647 (2025) 3, 5 19. Majumdar, A., Aggarwal, G., Devnani, B., Hoffman, J., Batra, D.: Zson: Zero-shot object-goal navigation using multimodal goal embeddings. Advances in Neural Information Processing Systems 35 , 32340–32352 (2022) 2, 12 20. Narasimhan, S., Lisondra, M., Wang, H., Nejat, G.: Splatsearch: Instance image goal navigation for mobile robots using 3d gaussian splatting and diffusion models. arXiv preprint arXiv:2511.12972 (2025) 2, 4 21. Oquab, M., Darcet, T., Moutakanni, T., Vo, H., Szafraniec, M., Khalidov, V., Fernandez, P., Haziza, D., Massa, F., El-Nouby, A., et al.: Dinov2: Learning robust visual features without supervision. arXiv preprint arXiv:2304.07193 (2023) 7, 13 22. Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., et al.: Learning transferable visual models from natural language supervision. In: International conference on machine learning. pp. 8748–8763. PmLR (2021) 13 23. Sarlin, P.E., Cadena, C., Siegwart, R., Dymczyk, M.: From coarse to fine: Robust hierarchical localization at large scale. In: Proceedings of the IEEE/CVF confer-ence on computer vision and pattern recognition. pp. 12716–12725 (2019) 5 24. Sarlin, P.E., DeTone, D., Malisiewicz, T., Rabinovich, A.: Superglue: Learning feature matching with graph neural networks. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 4938–4947 (2020) 5 25. Sattler, T., Maddern, W., Toft, C., Torii, A., Hammarstrand, L., Stenborg, E., Safari, D., Okutomi, M., Pollefeys, M., Sivic, J., et al.: Benchmarking 6dof outdoor visual localization in changing conditions. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 8601–8610 (2018) 5 26. Savinov, N., Dosovitskiy, A., Koltun, V.: Semi-parametric topological memory for navigation. arXiv preprint arXiv:1803.00653 (2018) 4 27. Savva, M., Kadian, A., Maksymets, O., Zhao, Y., Wijmans, E., Jain, B., Straub, J., Liu, J., Koltun, V., Malik, J., et al.: Habitat: A platform for embodied ai research. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 9339–9347 (2019) 11 Abbreviated paper title 17 28. Sethian, J.A.: A fast marching level set method for monotonically advancing fronts. proceedings of the National Academy of Sciences 93 (4), 1591–1595 (1996) 8 29. Sun, J., Shen, Z., Wang, Y., Bao, H., Zhou, X.: Loftr: Detector-free local fea-ture matching with transformers. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 8922–8931 (2021) 5 30. Sun, X., Chen, P., Fan, J., Chen, J., Li, T., Tan, M.: Fgprompt: Fine-grained goal prompting for image-goal navigation. Advances in Neural Information Processing Systems 36 , 12054–12073 (2023) 2, 4, 12 31. Wang, J., Chen, M., Karaev, N., Vedaldi, A., Rupprecht, C., Novotny, D.: Vggt: Visual geometry grounded transformer. In: Proceedings of the Computer Vision and Pattern Recognition Conference. pp. 5294–5306 (2025) 3, 5, 9, 10 32. Wang, S., Leroy, V., Cabon, Y., Chidlovskii, B., Revaud, J.: Dust3r: Geometric 3d vision made easy. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 20697–20709 (2024) 5 33. Wang, Y., Zhou, J., Zhu, H., Chang, W., Zhou, Y., Li, Z., Chen, J., Pang, J., Shen, C., He, T.: π3: Permutation-equivariant visual geometry learning. arXiv preprint arXiv:2507.13347 (2025) 3, 5, 10 34. Wasserman, J., Yadav, K., Chowdhary, G., Gupta, A., Jain, U.: Last-mile embodied visual navigation. In: Conference on Robot Learning. pp. 666–678. PMLR (2023) 435. Xia, F., Zamir, A.R., He, Z., Sax, A., Malik, J., Savarese, S.: Gibson env: Real-world perception for embodied agents. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 9068–9079 (2018) 11 36. Yadav, K., Majumdar, A., Ramrakhya, R., Yokoyama, N., Baevski, A., Kira, Z., Maksymets, O., Batra, D.: Ovrl-v2: A simple state-of-art baseline for imagenav and objectnav. arXiv preprint arXiv:2303.07798 (2023) 4, 12 37. Yadav, K., Ramrakhya, R., Majumdar, A., Berges, V.P., Kuhar, S., Batra, D., Baevski, A., Maksymets, O.: Offline visual representation learning for embodied navigation. In: Workshop on Reincarnating Reinforcement Learning at ICLR 2023 (2023) 4, 12 38. Yadav, K., Ramrakhya, R., Ramakrishnan, S.K., Gervet, T., Turner, J., Gokaslan, A., Maestre, N., Chang, A.X., Batra, D., Savva, M., et al.: Habitat-matterport 3d semantics dataset. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 4927–4936 (2023) 11 39. Yin, H., Xu, X., Zhao, L., Wang, Z., Zhou, J., Lu, J.: Unigoal: Towards universal zero-shot goal-oriented navigation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 19057–19066 (2025) 2, 4, 12 40. Yokoyama, N., Ha, S., Batra, D., Wang, J., Bucher, B.: Vlfm: Vision-language frontier maps for zero-shot semantic navigation. In: 2024 IEEE International Con-ference on Robotics and Automation (ICRA). pp. 42–48. IEEE (2024) 8 41. Yuan, S., Yang, Y., Yang, X., Zhang, X., Zhao, Z., Zhang, L., Zhang, Z.: In-finitevggt: Visual geometry grounded transformer for endless streams. arXiv preprint arXiv:2601.02281 (2026) 14 42. Zhu, Y., Mottaghi, R., Kolve, E., Lim, J.J., Gupta, A., Fei-Fei, L., Farhadi, A.: Target-driven visual navigation in indoor scenes using deep reinforcement learning. In: 2017 IEEE International Conference on Robotics and Automation (ICRA). pp. 3357–3364 (2017). https://doi.org/10.1109/ICRA.2017.7989381 2, 4 43. Zhu, Y., Mottaghi, R., Kolve, E., Lim, J.J., Gupta, A., Fei-Fei, L., Farhadi, A.: Target-driven visual navigation in indoor scenes using deep reinforcement learning. In: 2017 IEEE international conference on robotics and automation (ICRA). pp. 3357–3364. ieee (2017) 4 18 Y. Deng et al. 44. Zhuo, D., Zheng, W., Guo, J., Wu, Y., Zhou, J., Lu, J.: Streaming 4d visual geometry transformer. arXiv preprint arXiv:2507.11539 (2025) 14

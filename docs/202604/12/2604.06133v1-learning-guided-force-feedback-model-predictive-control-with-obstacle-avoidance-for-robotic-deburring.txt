@@ -1,0 +1,320 @@
+Title: Learning-Guided Force-Feedback Model Predictive Control with Obstacle Avoidance for Robotic Deburring
+
+URL Source: https://arxiv.org/pdf/2604.06133v1
+
+Published Time: Wed, 08 Apr 2026 01:24:18 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Learning-Guided Force-Feedback Model Predictive Control with Obstacle Avoidance for Robotic Deburring 
+
+Krzysztof Wojciechowski 1, Ege Gursoy 1, Arthur Haffemayer 1, Sebastien Kleff 2,Vincent Bonnet 1,3, Florent Lamiraux 1 and Nicolas Mansard 1,4
+
+Abstract — Model Predictive Control (MPC) is widely used for torque-controlled robots, but classical formulations often neglect real-time force feedback and struggle with contact-rich industrial tasks under collision constraints. Deburring in partic-ular requires precise tool insertion, stable force regulation, and collision-free circular motions in challenging configurations, which exceeds the capability of standard MPC pipelines. We propose a framework that integrates force-feedback MPC with diffusion-based motion priors to address these challenges. The diffusion model serves as a memory of motion strategies, pro-viding robust initialization and adaptation across multiple task instances, while MPC ensures safe execution with explicit force tracking, torque feasibility, and collision avoidance. We validate our approach on a torque-controlled manipulator performing industrial deburring tasks. Experiments demonstrate reliable tool insertion, accurate normal force tracking, and circular deburring motions even in hard-to-reach configurations and under obstacle constraints. To our knowledge, this is the first integration of diffusion motion priors with force-feedback MPC for collision-aware, contact-rich industrial tasks. 
+
+I. I NTRODUCTION 
+
+Model Predictive Control (MPC) has long been the staple for motion generation on torque-controlled robots, with ap-plications ranging from locomotion [1], [2], [3] to collision avoidance [4], [5]. However, most MPC formulations opti-mize motion alone without explicitly incorporating real-time force feedback [6], [7], [8], making force tracking purely feedforward and sensitive to modeling errors. In contrast, the control of contact forces has been alongstanding topic in robotics [9], [10], originally devel-oped through direct and indirect feedback methods such as hybrid force/motion control [11], impedance control [12], or admittance control [9]. These techniques offer reactivity and robustness but lack planning capabilities, which limits effectiveness in complex and contact-rich tasks. To bridge this gap some works attempted to incorpo-rate optimization into force control, for instance through MPC formulations based on linear spring models [13], [14], [15], [16], bounded admittance behavior [17], or adaptive impedance models [18], [19], [20]. These approaches im-prove motion–force coordination but often rely on simplified or low-dimensional dynamics.          
+
+> This work is supported by the European project AGIMUS (under GA no.101070165), ANITI (ANR-19-P3IA-0004), NERL (ANR-23-CE94-0004-02), AS2 (ANR-22-EXOD-0006) PEPR O2R project and by D´ efi Cl´ eRobotique centr´ ee sur l’Humain funded by R´ egion Occitanie, France.
+> 1LAAS-CNRS, Universite de Toulouse, CNRS, Toulouse, France
+> 2Inria, AUCTUS team, Talence, France
+> 3Image and Pervasive Access Laboratory (IPAL), CNRS-UMI, 2955, Singapore
+> 4Artificial and Natural Intelligence Toulouse Institute, France
+
+Fig. 1: Torque-controlled Franka Emika Panda robot exe-cuting the deburring task in scenario 3 (see sec. V-D). The robot inserts a custom end-effector into different holes of the workpiece and applies a constant normal force while per-forming circular motions, all while adapting to varying joint configurations and avoiding collisions with the environment. Conversely, another line of work attempted to extend MPC with force feedback, either by relaxing the rigid contact model [21], [22], using spring models [23], or modifying the control structure [24], [25]. These hybrid approaches do demonstrate the importance of contact force prediction, but often face trade-offs: simplified dynamics [23], low planning rates [26], or increased state size and model approxima-tions [27]. Force feedback is typically either ignored or estimated from joint torques. More recently, [28] proposed a unified formulation that combines force control and nonlinear MPC without these compromises. Despite progress, running such controllers online in real time remains challenging, especially for tasks like deburring, where stable contact and precise tool motions must be main-tained under uncertainty [29]. In these tasks, not only the force magnitude but also the spatiotemporal profile of force application is critical. The robot must retain and reproduce task-specific motion strategies, for instance characteristic insertion poses and trajectories for each hole to deburr. While MPC typically exploits the previous solution as a warm start, this only accelerates convergence locally and does not provide a true memory of task-specific motion strategies across different instances. To address this limitation, generative models have recently 
+
+> arXiv:2604.06133v1 [cs.RO] 7 Apr 2026
+
+Fig. 2: Robotic deburring process: the manipulator applies a constant normal force along the tool axis while performing a circular motion inside the hole to remove burrs with limited tangential forces. emerged as powerful motion priors. Classical representations such as dynamic movement primitives or Gaussian mixtures could encode demonstrations [30], [31], [32], [33], but were limited in capturing the variability and multi-modality of real robot behavior. Diffusion models overcome these issues by learning rich distributions of feasible motions. Recent diffusion-based policies have shown that such models can generate diverse, feasible trajectories conditioned on goals or sensory input [34], [35], [36], making them a natural candidate for serving as a memory of motion in contact-rich planning. In this paper, we propose a framework that combines force-feedback MPC with diffusion-based motion priors. Diffusion models provide robust initialization and adapta-tion for the predictive controller, while MPC ensures safe execution with force regulation and collision avoidance. We demonstrate the approach on a deburring task that requires precise tool insertion, circular force-controlled motions, and obstacle avoidance. Our contributions are threefold. First, we formalize the deburring task and formulate the corresponding Optimal Control Problem (OCP). Second, we integrate diffusion-based motion priors into a force-feedback MPC. Finally, we experimentally validate the framework on a torque-controlled manipulator. Our experimental setup is shown in Fig. 1. To the best of our knowledge, this is the first integration of diffusion-based motion priors with force-feedback MPC for a contact-rich task such as deburring. II. P ROBLEM STATEMENT 
+
+Deburring is the process of removing excess material to smooth the edges of a machined metal part, as shown in Fig. 2. To this end, we define it as the insertion of a precision tool into a hole, followed by the application of a constant nor-mal force λ⊥ along the hole axis while performing a circular motion inside it to remove excess material. Tangential forces, 
+
+λ∥, should not be zero but only limited. In hole deburring, the tangential force component provides the cutting and abrading action. Excessive tangential force, however, can cause slip-out. The objective is to track the desired normal force and reference trajectory, while bounding tangential forces within the friction cone within a safe envelope, i.e. to respect the friction cone ∥λ⊥∥2 ≤ αλ∥. In our empirical observations on dry steel deburring, a friction coefficient of α = 0 .6 is adopted. This value is conservative, ensuring stable contact and preventing slip-out. Reaching and deburring small holes under collision avoid-ance is particularly challenging in real manufacturing set-tings. Fig. 1 shows the realistic aeronautics-inspired work-piece used in our study. On the shop floor, it is common to reposition or re-fixture either the workpiece or the robot base to improve manipulability for each hole or batch of holes, which is an approach that increases setup time, cost, and system complexity. A more scalable alternative is to plan from a single, fixed robot pose. However, this makes the motion-planning problem especially hard: such workpieces are highly nonconvex, with thin corridor-like features and tight clearances around fixtures, creating narrow passages where small path deviations can cause collision or loss of reachability. Overall to perform a deburring task the following elements are required (i) tight geometric clearances around the work-piece and fixture, (ii) strict orientation constraints to align the tool axis with the hole axis, and (iii) force control that prevent slippage. These requirements must be satisfied under robot dynamics and rate limits at high control frequencies leaving little time for collision checking, Jacobian/Hessian updates, or replanning. As a result, the task stresses both planning and control: it couples geometric feasibility with contact stability and real-time computation, making it an exciting benchmark for MPC-based contact-aware motion planning. III. F ORCE -FEEDBACK MODEL PREDICTIVE CONTROL 
+
+We recall here the force-feedback MPC approach de-scribed in [28]. 
+
+A. Optimal Control Problem 
+
+The OCP is defined as: 
+
+min  
+
+> x,u
+> T−1
+
+X
+
+> t=0
+
+ℓt(xt, ut) + ℓT (xT )
+
+s.t. xt+1 = ft(xt, ut), 0 ≤ t < T, ct(xt, ut) ≥ 0, 0 ≤ t < T, cT (xT ) ≥ 0.
+
+(1) where x = {x0, ..., xT }, u = {u0, ..., uT −1} are the state and control input trajectories, T ∈ N∗ is the horizon length, 
+
+ℓt, f t, c t are the running cost, dynamics and constraint at stage t and ℓT , c T are the terminal cost and constraint. 
+
+B. Classical MPC 
+
+For torque-controlled manipulators, a common state-control choice is the joint position–velocity pair (q, ˙q) and the joint torque input τ [6], [7], [8]. In this case, for a fully actuated n-DoF manipulator in contact with the environment, the forward dynamics are expressed as: 
+
+¨q(q, ˙q, λ, τ ) = M −1(q)  τ − h(q, ˙q) + J(q)⊤λ (2) where M (q) ∈ Rn×n is the generalized inertia matrix, 
+
+h(q, ˙q) ∈ Rn denotes gravity and Coriolis terms, J(q) ∈
+
+Rm×n is the contact Jacobian, λ ∈ Rm are the contact forces with 1 ≤ m ≤ 3, and ¨q is the vector of joint accelerations. This formulation, under the rigid contact assumption [37], defines the classical MPC setting. Contact forces can be introduced as feedforward terms in the dynamics, but they are not directly regulated through explicit force measurement feedback. Therefore, force objectives can be encoded in the cost function, yet tracking remains model-dependent and sensitive to uncertainties. 
+
+C. Force-feedback MPC 
+
+In order to allow force feedback from sensors, we follow the approach described in [28] which augments the position-velocity state with the contact force λ. The state and control are defined as: 
+
+x = ( q, ˙q, λ) ∈ R2n+m
+
+u = τ ∈ Rn (3) Contact forces are modeled with a linear spring–damper law as: 
+
+λ(q, ˙q) = −K ∆p(q, p c) − B ˙p(q, ˙q). (4) where ∆p(q, p c) = p(q) − pc is the end-effector deflection relative to the anchor pc ∈ Rm, p(q) ∈ Rm is the forward kinematics, and ˙p(q, ˙q) = J(q) ˙q is the Cartesian velocity. The matrices K, B ∈ Rm×m are diagonal and positive definite. Assuming no slip, differentiating (4) yields to the force dynamics: 
+
+˙λ(x, u) = −K ˙p(q, ˙q) − B ¨p(x, u)¨p(x, u) = J(q) ¨q(q, ˙q, λ, τ ) + ˙J(q) ˙q (5) The overall system dynamics combine joint and force dynamics as: 
+
+ft =
+
+
+
+˙q
+
+M −1 τ − h + J⊤λ
+
+−KJ ˙q − B
+
+
+
+JM −1 τ − h + J⊤λ + ˙J ˙q
+
+ (6) This MPC formulation allows to combine the benefits of nonlinear MPC and direct force control and has been shown to outperform both taken individually in challenging contact tasks such as surface polishing and static multicontact push-ing [28]. However, tasks requiring the combined regulation of end-effector motion and tangential contact forces, such as deburring, have not been investigated yet. In particular, two contact models are considered for the deburring task: the 1D model which only predicts the normal contact force and assumes unconstrained tangential movement ( m = 1 )and the 3D model which additionally predicts the tangential forces ( m = 3 ). 
+
+D. Cost and constraints 
+
+The controller penalizes deviations in end–effector pose and contact force, while regularizing state and input effort. Hard constraints ensure feasibility under joint, torque, and collision limits. Throughout, the weighted norm is defined as ∥v∥2 
+
+> Q
+
+:= v⊤Qv for Q ⪰ 0.
+
+Stage and terminal costs: The running and terminal costs are 
+
+ℓt = ∥et∥2 
+
+> Qe
+
++ ∥xt − xref  
+
+> t
+
+∥2 
+
+> Qx
+
++ ∥ut − τ (qt, λt)∥2
+
+> Ru
+
+ℓT = ∥eT ∥2 
+
+> Qe,T
+
++ ∥xT − xref  
+
+> T
+
+∥2
+
+> Qx,T
+
+(7) where Qe = diag( Qp, Q R, Q λ,∥, Q λ,⊥) (and similarly for 
+
+Qe,T ) is block diagonal to weight the residuals indepen-dently. The residual vector is defined as: 
+
+et = ep(t), e R(t), e λ,∥(t), e λ,⊥(t)⊤
+
+ep(t) = p(qt) − pref  
+
+> t
+
+∈ R3
+
+eR(t) = vec  log  Rref ⊤ 
+
+> t
+
+R(qt) ∈ R3
+
+eλ,∥(t) = λt, ∥ − λref  
+
+> t, ∥
+
+∈ R
+
+eλ,⊥(t) = λt, ⊥ ∈ R2 (3D model only) (8) where p(q) ∈ R3 and R(q) ∈ SO (3) are the forward kinematics of the end–effector position and orientation; pref 
+
+> t
+
+and Rref  
+
+> t
+
+are their time-varying references; vec   log( ·) :
+
+SO (3) → R3 denotes the orientation error as a rotation vector; λt ∈ Rm is the contact force; n ∈ R3 is the unit vector along the hole axis and λref  
+
+> t, ∥
+
+∈ R is the desired normal contact force. The term eλ,∥ enforces tracking of the desired normal force, while eλ,⊥ penalizes tangential forces, which are defined as: 
+
+λt, ∥ = n⊤λt ∈ R,
+
+λt, ⊥ = ( I − nn ⊤)λt ∈ R2 (3D model only) . (9) Note that the tangential force λt, ⊥ and residual eλ,⊥(t)
+
+are only used with the 3D model ( m = 3 ). The reference 
+
+τ (qt, λt) is the gravity/Coriolis compensation torque, typi-cally g(qt) − J(qt)⊤λt, assuming zero reference velocity. It was tracked thanks to a regularization term Ru.
+
+Task-phase weighting: The cost terms are scheduled across phases of the task: 1) Trajectory following: follow joint trajectory ( Qx ac-tive), no force tracking ( Qλ,∥ = Qλ,⊥ = 0 ), no pose tracking ( Qp = QR = 0 ). 2) Pre-contact: increase pose tracking ( Qp, Q R), reduce reliance on reference configuration. 3) Insertion: increase Qλ,∥ to build normal force, keep 
+
+Qλ,⊥ large to suppress tangential force, maintain ori-entation with QR, and disable reference configuration tracking ( Qq = 0 ). 4) Deburring: track circular pref  
+
+> t
+
+in the plane orthogonal to n, enforce normal force with Qλ,∥, suppress tan-gential forces with Qλ,⊥, and maintain tool orientation with QR.Collision avoidance: For each pair (i, j ) of robot–environment bodies, a signed-distance margin 
+
+ε > 0 is imposed: 
+
+ct,i,j (qt) := dij (qt) − ε ≥ 0, (10) where dij (qt) is the signed distance between body i and body j. For the trajectory optimization algorithm, based on Sequential-Quadratic Programming (SQP) [38], the follow-ing linearization is used [39]: 
+
+ct,i,j (qt) ≈ ct,i,j ( ¯ qt) + ∇q dij ( ¯ qt)⊤(qt − ¯qt) ≥ 0 (11) IV. D IFFUSION PRIORS AS MEMORY OF MOTION 
+
+Collision avoidance in cluttered, non-strictly convex workspaces is hard for local optimizers, since the feasible set is highly non-convex and narrow passages are common. MPC with generic initialization often converges to poor local minima, or spends many iterations just to recover feasibility. This motivates a warm-start that already encodes task-specific strategies and collision-aware geometry. 
+
+A. Trajectory generation 
+
+To do so, we build a synthetic dataset of feasible deburring motions that captures the multimodality of motions around the different holes and poses. The motion data are obtained by the task-and-motion planner Humanoid Path Planner [40], by defining a simple task sequence composed of 3 steps: reach a pre-grasp location in front of the hole, apply the contact, retract to a rest location. For each configuration we (i) solve inverse kinematics to reach the target end effector pose from many seeds, (ii) connect start and goal with a bi-directional RRT ⋆ in configuration space to get a collision free path, (iii) refine this path with an OCP to obtain feasible and smooth trajectories. Since the dataset is inherently multimodal, with multiple approach directions and collision-avoidance strategies, we train a conditional diffusion motion to capture this diver-sity without mode collapse and enable controlled sampling, providing a reusable prior that encodes motion strategies. 
+
+B. Diffusion model for memory of motion 
+
+The model maps a noise sequence to a trajectory pro-posal conditioned on the initial robot state x0 and the target end-effector pose. We implement this with a Diffusion Transformer (DiT) [41], following the standard diffusion architecture for trajectories [42], [34], where trajectory to-kens represent joint configurations, while conditioning tokens encode x0 and the target pose using learnable type and timestep embeddings. An encoder builds a memory from the conditioning tokens, a decoder cross-attends to this memory while processing trajectory tokens, and a linear head predicts the noise across all timesteps. To satisfy real-time constraints, we restrict the diffusion process to a small number of denoising steps Ds = 25 , rather than the hundreds typically used in generative modeling, which keeps inference fast while preserving robustness and diversity, especially when combined with classifier-free conditioning. 
+
+Fig. 3: Custom end-effector mount for the Franka Emika Panda integrating a force-torque sensor and provisions for RGB-Depth camera. A spherical tool tip enables smooth circular motion within holes. (Scenario 2, Sec. V-D) 
+
+C. Using the diffusion as prior 
+
+The diffusion output is not executed directly. Instead, the diffusion output serves as a reference for the OCP inside the MPC loop, similar to the approach in [43]. We use the state regularization term from (7), but set its reference to the diffusion prior trajectory. This effectively pulls the solution toward the prior while dynamics, force objectives, and hard constraints enforce feasibility. In practice, this gives the solver a favorable basin of attraction and accelerates convergence [31], while MPC ensures force tracking, torque limits, and collision avoidance. V. E XPERIMENTS 
+
+A. Setup 
+
+A custom instrumented end-effector is attached to a Franka Emika Panda robot, as shown in Fig. 3. The end effector is provided with an ATI Mini45 force-torque sensor and an Intel RealSense D435i RGB-D camera. The tool has a spherical shape to allow smooth circular deburring-like motions. The Diffusion model is running on a computer with AMD Ryzen 9 5950X CPU with NVIDIA RTX 3060 GPU. The MPC is implemented in Python in Crocoddyl [44] with CSQP solver [38] running inside of a real-time process of ros2 control on a computer with Intel i9-14900K @5.6 GHz. Both computers are connected in the same network and communicate through ROS2 Humble. Similarly to [28], the controlled torques are linearly in-terpolated at 1 kHz, and the measured forces are low-pass filtered using a second-order Butterworth filter (cut-off frequency: 10 Hz). 
+
+B. Task definition 
+
+The robot is set to reach one or more holes with progres-sively increasing difficulty (Scenarios 1–3 described below). Upon reaching a hole, the robot regulates a normal deburring force of 30 N and executed a circular (revolute) passes at angles of 7.5 deg and 15 deg about the hole axis, each lasting 5 s. A typical deburring motion can be seen in Fig. 4. When activated, the collision constraint is imposed between a capsule approximation of the forearm and a planar obstacle in front of the robot. t=0.0s t=1.0s t=2.0s   
+
+> t=3.0s t=4.0s t=5.0s
+
+Fig. 4: Representative sequence of a circular deburring motion performed onto the object. (Scenario 2, Sec. V-D) -0.02 0.02     
+
+> -0.02
+> 0.02
+> Y-axis [m]
+> x-axis [m] x-axis [m]
+> -0.02 0.02
+> -0.03 0.02
+> -0.02 0.02
+> Y-axis [m]
+> -0.02
+> 0.02
+> -0.015
+> 0.02
+> 0
+> 35
+> 10
+> 20
+> 30
+> -0.02
+> 0.02
+> (a).
+> (b)
+> (c).
+> (d)
+
+Fig. 5: Scenario 1 (Sec. V-C): Force-colored end-effector x-y trajectories for a single hole; color encodes normal normal force magnitude. (a) 1D contact, no obstacle avoidance; (b) 1D contact with an obstacle in front of the robot; (c) 3D contact, no collision avoidance; (d) 3D contact with collision avoidance. The obstacle shape is clearly visible in the successful example c, and prevents the robot to achieve the complete circle. 
+
+C. Scenario 1: Accessible Single-Hole Deburring 
+
+This experiment serves as the method baseline for the force feedback MPC. It also evaluates 1D and 3D contact models under hard collision avoidance constraints. As ex-plained earlier, the 1D model regulates only the normal force along the tool axis, whereas the 3D model also accounts for tangential forces. The setup, visible in Fig. 3, consists of a very accessible single hole positioned on a table in front of the robot ( x = 0 .52 m, y = 0 .0 m, in robot base frame shown in Fig. 7) at the same height as the robot’s base. Identical cost weights and gains were used across conditions to ensure fair comparison. For these experiments, the MPC was executed at 200 Hz with a 300 ms horizon and 15 nodes, using 3 SQP iterations and 150 QP iterations per cycle. In the nominal setting, the robot performs the deburring task without any obstacle. As shown in Fig. 5a and 5c, when 
+
+Fig. 6: Scenario 1 (Sec. V-C): Tracking of normal and tangential forces during deburring motion on a flat table with collision avoidance with 1D (top) and 3D contact (bottom) models. In this case when 1D contact model approaches collision, lateral forces exceed force friction cone ( μ = 0 .6)and break the contact while 3D contact maintains stable movement. there is no collision constraint, both models were able to correctly track desired end-effector trajectories. The normal force tracking for both models in this obstacle-free setting along four repetitions of the deburring task is shown in Fig. 6a and Fig. 6b. The Root Mean Square Error (RMSE) was 
+
+5.35 N and 4.40 N, for 1D and 3D models respectively. In the nominal case both models perform equally well. A second setup placed the robot close to a wall (i.e. close to a collision). In this setting, the nominal circular deburring motion would make the robot collide with the wall. For the 3D model, activating the collision-avoidance con-straint in (10) forced the solver trade-off trajectory tracking against constraint satisfaction and deviate the end-effector path during execution (Fig. 5d). Under these conditions, the 1D contact model failed to maintain stable in-hole contact (Fig. 5b). The tool slid out of the hole as the optimizer prioritized clearance over orientation, while tangential forces were not explicitly regulated. This led to violation of the no-slip condition. This setup confirms that the explicit regulation of tangential forces is crucial to preserve contact stability. 
+
+D. Scenario 2: Obstacle-Constrained Multi-Hole Reach-and-Deburring Sequence 
+
+This scenario evaluates force–tracking performance in more demanding configurations involving both collision-avoidance constraints and far-reach targets (Fig. 7a). The workpiece contains holes intentionally placed near the robot’s workspace boundary: the robot’s maximum nominal reach is 0.85 m, whereas Holes 3 and 2 are located at radial distances of 0.92 m and 1.00 m, respectively. Additional holes are positioned to highlight the effect of a plane collision constraint defined at the base of the workpiece Hole 1 = 
+
+> 0.43
+> 0.07
+> 0.89
+> Hole 2 =
+> 0.40
+> −0.29
+> 0.96
+> Hole 3 =
+> 0.67
+> 0.07
+> 0.64
+> Hole 4 =
+> 0.38
+> 0.01
+> 0.65
+> Hole 5 =
+> 0.43
+> 0.07
+> 0.64
+
+Fig. 7: Positions of the 5 holes to be deburred on the investigated workpiece and reaching postures for each hole. TABLE I: Inverse velocity manipulability and corresponding force RMSE.              
+
+> Hole wf(–) Force RMSE [N] Hole 1 10.6956 11.30 Hole 2 6.4821 7.98 Hole 3 6.9166 17.20 Hole 4 19.0211 17.41 Hole 5 12.3884 15.34
+
+(Fig. 8a). The resulting five reaching postures are shown in Fig. 7; as expected, holes 3–2 induce near fully-extended arm configurations. Thus, as shown in Table I this induces a reduced force manipulability. 1 To improve stability in these configurations, the controller is executed at 500 Hz with a prediction horizon of 30 ms, discretized into 15 nodes. The solver uses 3 SQP iterations and 25 QP iterations per cycle. No collision constraints are applied in this task. Across all five targets, deburring is completed without slip or collisions (success rate of 100%), indicating that the controller can jointly satisfy contact and geometric con-straints even in adverse poses. However, the normal-force tracking RMSE increases as the robot operates farther from the baseline pose of Scenario 1 (Fig. 7c). This degrada-tion is consistent with (i) poor Jacobian conditioning near workspace limits, which reduces force authority along the hole axis; (ii) proximity to joint/torque bounds that constrains corrective actions; and (iii) tighter orientation feasibility when the end-effector must remain aligned with the hole while respecting the plane constraint. In practice, these factors reduce the effective bandwidth available for force regulation and increase sensitivity to small pose deviations or modeling errors. For holes adjacent to the plane constraint, the nominal circular deburring trajectory can not be executed in full, as the avoidance constraint truncated the path, which is an outcome analogous to Scenario 1 but amplified by the far-reach geometry. As shown in Fig. 8. In these cases the solver produces collision-aware path deflections that preserves contact stability while trading off perfect trajectory      
+
+> 1Force manipulability [45] is calculated as wf=1√(det (JJ T)) .(b). Y-axis [m]
+> x-axis [m]
+> -0.02
+> 0.0 2
+> 0.0 2
+> -0.02
+> (a). Collision pair
+
+Fig. 8: Description of the collision pair between the plane (red) and ellipsoid (yellow) (a). Force-colored end-effector x-y trajectories for a single hole. Color encodes normal force magnitude. tracking against the maintenance of the desired normal force. 
+
+E. Scenario 3: Long Sequence Integration 
+
+In this scenario visible in the accompanying video, it is shown a complete integration of the deburring task on the MPC level with a diffusion-guided motion around the object. Here we demonstrate the complete integration of the pipeline. An ad-hoc sequence decides the list of holes to be machined. For each hole, the diffusion model is queried to produce a reference guide used as specified in Sec. IV. The MPC executes the motion while regulating the contact force. It compensates for model inaccuracies and object pose deviations, while simultaneously enforcing local collision avoidance. The diffusion guidance allows the robot to reach difficult locations beyond narrow passages which would be very expensive to compute at run-time with an on-line planner. Holes are reached and machined within the accuracy range observed in Scenario V-D. As shown in the video, the torque controlled compliance also tolerates physical disturbance by a human co-operator. VI. D ISCUSSIONS 
+
+The proposed method enabled us to perform a complex industrial task by integrating capabilities that are often treated separately in robotics workflows: collision avoid-ance, reactive control, accurate force feedback. While we have argued that the approach is broadly applicable, its current performance relies on several assumptions and design choices that warrant discussion. First, our approach relies on offline computations using a motion planner to train a diffusion model. In this work, we considered static scenes, so the computation cost and sample requirements are not representative of what would be needed to generalize to unknown environments, ideally by conditioning on sensor-based representations of obstacles and targets. Future work will explore parallelized motion planning on GPU [46], which could be integrated into our current workflow with minimal modifications. Moreover, exhaustive offline exploration could be alleviated by enabling fast refinement of the motion prior at run time, for instance with sample-based optimizers such as MPPI [47], which naturally provide strong exploration capabilities. At high control frequencies, MPC cannot efficiently han-dle a large number of collision pairs. To reach 200 Hz 
+
+in our experiments, we indeed restricted the controller to a single pair. This limitation is largely mitigated by the motion prior, which provides safe, collision-free guidance, but it may become restrictive in more complex scenarios. Achieving such performance also requires careful tuning of the numerical solver (e.g., QP iterations), a know-how that could be alleviated by adopting recent advances in numerical optimization [48]. The experiments also highlight that a key limiting factor lies in the robot kinematics and link lengths. In such complex scenes, the robot struggles to reach all the holes shown in Fig. 1 while simultaneously maintaining the prescribed circular motion. Our results show that task accuracy is strongly correlated with manipulability. More generally, far-reach and obstacle-constrained conditions stress both motion planning and contact regulation, motivating future work on manipulability-aware cost shaping [49], [50] and constraint handling to preserve force fidelity near workspace limits. One possible direction is to introduce a cost term such as 
+
+log(det( JT )) to bias reaching postures toward configura-tions with higher directional force authority. However, the nonlinearity of such a term may negatively impact solver performance, which suggests investigating local convexifica-tions or scheduling strategies to maintain a tractable QP at each MPC step. It would also be beneficial to transfer the task to amobile manipulator. The added mobility introduces the need for a careful sequencing of the holes to be machined, to minimize unnecessary base movements. External perception, e.g. through vision-based system, would become essential to coordinate the robot’s repositioning and ensure accuracy. VII. C ONCLUSION 
+
+We presented a complete solution based on model pre-dictive control to perform an industrial-inspired deburring task. A controller enables the robot to safely navigate around complex obstacles, avoid collisions despite disturbances, and maintain precise force regulation through direct sensor feed-back. Operating in torque control further enhances safety: the robot can be interrupted by a nearby worker, and the risk of damage is reduced even in the presence of undetected obstacles, making the approach suitable for human–robot collaboration. Our framework builds on open-source modules for mo-tion planning, optimization, and ROS integration, and we will release the code upon acceptance. By combining these elements, the method provides a practical alternative to typical robot deburring setups, which rely on costly tools, rigid manipulators, and dedicated insertion guides. Instead, we show that a collaborative robot can achieve comparable performance and strategies to a human operator, while re-maining versatile enough to be deployed for a wide range of collaborative tasks using standard tools and processes. Future work will focus on extending the proposed methods beyond the current limitations and transferring the demonstrator to more realistic scenarios involving direct metal–tool interac-tion. REFERENCES [1] R. Grandia, F. Farshidian, R. Ranftl, and M. Hutter, “Feedback MPC for Torque-Controlled Legged Robots,” Aug. 2019, arXiv:1905.06144 [cs]. [Online]. Available: http://arxiv.org/abs/1905.06144 [2] G. Romualdi, S. Dafarra, G. L’Erario, I. Sorrentino, S. Traversaro, and D. Pucci, “Online Non-linear Centroidal MPC for Humanoid Robot Locomotion with Step Adjustment,” in 2022 International Conference on Robotics and Automation (ICRA) , 2022, pp. 10 412–10 419. [3] E. Dantec, M. Naveau, P. Fernbach, N. Villa, G. Saurel, O. Stasse, M. Taix, and N. Mansard, “Whole-Body Model Predictive Control for Biped Locomotion on a Torque-Controlled Humanoid Robot,” in                                        
+
+> 2022 IEEE-RAS 21st International Conference on Humanoid Robots (Humanoids) , 2022, pp. 638–644. [4] M. Gaertner, M. Bjelonic, F. Farshidian, and M. Hutter, “Collision-Free MPC for Legged Robots in Static and Dynamic Scenes,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) ,May 2021, pp. 8266–8272, iSSN: 2577-087X. [Online]. Available: https://ieeexplore.ieee.org/document/9561326 [5] A. Haffemayer, A. Jordana, L. de Matte¨ ıs, K. Wojciechowski, L. Righetti, F. Lamiraux, and N. Mansard, “Collision Avoidance in Model Predictive Control using Velocity Damper,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025. [Online]. Available: https://laas.hal.science/hal-04707324 [6] F. Farshidian, E. Jelavic, A. Satapathy, M. Giftthaler, and J. Buchli, “Real-time motion planning of legged robots: A model predictive con-trol approach,” in IEEE-RAS International Conference on Humanoid Robotics (Humanoids) , 2017. [7] R. Grandia, F. Jenelten, S. Yang, F. Farshidian, and M. Hutter, “Percep-tive Locomotion Through Nonlinear Model-Predictive Control,” IEEE Transactions on Robotics , vol. 39, no. 5, pp. 3402–3421, 2023. [8] C. Mastalli, S. P. Chhatoi, T. Corberes, S. Tonneau, and S. Vi-jayakumar, “Inverse-Dynamics MPC via Nullspace Resolution,” IEEE Transactions on Robotics , vol. 39, no. 4, pp. 3222–3241, 2023. [9] D. E. Whitney, “Force feedback control of manipulator fine motions,”
+> Journal of Dynamic Systems Measurement and Control-transactions of The Asme ,vol. 99, pp. 91–97, 1977. [Online]. Available: https://api.semanticscholar.org/CorpusID:121383894 [10] L. Villani and J. De Schutter, Force Control .Berlin, Heidelberg: Springer Berlin Heidelberg, 2008, pp. 161–185. [Online]. Available: https://doi.org/10.1007/978-3-540-30301-5 8 [11] M. T. Mason, “Compliance and Force Control for Computer Con-trolled Manipulators,” IEEE Transactions on Systems, Man and Cy-bernetics , vol. 11, no. 6, pp. 418–432, 1981. [12] N. Hogan, “Impedance Control Part1-3,” J. Dyn. Sys., Meas., Control. ,vol. 107, pp. 1–24, 1985. [13] M. D. Killpack, A. Kapusta, and C. C. Kemp, “Model predictive control for fast reaching in clutter,” Autonomous Robots , vol. 40, no. 3, pp. 537–560, 2016. [14] J. Matschek, J. Bethge, P. Zometa, and R. Findeisen, “Force Feedback and Path Following using Predictive Control: Concept and Application to a Lightweight Robot,” IFAC-PapersOnLine , vol. 50, 2017.
+
+[15] S. Husmann, S. Stemmler, S. H¨ ahnel, S. Vogelgesang, D. Abel, and T. Bergs, “Model Predictive Force Control in Grinding based on a Lightweight Robot,” IFAC-PapersOnLine , vol. 52, 2019. [16] D. M¨ uller, A. Mayer, and O. Sawodny, “Model predictive force control for robots in compliant environments with guaranteed maximum force,” in 2019 American Control Conference (ACC) , 2019, pp. 1355– 1360. [17] A. Wahrburg and K. Listmann, “MPC-based admittance control for robotic manipulators,” 2016 IEEE 55th Conference on Decision and Control, CDC 2016 , pp. 7548–7554, dec 2016. [18] J. Pankert and M. Hutter, “Perceptive model predictive control for continuous mobile manipulation,” IEEE Robotics and Automation Letters , vol. 5, no. 4, pp. 6177–6184, oct 2020. [19] K. J. Kazim, J. Bethge, J. Matschek, and R. Findeisen, “Combined Predictive Path Following and Admittance Control,” Proceedings of the American Control Conference , vol. 2018-June, pp. 3153–3158, aug 2018. [20] M. V. Minniti, R. Grandia, K. F¨ ah, F. Farshidian, and M. Hutter, “Model Predictive Robot-Environment Interaction Control for Mobile Manipulation Tasks,” Proceedings - IEEE International Conference on Robotics and Automation , vol. 2021-May, no. Icra, pp. 1651–1657, 2021. [21] M. Neunert, M. Stauble, M. Giftthaler, C. D. Bellicoso, J. Carius, C. Gehring, M. Hutter, and J. Buchli, “Whole-Body Nonlinear Model Predictive Control Through Contacts for Quadrupeds,” IEEE Robotics and Automation Letters , vol. 3, no. 3, pp. 1458–1465, 2018. [22] S. Fahmi, M. Focchi, A. Radulescu, G. Fink, V. Barasuol, and C. Semini, “STANCE: Locomotion Adaptation over Soft Terrain,” 
+
+IEEE TRO , vol. 36, no. 2, apr 2020. [23] T. Gold, A. V¨ olz, and K. Graichen, “Model Predictive Interaction Control for Robotic Manipulation Tasks,” IEEE Transactions on Robotics , vol. 39, no. 1, pp. 76–89, 2023. [24] S. Kleff, E. Dantec, G. Saurel, N. Mansard, and L. Righetti, “Intro-ducing force feedback in model predictive control,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2022, pp. 13 379–13 385. [25] A. Gazar, G. Nava, F. J. A. Chavez, and D. Pucci, “Jerk control of floating base systems with contact-stable parameterized force feed-back,” IEEE Transactions on Robotics , vol. 37, no. 1, pp. 1–15, 2021. [26] L. Wijayarathne, Z. Zhou, Y. Zhao, and F. L. Hammond, “Real-Time Deformable-Contact-Aware Model Predictive Control for Force-Modulated Manipulation,” IEEE Transactions on Robotics , vol. 39, no. 5, pp. 3549–3566, 2023. [27] M. Selvaggio, A. Garg, F. Ruggiero, G. Oriolo, and B. Siciliano, “Non-prehensile object transportation via model predictive non-sliding manipulation control,” IEEE Transactions on Control Systems Tech-nology , vol. 31, no. 5, pp. 2231–2244, 2023. [28] S. Kleff, A. Jordana, N. Mansard, and L. Righetti, “Force Feedback in Model Predictive Control: A Soft Contact Approach,” May 2024, working paper or preprint. [Online]. Available: https: //hal.science/hal-04572399 [29] M. Makulaviˇ cius, S. Petkeviˇ cius, J. Roˇ z˙ en˙ e, A. Dzedzickis, and V. Buˇ cinskas, “Industrial Robots in Mechanical Machining: Perspectives and Limitations,” Robotics , vol. 12, no. 6, 2023. [Online]. Available: https://www.mdpi.com/2218-6581/12/6/160 [30] N. Jetchev and M. Toussaint, “Trajectory prediction: learning to map situations to robot trajectories,” in Proceedings of the 26th Annual International Conference on Machine Learning , ser. ICML ’09. New York, NY, USA: Association for Computing Machinery, 2009, pp. 449–456, event-place: Montreal, Quebec, Canada. [Online]. Available: https://doi.org/10.1145/1553374.1553433 [31] N. Mansard, A. DelPrete, M. Geisert, S. Tonneau, and O. Stasse, “Using a Memory of Motion to Efficiently Warm-Start a Nonlinear Predictive Controller,” in 2018 IEEE International Conference on Robotics and Automation (ICRA) , May 2018, pp. 2986–2993, iSSN: 2577-087X. [Online]. Available: https://ieeexplore.ieee.org/document/ 8463154 [32] T. S. Lembono, C. Mastalli, P. Fernbach, N. Mansard, and S. Calinon, “Learning How to Walk: Warm-starting Optimal Control Solver with Memory of Motion,” in 2020 IEEE International Conference on Robotics and Automation (ICRA) , May 2020, pp. 1357–1363, iSSN: 2577-087X. [Online]. Available: https: //ieeexplore.ieee.org/document/9196727 [33] E. Dantec, R. Budhiraja, A. Roig, T. Lembono, G. Saurel, O. Stasse, P. Fernbach, S. Tonneau, S. Vijayakumar, S. Calinon, M. Taix, and N. Mansard, “Whole Body Model Predictive Control with a Memory of Motion: Experiments on a Torque-Controlled Talos,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2021, pp. 8975–8981. [34] M. Janner, Y. Du, J. B. Tenenbaum, and S. Levine, “Planning with Diffusion for Flexible Behavior Synthesis,” in International Conference on Machine Learning , 2022. [Online]. Available: https://api.semanticscholar.org/CorpusID:248965046 [35] G. Zhou, S. Swaminathan, R. V. Raju, J. S. Guntupalli, W. Lehrach, J. Ortiz, A. Dedieu, M. L´ azaro-Gredilla, and K. Murphy, “Diffusion Model Predictive Control,” Oct. 2024, arXiv:2410.05364 [cs]. [Online]. Available: http://arxiv.org/abs/2410.05364 [36] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , p. 02783649241273668, Oct. 2024, publisher: SAGE Publications Ltd STM. [Online]. Available: https://doi.org/10.1177/ 02783649241273668 [37] R. Budhiraja, J. Carpentier, C. Mastalli, and N. Mansard, “Differential dynamic programming for multi-phase rigid contact dynamics,” in 
+
+IEEE Humanoids , 2018. [38] A. Jordana, S. Kleff, A. Meduri, J. Carpentier, N. Mansard, and L. Righetti, “Structure-Exploiting Sequential Quadratic Programming for Model-Predictive Control,” IEEE Transactions on Robotics , Aug. 2025. [Online]. Available: https://laas.hal.science/hal-04330251 [39] A. Haffemayer, A. Jordana, M. Fourmy, K. Wojciechowski, G. Saurel, V. Petr´ ık, F. Lamiraux, and N. Mansard, “Model predictive control under hard collision avoidance constraints for a robotic arm,” in Ubiquitous Robots 2024 . New York (USA), United States: Korea Robotics Society, June 2024. [Online]. Available: https://laas.hal.science/hal-04425002 [40] J. Mirabel, S. Tonneau, P. Fernbach, A.-K. Sepp”al”a, M. Campana, N. Mansard, and F. Lamiraux, “Hpp: A new software for constrained motion planning,” in 2016 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2016, pp. 383–389. [41] W. Peebles and S. Xie, “Scalable Diffusion Models with Transformers,” Mar. 2023, arXiv:2212.09748 [cs]. [Online]. Available: http://arxiv.org/abs/2212.09748 [42] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” in Proceedings of the 34th International Conference on Neural Information Processing Systems , ser. NIPS ’20. Red Hook, NY, USA: Curran Associates Inc., 2020, event-place: Vancouver, BC, Canada. [43] A. Haffemayer, A. Chapin, K. Wojciechowski, A. Jordana, F. Lami-raux, V. Petr´ ık, and N. Mansard, “Collision-free model predictive control with diffusion model warm-starting,” 2025, preprint, submitted to RAL. [44] C. Mastalli, R. Budhiraja, W. Merkt, G. Saurel, B. Hammoud, M. Naveau, J. Carpentier, S. Vijayakumar, and N. Mansard, “Crocoddyl: An efficient and versatile framework for multi-contact optimal control,” CoRR , vol. abs/1909.04947, 2019. [Online]. Available: http://arxiv.org/abs/1909.04947 [45] T. Yoshikawa, “Manipulability of robotic mechanisms,” The interna-tional journal of Robotics Research , vol. 4, no. 2, pp. 3–9, 1985. [46] J. Bialkowski, S. Karaman, and E. Frazzoli, “Massively parallelizing the rrt and the rrt,” in 2011 IEEE/RSJ International Conference on Intelligent Robots and Systems . IEEE, 2011, pp. 3513–3518. [47] C. H. Huang, P. Jadhav, B. Plancher, and Z. Kingston, “prrtc: Gpu-parallel rrt-connect for fast, consistent, and low-cost motion planning,” 
+
+arXiv preprint arXiv:2503.06757 , 2025. [48] G. Frison and M. Diehl, “Hpipm: a high-performance quadratic programming framework for model predictive control,” arXiv preprint arXiv:2003.02547 , 2020. [Online]. Available: https://arxiv.org/abs/ 2003.02547 [49] F. Mari’c, O. Limoyo, L. Petrovi’c, T. Ablett, I. Petrovi’c, and J. Kelly, “Fast manipulability maximization using continuous-time trajectory optimization,” in 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2019, pp. 8258– 8264. [50] F. Kennel-Maushart, R. Poranne, and S. Coros, “Manipulability op-timization for multi-arm teleoperation,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2021, pp. 3956–3962.
