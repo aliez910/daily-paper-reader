@@ -6,45 +6,52 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-04-12
-- 运行时间：2026-04-12 19:19:46 UTC
+- 最新运行日期：2026-04-13
+- 运行时间：2026-04-13 20:28:40 UTC
 - 运行状态：成功
-- 本次总论文数：8
-- 精读区：1
-- 速读区：7
+- 本次总论文数：10
+- 精读区：6
+- 速读区：4
 
 ### 今日简报（AI）
-今日聚焦机器人控制安全与具身智能前沿，深度拆解了世界动作模型（WAM）面临的“越狱”攻击风险。
-重点关注 JailWAM 揭示的机器人系统安全漏洞，以及具身智能在能力进化与
-- 详情：[/202604/12/README](/202604/12/README)
+今日聚焦 VLA 模型推理优化与人机交互仿真，深度解读 10 篇机器人领域高分论文。
+重点推荐自适应动作分块技术与生成式模拟策略，两者在提升模型推理效率与物理协作能力上表现卓越。
+建议关注视觉语言模型在复杂场景下的落地，并参考最新的灵巧手评测标准优化任务设计。
+- 详情：[/202604/13/README](/202604/13/README)
 
 ### 精读区论文标签
-1. [JailWAM: Jailbreaking World Action Models in Robot Control](/202604/12/2604.05498v1-jailwam-jailbreaking-world-action-models-in-robot-control)  
+1. [Adaptive Action Chunking at Inference-time for Vision-Language-Action Models](/202604/13/2604.04161v2-adaptive-action-chunking-at-inference-time-for-vision-language-action-models)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：视觉-语言-动作 (VLA) 模型的自适应动作分块
+2. [Generative Simulation for Policy Learning in Physical Human-Robot Interaction](/202604/13/2604.08664v1-generative-simulation-for-policy-learning-in-physical-human-robot-interaction)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：在合成数据上训练的用于辅助机器人任务的视觉模仿学习策略
+3. [V-CAGE: Vision-Closed-Loop Agentic Generation Engine for Robotic Manipulation](/202604/13/2604.09036v1-v-cage-vision-closed-loop-agentic-generation-engine-for-robotic-manipulation)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：用于机器人数据合成的视觉闭环智能生成
+4. [VAG: Dual-Stream Video-Action Generation for Embodied Data Synthesis](/202604/13/2604.09330v1-vag-dual-stream-video-action-generation-for-embodied-data-synthesis)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：用于具身数据合成和策略学习的视频-动作生成
+5. [SIM1: Physics-Aligned Simulator as Zero-Shot Data Scaler in Deformable Worlds](/202604/13/2604.08544v2-sim1-physics-aligned-simulator-as-zero-shot-data-scaler-in-deformable-worlds)  
    标签：评分：8.0/10、query:rob-il
-   evidence：机器人控制中世界动作模型的安全性
+   evidence：柔性物体操纵的数据扩展引擎
+6. [Task-Aware Bimanual Affordance Prediction via VLM-Guided Semantic-Geometric Reasoning](/202604/13/2604.08726v1-task-aware-bimanual-affordance-prediction-via-vlm-guided-semantic-geometric-reasoning)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：VLM引导的双臂操纵亲和力预测
 
 ### 速读区论文标签
-1. [Learning-Guided Force-Feedback Model Predictive Control with Obstacle Avoidance for Robotic Deburring](/202604/12/2604.06133v1-learning-guided-force-feedback-model-predictive-control-with-obstacle-avoidance-for-robotic-deburring)  
+1. [Adaptor: Advancing Assistive Teleoperation with Few-Shot Learning and Cross-Operator Generalization](/202604/13/2604.09462v1-adaptor-advancing-assistive-teleoperation-with-few-shot-learning-and-cross-operator-generalization)  
+   标签：评分：8.0/10、query:rob-il
+   evidence：用于机器人动作专家的视觉语言模型上下文
+2. [Pickalo: Leveraging 6D Pose Estimation for Low-Cost Industrial Bin Picking](/202604/13/2604.04690v1-pickalo-leveraging-6d-pose-estimation-for-low-cost-industrial-bin-picking)  
    标签：评分：7.0/10、query:rob-il
-   evidence：带有力反馈和运动先验的机器人去毛刺任务
-2. [Learning Without Losing Identity: Capability Evolution for Embodied Agents](/202604/12/2604.07799v1-learning-without-losing-identity-capability-evolution-for-embodied-agents)  
+   evidence：用于工业机器人操纵的基于6D位姿的抓取流水线
+3. [A Benchmark of Dexterity for Anthropomorphic Robotic Hands](/202604/13/2604.09294v1-a-benchmark-of-dexterity-for-anthropomorphic-robotic-hands)  
    标签：评分：7.0/10、query:rob-il
-   evidence：动态环境中具身智能体的能力演化
-3. [AnyImageNav: Any-View Geometry for Precise Last-Meter Image-Goal Navigation](/202604/12/2604.05351v3-anyimagenav-any-view-geometry-for-precise-last-meter-image-goal-navigation)  
+   evidence：机器人操纵与抓取的灵巧性基准
+4. [Towards Multi-Object Nonprehensile Transportation via Shared Teleoperation: A Framework Based on Virtual Object Model Predictive Control](/202604/13/2604.06932v1-towards-multi-object-nonprehensile-transportation-via-shared-teleoperation-a-framework-based-on-virtual-object-model-predictive-control)  
    标签：评分：6.0/10、query:rob-il
-   evidence：通过视觉对应关系实现抓取任务的精确辅助定位
-4. [Automating Manual Tasks through Intuitive Robot Programming and Cognitive Robotics](/202604/12/2604.05978v1-automating-manual-tasks-through-intuitive-robot-programming-and-cognitive-robotics)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：用于机器人编程的视觉与语言
-5. [Walk the Talk: Bridging the Reasoning-Action Gap for Thinking with Images via Multimodal Agentic Policy Optimization](/202604/12/2604.06777v1-walk-the-talk-bridging-the-reasoning-action-gap-for-thinking-with-images-via-multimodal-agentic-policy-optimization)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：针对视觉动作的多模态智能体策略优化
-6. [PhyEdit: Towards Real-World Object Manipulation via Physically-Grounded Image Editing](/202604/12/2604.07230v2-phyedit-towards-real-world-object-manipulation-via-physically-grounded-image-editing)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：世界模型中基于物理落地的图像编辑用于物体操纵
-7. [Event-Centric World Modeling with Memory-Augmented Retrieval for Embodied Decision-Making](/202604/12/2604.07392v1-event-centric-world-modeling-with-memory-augmented-retrieval-for-embodied-decision-making)  
-   标签：评分：6.0/10、query:rob-il
-   evidence：具身决策与动态环境下的世界建模
+   evidence：远程操作中多物体非抓取式运输框架
 
 
 <div class="dpr-home-promo-card">
