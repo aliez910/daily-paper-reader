@@ -1,0 +1,579 @@
+Title: Disentangled Point Diffusion for Precise Object Placement
+
+URL Source: https://arxiv.org/pdf/2604.11793v1
+
+Published Time: Tue, 14 Apr 2026 02:51:39 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Disentangled Point Diffusion for Precise Object Placement 
+
+Lyuxing He* 1, Eric Cai* 1, Shobhit Aggarwal 1, Jianjun Wang 2, David Held 1
+
+Fig. 1: Our method (TAX-DPD) uses disentangled point diffusion to predict precise goal configurations for a millimeter-precision industrial insertion task. Blue denotes the scene point cloud, turquoise denotes the manipulated object point cloud, and red denotes the diffused goal point cloud, where we jointly diffuse the object placement frame and geometry. 
+
+Abstract — Recent advances in robotic manipulation have highlighted the effectiveness of learning from demonstration. However, while end-to-end policies excel in expressivity and flexibility, they struggle both in generalizing to novel object geometries and in attaining a high degree of precision. An alternative, object-centric approach frames the task as pre-dicting the placement pose of the target object, providing a modular decomposition of the problem. Building on this goal-prediction paradigm, we propose TAX-DPD, a hierarchical, disentangled point diffusion framework that achieves state-of-the-art performance in placement precision, multi-modal coverage, and generalization to variations in object geometries and scene configurations. We model global scene-level place-ments through a novel feed-forward Dense Gaussian Mixture Model (GMM) that yields a spatially dense prior over global placements; we then model the local object-level configuration through a novel disentangled point cloud diffusion module that separately diffuses the object geometry and the placement frame, enabling precise local geometric reasoning. Interestingly, we demonstrate that our point cloud diffusion achieves substan-tially higher accuracy than a prior approach based on SE(3)-diffusion, even in the context of rigid object placement. We validate our approach across a suite of challenging tasks in simulation and in the real-world on high-precision industrial insertion tasks. Furthermore, we present results on a cloth-hanging task in simulation, indicating that our framework can further relax assumptions on object rigidity. Visualizations and supplementary materials can be found on our project website: 
+
+https://3dgp-icra2026.github.io/ .     
+
+> * Equal contribution
+> 1The authors are with Carnegie Mellon University, Pittsburgh, USA.
+> {lyuxingh, eycai, shobhita, dheld }@andrew.cmu.edu
+> 2The author is with ABB Inc., USA. jianjun.wang@us.abb.com
+> David Held holds concurrent appointments at CMU and as an Amazon Scholar. This paper describes work performed at CMU and is not associated with Amazon.
+
+I. INTRODUCTION Learning from demonstration has emerged as a popular paradigm for robotic manipulation [1], [2], [3], [4], [5], [6], [7], [8], [9], [10]. While direct end-to-end visuomotor policy learning methods have produced impressive results across a diverse range of complex manipulation tasks, (e.g. shoelace tying [2], sauce pouring [7], laundry folding [11]), they have yet to display robust generalization to variations in object geometry, nor have they shown the precision required for low-tolerance tasks, such as industrial manufacturing or inserting a key into a lock. An alternative line of work is to modularly decompose the problem into where and how —first predicting a goal configuration ( where to place an object ) and then executing it with a low-level policy or motion planner ( how to place the object at that location ). Such a decomposition enables the system to reason more explicitly about object-centric geometry as a form of goal prediction [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22]. Recent methods further leveraged generative approaches to capture multi-modal placement distributions [15], [16], [17], [18], [22], providing multiple feasible solutions for tasks where diverse goal configurations are possible. Although these works show a high degree of sample efficiency and some degree of generalization to novel object geometries, they still do not achieve the precision required for very low-tolerance tasks. We posit that this limitation arises from the dominant reliance on SE(3)-based representations for goal prediction. Although an SE(3) pose is sufficient to represent the config-uration of a single object, it is difficult to define a consistent SE(3) pose representation across a range of objects with varying geometries. An alternative approach is to predict the goal configuration via point cloud generation [14], [12], 
+
+> arXiv:2604.11793v1 [cs.RO] 13 Apr 2026
+
+i.e. predicting the point cloud of the target object in the goal configuration. Point cloud generation avoids the need to define a consistent reference frame across a range of objects with varying geometries. From the generated point cloud, one can derive the SE(3) transformation to perform the precise placement. We show that point cloud generation leads to significantly more accurate object placement, even when placing a rigid object, when generalizing across a class of objects of varying geometry. 
+
+However, we found that previous approaches to point cloud diffusion struggle to produce high-fidelity configura-tions when modeling multi-modal placements across large scenes. Our second insight is that explicitly decoupling point cloud diffusion into distinct problems of multi-modal cover-age, shape prediction, and frame prediction can overcome these challenges. To materialize these insights, we propose 
+
+TAX-DPD (TA sk-specific Cross -Geometry reasoning with 
+
+Disentangled Point Diffusion), a hierarchical framework that operates in two stages: 1) global placement initializa-tion , where a neural network is trained to predict a Dense Gaussian Mixture Model (GMM) to capture the multi-modal distribution of potential object placement positions across the scene, ensuring coverage over placement locations; and 2) 
+
+local configuration refinement , where a novel disentangled point diffusion process predicts the object placement config-uration, by separately denoising the object-centric geometry and object frame in the initialized placement frame. For rigid objects, we further recover the final SE(3) pose using a standard RANSAC-SVD alignment procedure. Concretely, our contributions are as follows: 1) A novel global placement initialization method using a deep network to predict a Dense GMM to model multi-modal placement distributions at the scene-level. 2) A novel local configuration refinement method using a disentangled point diffusion objective for the separate denoising of object geometry and placement frame, allowing for precise placement predictions. 3) A broad suite of evaluations on simulation (mug-hanging, book-shelving, etc.) and real-world indus-trial insertion tasks, in which TAX-DPD achieves millimeter-level precision while also maintaining broad coverage for multi-modal tasks. II. RELATED WORK 
+
+A. Point Cloud Generation. 
+
+Recent advancements in generative modeling have signif-icantly enhanced the synthesis of 3D point clouds. Meth-ods based on unconditional generative models including VAEs [23], [24], GANs [25], [26], [27], and Diffusion Mod-els [28], [29], [30], [31], [32] have demonstrated the ability to produce diverse and high-fidelity 3D shapes. Building upon these foundations, recent works explored conditioning point clouds generation on auxiliary information such as images [33], textual descriptions [34], [35], partial point clouds [36], or a diverse set of inputs [37], [38], allowing for more controlled and context-aware synthesis. The success of these models stems from their ability to learn a rich, continuous latent representation of 3D shapes. This capacity for learning the underlying manifold of 3D data endows them with strong generalization capabilities, enabling them to synthesize novel object instances that structurally adhere to learned geometric priors. While prior works generate 3D shapes for data synthesis, TAX-DPD generates task-specific point clouds conditioned on a scene to infer relative transformations for object manipulation. 
+
+B. Relative Placement Tasks. 
+
+Many placement tasks can be decomposed into predict-ing the geometric relationship between a pair of objects. Some prior work [20], [21], [13], [19] explicitly model this relationship by learning either category-level descriptors or dense object correspondences, from which a task-specific SE(3) transformation between objects (i.e. a goal pose) can be predicted and executed on a robot. To better accommodate multi-modal placements, some prior work [18], [15], [22], [16] adopt generative methods to learn placement distri-butions defined directly in the SE(3) space, from which a goal pose can be sampled. Similar to TAX-DPD, another line of works leverages point cloud generation and denoises goal states through dense point flow [14] or point cloud diffusion [12]. In contrast, we propose a hierarchical point cloud generation framework with a novel disentangled diffu-sion objective over object geometry and placement frames, enabling robust handling of high-precision and multi-modal relative placement tasks and strong generalization to novel object geometries and scene configurations. III. P ROBLEM STATEMENT 
+
+A. Goal Prediction for Object Placement. 
+
+In this paper, we focus on general object placement tasks, in which an object O must be manipulated into a precise configuration within a larger scene S (e.g. hanging a mug on one of multiple racks - see Fig. 3). To solve this task, we predict the goal configuration of object O as a dense point cloud, i.e. the location that every point in object O
+
+must move to successfully complete the task. More formally, given point clouds PO ∈ RNO ×3 for the segmented object O
+
+and PS ∈ RNS ×3 for the scene S, we aim to predict a goal point cloud ˆP ∗O ∈ RNO ×3 such that ( ˆP ∗O , P S ) represents a valid placement of O. Since there are often multiple feasible placements for object O, we aim to learn a distribution over goal point clouds that we can sample from, i.e. ˆP ∗O ∼
+
+f (PO , P S ). We then move object O to the goal configuration given by ˆP ∗O using motion planning or potentially a learned policy (see Appendix I on the project website for details). This formulation stands in contrast to many existing methods for object-centric placement, which represent goals explicitly as SE(3) transformations under a rigid object assumption. Our experiments indicate that, by predicting point cloud configurations instead of SE(3) poses, TAX-DPD demonstrates greater precision when the task requires generalization across variations in object geometry, for which Fig. 2: Method Overview. (Left ) Our Global Placement Initialization samples a rough global position using a novel dense GMM-based prediction module, a framework that models highly multi-modal placement distributions at the scene-level. (Right ) Our Local Configuration Refinement then proceeds with a novel disentangled shape and reference frame diffusion that simultaneously allow precise and dense goal predictions. a unified pose reference frame can be difficult to define. Fur-thermore, we show that this point cloud–based formulation can be naturally relaxed to the setting of placing non-rigid objects. 
+
+B. Assumptions. 
+
+Similar to prior works on relative placement [20], [21], [13], [19], we assume the object O that is being manip-ulated is segmented from the rest of the scene S. During training, we assume access to a set of N demonstrations 
+
+{(P (n) 
+
+> O
+
+, P (n) 
+
+> S
+
+, P ∗(n) 
+
+> O
+
+)}Nn=1 which indicate the initial object point cloud P (n) 
+
+> O
+
+, the initial scene point cloud P (n) 
+
+> S
+
+, and the point cloud of the object in a goal configuration P ∗(n) 
+
+> O
+
+.We further assume knowledge of the ground-truth correspon-dences between the initial object point cloud P (n) 
+
+> O
+
+and the goal point cloud P ∗(n) 
+
+> O
+
+, which (for rigid objects) can be obtained from the demonstrations using the robot kinematics. IV. M ETHOD 
+
+To sample a goal configuration ˆP ∗O ∼ f (PO , P S ),our approach builds on Denoising Diffusion Probabilis-tic Models (DDPM) [39], [40], in which data samples 
+
+x0 are perturbed under a Markovian noising process 
+
+q(xt|xt−1) = N (xt|√1 − βtxt−1, β tI) and a network is trained to learn the reverse transitions pθ (xt−1|xt) =
+
+N (xt−1|μθ (xt, t ), σ 2 
+
+> t
+
+I). While Denoising Diffusion Prob-abilistic Models (DDPMs) have demonstrated a powerful capacity to learn rich geometric distributions in the point cloud generation domain [28], [34], [38], [30], [31], we find that prior works integrating them for goal-prediction in object manipulation [12], [14], [41] struggle with obtaining high precision. To leverage the powerful capacity of point cloud diffusion for the distinct challenge of simultaneously achiev-ing high precision, multi-modal coverage, and robustness to unseen object geometries, we propose the following two key methodological contributions (1 and 2), complemented by a rigid alignment procedure (3): 1) Global placement initialization (Fig. 2, left ): We sam-ple an approximate placement frame ˆg ∈ R3 (i.e. the centroid of the object in the goal pose) from a dense Gaussian Mixture Model (GMM) that is predicted per scene by a network ˆg ∼ fglobal (PO , P S ).2) Local placement refinement (Fig. 2, right ): We perform a disentangled point cloud diffusion in the reference frame ˆg. We decompose the prediction of the goal  
+
+> ˆg
+
+P ∗O in the local placement frame ˆg into a mean-centered shape ϕ and an object frame ρ prediction, with  
+
+> ˆg
+
+P ∗O = ϕ + ρ and ˆP ∗O = ˆg ˆP ∗O + ˆ g (detailed definitions in Sec. IV-B). Following standard DDPM practice, we gradually denoise these variables via an iterative process: flocal 
+
+ˆg PO , ˆg PS , ˆg ˆP ∗O,t , t 
+
+
+
+→   ˆϕt−1, ˆρt−1
+
+,where t is the diffusion timestep. 3) Rigid transformation estimation for rigid objects: We recover an SE(3) alignment between the input object point cloud and the predicted goal configuration using a RANSAC-SVD procedure. We direct the readers to Appendix III-E for implementation details. 
+
+A. Global Placement Initialization 
+
+Point cloud diffusion models typically focus on generating a single-object in isolation [28], [38], [34]. The object is often normalized to a fixed size [−1, 1] 3 to match the diffusion prior that noises the point cloud towards N (0 , I ).In the object placement setting, however, two scales must be considered: the size of the manipulated object and the size of the surrounding scene, which can be arbitrarily large relative to the object itself. Our intuition, supported by empirical results, suggests that this scale discrepancy introduces a fundamental conflict: normalizing by the object scale hin-ders the model’s ability to capture multi-modal placement distributions across the full scene, whereas normalizing by the scene scale reduces the model’s capacity to recover the object’s precise goal pose. To mitigate this issue, we propose a two-stage method: we first predict a local coordinate system (represented by the approximate placement frame ˆg), and then we predict the object pose in the reference frame of ˆg. Concretely, we consider the centroid of the object in any goal configuration 
+
+μ = P ∗O to be a valid placement frame, and we aim in the first stage to learn a distribution fglobal (PO , P S ) over such placement frames. To model such a distribution, we learn a feedforward network fglobal (see Fig. 2, left ) to output a spatially-grounded 
+
+Dense Gaussian Mixture Model (GMM) , in which we predict one Gaussian for each point in the scene S. In particular, given the object and scene point clouds (PO , P S ) as input, we predict for each scene point pi ∈ PS a mixing weight 
+
+wi ∈ R and a residual vector ri ∈ R3, where pi + ri is the mean of the Gaussian corresponding to point pi. At inference, we simply sample ˆg ∼ fglobal (PO , P S ) from a categorical distribution over the Gaussian means {pi +ri}NS
+
+> i=1
+
+parameterized by the mixing weights {wi}NS
+
+> i=1
+
+, similar to standard GMMs. To train fglobal , we use a negative log-likelihood loss computed using the learned mixing weights: 
+
+Lglobal (μ) = − log 
+
+> NS
+
+X
+
+> i=1
+
+wi exp  − 12σ2 ∥pi + ri − μ∥2 (1) where μ = P ∗O is a ground-truth placement frame. In principle, the variances can also be learned, although we found this detrimental to training stability and unnecessary for approximate placement initialization. 
+
+B. Local Configuration Refinement 
+
+Disentangled point diffusion. Our global placement initial-ization (Sec. IV-A) predicts a single point ˆg which approxi-mates the centroid of the object in the goal configuration P ∗O .This prediction is largely adequate to resolve the placement multi-modality induced by the geometry of a scene S (e.g., selecting one of multiple mug-racks, or one of multiple pegs on a mug-rack), but cannot capture the precise geometric relationships needed to solve precise manipulation tasks (e.g. the object’s exact position and orientation). In order to estimate the precise object pose in the goal configuration, we need to estimate two things: (i) exactly where the object will be placed, i.e. translation, and (ii) the configuration of the object in the placement pose, i.e. rotation for a rigid object, or shape deformation for a deformable object (as we demonstrate in Appendix I on the project website). Therefore, we propose Disentangled Point Diffusion that disentangles the objective of predicting goal object config-uration in point space into diffusing the object frame (i.e. translation) and diffusing the object shape in the goal config-uration (i.e. rotation or object deformations). We express the ground-truth goal configuration as a sum of a mean-centered 
+
+shape ϕ0 and a frame ρ0:
+
+ϕ0 := ˆg P ∗O − ˆg P ∗O ∈ RNO ×3, ρ0 := ˆg P ∗O ∈ R3 (2) where ˆg P ∗O is the ground-truth goal configuration of object 
+
+O in frame ˆg, and ˆg P ∗O is the centroid of the object in the ground-truth goal configuration in frame ˆg (i.e. the mean across the NO object points). These terms are defined so that the ground-truth goal configuration can be computed as  
+
+> ˆg
+
+P ∗O = ϕ0 +ρ0, where ρ0 ∈ R3 is broadcast to all NO points during the addition. During diffusion noising and denoising, we similarly decompose the goal configuration: ˆg ˆP ∗O,t = ˆϕt+ˆρt, again broadcasting ˆρt across object points. We model two decoupled forward corruption processes with a shared noise schedule: 
+
+ϕt = √¯αt ϕ0 + √1 − ¯αt ϵϕ, ϵϕ ∼ N (0 , I ) (3) 
+
+ρt = √¯αt ρ0 + √1 − ¯αt ϵρ, ϵρ ∼ N (0 , I ) (4) Both Eqns 3 and 4 apply per-point isotropic Gaussian noising following prior work [28], [38] under the same schedule {¯αt}t. The reverse process is estimated by adual-head denoiser operating in the local frame ˆg, i.e. 
+
+flocal 
+
+ˆg PO , ˆg PS , ˆg ˆP ∗O,t , t 
+
+
+
+→   ˆϕt−1, ˆρt−1
+
+, where the in-puts are the object and scene point clouds and the current estimate at denoising step t of the object in the goal config-uration in frame ˆg: ˆg ˆP ∗O,t = ˆϕt + ˆ ρt. The network directly predicts the next-step disentangled estimates ( ˆϕt−1, ˆρt−1),which are composed to yield the updated goal configuration  
+
+> ˆg
+
+ˆP ∗O,t −1 = ˆϕt−1 + ˆ ρt−1. Next we describe the inputs to the network that represents flocal , shown in Fig. 2 ( right ). 
+
+Reconstruction embedding. Rather than encoding the de-noised object and the scene separately (similar to [12], [15], [16]), we input to the diffusion model the reconstructed 
+
+placement point cloud, consisting of the scene ˆg PS combined with the current denoised object in the predicted goal con-figuration ˆg ˆP ∗O,t . This combined point cloud (ˆg PS ,ˆg ˆP ∗O,t )
+
+is processed by a single point cloud encoder to obtain per-point reconstruction embeddings {fi}NO +NS 
+
+> i=1
+
+, allowing the network to more precisely model the geometric relationship between the object and the scene. We also separately com-pute per-point object embeddings {oj }NO 
+
+> j=1
+
+by encoding the initial, mean-centered object point cloud O PO = PO − ¯PO .These object embedding tokens are used to predict the goal shape ϕ, which is also mean-centered. 
+
+Deformation embedding. To reason more granularly about how object O must transform, flocal contains an additional deformation encoder that takes as input the per-point dis-placements ˆϕt − O PO between the current denoised and ini-tial object shapes, and computes a per-point deformation em-bedding {dk}NO
+
+> k=1
+
+. As ˆϕt and O PO are both mean-centered, their difference explicitly models local transformations due to rotations or deformations. 
+
+Rotation noise. To enable flocal to more precisely denoise pose transformations, we sample an additional rotation noise term ϵrot = Rϕ 0 − ϕ0, where R is sampled from a dis-tribution over SO(3) . Consequently, our forward diffusion process for the shape ϕ0 during training is: ϕt = √¯αtϕ0 +√1 − ¯αt(ϵϕ + ϵrot ). The reverse process for the shape ϕ
+
+remains unchanged. Details for the rotation noise implemen-tation can be found in Appendix III-B on the project website. Given the sampled global placement reference frame ˆg
+
+and the denoised local placement configuration ˆg ˆP ∗O , we can then compute the global predicted goal placement point cloud TABLE I: Ablations and Task Success Rates on RPDiff tasks.                                                                               
+
+> Mug/EasyRack Mug/MedRack Mug/Multi-MedRack Book/Shelf Can/Cabinet Average
+> TAX3D [12] 0.84 0.46 0.32 0.38 0.42 0.48 RPDiff [15] (w/o classifier-based reranking) -----0.83 RPDiff [15] 0.92 0.83 0.86 0.94 0.85 0.88
+> TAX-DPD (Ours) w/o disentangled point diffusion 0.97 0.74 0.61 0.53 0.77 0.72
+> TAX-DPD (Ours) w/ MLP encodings 0.99 0.84 0.81 0.61 0.64 0.78
+> TAX-DPD (Ours) w/o GMM 1.00 0.87 0.74 0.75 0.79 0.83
+> TAX-DPD (Ours) w/o recon. embedding 0.98 0.91 0.80 0.78 0.83 0.86
+> TAX-DPD (Ours) w/o rot. noise 0.94 0.85 0.73 0.96 0.91 0.88
+> TAX-DPD (Ours) w/o deform. embedding 0.98 0.94 0.88 0.95 0.80 0.91
+> TAX-DPD (Ours) w/ SE(3) diffusion 0.97 0.92 0.89 0.96 0.91 0.93
+> TAX-DPD (Ours) 1.00 0.97 0.95 0.99 0.95 0.97
+
+Fig. 3: RPDiff Task Environments. (Top ) Our experiments span various multi-modal placement tasks with significant object and scene variation. ( Middle ) TAX-DPD is able to precisely model goal configuration as point clouds. ( Bottom )Successful executions of our model’s goal predictions. as ˆP ∗O = ˆg ˆP ∗O + ˆ g. The robot can then move the object to this pose, using either a learned goal-conditioned policy (Appendix I-B) or by estimating an SE(3) transformation (Appendix III-E) followed by motion planning. 
+
+C. Additional Architecture & Training Details. 
+
+We compute reconstruction, object, and deformation em-beddings each with a PointNet++ [42] point cloud encoder. These embeddings are aggregated into object and scene tokens, and are passed as input along with a learnable frame token into a modified Diffusion Transformer (DiT) [43], where the object tokens and frame token cross-attend to the scene tokens. The frame token is then decoded by the frame prediction head into ˆρt, and the object tokens are decoded by the shape prediction head into ˆϕt. The current denoised configuration ˆg ˆP ∗O,t = ˆ ρt + ˆϕt is passed back as input into the model for the next diffusion timestep. For efficiency and stable training, we do not sample ˆg
+
+from fglobal when training flocal . Querying fglobal for each training sample significantly increases training cost and may introduce mode mismatch, as predictions from fglobal may fall into a different mode than the ground-truth placement 
+
+P ∗O , forcing flocal to handle large translational errors rather than perform local shape refinements. Instead, we sample ˆg
+
+by adding noise to the ground-truth placement frame P ∗O ,i.e. ˆgtrain ∼ N (P ∗O , Σ) . For simplicity, we use Σ = I,though this parameter can be tuned to match the scale of the errors in fglobal . In practice, the global stage only needs to place ˆg inside the basin where local refinement is effective, so this training scheme remains well aligned with the test-time objective while avoiding unnecessary global ambiguity. Additional architecture and training details can be found in Appendix II and III on the project website. V. E XPERIMENTS 
+
+We include experiments in both simulation on standard object placement benchmarks (Sec. V-A) as well as real-world insertion for manufacturing-related tasks using the NIST-board (Sec. V-B). TAX-DPD can theoretically be ap-plied to placement for non-rigid objects, since it makes no assumptions about SE(3) rigidity. See Appendix I for simula-tion results of placing non-rigid cloths on hangers. However, non-rigid placement in the real world is challenging due to the difficulty of 3D tracking of non-rigid objects; we leave handling of these issues for future work. We direct the reader to our project website for supplementary materials and video demonstrations. 
+
+A. Simulation Experiments 1) Experimental Setup: Our simulation experiments are conducted on the full suite of RPDiff [15] placement tasks, which are implemented in the PyBullet [44] sim-ulation engine and designed to evaluate precise rela-tional object rearrangement in complex, multi-modal en-vironments. The suite of tasks includes Mug/EasyRack ,
+
+Mug/MedRack , Mug/Multi-MedRack , Book/Shelf ,and Can/Cabinet , collectively spanning different degrees of placement precision, multi-modality, and geometric vari-ations. Each task has the following objective: (1) hanging a mug on one rack with one peg, (2) hanging a mug on one rack with two pegs, (3) hanging a mug on multiple racks with two pegs, (4) inserting a book into a partially filled bookshelf, (5) stacking a can on top of a stack of cans or onto an open shelf. For detailed descriptions and visualizations of the RPDiff tasks, please refer to the RPDiff paper [15]. 
+
+2) Evaluation and Metrics: We adopt the insertion con-troller introduced in RPDiff to execute the predicted place-ments produced by TAX-DPD and the baselines. For each placement task, we evaluate success rates over 100 trials, where in each trial the scene configuration is generated by TABLE II: Additional Ablations Comparing Point Diffusion to SE(3) Diffusion on variations of the Mug Hanging task.        
+
+> OneMug ManyMugs
+> TAX-DPD (Ours) w/ SE(3) diffusion 0.97 0.89
+> TAX-DPD (Ours) (Point diffusion) 0.98 0.95
+
+spawning randomly sampled meshes with randomized poses for both placement and scene objects from a held-out test suite (unseen during training). Success is determined by evaluating the final simulator state after the placement. 
+
+3) Baselines: We compare TAX-DPD to RPDiff [15] and TAX3D [12], two recent diffusion-based approaches that operate on distinct domains. RPDiff models object rearrangement as an iterative de-noising process directly in the space of rigid SE(3) transformations, which guides a perturbed transformation toward a valid placement using object-scene point clouds. To enhance generalization and pre-cision, RPDiff crops a local point cloud context around the object based on heuristics and employs a separately trained success classifier to select the highest-scoring prediction for evaluation. We report RPDiff’s success rates presented in its original paper. In contrast, TAX3D operates as a diffusion model in 3D point space, predicting dense displacements for the object conditioned on the scene. Although originally designed for deformable objects, we train it on the same task suite and apply an identical rigid transformation estimation procedure (Appendix III-E) for a fair comparison. 
+
+4) Comparison between SE(3) diffusion and Point Cloud Diffusion: Table I reports success rates across the RPDiff task suite for baselines (top rows), our ablation variants (middle rows), and TAX-DPD (bottom row). TAX-DPD demonstrates superior performance over the RPDiff base-line, which diffuses in SE(3) space. We achieve an av-erage success rate of 97%, establishing a significant 9% margin over RPDiff’s 88%. Specifically, in tasks char-acterized by significant geometric variations across un-seen objects (e.g. Mug/EasyRack , Mug/MedRack , and 
+
+Mug/Multi-MedRack ), TAX-DPD consistently generates more feasible placements under these shape variations; in cluttered scenes requiring high precision (e.g. Book/Shelf 
+
+and Can/Cabinet ), our approach demonstrates a superior capacity for fine-grained local geometric reasoning, with-out requiring heuristic local cropping adopted in RPDiff. Furthermore, RPDiff trains a separate learned classifier to score sampled poses and takes the highest-ranking prediction for evaluation, while TAX-DPD directly evaluates sampled configurations in one-shot, without heuristic local cropping or classifier-based reranking. Compared to RPDiff without a classifier, which is a more direct comparison, our approach has an even larger performance gain of 14%. To isolate the benefits of diffusing in point space from other architectural choices, we create a controlled ablation by adapting our own method to perform diffusion directly on the SE(3) manifold (See Appendix III-C for implementation details). As shown in Table I, this variant, dubbed “ TAX-DPD (Ours) w/ SE(3) diffusion”, underperforms our full method by an average of 4%, with this deterioration being most 
+
+Fig. 4: Coverage vs. Precision. We further evaluate TAX-DPD and the baselines on coverage and precision with increasing numbers of inference samples on the RPDiff task 
+
+Book/Shelf .significant on mug-hanging tasks involving substantial object geometric variations. This result confirms that operating in point space is a key contributor to our model’s success. To further analyze why point cloud diffusion is prefer-able, we conduct a targeted analysis on two versions of the Mug/Multi-MedRack task. The first, which we term 
+
+OneMug , uses a fixed mug geometry and a fixed set of racks to isolate the placement challenge from shape variation. The second, ManyMugs , is the original task featuring diverse, unseen geometries for both mugs and racks. As shown in Table II, the two methods perform comparably on OneMug 
+
+(98% vs. 97%) when the object geometry has no variations. However, when faced with the diverse, unseen shapes of the 
+
+ManyMugs task, TAX-DPD’s performance remains robust with only a small drop ( 98% →95%), whereas the SE(3) variant suffers a more significant deterioration ( 97% →89%). This aligns with our insight that point cloud diffusion, in contrast to SE(3) diffusion, supports reasoning about low-level object geometry, thereby facilitating more effective generalization to geometric variations in object manipulation. 
+
+5) Benefits of Global Placement Initialization: To un-derstand the importance of global placement initialization, we also perform an ablation in which we remove the dense GMM and instead initialize the diffusion process at the centroid of the scene point cloud (“ TAX-DPD (Ours) 
+
+w/o GMM”). Table I shows that this leads to a drop in performance of 14%. We further compute the coverage and precision of the Book/Shelf task for different values of K,which is defined as the number of predictions sampled (see Figure 4). Here, coverage measures the fraction of feasible ground-truths that are within a threshold distance of at least one of the K samples, while precision measures the fraction of the K sampled predictions that are within a threshold distance of one of the ground-truths. TAX-DPD achieves state-of-the-art coverage while maintaining high precision. In TABLE III: Task Success Rates and Precision Metrics on Real-World Insertion Tasks. For the multimodal Waterproof task, translation and rotation errors are omitted because there is no single canonical target pose.                                
+
+> Unimodal Multimodal Waterproof DSUB-25 SSD Waterproof TAX-Pose TAX-DPD (Ours) TAX-Pose TAX-DPD (Ours) TAX-Pose TAX-DPD (Ours) TAX-DPD (Ours)
+> Success Rate 80% (16/20) 100% (20/20) 80% (16/20) 80% (16/20) 0% (0/20) 85% (17/20) 90% (18/20)
+> Trans. Err. (mm) 1.04 0.72 0.93 1.00 16.18 2.75 -Rot. Err. ( ◦)1.64 1.18 3.16 1.36 13.81 2.77 -
+
+contrast, the ablation of our method without the GMM has a significant drop in both precision and coverage, highlighting the importance of the global placement initialization. 
+
+6) Benefits of Disentangled Point Diffusion: To under-stand the importance of disentangled point diffusion, we perform an ablation in which we directly predict the goal configuration with point cloud diffusion (“ TAX-DPD (Ours) 
+
+w/o disentangled point diffusion”). As shown in Table I, re-moving disentangled point diffusion causes the most perfor-mance degradation of 25%, confirming that forcing the model to predict dense geometry and translation as a combined output is ineffective for point cloud diffusion approaches. 
+
+7) Ablation Study: We further ablate the remaining design choices of TAX-DPD in Table I. Variants that replace the encoder with simple MLPs or remove reconstruction or deformation embeddings all degrade performance, indicating the need for expressive feature representations that capture fine-grained geometric structure for precise dense prediction. In addition, rotation noise perturbations are essential for learning diverse poses, and their removal lowers the average success rate to 88%, most notably in mug-hanging tasks. 
+
+B. Real-World Experiments 1) Experimental Setup: To examine whether TAX-DPD can reliably complete real-world placement tasks, we eval-uate it on high-precision industrial tasks with three distinct connectors: the “Waterproof”, “DSUB-25”, and “SSD” con-nector from the NIST Assembly Task Board 1 [45] (see Figure 1 and Figure 5). Our setup uses a 6-DOF robot arm with a dual-camera system (wrist and side) to capture point clouds of the plug and the sockets. The primary challenge arises from significant, random perturbations to the con-nector’s initial configuration via varying the object’s initial pose in the gripper. For each task, we collect a dataset of 20 demonstrations of successful connection placements via    
+
+> (a) Unimodal Waterproof (b) Unimodal DSUB-25 (c) Unimodal SSD (d) Multimodal Waterproof
+
+Fig. 5: Insertion task rollouts. Selected TAX-DPD rollouts. Top: pre-insertion. Bottom: post-insertion. teleoperations. More details about the real-world experiments can be found in Appendix IV. 
+
+2) Insertion Success Rate Results: The results presented in Table III underscore the effectiveness of our approach. We achieved 80-100% success across four high-precision insertion tasks that necessitate positional accuracy at the millimeter scale and rotational error within a 1-2 degree tolerance, highlighting the difficulty of accomplishing the in-sertion tasks in an industrial setting. TAX-DPD also matches or dramatically outperforms TAX-Pose [13], a strong base-line tailored for unimodal relative placement tasks through learned soft correspondences. Notably, TAX-Pose fails all 20 SSD trials, producing extremely high errors. Because the SSD object is relatively tall, small rotation errors in the predicted bottom-face point cloud lead to large errors in the resulting gripper pose. TAX-DPD, on the other hand, is still able to achieve high success rates. Furthermore, in the multi-modal version of the Waterproof connector insertion task, our model still achieves a reliable success rate of 90%. VI. C ONCLUSION 
+
+We present a hierarchical goal prediction framework that pairs a scene-conditioned Dense GMM for global placement with a local point-cloud diffuser that jointly denoises the object geometry and frame in local coordinates. This design resolves scene-level multi-modality while preserving place-ment precision and generalizes across object geometries. In simulation (RPDiff), we attain state-of-the-art success rates, significantly outperforming prior work. Our analysis shows that point cloud diffusion significantly outperforms SE(3) diffusion especially when the task requires generalizing over variations in object geometry. On a millimeter-level industrial real world insertion challenge, TAX-DPD outperforms a strong baseline in both unimodal and multi-modal settings, achieving success rates between 80 and 100%. VII. A CKNOWLEDGMENTS 
+
+Supported by NSF CAREER Grant IIS-2046491. We also thank ABB Inc. for their support. REFERENCES [1] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning fine-grained bimanual manipulation with low-cost hardware,” in ICML Workshop on New Frontiers in Learning, Control, and Dynamical Systems .[2] T. Z. Zhao, J. Tompson, D. Driess, P. Florence, S. K. S. Ghasemipour, C. Finn, and A. Wahid, “Aloha unleashed: A simple recipe for robot dexterity,” in 8th Annual Conference on Robot Learning .[3] J. Wu, W. Chong, R. Holmberg, A. Prasad, Y. Gao, O. Khatib, S. Song, S. Rusinkiewicz, and J. Bohg, “Tidybot++: An open-source holonomic mobile manipulator for robot learning,” in 8th Annual Conference on Robot Learning .[4] C. Chi, Z. Xu, C. Pan, E. Cousineau, B. Burchfiel, S. Feng, R. Tedrake, and S. Song, “Universal manipulation interface: In-the-wild robot teaching without in-the-wild robots.” Robotics: Science and Systems, 2024. [5] P. Wu, Y. Shentu, Z. Yi, X. Lin, and P. Abbeel, “Gello: A general, low-cost, and intuitive teleoperation framework for robot manipulators,” in 
+
+2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024, pp. 12 156–12 163. [6] X. Cheng, J. Li, S. Yang, G. Yang, and X. Wang, “Open-television: Teleoperation with immersive active visual feedback,” in 8th Annual Conference on Robot Learning .[7] C. Chi, S. Feng, Y. Du, Z. Xu, E. Cousineau, B. Burchfiel, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” in 
+
+Robotics: Science and Systems , 2023. [8] Y. Ze, G. Zhang, K. Zhang, C. Hu, M. Wang, and H. Xu, “3d diffusion policy: Generalizable visuomotor policy learning via simple 3d representations,” in 2nd Workshop on Dexterous Manipulation: Design, Perception and Control (RSS) .[9] N. M. Shafiullah, Z. Cui, A. A. Altanzaya, and L. Pinto, “Behavior transformers: Cloning k modes with one stone,” Advances in neural information processing systems , vol. 35, pp. 22 955–22 968, 2022. [10] S. Lee, Y. Wang, H. Etukuru, H. J. ovKim, N. M. M. Shafiullah, and L. Pinto, “Behavior generation with latent actions,” in International Conference on Machine Learning . PMLR, 2024, pp. 26 991–27 008. [11] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. , “ π0: A vision-language-action flow model for general robot control,” arXiv preprint arXiv:2410.24164 , 2024. [12] E. Cai, O. Donca, B. Eisner, and D. Held, “Non-rigid relative place-ment through 3d dense diffusion,” in Conference on Robot Learning (CoRL) , 2024. [13] C. Pan, B. Okorn, H. Zhang, B. Eisner, and D. Held, “Tax-pose: Task-specific cross-pose estimation for robot manipulation,” in Conference on Robot Learning . PMLR, 2023, pp. 1783–1792. [14] H. Huang, K. Schmeckpeper, D. Wang, O. Biza, Y. Qian, H. Liu, M. Jia, R. Platt, and R. Walters, “Imagination policy: Using generative point cloud models for learning manipulation policies,” in Proceedings of the Conference on Robot Learning , 2024. [15] A. Simeonov, A. Goyal, L. Manuelli, Y.-C. Lin, A. Sarmiento, A. R. Garcia, P. Agrawal, and D. Fox, “Shelving, stacking, hanging: Rela-tional pose diffusion for multi-modal rearrangement,” in Conference on Robot Learning . PMLR, 2023, pp. 2030–2069. [16] Y. Zhao, M. Bogdanovic, C. Luo, S. Tohme, K. Darvish, A. Aspuru-Guzik, F. Shkurti, and A. Garg, “Anyplace: Learning general-ized object placement for robot manipulation,” arXiv preprint arXiv:2502.04531 , 2025. [17] W. Liu, Y. Du, T. Hermans, S. Chernova, and C. Paxton, “Structdif-fusion: Language-guided creation of physically-valid structures using unseen objects,” in Robotics: Science and Systems , 2023. [18] J. Wang, O. Donca, and D. Held, “Learning distributional demon-stration spaces for task-specific cross-pose estimation,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2024, pp. 15 054–15 060. [19] B. Eisner, Y. Yang, T. Davchev, M. Vecerik, J. Scholz, and D. Held, “Deep se (3)-equivariant geometric reasoning for precise placement tasks,” in The Twelfth International Conference on Learning Repre-sentations .[20] A. Simeonov, Y. Du, A. Tagliasacchi, J. B. Tenenbaum, A. Rodriguez, P. Agrawal, and V. Sitzmann, “Neural descriptor fields: Se (3)-equivariant object representations for manipulation,” in 2022 Interna-tional Conference on Robotics and Automation (ICRA) . IEEE, 2022, pp. 6394–6400. [21] P. R. Florence, L. Manuelli, and R. Tedrake, “Dense object nets: Learn-ing dense visual object descriptors by and for robotic manipulation,” in Conference on Robot Learning . PMLR, 2018, pp. 373–385. [22] H. Chang, K. Boyalakuntla, Y. Liu, X. Zhang, L. Schramm, and A. Boularias, “Dap: Diffusion-based affordance prediction for multi-modality storage,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024, pp. 9476–9481. [23] A. Brock, T. Lim, J. M. Ritchie, and N. Weston, “Generative and discriminative voxel modeling with convolutional neural networks,” 
+
+arXiv preprint arXiv:1608.04236 , 2016. [24] J. Kim, J. Yoo, J. Lee, and S. Hong, “Setvae: Learning hierarchical composition for generative modeling of set-structured data,” in Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2021, pp. 15 059–15 068. [25] P. Achlioptas, O. Diamanti, I. Mitliagkas, and L. Guibas, “Learning representations and generative models for 3d point clouds,” in Inter-national conference on machine learning . PMLR, 2018, pp. 40–49. [26] D. W. Shu, S. W. Park, and J. Kwon, “3d point cloud generative adversarial network based on tree structured graph convolutions,” in 
+
+Proceedings of the IEEE/CVF international conference on computer vision , 2019, pp. 3859–3868. [27] X. Yang, Y. Wu, K. Zhang, and C. Jin, “Cpcgan: A controllable 3d point cloud generative adversarial network with semantic label generating,” in Proceedings of the AAAI conference on artificial intelligence , vol. 35, no. 4, 2021, pp. 3154–3162. [28] S. Luo and W. Hu, “Diffusion probabilistic models for 3d point cloud generation,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2021, pp. 2837–2845. [29] V. Zyrianov, X. Zhu, and S. Wang, “Learning to generate realistic lidar point clouds,” in European Conference on Computer Vision . Springer, 2022, pp. 17–35. [30] S. Mo, E. Xie, R. Chu, L. Hong, M. Niessner, and Z. Li, “Dit-3d: Exploring plain diffusion transformers for 3d shape generation,” 
+
+Advances in neural information processing systems , vol. 36, pp. 67 960–67 971, 2023. [31] S. Mo, E. Xie, Y. Wu, J. Chen, M. Nießner, and Z. Li, “Fast training of diffusion transformer with extreme masking for 3d point clouds generation,” in European Conference on Computer Vision . Springer, 2024, pp. 354–370. [32] J. Huang, J. Stoter, R. Peters, and L. Nan, “City3d: Large-scale building reconstruction from airborne lidar point clouds,” Remote Sensing , vol. 14, no. 9, p. 2254, 2022. [33] M. Dahnert, A. Dai, N. M¨ uller, and M. Nießner, “Coherent 3d scene diffusion from a single rgb image,” Advances in Neural Information Processing Systems , vol. 37, pp. 23 435–23 463, 2024. [34] A. Nichol, H. Jun, P. Dhariwal, P. Mishkin, and M. Chen, “Point-e: A system for generating 3d point clouds from complex prompts,” arXiv preprint arXiv:2212.08751 , 2022. [35] A. Sanghi, H. Chu, J. G. Lambourne, Y. Wang, C.-Y. Cheng, M. Fumero, and K. R. Malekshan, “Clip-forge: Towards zero-shot text-to-shape generation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 18 603–18 613. [36] J. Lee, W. Im, S. Lee, and S.-E. Yoon, “Diffusion probabilistic models for scene-scale 3d categorical data,” arXiv preprint arXiv:2301.00527 ,2023. [37] H. Ran, V. Guizilini, and Y. Wang, “Towards realistic scene gener-ation with lidar diffusion models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 14 738–14 748. [38] L. Zhou, Y. Du, and J. Wu, “3d shape generation and completion through point-voxel diffusion,” in Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , October 2021, pp. 5826–5835. [39] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” Advances in neural information processing systems , vol. 33, pp. 6840–6851, 2020. [40] A. Q. Nichol and P. Dhariwal, “Improved denoising diffusion prob-abilistic models,” in International conference on machine learning .PMLR, 2021, pp. 8162–8171. [41] H. Zhen, X. Qiu, P. Chen, J. Yang, X. Yan, Y. Du, Y. Hong, and C. Gan, “3d-vla: A 3d vision-language-action generative world model,” in International Conference on Machine Learning . PMLR, 2024, pp. 61 229–61 245. [42] C. R. Qi, L. Yi, H. Su, and L. J. Guibas, “Pointnet++: Deep hierarchical feature learning on point sets in a metric space,” Advances in neural information processing systems , vol. 30, 2017. [43] W. Peebles and S. Xie, “Scalable diffusion models with transformers,” in Proceedings of the IEEE/CVF international conference on computer vision , 2023, pp. 4195–4205. [44] E. Coumans and Y. Bai, “Pybullet, a python module for physics simulation for games, robotics, and machine learning,” 2016-2020. [Online]. Available: http://pybullet.org [45] “Assembly Performance Metrics and Test Meth-ods,” NIST , May 2018. [Online]. Avail-able: https://www.nist.gov/el/intelligent-systems-division-73500/ robotic-grasping-and-manipulation-assembly/assembly [46] R. Antonova, P. Shi, H. Yin, Z. Weng, and D. K. Jensfelt, “Dynamic environments with deformable objects,” in Thirty-fifth Conference on Neural Information Processing Systems Datasets and Benchmarks Track (Round 2) , 2021. [47] Y. Wang, Z. Wang, M. Nakura, P. Bhowal, C.-L. Kuo, Y.-T. Chen, Z. Erickson, and D. Held, “Articubot: Learning universal articulated object manipulation policy via large scale simulation,” arXiv preprint arXiv:2503.03045 , 2025. [48] Z. Xian and N. Gkanatsios, “Chaineddiffuser: Unifying trajectory diffusion and keypose prediction for robotic manipulation,” in Confer-ence on Robot Learning/Proceedings of Machine Learning Research .Proceedings of Machine Learning Research, 2023. [49] Y. Zhou, C. Barnes, J. Lu, J. Yang, and H. Li, “On the continuity of rotation representations in neural networks,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition ,2019, pp. 5745–5753. [50] G. Xu, X. Wang, X. Ding, and X. Yang, “Iterative geometry encoding volume for stereo matching,” in Proceedings of the IEEE/CVF confer-ence on computer vision and pattern recognition , 2023, pp. 21 919– 21 928. Supplementary Material 
+
+APPENDIX IEXTENSION TO NON -R IGID PLACEMENT TASKS 
+
+A. Experimental Setup 
+
+Since our point cloud–based formulation for goal predic-tion does not assume object rigidity, our method can be naturally applied to deformable objects without requiring any architecture modifications. We validate this capability on a cloth hanging task from Dynamic Environments with Deformable Objects (DEDO) [46] built on PyBullet physics engine [44]. Specifically, we conduct experiments on a mod-ified multi-hanger implementation of the HangProcCloth 
+
+task, in which a procedurally generated cloth with two holes must be hung on one of the two hangers in the scene. The task explores multi-modal non-rigid placements under significant variation in object shape and scene layout (see Figure 6). 
+
+B. Goal-conditioned Policy Learning 
+
+In RPDiff, the predicted goal configurations are executed via motion planning and task-specific primitives, or in other words using manually defined pre-placement offset poses based on task-dependent heuristics to avoid collisions during execution. However, in deformable settings, such heuristics and motion planning cannot guarantee success, since—unlike rigid objects where aligning a key part suffices—the object’s shape continuously changes under manipulation, making fixed pre-placement offsets unreliable. Alternatively, recent work [47], [48] has demonstrated success with hierarchical policy learning with explicitly 3D high-level goals. ArticuBot [47], for example, predicts an action-centric high-level goal (represented directly in 3D as a set of gripper points) to condition a lower-level policy. We follow the similar ideology to train a placement policy condi-tioned on our predicted goal configuration ˆP ∗O to accomplish the challenging deformable cloth hanging task. Specifically, we use an exceedingly simple framework in which we concatenate ˆP ∗O to the point cloud observation input for 3D Diffusion Policy (DP3) [8]. To avoid iteratively denoising 
+
+ˆP ∗O during training, which can be slow, we condition on the ground-truth P ∗O when training the low-level policy, and condition on the predicted goal configuration ˆP ∗O during task evaluation. 
+
+C. Demonstration Generation 
+
+To collect demonstrations in the HangProcCloth envi-ronment, we design a task-specific expert policy that applies end-effector position control with soft constraints to (i) smoothly orient the cloth toward the hanger, (ii) maintain the gripper distance approximately equal to the cloth width, and (iii) keep the grippers at similar heights along the z-axis. Each demonstration provides data for two comple-mentary objectives: for goal prediction, we collect triplets 
+
+(PO , P S , P ∗O ) where PO ∈ RNO ×3 is the segmented object point cloud, PS ∈ RNS ×3 is the scene point cloud, and P ∗O ∈
+
+RNO ×3 is the ground-truth goal configuration, as we defined TABLE IV: Ablations and Task Success Rates on modified DEDO HangProcCloth task.                                 
+
+> SR Cov. RMSE Prec. RMSE TAX3D [12] 0.50 0.87 1.34
+> Ours w/o disentangled point diffusion 0.73 0.82 1.16
+> Ours w/ MLP encodings 0.76 0.96 1.04
+> Ours w/o GMM 0.69 0.88 0.96
+> Ours w/o recon. embedding 0.75 0.82 0.81
+> Ours w/o rot. noise 0.64 0.64 0.95
+> Ours w/o deform. embedding 0.71 0.96 0.95
+> Ours 0.78 0.50 0.58
+
+earlier in the problem statement. For policy learning, we collect tuples ({ot}Tt=1 , {at}Tt=1 , P ∗O ) where ot ∈ O are point cloud observations, at ∈ A are end-effector actions, and P ∗O
+
+is the conditioning goal. These demonstrations allow us to train our method for predicting goal placement configuration for the cloth as well as a placement policy (goal conditioned 3D Diffusion Policy) to execute the prediction. 
+
+D. Evaluation and Metrics 
+
+For the cloth hanging task, we evaluate success rates over 100 trials, where in each trial the initial pose of the cloth and the hangers are both randomized, and the cloth’s geometry is also randomized by varying the holes’ positions (unseen during training). Success is determined by evaluating the final simulator state, whether a hole of the cloth passes fully through the rod of one of the hangers in the scene after the trained placement policy executes the predicted placement configuration. Additionally, we quantify multimodal capture and placement precision via reporting Coverage RMSE ,defined as the minimum point-wise root-mean-square error (RMSE) between a ground-truth goal configuration P ∗O and a set of K predicted samples { ˆP ∗(k) 
+
+> O
+
+}Kk=1 , and Precision RMSE , defined as the minimum RMSE between a single predicted sample ˆP ∗O and a set of M ground-truth goal configurations {P ∗(m) 
+
+> O
+
+}Mm=1 .
+
+E. Baselines 
+
+We train and compare against TAX3D [12], a point cloud diffusion approach for non-rigid, multi-modal placement. To ensure a fair comparison, during success rate evaluation we execute the predicted placements from TAX3D using the same learned placement policy described in Sec S1-B. 
+
+F. Results and Ablations 
+
+As shown in Table IV, our method achieves substan-tially better performance than the TAX3D baseline on the 
+
+HangProcCloth task, improving success rate by a large margin (0.50 → 0.78) while also drastically reducing cov-erage RMSE (0.87 → 0.50) and precision RMSE (1.34 →
+
+0.58). Removing disentangled point diffusion reduces success rate by 5 percents, while coverage and precision RMSE increase by 0.32 and 0.58, respectively. This highlights the critical role of explicitly separating frame and shape denoising rather than conflating them in a single point-space process. Similarly, removing the scene-conditioned Dense Fig. 6: DEDO Task Environment. (Top ) A visualization of the variation in configuration in the HangProcCloth-DH task. (Middle ) Our method generalizes well to diverse cloth geometries. ( Bottom ) Successful placements with a goal-conditioned placement policy. 
+
+GMM for global initialization lowers success rate by 9 points and degrades both coverage and precision RMSE by 0.38 each, confirming its importance in capturing multimodality at the global scene level. All the remaining components also contribute meaningfully to performance. In particular, ablating the deformation embedding reduces success by 7 points and worsens coverage and precision RMSE by 0.46 and 0.37, a much larger relative effect than observed in rigid-object experiments. This underscores the value of explicitly encoding deformation-specific cues in non-rigid placement tasks, where object geometry evolves dynamically under manipulation. APPENDIX II TRAINING DETAILS 
+
+A. Training Pre-processing 1) Dataset Scaling: As one of the motivating issues of our method, diffusing point clouds in the object placement setting is less feasible due to the scale mismatch between the object and the scene. To address this and ensure consistency across tasks, we standardize the input space by adaptively scaling both the scene and object point clouds based on task-specific statistics. Specifically, we compute normalization factors from the empirical distribution of point cloud scales for each task, allowing our method to operate in a unified and numerically stable space that maximizes the effectiveness of goal configuration prediction. The scale normalization of point clouds is done automatically for each batch. 
+
+2) Point Cloud Downsampling: For training, both the ob-ject and scene point clouds are downsampled using furthest point sampling. Depending on the scene complexity, we vary the number of sampled points to ensure minimal geometric information loss, preserving the structural features necessary for inferring the goal object configuration. We document the number of points for the objects and the scenes for each task in Table VI. 
+
+3) Augmentation: We additionally augment the scene, initial object, and goal configuration point clouds with the same rotation, which is uniformly sampled from [0 , 2π] about the z-axis. 
+
+B. Hyper-parameters 
+
+We provide the hyper-parameters used for training and model configuration in Table V. These include both optimiza-tion settings (e.g., batch size, learning rate, weight decay) and architectural choices for the diffusion transformer backbone. APPENDIX III METHOD DETAILS 
+
+A. Global Placement Initialization - Architecture 
+
+To predict the Dense GMM from which we sample ˆg,we use a simplified version of the point cloud diffusion architecture for local configuration refinement. Namely, we encode the object point cloud PO and the scene point cloud PS separately with PointNet++ [42], before passing the object and scene tokens into a point cloud transformer. This transformer has the same underlying architecture as the TABLE V: Training and Model Hyper-parameters.           
+
+> Parameter Value
+> Batch size 16 Learning rate 1e-4 Learning rate warmup steps 100 Weight decay 1e-5 Epochs 20,000 Number of DiT blocks 5Number of heads per block 4Hidden size per block 128 Diffusion steps 100
+
+TABLE VI: Point Cloud Downsampling per Task.                               
+
+> RPDiff-Mug/EasyRack number of POpoints = 512 number of PSpoints = 512
+> RPDiff-Mug/MedRack number of POpoints = 512 number of PSpoints = 512
+> RPDiff-Mug/Multi-MedRack number of POpoints = 512 number of PSpoints = 1024
+> RPDiff-Book/Shelf number of POpoints = 512 number of PSpoints = 1024
+> RPDiff-Can/Cabinet number of POpoints = 256 number of PSpoints = 1024
+> DEDO-HangProcCloth number of POpoints = 512 number of PSpoints = 512
+
+modified DiT in local configuration refinement, with two exceptions: 1) the scene tokens cross-attend to the object tokens (rather than the object tokens cross-attending to the scene tokens), and 2) the timestep t is set to 0, since gloal placement initialization does not do any iterative denoising. The final scene tokens are then decoded by a pointwise MLP into per-point weights {wi}NS 
+
+> i=1
+
+and per-point residuals 
+
+{ri}NS
+
+> i=1
+
+, which parameterize our proposed Dense GMM.. 
+
+B. Local Configuration Refinement - Rotation Noise 
+
+During the forward diffusion process applied to the shape point cloud ϕ0 ∈ R3×N , we inject both standard Gaussian noise and an additional rigid-body rotation noise. The per-turbed shape at diffusion timestep t is defined as 
+
+ϕt = √¯αt ϕ0 + √1 − ¯αt (ϵϕ + ϵrot )
+
+where ¯αt ∈ (0 , 1) denotes the cumulative product of noise scheduling coefficients, ϵϕ ∼ N (0 , I) ∈ R3×N is the per-point i.i.d. Gaussian noise for the object shape forward corruption processes, and ϵrot ∈ R3×N represents the rigid-body rotation noise. To compute ϵrot , we first sample a random rotation axis 
+
+u ∈ R3 uniformly on the unit sphere, i.e., 
+
+u ∼ U (S2), s.t. ∥u∥2 = 1 
+
+and a rotation angle θ ∈ R from a zero-mean Gaussian distribution, 
+
+θ ∼ N (0 , σ 2rot )
+
+We empirically set σrot = π 
+
+> 4
+
+(i.e., 45 degrees). Given (u, θ ),we construct the corresponding rotation matrix R ∈ SO(3) 
+
+using Rodrigues’ rotation formula: 
+
+R = I3 + sin( θ)[ u]× + (1 − cos( θ))[ u]2
+
+> ×
+
+where [u]× ∈ R3×3 is the skew-symmetric matrix of u:
+
+[u]× =
+
+ 0 −u3 u2
+
+u3 0 −u1
+
+−u2 u1 0
+
+
+
+We then define the rotation noise as the deviation between the rotated and original shape: 
+
+ϵrot = Rϕ 0 − ϕ0
+
+This term is added to the standard diffusion noise to encour-age the model to denoise both pointwise and global rotational perturbations. We empirically found this modification help the denoiser to better model pose transformations of the placement objects. 
+
+C. Local Configuration Refinement - Token Mixing 
+
+After point cloud encoding in local configuration refine-ment, we obtain reconstruction embeddings {fi}NO +NS 
+
+> i=1
+
+,object embeddings {oj }NO
+
+> j=1
+
+, and deformation embeddings 
+
+{dk}NO
+
+> k=1
+
+. In particular, the reconstruction embeddings can be split into object-specific reconstruction embeddings {f O 
+
+> i
+
+}NO
+
+> i=1
+
+and scene-specific reconstruction embeddings {f S 
+
+> i
+
+}NS
+
+> i=1
+
+. With 
+
+d denoting the dimension size of these embeddings, we concatenate the three sets of object-specific embeddings into object tokens T O = {f O 
+
+> i
+
+oi di
+
+}NO 
+
+> i=1
+
+such that T O ∈
+
+RNO ×3d, and directly use the scene-specific reconstruction embeddings as scene tokens T S = {f S 
+
+> i
+
+}NS 
+
+> i=1
+
+such that 
+
+T S ∈ RNS ×d.Before passing these tokens into the modified Point Cloud Diffusion Transformer, we project the object tokens T O from a dimension size of 3d down to a dimension size of d with a pointwise MLP to match the scene tokens T S . We refer to this step as “token mixing.” 
+
+D. Local Configuration Refinement - SE(3) Diffusion Abla-tion 
+
+To adapt our local refinement stage to instead perform dif-fusion directly on the SE(3) manifold, we replace the object shape diffusion with a denoising process over the object’s orientation, while maintaining the rest of the architecture of local configuration refinement components unchanged. Following prior work, we represent the orientation in a 6D continuous rotation format [49], which allows for the ap-plication of a standard Gaussian-noise-based DDPM process in this Euclidean space. Specifically, let ˆRt−1 ∈ SO(3) and 
+
+ˆtt−1 ∈ R3 denote the denoised orientation and translation at step t − 1 in the local frame ˆg. The denoiser predicts 
+
+( ˆRt−1, ˆtt−1) from the current estimate at step t, and we compose 
+
+ˆTt−1 =
+
+" ˆRt−1 ˆtt−1
+
+0⊤ 1
+
+#
+
+∈ SE(3) 
+
+Applying this transform to the initial object point cloud expressed in the ˆg-frame, ˆgPO , yields the denoised goal at step t−1: ˆg ˆP ∗O, t −1 = ˆTt−1 ˆgPO
+
+with all quantities defined in the local placement frame ˆg.
+
+E. RANSAC 
+
+Given the sampled global placement reference frame ˆg
+
+and the denoised local placement configuration ˆg ˆP ∗O , we can compute the global predicted goal placement point cloud as 
+
+ˆP ∗O = ˆg ˆP ∗O + ˆ g. In our model design, each input point pi ∈
+
+PO directly corresponds to a predicted goal point ˆp∗ 
+
+> i
+
+∈ ˆP ∗O .TABLE VII: Additional Real-World Unimodal Insertion Tasks Results.                                        
+
+> Waterproof DSUB-25 SSD TAX-Pose Ours TAX-Pose Ours TAX-Pose Ours
+> Success Trans. Err. (mm) 0.99 0.72 0.75 0.53 -1.72
+> Rot. Err. ( ◦)1.54 1.18 2.90 1.17 -2.01
+> Failure Trans. Err. (mm) 1.35 (+0.36) -(-) 1.65 (+0.90) 1.96 (+1.43) 16.18 (-) 6.94 (+5.22) Rot. Err. ( ◦)2.26 (+0.72) -(-) 4.20 (+1.30) 1.73 (+0.56) 13.81 (-) 8.75 (+6.74)
+
+For some downstream applications, we may need to pre-dict the final SE(3) pose of the target object. However, since our diffusion process denoises points independently, the predicted goal set may contain local inconsistencies and outliers that violate rigid-body constraints. To address this, we employ a RANSAC-SVD approach as a post-processing step that projects the noisy correspondences onto a single rigid-body transform. Specifically, RANSAC iteratively: 1) samples a set of three correspondences {(pi, ˆp∗ 
+
+> i
+
+)},2) estimates a candidate transformation T from these correspondences, 3) evaluates inlier support by counting correspondences that satisfy ∥T p j − ˆp∗ 
+
+> j
+
+∥2 < τ , where τ is a distance threshold. After N iterations, we select the transform with the largest inlier set, then re-estimate the final SE(3) transform using SVD over all inliers. APPENDIX IV REAL WORLD EXPERIMENTS DETAILS 
+
+A. Setup Descriptions 1) Hardware: The hardware setup is shown in Figure 8. The robot uses a 6-DOF arm and a gripper to manipulate the objects. To get visual input for insertion pose estimation, our setup contains two cameras: one at the end effector (wrist camera, Intel D405), and the other fixed to the table on the side of the workspace (side camera, ZEDX-Mini)). The objects chosen to train and perform insertion tasks are connectors from the NIST Assembly Task Board 1 [45]. Specifically, we perform experiments with the “Waterproof” 
+
+Fig. 7: Data collection process for the vision-based insertion skill. The number of cycles, pose variation ranges, and setup parameters are defined using a YAML configuration file. connector, the “DSUB-25” connector, and the “SSD” con-nector. Each connector has two parts: the “object” O (the connector) and the “scene” S (the socket). The scene S is fixed in place on the table surface while the object O is grasped by the robot gripper. The robot aims to infer the correct placement pose to insert the object into the scene successfully. 
+
+2) Capturing Point Cloud: We use images from the stereo cameras and the deep stereo method IGEV [50] to provide depth estimation and therefore scene point clouds. When capturing the plug part of the connector (i.e. the object O), which is movable, the robot grasping the object O moves to an object-capturing pose such that the side camera, fixed to the ground, can capture the bottom surface of the connector, which is the contact interface for insertion. When capturing the receptacle part of the connector (i.e. the scene S), which is fixed, the robot then moves to a scene-capturing pose such that the in-hand camera can capture a close-up view of the receptacle’s opening surface, which serves as the insertion target for the plug. Both the object-capturing and scene-capturing poses are tuned such that the target objects can get close to the cameras to capture point clouds of a desired fidelity. Once the point clouds are captured, we further apply a heuristic 3D bounding box, manually defined based on the object geometries, to crop or segment the object and scene point clouds from the full observation. 
+
+3) Generating Demonstration Data.: Data is collected by making the robot perform the insertion task multiple times with pre-programmed poses and human instructions. Figure 7 shows how each cycle of data collection works, where we randomly add variations to the initial gripper pose to simulate various initial object configurations. Specifically, the variations are applied via randomly sampling the grasping pose of the gripper with varying rotations along the y-axis and translations along the x- and z-axis. The variation for the rotation around y-axis is ±10 ◦, translation around the x-axis is ±5mm, and translation around the z-axis is +5 mm (see Figure 9 for visualizations). Each demonstration is a triplet of (PO , P S , T ∗OS ), where PO is the initial object point cloud, PS is the scene point cloud, and T ∗OS is the ground-truth transformation that aligns the object into its target configuration. The goal object point cloud is then given by P ∗O = T ∗OS · PO , preserving per-point correspondence between the initial and goal object configurations. These variations increase the difficulty of the task by inducing diverse viewpoints (and therefore occlusions) in the observed object point clouds, which may appear partially visible or differently oriented across demonstrations. For all three types Fig. 8: The vision-based insertion requires two cameras, one on the end effector (wrist camera, Intel D405), and the other fixed to ground (side camera, ZEDX-Mini). The setup shows Yaskawa GP4 robot, and Robotiq HandE gripper. 
+
+Fig. 9: The conditioning scene is the receptacle or socket, and the object is the plug or connector. Ran-dom variations of 20 ◦ y-axis rotation, 10mm x-axis translation, and 5mm x-axis translation are applied to the objects. of connectors, we collect 20 demonstrations of successful connection placements, and we split them into 16 demos for training and 4 demos for validation. 
+
+B. Task Descriptions 
+
+We designed unimodal and multi-modal placement tasks using these connectors. For the unimodal tasks, the robot inserts each of the three distinct NIST connectors into its single corresponding socket, with the primary challenge aris-ing from significant, random perturbations to the connector’s initial configuration via varying the object’s initial pose in the gripper. The multi-modal task focuses on the “Waterproof” connector but increases scene complexity by introducing a second valid placement mode and geometrically distinct sockets as distractors. These tasks are exceptionally chal-lenging, as it requires achieving millimeter-scale precision from partial and noisy point cloud inputs. This difficulty is compounded by the significant, randomized variations in the object’s starting pose, which create diverse and occluded viewpoints that are not well supported by the sparse training samples 
+
+C. Evaluation and Metrics 
+
+To execute the predicted goal placement pose, we calculate the corresponding pre-insertion target gripper pose as an intermediate waypoint and execute the trajectory with the motion planner. We report success rates for both unimodal and multi-modal tasks, which is manually determined by observing whether the connector is inserted into the socket, with connector’s pins and boundary precisely aligned with the corresponding socket. For unimodal tasks, we addition-ally report the translation and rotation errors with respect to the predicted gripper pose to further quantify the precision of each model’s predictions and the demanding success criteria of the insertions. For all tasks, we evaluate on 20 trials with the random grasp variations shown in Figure 9. 
+
+D. Additional Results and Analysis 
+
+To more thoroughly investigate the precision requirements of these tasks, we further separate the trials from the unimodal insertion tasks into successes and failures, and evaluate average translation and rotation error amongst those groups. The numbers in the red parentheses () indicate the average error differential between failures and successes, and the dashes “-” indicate results where no corresponding successes or failures were recorded. As Table VII indicates, both Waterproof and DSUB-25 require extremely precise translation accuracy within ∼1 mm. Waterproof similarly requires rotation accuracy of ∼ 1◦, with DSUB-25 requiring 
+
+< 2◦ rotation error. Although SSD appears more error tolerant, it is in fact the most challenging task due to its geometry: the SSD object is relatively tall, and even small rotation errors in the point cloud prediction of its bottom face amplify into large errors in the predicted gripper pose.
