@@ -1,0 +1,527 @@
+Title: Differentiable Object Pose Connectivity Metrics for Regrasp Sequence Optimization
+
+URL Source: https://arxiv.org/pdf/2604.14733v1
+
+Published Time: Fri, 17 Apr 2026 00:39:32 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+> UNDER REVIEW BY A ROBOTICS JOURNAL 1
+
+# Differentiable Object Pose Connectivity Metrics for Regrasp Sequence Optimization 
+
+Liang Qin, Weiwei Wan ∗, and Kensuke Harada 
+
+Abstract —Regrasp planning is often required when one pick-and-place cannot transfer an object from an initial pose to a goal pose while maintaining grasp feasibility. The main challenge is to reason about shared-grasp connectivity across intermediate poses, where discrete search becomes brittle. We propose an implicit multi-step regrasp planning framework based on dif-ferentiable pose sequence connectivity metrics. We model grasp feasibility under an object pose using an Energy-Based Model (EBM) and leverage energy additivity to construct a continuous energy landscape that measures pose-pair connectivity, enabling gradient-based optimization of intermediate object poses. An adaptive iterative deepening strategy is introduced to determine the minimum number of intermediate steps automatically. Exper-iments show that the proposed cost formulation provides smooth and informative gradients, improving planning robustness over other alternatives. They also demonstrate generalization to un-seen grasp poses and cross-end-effector transfer, where a model trained with suction constraints can guide parallel gripper grasp manipulation. The multi-step planning results further highlight the effectiveness of adaptive deepening and minimum-step search. 
+
+Index Terms —Regrasping, Manipulation planning, Deep learn-ing in regrasping and manipulation. 
+
+I. I NTRODUCTION 
+
+# IN robotic pick-and-place, regrasp planning becomes nec-essary when no grasp can transfer an object from an initial pose to a goal pose under robotic and environmental constraints [1]. Classic approaches address this by searching over discretized regrasp graphs constructed from sampled stable placements and grasp candidates [2][3]. However, their performance is fundamentally coupled to sampling density and discretization resolution, and planning can become chal-lenging when the available grasp candidates are highly con-strained [4][5]. In this paper, we propose an implicit planning framework that replaces discrete connectivity search with differentiable connectivity metrics. This framework enables gradient-based intermediate-pose optimization and adaptively determines the minimum number of regrasp steps. (Fig. 1) At the core of regrasp planning is shared grasp : for each ad-jacent pose pair in a regrasp sequence, there must exist at least one grasp configuration that is feasible at both poses [3]. When such grasps are missing between the initial and goal poses, intermediate object poses must be introduced to “bridge” the sequence, and multiple intermediate steps may be required when feasible grasps are highly constrained. To address these challenges, we turn shared-grasp con-straints into differentiable metrics within an implicit planning 
+
+All authors are with the Graduate School of Engineering Science, The University of Osaka, Japan. Contact: Weiwei Wan, wan.weiwei.es@osaka-u.ac.jp .
+
+Fig. 1. When one pick-and-place manipulation is infeasible for given object poses Tinit and Tgoal , regrasp through one or multiple inter-mediate poses {T}Ni=1 (yellow) is required. We propose a pose con-nectivity score Qpair (Ta, Tb) and a differentiable pose sequence cost 
+
+Jseq (Ta, Tb, Tc, ... ) based on EBMs to generate an optimal regrasp se-quence by following the gradient ∇Jseq , thus enabling efficient multi-step pick-and-place planning. 
+
+framework. Specifically, we model grasp feasibility with an Energy-Based Model (EBM) and derive a pose connectiv-ity score by marginalizing composed grasp energies for a pose pair. This yields a smooth scalar field over the object pose space that measures shared-grasp abundance, enabling gradient-based optimization of intermediate poses. We then define a differentiable pose sequence cost that aggregates pairwise scores along a chain and includes a regularizer to avoid connectivity bottlenecks. Finally, we combine Langevin dynamics with an adaptive iterative deepening strategy to jointly optimize intermediate poses and search for the min-imum required sequence length. Experiments on a 6-DoF manipulator show that the pro-posed cost formulation provides smooth and informative gra-dients, improving planning robustness over alternative metrics. They also demonstrate generalization to unseen grasp poses in one-step intermediate-pose generation and cross-end-effector transferability, where a model trained with suction constraints can guide parallel gripper manipulation. The supplementary video 1 published together with this paper shows several real-world execution results with random init and goal poses. In summary, our key contribution is a differentiable pose sequence connectivity cost derived from compositional EBMs, which transforms discrete shared-grasp constraints into a 
+
+> arXiv:2604.14733v1 [cs.RO] 16 Apr 2026 2UNDER REVIEW BY A ROBOTICS JOURNAL
+
+smooth energy landscape and enables gradient-based optimiza-tion of intermediate object poses. II. R ELATED WORK 
+
+A. Graph-Based Regrasp Planning 
+
+Graph-based approaches construct a connectivity graph from discrete object-grasp pairs, linked by shared poses (tran-sit) or shared grasps (transfer). Planning then becomes a graph search for feasible paths connecting the initial and target poses. Wan et al. [6] applied this approach to single-arm regrasp and dual-arm handover planning in tabletop settings. Address-ing environmental complexity, Ma et al. [7] extended this framework to unstructured and cluttered static environments. Beyond standard pick-and-place tasks, graph search methods have been widely applied to dexterous manipulation scenarios. Cruciani et al. [8] introduced graph search to in-hand ma-nipulation, addressing regrasp planning where fingers cannot maintain continuous contact. Building on this, Nagahama et al. [9] utilized graph search to mitigate uncertainty in in-hand manipulation, significantly enhancing grasp precision. Furthermore, to tackle planning challenges involving complex dynamics or long horizons, researchers have introduced addi-tional modalities and abstraction strategies. Considering grasp stability, Hu et al. [10] incorporated sliding actions into the regrasp framework to expose potentially feasible grasps, es-tablishing a multi-modal transition graph planned via Markov Decision Processes (MDPs). In deformable object assembly tasks, Qin et al. [11] proposed constructing a local Voronoi graph around the object’s ideal path, treating regrasping as a passive repair mechanism to resolve geometric blockages. For sequential manipulation puzzles involving rigid bodies, Levit et al. [12] proposed reducing planning dimensionality by searching for sequences of easier sub-problems, using heuristics to guide the operation order. Furthermore, Levit and Toussaint [13] introduced Regrasp Maps, which voxelize space and construct a global state abstraction based on grasp signa-tures, effectively guiding solvers to discover complex regrasp sequences in highly constrained environments. In this work, we explore an alternative formulation based on a differentiable energy-based cost. By modeling grasp feasibility as an EBM, we compose individual constraints into a combinatorial gra-dient field, which enables explicit computing derivatives with respect to object poses, thus producing a dense, informative signal derived from the learned grasp manifold to help guide optimization into feasible regions. Moreover, our formulation defines a differentiable objective over an entire intermediate pose sequence, and our algorithm supports adaptively selecting the required number of intermediate steps. 
+
+B. Learning-based Regrasp Planning 
+
+Learning methods have made significant progress in regrasp generation. For example, Wada et al. [14] learned to gener-ate feasible reorientation waypoints for visual manipulation. Mishra and Chen [15] utilized diffusion models to sample intermediate poses between start and goal configurations. Xu et al. [16] proposed a hierarchical planning framework that guides multi-step reorientation search by learning a path cost estimator. Recent studies have also focused on predicting diverse stable placements directly from point clouds [17] or constructing incremental regrasp graphs via closed-loop perception [18]. Despite their flexibility and improved per-formance, these contemporary learning-based approaches pri-marily target at general regrasp motion generation through learned priors. Different from them, our objective is to combine the controllability of analytical modeling with the efficiency, flexibility, and generalization capability of data-driven methods. In our setting, the object model is available. We analytically precompute table-stable placements from the known object geometry and restrict intermediate poses to planar perturbations around these stable placements. For multi-step regrasp sequence planning, our formulation optimizes the entire sequence of intermediate poses through a differentiable energy-based cost, which enables gradient-based refinement of intermediate states and supports automatic determination of the required number of intermediate steps, rather than relying solely on discrete sampling or fixed-length search. III. E NERGY -B ASED REGRASP PLANNING 
+
+This section presents our energy-based formulation for multi-step regrasp planning. We first model grasp feasibility and shared grasps using EBM, then derive differentiable pose and sequence connectivity metrics that enable gradient-based optimization of intermediate object poses. Finally, we describe the adaptive iterative deepening search algorithm used to determine the required number of regrasp steps. 
+
+A. Shared Grasp 
+
+Let ΣW, ΣO, and ΣE denote the world frame, the object’s canonical frame, and the end-effector frame, respectively. The 6D object pose in the world frame is represented by ΣW TΣO ∈
+
+SE (3) ⊂ R4×4. A grasp configuration is parameterized as a tuple g = ( ΣO TΣE , w ) (Fig. 2(a-c)), where ΣO TΣE ∈ SE (3) 
+
+represents the end-effector pose in the object canonical frame and w ∈ [0 , 1] denotes the gripper opening normalized by its maximum stroke. Accordingly, we define the grasp space in the object frame as G ≜ SE (3) × [0 , 1] , with g ∈ G . Since grasps are represented in ΣO, G is pose-invariant. For any object pose ΣW TΣO and grasp g ∈ G , the absolute end-effector pose in the workspace is given by ΣW TΣE = ΣW TΣO ·ΣO TΣE
+
+(Fig. 2(d)). For notational simplicity, we omit the frame superscripts/subscripts henceforth, as the reference frames are clear from context.       
+
+> Fig. 2. (a) Bottle object. (b) A grasp defined in the object canonical frame. (c) All sampled grasp candidates G. (d) Feasible grasps in the world frame, or namely workspace. QIN et al. : ANALYTICAL REGRASP PLANNING WITH ENERGY-BASED LEARNING: GRADIENT OPTIMIZATION OVER PRE-SAMPLED GRASP CANDIDATES 3
+> Fig. 3. Validation of energy compositionality. (a) Ground truth feasible (white) and shared (blue) grasps. (b)-(c) Individual energy landscapes Eϕf
+> for initial and goal poses. (d) Joint energy distribution obtained by summation, where low-energy minima correctly align with the shared grasps in (a).
+
+To evaluate grasp feasibility, we learn an energy function 
+
+Eϕf : SE (3) × G → R, where ϕf denotes the learned parameters of the feasibility energy model. The inputs to the model include the object pose T and a grasp g ∈ G , and the output is a scalar energy value. Lower energy values indicate a higher likelihood that g is feasible under T with respect to IK solvability and collision constraints. A grasp is defined as a shared grasp between an initial object pose Tinit and a target pose Tgoal if the grasp con-figuration is feasible at both poses [19][20]. We model the prediction of shared grasps as a joint probability estimation problem. Given Tinit and Tgoal , we aim to identify grasps 
+
+g ∈ G that lead to a high joint probability p(Tinit , Tgoal , g).This joint distribution can be approximated as the product of two independent terms: 
+
+p(Tinit , Tgoal , g) ∝ p(Tinit , g) · p(Tgoal , g). (1) Following the Boltzmann distribution p(x) ∝ exp( −E(x)) ,the approximation yields an additive energy form: 
+
+p(Tinit , Tgoal , g) ∝ exp  − Eϕf (Tinit , g) + Eϕf (Tgoal , g) .
+
+(2) This implies that we can efficiently evaluate the joint probability, and thus shared grasps, by summing the energy of a grasp g under Tinit and Tgoal [21], [22]. All shared grasps under given initial and goal poses form a subset Gshare ⊂ G where the summed energy falls below a certain threshold h [23]: 
+
+Gshare = {g ∈ G | Eϕf (Tinit , g) + Eϕf (Tgoal , g) ≤ h}. (3) Fig. 3 illustrates this energy additivity: individual energy landscapes assign low energy to feasible grasps under each pose, and summing them yields a joint energy whose minima align with grasps feasible in both configurations. 
+
+B. Object Pose Connectivity and Sequence Optimization 
+
+Equation (3) provides a set-valued characterization of shared grasps. When Gshare = ∅, a direct transfer from Tinit to 
+
+Tgoal under one grasp becomes infeasible, and regrasping via intermediate object poses is required. To enable gradient-based search in the object pose space, we define a scalar score to quantify the shared-grasp connectivity between two poses. Specifically, we use a pose connectivity score function 
+
+Qpair (Ta, Tb) : SE (3) × SE (3) → R to reflect the existence and abundance of shared grasps. Following equation (2), 
+
+Qpair (Ta, Tb) can be approximated by marginalizing the additive grasp energy over the grasp space: 
+
+Qpair (Ta, Tb)= −α log 
+
+Z
+
+> g∈G
+
+exp 
+
+
+
+− Eϕf (Ta, g) + Eϕf (Tb, g)
+
+α
+
+
+
+dg
+
+≈ − α log X
+
+> g∈G
+
+exp 
+
+
+
+− Eϕf (Ta, g) + Eϕf (Tb, g)
+
+α
+
+
+
+, (4) where α is the scaling factor controlling distribution smooth-ness. In practice, we sample a discrete set of candidate grasps from G and approximate the integral by finite summation. Using Qpair , we can evaluate end-to-end regrasp feasibility along an object pose sequence. We define a differentiable pose sequence cost for a sequence Tinit , {T}Ni=1 , Tgoal :
+
+Jseq ({T}N +1  
+
+> i=0
+
+) = 
+
+> N
+
+X
+
+> i=0
+
+Qpair (Ti, Ti+1 )
+
+| {z }
+
+> Connectivity Term
+
++
+
+λreg  
+
+> N−1
+
+X
+
+> i=0
+
+(Qpair (Ti, Ti+1 ) − Qpair (Ti+1 , Ti+2 )) 2
+
+| {z }
+
+> Regularization Term
+
+, (5) with T0 := Tinit and TN +1 := Tgoal for simplification. Here, {T}Ni=1 denotes the intermediate pose sequence to be optimized. The cost is differentiable with respect to the intermediate poses, enabling gradient-based optimization. The first term of the definition encourages high shared-grasp con-nectivity across all adjacent pose pairs in the sequence. The second term is a regularizer that promotes uniform connec-tivity distribution along the sequence, preventing bottlenecks where one transition is significantly more difficult than others. When N = 0 , the chain reduces to (Tinit , Tgoal ) and the objective becomes Jseq (∅) = Qpair (Tinit , Tgoal ), correspond-ing to a direct pick-and-place without intermediate poses. When N = 1 , the chain reduces to (Tinit , Tmid , Tgoal ) and 
+
+Jseq (Tinit , Tmid , Tgoal ) corresponds to pick-and-place with one intermediate regrasp. 
+
+C. Minimum-Step Regrasp Sequence Search 
+
+Our goal is to find the minimum number of intermediate poses N and the corresponding pose sequence such that every adjacent pose pair along the chain admits at least one shared grasp. We achieve this by converting the set-valued shared-grasp constraint into differentiable metrics: the pairwise pose connectivity score Qpair evaluates shared-grasp abundance 4 UNDER REVIEW BY A ROBOTICS JOURNAL 
+
+Algorithm 1: Adaptive Iterative Deepening Search  
+
+> 1
+
+for N = 1 to Nmax do    
+
+> // 1. Initialization
+> 2
+
+Initialize batch ΨB = {{ T}Ni=1 (b)}Bb=1 via equation (6) ;     
+
+> // 2. Langevin Dynamics
+> 3
+
+for k = 1 to Kopt do  
+
+> 4
+
+Compute ∇{ξi}Ni=1 Jseq for all {T}Ni=1 ∈ ΨB ; 
+
+> 5
+
+Update {ξi}Ni=1 using equation (7) ;      
+
+> // 3. Sequential Threshold Check
+> 6
+
+{T}Ni=1 (∗) ← argmin {T}Ni=1 ∈ΨB
+
+ Jseq ({T}Ni=1 ) ; 
+
+> 7
+
+{T}N +1  
+
+> i=0
+
+← { Tinit , {T}Ni=1 , Tgoal } ; 
+
+> 8
+
+is valid ← True ; 
+
+> 9
+
+for i = 0 to N do  
+
+> 10
+
+Compute shared set: Gshare ←{g ∈ G | Eϕf (Ti, g) + Eϕf (Ti+1 , g) ≤ h} ; 
+
+> 11
+
+if Gshare = ∅ then  
+
+> 12
+
+is valid ← False ; 
+
+> 13
+
+break ; 
+
+> 14
+
+if is valid then  
+
+> 15
+
+return {T}Ni=1 (∗) 
+
+> 16
+
+return Failure ;
+
+Algorithm 2: Batch Alternative of Step 3  
+
+> 1
+
+Ψtop ← argmin Ktop 
+
+> {T}Ni=1 ∈ΨB
+
+ Jseq ({T}Ni=1 ) ; 
+
+> 2
+
+for i = 0 to N do  
+
+> 3
+
+Compute shared set: 
+
+Gshare ← { g ∈ G | Eϕf (Ti, g) + Eϕf (Ti+1 , g) ≤ h}
+
+for all {T}Ni=1 ∈ Ψtop ; 
+
+> 4
+
+Update candidates: 
+
+Ψtop ← {{ T}Ni=1 ∈ Ψtop | G share ̸ = ∅} ; 
+
+> 5
+
+if Ψtop = ∅ then  
+
+> 6
+
+return ∅ ; 
+
+> 7
+
+return argmin {T}Ni=1 ∈Ψtop 
+
+ Jseq ({T}Ni=1 ) ;
+
+between two poses, and the pose sequence cost Jseq aggregates these terms over the full chain (equation (5)). Since N is unknown, we adopt an adaptive iterative deepening search method (Algorithm 1) that increases N from small to large; for each N , it optimizes a batch of candidate sequences by minimizing Jseq , then accepts the first N whose best Ktop 
+
+candidate passes the shared-grasp threshold check on every adjacent pose pair. In practice, Step 3 can be accelerated through a batched threshold check, as shown in Algorithm 2. In particular, we assume the object has a known shape and is placed in a tabletop environment. Intermediate poses are constrained to planar perturbations around canonical stable placements {T(m)s }Sm=1 . Each intermediate pose Ti (with 
+
+i = 1 , . . . , N ) is parameterized by selecting a stable place-ment index m ∈ { 1, . . . , S } and applying planar parameters 
+
+ξi = [ xi, y i, θ i]⊤:
+
+Ti = ∆ T(ξi) T(m)s , ∆T(ξi) := 
+
+Rz (θi) [xi, y i, 0] ⊤
+
+0⊤ 1
+
+
+
+,
+
+(6) where Rz (θi) denotes a yaw rotation about the world z-axis. Fig. 4 illustrates the constraints. Intermediate sequences are initialized by applying planar perturbations to randomly sampled stable placement sequences.  
+
+> Fig. 4. (a) Stable placements on a tabletop environment. (b) Intermediate poses constrained to planar perturbations and rotations.
+
+To perform optimization, we generate a batch ΨB con-taining B sequences of length N using perturbed canoni-cal stable placements. For each particular N , we minimize 
+
+Jseq ({T}N +1  
+
+> i=0
+
+) using Langevin dynamics with the following update rule: 
+
+ξ(k+1)  
+
+> i
+
+← ξ(k) 
+
+> i
+
+− η∇ξi Jseq ({T}N +1 
+
+> i=0 (k)
+
+) + p2ητ · zk, (7) where zk ∼ N (0, I) is the random noise term, η is the step size, k is the iteration step, and τ is the temperature parameter. The noise term helps balance local gradient guidance and global exploration for optimized sequence {T}N +1 
+
+> i=0 (∗)
+
+.IV. E XPERIMENTS AND ANALYSIS 
+
+We conducted experiments using an Intel Core i9-13900KF (128GB RAM) PC with an RTX 4090 GPU. The data col-lection, algorithmic implementation, and various studies and verifications are carried out in simulation using the WRS sys-tem 1. The real-world deployment are carried out on a 6-DoF Dobot Nova2 manipulator. The workspace was constrained to 
+
+x ∈ [−0.45 , 0.45] m, y ∈ [0 .1, 0.6] m, and θ ∈ [0 , 2π] rad. The EBM, a three-layer MLP with SELU activations, was trained on 20,000 feasible grasp samples (details in Appendix V-B). Optimization used Kopt = 20 iterations with step size η = 0 .3
+
+and noise τ = 0 .1. Connectivity parameters were α = 1 .0 and 
+
+λreg = 0 .5, with the energy threshold h calibrated individually per object. For fair comparison, we set the batch size to 
+
+B = 200 for each stable placement during one-step generation, and scaled it to B = 1000 random sequences for multi-step planning. 
+
+A. Ablation Study of Cost Formulations 
+
+We first analyze different pose sequence cost formulations to verify the effectiveness of the proposed Jseq . To isolate the effect of the objective from optimizer stochasticity, we fix a pose pair (Tinit , Tgoal ) and sweep the intermediate pose Tmid 
+
+along a controlled trajectory: a 40-step linear interpolation from Tgoal to Tinit (Fig. 5(a)). Along this trajectory, we evaluate Jseq and compare it with other two connectivity formulations: a truncated cost (Appendix V): 
+
+Jh 
+
+> seq
+
+= Qh
+
+> pair
+
+(Tinit , Tmid ) + Qh
+
+> pair
+
+(Tmid , Tgoal ) + λreg Lreg ,
+
+(8) and a naive summation cost without the regularizer: 
+
+J+seq = Qpair (Tinit , Tmid ) + Qpair (Tmid , Tgoal ). (9)                 
+
+> 1https://github.com/wanweiwei07/wrs QIN et al. : ANALYTICAL REGRASP PLANNING WITH ENERGY-BASED LEARNING: GRADIENT OPTIMIZATION OVER PRE-SAMPLED GRASP CANDIDATES 5
+> Fig. 5. (a) Changes of grasps as Tmid shifts from Tinit to Tgoal . (b) Comparison of different cost formulations. Red, green, blue, and purple curves respectively correspond to results using 50, 100, 150, and 200 sampled candidate grasps from G. (b.1) J+seq leads to spurious minima; (b.2) Jh
+> seq
+> suffers from vanishing gradients; (b.3) Jseq (λreg =0.5) has satisfying gradients. (c) Ground truth count of shared grasps (c.1) between adjacent poses, and (c.2) across the whole sequence.
+
+Results are shown in Fig. 5. Fig. 5(a) illustrates the changes of grasps as Tmid shifts from Tinit to Tgoal . Fig. 5(b.1) reveals the flaw in the naive summation J+seq : it masks asymmetric connectivity distributions, leading to spurious minima where physical connectivity is broken. Fig. 5(b.2) shows that Jh
+
+> seq
+
+creates flat potential surfaces in non-connected regions, caus-ing vanishing gradients that hinder optimization. Conversely, Fig. 5(b.iii) demonstrates the necessity of the energy-variance regularizer in Jseq : it eliminates spurious minima and reshapes the energy landscape into a convex structure with signifi-cant gradients, ensuring the optimizer effectively converges to a solution where shared grasps exist across the entire 
+
+{Tinit , Tmid , Tgoal } sequence. Fig. 5(c) shows the ground truth count of shared grasps for reference. The curves in (c.1) are the shared grasps between two adjacent object poses ({Tinit , Tmid } or {Tmid , Tgoal }). The curves in (c.2) are the shared grasps across the whole {Tinit , Tmid , Tgoal } sequence. 
+
+B. Comparison with Discrete Search Baseline 
+
+We used a one-intermediate-pose regrasp benchmark to compare Jseq with a discrete search baseline. The benchmark included four representative objects (Bottle, Bunny, Pentagon, Mug shown in Fig. 2 and Fig. 7). We prepared 200 candi-date grasps for each object, and tested across 10 sampled 
+
+{Tinit , Tgoal } pairs that lack shared grasps but are guaranteed to be solvable with one intermediate regrasp. The sequence length Nmax is thus set to 1 to limit iteration depth.                                                                                                        
+
+> TABLE I AVERAGE VERIFICATION SUCCESS RATES (S.V.) OF
+> ONE -S TEP INTERMEDIATE POSE GENERATION .
+> Ktop Jseq J+seq Jh
+> seq Usn Ktop Jseq J+seq Jh
+> seq Usn Bt 200 83.1 73.0 57.1 72.9 Bn 200 56.0 53.0 37.2 45.8 100 85.9 75.3 58.0 72.8 100 55.3 54.6 38.3 49.8 50 85.4 76.6 57.6 72.2 50 53.2 55.6 37.2 51.6 10 82.0 77.0 60.0 76.0 10 48.0 57.0 32.0 59.0 M200 70.8 24.9 29.9 16.1 P200 67.0 56.5 65.4 41.4 100 83.7 37.6 53.0 28.6 100 63.6 56.0 62.5 46.0 50 82.4 45.2 61.4 34.8 50 63.2 55.8 62.2 45.6 10 76.0 43.0 42.0 29.0 10 60.0 51.0 61.0 45.0
+> Note 1 Bt – Bottle, M – Mug, Bn – Bunny, P – Pentagon.
+> Note 2 Jseq (Proposed) / J+seq (Naive) / Jh
+> seq (Truncated).
+> Note 3 Lime cells indicate the highest success rate in each comparison.
+> Note 4 The “Usn” columns report Jseq evaluated on unseen grasps.
+> Note 5 Values are averaged across 10 {Tinit ,Tmid ,Tgoal }sequences.
+
+In the experiments, we used the batched alternative in Algorithm 2. We evaluated Ktop ∈ { 200 , 100 , 50 , 10 } and reported the average verification success rate across all tests. The verification success rate (S.V.) is defined as the fraction of generated intermediate poses that admit IK-feasible and collision-free shared grasps. The discrete search baseline was built based on the canonical stable placements. It established the Ground Truth (GT) intermediate regrasp poses through exhaustive grid sampling on the SE (2) subspace (resolutions: 
+
+0.01 m, 60 ◦) with IK and collision checking. Fig. 6 visualizes some results of the bottle. The bottle has five canonical stable placements as shown in Fig. 6(a). One optimization process is shown in Fig. 6(b.1-3). Fig. 6(c.4) is the intermediate poses generated by the proposed method. They exhibit a high degree of distribution alignment with the GT in Fig. 6(c.1). Fig. 6(c.2) and (c.3) additionally show the results of the naive and truncated costs for comparison. As expected, they are less effective and deviate from the GT. Table I shows the average S.V. of all tests (the GT veri-fication success rate can be considered as 100%). The Jseq 
+
+cost generally exhibits advantages across all objects. The trend is particularly notable for the Mug, where its complex geometry results in narrow connectivity passages that may pose challenges for J+seq and Jh
+
+> seq
+
+. Meanwhile, although J+seq 
+
+and Jh 
+
+> seq
+
+can be competitive within the narrow Ktop =10 range for certain shapes, their performance decreases with larger 
+
+Ktop . This is due to the continuous gradient guidance, which helps reduce the risk of becoming trapped in plateaus or spurious minima. 
+
+C. Generalization and Transferability 1) Mid-pose generation on unseen grasps: In this experi-ment, we evaluated the generalization capability of the Jseq 
+
+cost using a separate randomly sampled set of 200 unseen grasps for the same 10 pairs used in experiment IV-B. As seen in the “Usn” columns of Table I, the method exhibits the capability to generalize to unseen grasp configura-tions. Although there is an expected performance gap between the “Usn” column and the Jseq column (seen), the gap is acceptable and the S.V. on unseen grasps remains satisfying 6 UNDER REVIEW BY A ROBOTICS JOURNAL                     
+
+> Fig. 6. (a) The bottle object has five canonical stable placements. (b.1-3) Evolution of pose distributions and costs during optimization. Since there is only one intermediate pose, we used its color to show the costs. Bluer color denotes lower cost. Redder color denotes a higher cost. (c) Comparison of distributions and costs of the Ground Truth (GT) or generated intermediate poses: (c.1) GT obtained through exhaustive grid sampling. Only perturbations around the canonical stable placement T(4)
+> sare valid. Pure red grid points indicate no validity. The points with blue arrows are the valid ones. Each arrow represents a 2D visualization of perturbation ξ= [ x, y, θ ]⊤. Its starting point is (x, y )and is pointing along the planar yaw θ; (c.2, c.3) Results of the naive cost J+seq
+> and the truncated cost Jh
+> seq . (c.4) Results of the proposed cost Jseq . Similarly, the arrows hold the same representations. The color of the arrows indicates the cost. Jseq leads to low cost values and similar perturbation distributions for T(4)
+> s. It also leads to high cost values for T(0)
+> s∼T(3)
+> s.
+> Fig. 7. Objects used in the experiments: Bunny, Pentagon, and Mug, in addition to the Bottle shown in Fig.2.
+
+for less complicated geometries like the Bottle. For the Bunny, the method achieves higher precision in the narrow Ktop =10 range for unseen grasps. This suggests that the learned energy landscape captures the underlying object geometry effectively, allowing the optimizer to work with the unseen set that were not explicitly covered during training. However, for the Mug and Pentagon, more significant drops are observed. This may stem from: (1) insufficient grasps (200) to capture spatial diversity; (2) unseen grasps inadequately covering successful transitions. Both factors can lead to biased energy evaluations and reduced verification success rate. 
+
+2) Cross-End-Effector evaluation: To investigate the versa-tility of the EBM framework, we evaluated its generalization capability across diverse hardware configurations. Six end-effectors (EEs) were classified based on the strictness of their geometric constraints. We denote the six EEs as W, R1, R2, S1, S2, S3, corresponding to: three parallel grippers (Self-made (W), Robotiq-140 (R1), and Robotiq-85 (R2)), and three suction cups (S1, S2, S3), as shown by Fig. 8. The grippers represent stringent constraints as they require dual-contact alignment and stroke clearance. In contrast, the suction cups represent relaxed constraints and only require single-surface contact. All of them have different Tool Center Points (TCPs). We conducted a 6 × 6 cross-evaluation where an EBM trained on one EE was employed to guide one-intermediate pose optimization for another. To ensure a fair comparison, all EBMs were trained on datasets of equal size (20k samples), with the gripper opening width excluded from the input. Ktop 
+
+was set to 100. The reported S.V. was measured using IK and collision checking with the test end-effector. For parallel grippers, collision checking used the actual gripper opening width w associated with each grasp candidate. Evaluation results are summarized in Table II. QIN et al. : ANALYTICAL REGRASP PLANNING WITH ENERGY-BASED LEARNING: GRADIENT OPTIMIZATION OVER PRE-SAMPLED GRASP CANDIDATES 7
+
+Fig. 8. Six end-effectors 2 and their candidate grasps used for training. TABLE II AVERAGE VERIFICATION SUCCESS RATES (S.V.) OF 
+
+CROSS -E ND -E FFECTOR EVALUATION 
+
+S1 S2 S3 W R1 R2 S1 S2 S3 W R1 R2 Bt W 0.0 0.0 0.0 86.3 67.2 63.9 Bn W 9.2 0.0 0.0 66.8 32.5 26.7 R1 0.0 0.0 0.0 33.0 41.5 33.9 R1 0.0 1.7 0.0 10.8 35.4 0.0 R2 0.9 0.2 3.0 62.5 67.6 64.6 R2 5.5 22.9 0.0 8.1 33.7 39.9 S1 51.2 34.0 30.3 35.5 40.4 44.8 S1 39.7 29.5 1.4 25.5 4.6 0.0 S2 44.7 40.0 36.0 42.8 33.3 49.0 S2 4.5 46.1 0.6 26.2 0.1 0.0 S3 34.2 20.1 55.5 21.3 25.6 27.2 S3 0.0 0.0 5.9 0.0 0.0 0.0 MW 0.0 11.7 11.4 75.7 55.7 19.7 PW 17.2 9.4 9.7 64.2 53.9 47.7 R1 0.8 7.3 5.5 51.6 54.3 15.9 R1 24.6 15.6 17.0 17.2 44.4 53.5 R2 1.5 21.0 19.5 28.9 19.6 71.8 R2 18.8 8.0 16.0 16.0 32.5 58.1 S1 33.6 16.6 17.9 5.7 4.9 2.6 S1 40.2 41.3 46.4 25.8 17.7 27.3 S2 12.3 62.5 36.9 0.0 0.0 6.9 S2 57.5 57.4 54.6 41.1 27.2 41.5 S3 0.0 0.0 20.3 0.0 0.0 0.0 S3 62.8 69.2 88.1 49.4 40.8 54.5  
+
+> Note 1
+
+Lime cells indicate the same device for training and testing.  
+
+> Note 2
+
+Rows: Training end-effector; Columns: Testing end-effector. 
+
+The results show: (1) Hardware-specific grasp candi-date distributions critically impact performance (e.g., Bot-tle: W=86.3%, R1=41.5%, R2=64.6%), indicating that end-effector geometry and grasp sampling coverage af-fect pose connectivity. (2) Cross-modality transfer exhibits asymmetry: suction-trained EBMs can guide gripper-based intermediate-pose optimization with moderate success (Bottle: S1/S2/S3 →W/R1/R2 achieving 21–49%; Pentagon: 18–55%), consistent with the intuition that gripper grasp centers form a subset of suction contact distributions for these objects (By ’guide’ we mean that the suction-trained EBM is used to opti-mize intermediate object poses). In contrast, gripper →suction transfer is much weaker for Bottle (0–3%) and remains limited 
+
+> 2
+
+End-effector specifications in meters (TCP offset, maximum opening width): S1 (0.05, ×), S2 (0.046, ×), S3 (0.03, ×), W (0.16, 0.104), R1 (0.20, 0.14), R2 (0.15, 0.085). Suction cups do not have an opening width. 
+
+for Mug. We attribute this to gripper-specific stroke/clearance constraints and to excluding w in Eϕf (T, g′), while physical verification for parallel grippers still depends on the actual opening width w. (3) Optimal end-effector selection is object-specific (e.g., Bottle performs best with W, while Pentagon performs best with S3). 
+
+D. Multi-Step Search 
+
+This experiment evaluates the effectiveness of the iterative deepening search. We prepared 50 (Tinit , Tgoal ) pairs that require one or more regrasps. Each episode sampled B = 1000 
+
+intermediate trajectories, with their Ktop =10 and Ktop =50 candidates used for batched threshold checking. Nmax was set to 5. We report the threshold check success rate (S.T.) and compare it with the hard check baseline (S.H.). The S.T. is defined as the fraction of episodes where the deepening algorithm successfully finds a valid regrasp sequence through threshold checking within Nmax steps. The S.H. is defined as the fraction of episodes in which the optimized sequence passes the hard check (i.e., all transitions in the sequence admit at least one shared grasp that is IK-feasible and collision-free). Table III shows the results. It also includes the E.L. (Efficiency Length) and E.T. (Efficiency Time) indices, which report the average sequence length and planning time for successful cases, respectively. Fig. 9 exemplifies an optimization process and the deployment of the obtained sequence in the real world. 
+
+TABLE III MULTI -STEP SEARCH PERFORMANCE .
+
+Ktop S.T. S.H. E.L. E.T. Ktop S.T. S.H. E.L. E.T. Bt 10 42.0 48.0 1.67 1.67 Bn 10 94.0 94.0 1.09 0.68 50 44.0 50.0 1.82 1.97 50 94.0 96.0 1.09 0.68 M 10 10.0 10.0 1.00 0.55 P 10 90.0 84.0 1.09 0.66 50 10.0 10.0 1.00 0.55 50 92.0 84.0 1.17 0.83  
+
+> Note 1
+
+S.T. / S.H.: Threshold check success rate. / Hard check success rate.  
+
+> Note 2
+
+E.L. / E.T.: Efficiency indices. E.L.: Average sequence length (step count) for successful cases. E.T.: Average planning time (seconds).  
+
+> Note 3
+
+Each model was trained on 200 grasp candidates. 
+
+Fig. 9. (a) Initial pose Tinit (cyan) and goal pose Tgoal (green). (b) Generation of five candidate intermediate sequences (blue and red). (c.1–4) multi-step pick-and-place motion planning. 
+
+The results demonstrate that iterative deepening effectively restores solvability by adaptively increasing sequence length 8 UNDER REVIEW BY A ROBOTICS JOURNAL 
+
+when needed. The gap between S.T. and S.H. reflects the calibration of the energy threshold h: Bottle shows S.H. >
+
+S.T., indicating conservative filtering, while Pentagon shows S.T. > S.H., suggesting permissive acceptance. Compared to the Bunny and Pentagon results in Table I, multi-step search provides a higher success rate. Bunny and Pentagon also achieve significantly higher success rates (94% and 90-92%) compared to Bottle (42-44%) and Mug (10%), and less sequence length, which may correlate with their shape-related number of stable placements (7 each vs. 5 and 2) that provide better connectivity options. The minimal performance differ-ence between Ktop =10 and Ktop =50 indicates that feasible solutions concentrate in the low-energy region, validating the effectiveness of the energy-based cost formulation. V. C ONCLUSIONS AND FUTURE WORK 
+
+In this paper, we introduced differentiable connectivity met-rics derived from EBM to enable gradient-based intermediate-pose optimization and developed an iterative deepening search method for regrasp planning. Experiments and analysis val-idate the effectiveness of the proposed metrics and search framework. Future work will focus on online grasp generation and tighter integration of IK and collision constraints to reduce dependence on pre-sampled grasp sets. REFERENCES [1] P. Tournassoud, T. Lozano-P´ erez, and E. Mazer, “Regrasping,” in IEEE International Conference on Robotics and Automation (ICRA) , vol. 4, 1987, pp. 1924–1928. [2] K. Cho, M. Kim, and J.-B. Song, “Complete and rapid regrasp planning with look-up table,” Journal of Intelligent and Robotic Systems , vol. 36, no. 4, pp. 371–387, 2003. [3] T. Sim´ eon et al. , “Manipulation planning with probabilistic roadmaps,” 
+
+The International Journal of Robotics Research , vol. 23, no. 7-8, pp. 729–746, 2004. [4] R. Wang et al. , “Center-of-mass-based object regrasping: A rein-forcement learning approach and the effects of perception modality,” 
+
+IEEE/ASME Transactions on Mechatronics , vol. 30, no. 2, pp. 1356– 1365, 2025. [5] M. Raessa, W. Wan, and K. Harada, “Planning to repose long and heavy objects considering a combination of regrasp and constrained drooping,” 
+
+Assembly Automation , vol. 41, no. 3, pp. 324–332, 2021. [6] W. Wan, K. Harada, and F. Kanehiro, “Preparatory manipulation planning using automatically determined single and dual arm,” IEEE Transactions on Industrial Informatics , vol. 16, no. 1, pp. 442–453, 2020. [7] J. Ma et al. , “Regrasp planning using stable object poses supported by complex structures,” IEEE Transactions on Cognitive and Developmen-tal Systems , vol. 11, no. 2, pp. 257–269, 2019. [8] S. Cruciani et al. , “Dexterous manipulation graphs,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2018, pp. 2040–2047. [9] R. Nagahama et al. , “Bimanual regrasp planning and control for active reduction of object pose uncertainty,” IEEE Robotics and Automation Letters , vol. 10, no. 8, pp. 8027–8034, 2025. [10] J. Hu, Z. Tang, and H. I. Christensen, “Multi-modal planning on regrasp-ing for stable manipulation,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2023, pp. 10 620–10 627. [11] Y. Qin et al. , “Dual-arm mobile manipulation planning of a long deformable object in industrial installation,” IEEE Robotics and Au-tomation Letters , vol. 8, no. 5, pp. 3039–3046, 2023. [12] S. Levit, J. Ortiz-Haro, and M. Toussaint, “Solving sequential manipu-lation puzzles by finding easier subproblems,” in IEEE International Conference on Robotics and Automation (ICRA) , 2024, pp. 14 924– 14 930. [13] S. Levit and M. Toussaint, “Regrasp maps for sequential manipulation planning,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2025, pp. 17 436–17 441. [14] K. Wada, S. James, and A. J. Davison, “Reorientbot: Learning object reorientation for specific-posed placement,” in International Conference on Robotics and Automation (ICRA) , 2022, pp. 8252–8258. [15] U. A. Mishra and Y. Chen, “Reorientdiff: Diffusion model based reorientation for object manipulation,” in IEEE International Conference on Robotics and Automation (ICRA) , 2024, pp. 10 867–10 873. [16] K. Xu et al. , “Efficient object manipulation to an arbitrary goal pose: Learning-based anytime prioritized planning,” in International Confer-ence on Robotics and Automation (ICRA) , 2022, pp. 7277–7283. [17] P. Xu et al. , “Learning to predict diverse stable placements for extrinsic manipulation on a support plane,” IEEE Transactions on Cognitive and Developmental Systems , vol. 16, no. 3, pp. 1095–1107, 2024. [18] Z. Chen et al. , “Closed-loop placement planning for regrasping and reconstruction with single-view rgb-d images,” IEEE Transactions on Automation Science and Engineering , vol. 22, pp. 14 084–14 095, 2025. [19] T. Ko et al. , “Simultaneous pick and place detection by combining se(3) diffusion models with differential kinematics,” in IEEE/RSJ In-ternational Conference on Intelligent Robots and Systems (IROS) , 2025, pp. 9425–9432. [20] W. Liu et al. , “A planning framework for complex flipping manipula-tion of multiple mobile manipulators,” IEEE Robotics and Automation Letters , vol. 10, no. 5, pp. 5162–5169, 2025. [21] A. L. Mitchell, J. Watson, and I. Posner, “Building gradient by gradient: Decentralised energy functions for bimanual robot assembly,” arXiv preprint arXiv:2510.04696 , 2025. [22] J. Urain et al. , “Learning implicit priors for motion optimization,” in 
+
+IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2022, pp. 7672–7679. [23] A. Authors, “Reference omitted for double-anonymous review,” IEEE Robotics and Automation Letters , 2025, details are withheld to preserve double-anonymous reviewing. 
+
+APPENDIX 
+
+A. Truncated Free Energy Score 
+
+We define a truncated pose connectivity score Qh 
+
+> pair
+
+by restricting the energy summation to grasps with combined energy below the threshold h:
+
+Qh
+
+> pair
+
+(Ta, Tb) = −α log X
+
+> g∈G
+
+I[Ea(g) + Eb(g) < h ]
+
+· exp 
+
+
+
+− Ea(g) + Eb(g)
+
+α
+
+
+
+.
+
+(10) Here, Ea(g) = Eϕf (Ta, g), Eb(g) = Eϕf (Tb, g), and the indicator function I[·] ensures that only grasps with combined energy below h contribute to the score. The truncation thresh-old h is determined statistically. We evaluated the model on a pre-trained shared grasp validation set and selected the energy boundary that maximizes the F1 score for the shared grasp classification task as h. When Gshare = ∅, the absence of fea-sible samples creates a gradient-free (plateau) state, assigned a constant penalty of 0. This plateau is intrinsic to truncation: excluding sub-optimal grasps removes the directional cues required to guide optimization through infeasible regions, leading to the vanishing gradients shown in Fig. 5(b.2). 
+
+B. EBM Training Details 
+
+We train the energy function Eϕf (T, g) to assign lower energy to feasible grasps and higher energy to infeasible ones. The training objective combines three loss terms: (1) Negative Log-Likelihood loss ( Lnll ) that encourages low energy for feasible samples while normalizing via the partition function; (2) Contrastive loss ( Lcon ) that explicitly separates feasible and infeasible grasps; and (3) Regularization loss ( Lreg ) that prevents energy divergence. The final loss is Ltotal = Lnll +
+
+Lcon + αreg Lreg , where αreg is a weighting factor [23].
