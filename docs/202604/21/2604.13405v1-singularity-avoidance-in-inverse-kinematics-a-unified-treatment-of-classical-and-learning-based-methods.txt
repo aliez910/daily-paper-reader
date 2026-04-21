@@ -1,0 +1,352 @@
+Title: Singularity Avoidance in Inverse Kinematics: A Unified Treatment of Classical and Learning-based Methods
+
+URL Source: https://arxiv.org/pdf/2604.13405v1
+
+Published Time: Thu, 16 Apr 2026 00:24:57 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Singularity Avoidance in Inverse Kinematics: A Unified Treatment of Classical and Learning-based Methods 
+
+Vishnu Rudrasamudram * and Hariharasudan Malaichamee *
+
+Abstract —Singular configurations cause loss of task-space mobility, unbounded joint velocities, and solver divergence in inverse kinematics (IK) for serial manipulators. No existing survey bridges classical singularity-robust IK with rapidly grow-ing learning-based approaches. We provide a unified treatment spanning Jacobian regularization, Riemannian manipulability tracking, constrained optimization, and modern data-driven paradigms. A systematic taxonomy classifies methods by re-tained geometric structure and robustness guarantees (formal vs. empirical). We address a critical evaluation gap by proposing a benchmarking protocol and presenting experimental results: 12 IK solvers are evaluated on the Franka Panda under position-only IK across four complementary panels measuring error degradation by condition number, velocity amplification, out-of-distribution robustness, and computational cost. Results show that pure learning methods fail even on well-conditioned targets (MLP: 0% success, ∼10 mm mean error), while hy-brid warm-start architectures - IKFlow (59% →100%), CycleIK (0% →98.6%), GGIK (0% →100%) - rescue learned solvers via classical refinement, with DLS converging from initial errors up to 207 mm. Deeper singularity-regime evaluation is identified as immediate future work. 
+
+I. I NTRODUCTION 
+
+Inverse kinematics (IK) is a core problem in robot motion and control: given a desired end-effector pose, determine the joint configuration or joint motion required to realize it. For most serial manipulators, the forward kinematic mapping is nonlinear and does not admit a globally convenient closed-form inverse, especially when additional objectives such as joint-limit avoidance, obstacle avoidance, or task hierarchies are imposed [1]–[3]. IK is therefore most often solved numer-ically through inverse differential kinematics, where singular configurations become a dominant failure mode: they cause loss of instantaneous mobility in task-space directions while amplifying joint velocities, leading to oscillatory behavior, degraded tracking, and solver divergence [4]–[8]. These effects are especially severe in safety-critical applications—industrial manipulators, surgical platforms, collaborative robots—where unbounded or poorly conditioned joint commands are unac-ceptable. Over the last several decades, singularity handling in IK has evolved from classical Jacobian regularization methods into a broader design space that includes redundancy res-olution, hierarchical task control, geometric reformulations, optimization-based methods, and, more recently, learning-based approaches [1]–[6], [9]–[12]. The period from roughly      
+
+> *Vishnu Rudrasamudram and Hariharasudan Malaichamee contributed equally to this work. Emails: vishnurs@ieee.org, mhariharasudan@gmail.com
+
+2020 onward has seen an explosion of data-driven robotics methods, including imitation learning, visuomotor policies, and foundation-model-inspired control pipelines [13]–[15], renewing interest in IK solvers that are not only fast and accurate, but also robust, adaptive, and portable across robot morphologies and tasks [16]–[19]. Yet the literature remains fragmented: classical surveys provide strong coverage of damped least squares, null-space methods, and manipulability-based ideas [5], [6], but predate recent learning-based develop-ments; modern learning papers often treat singularity handling as a subcomponent without situating their contributions within the broader classical theory of singularity robustness [14], [15]. This paper bridges the gap with four contributions: 1) A unified taxonomy of singularity-handling strategies span-ning classical regularization, geometric advances, and learning-based IK, organized along two axes: singularity response type (detection, avoidance, robustification, escape) and method family , revealing structural parallels and open gaps across paradigms. 2) An analytical review of learning-based singularity han-dling, identifying the hybrid classical-neural warm-start pattern as the most empirically validated paradigm and empirically characterizing its convergence basins. 3) A benchmarking protocol for singularity-conditioned IK evaluation, specifying four complementary test panels that decompose solver performance by singularity proximity, and an open-source implementation for benchmarking (https://github.com/vvrs/Singularity-IK-Eval.git). 4) Experimental results on 12 solvers evaluated on the Franka Panda 7-DoF under position-only IK, providing initial em-pirical evidence for the warm-start paradigm across three architecturally distinct learned solvers and quantifying DLS convergence basins from initial errors up to 207 mm. Full 6-DoF and deeper singularity-regime evaluation are left to future work. Existing surveys provide partial coverage: Dul˛ eba [5] syn-thesizes classical singularity-robust methods but predates mod-ern learning developments; Calzada-Garcia et al. [14] review neural IK but do not analyze singularity behavior; Kalaycioglu et al. [15] contrast analytical and deep-learning solutions with-out systematic singularity conditioning. Table I distinguishes our survey, which provides the first unified treatment across all three families with a standardized benchmark. The paper is organized as follows. Section II introduces the singularity problem. Sections III and IV review classical and geometric/analytical methods. Section V covers learning-based approaches. Section VI presents benchmark results.                                      
+
+> arXiv:2604.13405v1 [cs.RO] 15 Apr 2026 TABLE I COMPARISON WITH PRIOR IK S URVEYS .NOTE :∼INDICATES PARTIAL COVERAGE .
+> Feature Dul˛ eba [5] Calzada [14] Kalaycioglu [15] Ours
+> Classical singularity theory ✓×✓✓
+> Neural IK architectures ×✓✓✓
+> Cross-paradigm taxonomy ××∼✓
+> Learning-based singularity behavior ×××✓
+> Hybrid method analysis ×××✓
+> Singularity-conditioned benchmark ×××✓
+> Open-source benchmark code ×××✓
+
+Section VII discusses the current industry trends. Section VIII discusses findings and open problems. Extended per-solver analyses, reproduction instructions, and the supplementary material are available at the project repository. II. B ACKGROUND : T HE SINGULARITY PROBLEM 
+
+Let q ∈ Rn denote joint variables and x ∈ Rm the task-space pose. The forward kinematics x = f (q) relate joint to task space. Linearizing yields ˙x = J(q) ˙ q, where J ∈ Rm×n
+
+is the manipulator Jacobian. The minimum-norm IK solution is ˙q = J† ˙x, where J† is the Moore-Penrose pseudoinverse. A singular configuration occurs when rank( J) < min( m, n ):the pseudoinverse norm ∥J†∥ → ∞ , and small task-space commands induce disproportionately large joint velocities [4], [5]. Two complementary metrics quantify singularity proximity. The condition number κ(J) = σmax /σ min measures ill-conditioning ( κ → ∞ at singularities). The Yoshikawa ma-nipulability w(q) = pdet( JJ ⊤) provides a smooth scalar signal that vanishes at singularities [5]. The manipulability ellipsoid M = JJ ⊤ encodes directional information: its principal axes indicate task-space directions of greatest and least mobility. We use κ for performance binning because it directly quantifies the amplification factor between task-space errors and joint-space responses, making it the operationally relevant metric for IK solver evaluation. The manipulability w
+
+captures solution-space volume and serves as a natural proxy for solution diversity. For serial manipulators, singularities are geometric prop-erties of the mechanism, not algorithmic failures [29]. Sin-gularities arise from workspace-boundary configurations (full extension) and internal joint-axis alignments. The central trade-off is that accuracy and stability are inherently in tension near singular configurations: methods that aggressively pursue tracking accuracy risk unbounded joint velocities, while meth-ods that regularize the inverse must sacrifice tracking fidelity in poorly conditioned directions [6]. Complete singularity avoid-ance is often unrealistic—many useful tasks require operating near singular regions—so the practical challenge is designing IK methods that degrade gracefully. Table II previews the cross-family taxonomy developed throughout Sections III–V, organizing methods by singularity response type and method family. III. C LASSICAL SINGULARITY -R OBUST IK 
+
+Damped least squares (DLS) replaces the fragile pseudoin-verse with a regularized inverse that explicitly bounds joint motion: 
+
+˙q = J⊤(JJ ⊤ + λ2I)−1 ˙x, (1) making the stability-accuracy trade-off explicit [4]. Constant 
+
+λ incurs unnecessary accuracy loss away from singulari-ties; variable damping driven by manipulability concentrates regularization where needed. Using the Chiaverini [6] for-mulation, adaptive DLS is defined as λ(q) = λmax (1 −
+
+min( w/w thresh , 1)) 2 +λbase . Selectively damped least squares (SDLS) applies per-direction attenuation via the SVD, suppressing only the singular components while preserv-ing responsiveness in well-conditioned subspaces [20]. The Levenberg-Marquardt (LM) method adaptively adjusts this damping and is uniquely favored in humanoid robotics [30]. A unifying perspective is that all singularity-robust inverses maintain a lower bound on effective conditioning [5]. 
+
+Manipulability measures serve dual roles: detecting sin-gularity proximity (monitoring w(q) or κ(J)) and guiding redundancy resolution (projecting ∇qw into the task null space to bias toward well-conditioned configurations with-out perturbing the end-effector task) [5]. The manipulability ellipsoid M(q) = JJ ⊤ provides directional information: its principal axes indicate task-space directions of greatest and least capability, and its volume is proportional to w.The limitation of scalar manipulability is that it conflates directional information into a single number; this motivates the manifold-valued representations of Section IV. 
+
+Task-priority and null-space methods decompose joint motion into task and null-space components, enabling multi-objective IK [1], [2]. Singularities arise both from the mecha-nism Jacobian and from the task hierarchy itself—algorithmic singularities occur when task Jacobians become nearly de-pendent, shrinking the effective null space abruptly [8]. Set-based task extensions address switching-induced conditioning issues [31]. 
+
+Higher-order methods. Classical Jacobian IK uses first-order linearization. QuIK [32] incorporates the geometric Hes-sian in a Halley-type iteration, achieving cubic convergence (benchmarked in Section VI). Two structural limitations persist across classical methods: robustness guarantees are soft (penalties, not constraints), and manipulability is treated in a Euclidean frame. The geometric advances of Section IV address both. IV. G EOMETRIC AND ANALYTICAL ADVANCES 
+
+To contextualize the evolution of singularity handling be-yond classical Jacobian methods, Table II presents a unified taxonomy spanning all major method families and response types. Classical DLS operates in a Euclidean frame with soft-penalty objectives. This section reviews the geometric advances that bring deeper mathematical structure and rigorous constraints to the avoidance and robustification columns of the taxonomy. TABLE II CROSS -F AMILY TAXONOMY OF SINGULARITY -H ANDLING STRATEGIES IN INVERSE KINEMATICS .
+
+Singularity Response Type Method Family Detection Avoidance Robustification Escape Classical Iterative Manipulability indices (w, κ ) [4] Null-space projection [1], [2] DLS [4], SDLS [20] N/A (no escape mecha-nism) 
+
+Geometric & Opt. Implicitly handled Riemannian tracking [11], MPC [21] HQP [10], TRAC-IK [22] AI-IK [12] 
+
+Pure Learning Classifiers [23] Generative (IKFlow, Diffusion) [24], [25] 
+
+Open Problem (MLPs fail) Open Problem 
+
+Hybrid Neural adaptive λ [17] GNN-VAE (GGIK) [18], Cy-cleIK [26] Neural DLS backbone [17] Open Problem 
+
+Reinf. Learning Open Problem Manip. reward shaping [27] Branch selection [28] Open Problem 
+
+Riemannian Manipulability. 
+
+The manipulability ellipsoid M(q) = JJ ⊤ ∈ Sm 
+
+> ++
+
+lives on the Riemannian manifold of symmetric positive-definite (SPD) matrices. The affine-invariant Riemannian metric provides a distance measure invariant to congruence transformations, making it natural for comparing manipulability across kine-matically different robots. Geodesics on Sm 
+
+> ++
+
+remain non-degenerate by construction, whereas Euclidean interpolation can produce degenerate intermediates even when both end-points are non-singular. Jaquier et al. develop a complete framework for learn-ing, tracking, and transferring manipulability ellipsoids on 
+
+Sm 
+
+> ++
+
+[11]. A tensor-based GMM learns desired manipulability profiles from demonstrations; a geometry-aware controller reg-ulates the robot toward the target profile using the Riemannian gradient of the geodesic distance. A transfer mechanism adapts profiles across kinematically different robots via Riemannian interpolation. This reframes singularity avoidance: rather than detecting proximity and applying damping reactively, the controller continuously tracks a desired manipulability profile that intrinsically encodes distance from singularity. Fig. 1 illustrates this: on the planar 3R, Euclidean inter-polation overestimates manipulability by up to 3× between well-conditioned and near-singular configurations, while the Riemannian geodesic decreases monotonically. The same qual-itative pattern holds for the Franka Panda (bottom panel). 
+
+Optimization-Based IK. 
+
+Reformulating IK as a constrained QP converts soft penal-ties into hard feasibility requirements [9]: 
+
+min  
+
+> ˙q
+
+∥J ˙q − ˙xdes ∥2
+
+s.t. qmin ≤ q + ˙ q δt ≤ qmax ,
+
+∥ ˙q∥∞ ≤ vmax , w(q + ˙ q δt ) ≥ wmin .
+
+(2) Joint-limit, velocity-bound, and manipulability constraints are enforced exactly rather than as penalties. The manipulability constraint converts singularity avoidance from an objective into a feasibility requirement. Since w(·) is nonlinear, it is practically enforced via the first-order Taylor expansion 
+
+w(q)+ ∇qw⊤ ˙q δt ≥ wmin to maintain the QP structure. Hier-Riemannian                    
+
+> (geodesic)
+> w=20.0
+> MA
+> w=14.6
+> t=0.17
+> w=10.6
+> t=0.33
+> w=7.7
+> t=0.50
+> w=5.6
+> t=0.67
+> w=4.1
+> t=0.83
+> w=3.0
+> MB
+> Euclidean
+> (linear)
+> w=20.0 w=20.0 w=19.3 w=17.9 w=15.5 w=11.7 w=3.0
+> 0
+> 20
+> w(t)
+> geom. mean = 7.7
+> Planar 3R
+> Riemannian w(t)
+> Euclidean w(t)
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Interpolation parameter t
+> 0.0
+> 0.2
+> w(t)
+> geom. mean = 0.0333 w= 0.005
+> Franka Panda 7-DOF (well-conditioned → near-singular)
+> Riemannian w(t)
+> Euclidean w(t)
+
+Fig. 1. Measured Riemannian vs. Euclidean interpolation of manipulability ellipsoids. Top/Middle: planar 3R ellipsoid interpolation. Bottom: scalar 
+
+w(t) for both planar 3R and Franka Panda 7-DoF. For the Panda, it shows transitions between well-conditioned ( κ = 2 .8, w = 0 .035 ) and near-singular (κ = 127 , w = 0 .001 ) configurations [11]. 
+
+archical QP (HQP) solvers exploit lexicographic priority struc-tures to handle multiple constraint tiers at 100–500 Hz [10]. The Saturation in the Null Space (SNS) algorithm [33] takes a complementary approach, explicitly saturating joints that exceed velocity limits and redistributing residual motion. In practice, TRAC-IK [22]—a concurrent SQP + pseu-doinverse solver—achieves 99.6% solve rates in the ROS ecosystem, demonstrating that optimization-based IK is the production-grade solution for singularity handling in thou-sands of deployed systems. Similarly, the MoveIt 2 framework has adopted pick_ik [34], which combines evolutionary algorithms with gradient-based local optimization to robustly navigate singular regions. MPC extends QP-based IK to a receding horizon, enabling singularity anticipation before the robot reaches a singular configuration [21]. 
+
+Analytical Singularity Escape. 
+
+Müller’s AI-IK method [12] computes the tangent space to the singular set Σ = {q : rank J < m } at a near-singular configuration and constructs a perturbation transverse to Σ,escaping the singular neighbourhood before applying standard IK. Unlike DLS, which applies global damping that degrades accuracy everywhere, AI-IK targets only the directions causing ill-conditioning. The trade-off is that analytical characteriza-tion requires per-morphology derivation. These four advances—Riemannian geometry, constrained optimization, predictive control, and analytical escape—form a coherent progression, each addressing a limitation of classical DLS while preserving the mathematical transparency needed for deployment. V. L EARNING -B ASED METHODS 
+
+Learning-based IK has expanded rapidly since 2020 [14], driven by millisecond inference requirements and reduced tuning. We organize methods into three learning paradigms (classified under the pure and hybrid rows in Table II). 
+
+Pure Learning. 
+
+End-to-end regressors train on FK-generated pairs (q, x ) and learn fθ (x) ≈ q [16], [23]. The fundamental obstacle is IK’s multi-valuedness: naïve ℓ2 regression collapses to the condi-tional mean, which may lie between solution branches at or near singular configurations [35]. Singularities are properties of the mechanism geometry —bypassing the Jacobian inverse does not remove singularity difficulties, and any learned in-verse must approximate a mapping that is intrinsically ill-conditioned near singular configurations. Distributional models address multi-valuedness directly: IK-Flow [24] trains a conditional normalizing flow to model 
+
+p(q | x); Neural IK [35] uses hypernetworks and GMM sampling; Urain et al. [25] apply SE(3) diffusion fields; and GNN architectures [19] encode kinematic topology as graph structure. However, none explicitly handle singularity-induced ill-conditioning. Our benchmark (Section VI) confirms this: IKFlow’s diversity collapses near singularities with success dropping from 63% on in-distribution targets to 33% on near-singular OOD targets (Fig. 4), and both MLP and Cy-cleIK MLP achieve 0% at the 1 mm threshold (Table IV). 
+
+Hybrid Classical-Neural Methods. 
+
+Hybrid methods retain a classical solver backbone while learning the difficult-to-tune components [17]. Three patterns dominate: 
+
+Learned adaptive damping. A network predicts λ(q) for DLS (Eq. 1), concentrating regularization where needed. Wang et al. predict an optimal step-size coefficient for redundant robots, accelerating convergence [17]. A positivity constraint (λ = λmin +softplus( gθ (q)) ) is essential to prevent the learned damping from collapsing toward zero in precisely the regimes where regularization is needed. Rate/smoothness constraints on λ prevent solver discontinuities. 
+
+Warm-starting. A generative model proposes initial guesses refined by a classical solver. This is the most empir-ically validated pattern. IKFlow [24] generates diverse candi-dates via a conditional normalizing flow; the best-of-N sample serves as the warm-start. GGIK [18] uses graph-based VAEs with equivariant GNNs, enabling cross-robot generalization: a single trained model produces solutions for manipulators unseen during training. CycleIK [26] uses MLP/GAN propos-als refined by SLSQP or genetic algorithms. Our benchmark validates this pattern across all three architectures (Table V): even CycleIK’s coarse predictions ( ∼18 mm mean error, 0% raw success) provide sufficient neighbourhood information for DLS to converge to sub-millimeter accuracy. 
+
+Branch selection. Where analytical IK yields multiple discrete branches (elbow-up/down, wrist flips), learning selects among them based on trajectory context, retaining analytical exactness while learning the branch-switching logic that is otherwise heuristic [28]. 
+
+Analytical-neural decomposition. Li et al. (HybrIK) [36] decompose joint rotations into analytically computable swing and learned twist components for human pose estimation. The design principle—analytically solve what can be solved, learn what cannot—offers a template for robot IK. 
+
+Reinforcement Learning. 
+
+RL casts IK as sequential control. Two patterns dominate: 
+
+branch-selection RL , where a DQN agent selects among analytical IK branches based on trajectory context, retaining exactness while learning the switching logic [28]; and end-to-end policies mapping observations directly to joint velocity commands [27], [37], [38]. Singularity-aware reward design (e.g., r = −α∥e∥− β/w (q)) is analogous to adaptive DLS, ex-cept the damping schedule is implicitly learned through policy optimization. In practice, implementations clip this term or use barrier-style formulations (e.g., r = −β·max(0 , w min −w(q)) )to avoid reward divergence at singularities. Despite this natu-ral connection, no surveyed RL paper explicitly benchmarks singularity-conditioned performance. In summary, pure learning inherits the inverse map’s ill-conditioning with no mechanism to handle it, while hybrid methods preserve classical structure with learned adaptivity— but standardized singularity-conditioned evaluation has been absent, which we address next. VI. E XPERIMENTAL EVALUATION : P OSITION -O NLY 
+
+PROTOCOL INSTANTIATION 
+
+We present an initial instantiation of the proposed bench-marking protocol on the Franka Panda 7-DoF under position-only (3-D) IK. This instantiation stress-tests classical-vs-learned comparison on the translational Jacobian Jv ∈ R3×7;full-pose (6-D) evaluation, which exposes wrist singularities invisible to position-only metrics, is the natural next step and is discussed as future work in Section VIII. 
+
+Scope of empirical claims. All quantitative results reported in this section concern the translational Jacobian Jv . Wrist-axis singularities—which arise from alignment of joints 5– 7 and manifest as rank deficiency in the rotational rows of the Jacobian—are by construction outside the scope of these experiments. The reported success rates and condition-number bin coverage should be interpreted accordingly; full-pose evaluation is expected to expose additional failure modes. Experiments use success threshold <1 mm, seed = 42 ,and timing via perf_counter with 50-query warmup on a AMD Ryzen 9 7900X CPU. The open-source library is available at the project repository. We recommend that IK papers report at minimum: (i) pose error decomposed by κ or manipulability bins; (ii) velocity amplification statistics; (iii) failure rate under distribution shifts toward singular manifolds; and (iv) computation time per query. Our protocol implements these as four panels: (A) posi-tion error decomposed by condition-number bins, revealing how each solver degrades under increasing ill-conditioning; 
+
+(B) error along an elbow-singularity sweep trajectory, probing velocity amplification dynamics; (C) success rate under three test distributions (training, near-singular OOD, workspace-shift OOD), measuring robustness to kinematic covariate shift; and (D) median solve time vs. success rate, mapping the Pareto frontier. Target generation specifically tests these regimes: safe targets use uniform joint sampling, while near-singular targets bias the Panda’s wrist joint ( q5) toward zero. Each target pose is generated via forward kinematics from a known ground-truth configuration q∗; the condition number κ(J(q∗)) of the generating configuration determines the bin assignment into 
+
+[1 , 5) , [5 , 20) , [20 , 100) , [100 , 500) , and [500 , ∞). Panel B complements this by sweeping the elbow joint ( q4). 
+
+Solvers and Setup. The benchmark includes 12 solvers (Table III) spanning classical iterative, pure learning, and hybrid families. All experiments run on an AMD Ryzen 9 7900X CPU in single-query mode (batch size = 1 ) to provide fair latency comparisons, using float64 implementations for classical solvers and PyTorch 2.1 float32 for neural solvers. Timing reports the median of queries after a 50-query warmup. 
+
+Fairness notes. This benchmark compares solvers that dif-fer in training budget (20k–2.5M samples) and numerical precision (float64 for classical, float32 for neural). These differences reflect the practical deployment conditions of each method rather than deliberate handicaps: classical solvers have no training cost and are precision-agnostic, while learning-based methods are evaluated under their published default precision. Timing comparisons should therefore be read as rep-resentative deployment latencies rather than controlled abla-tions. Cross-precision and cross-budget ablations are identified as future work; the primary conclusions (classical robustness vs. learned flexibility, warm-start rescue) hold across the full precision and budget range represented here. 
+
+Results. Classical solvers achieve 100% success across all pop-ulated condition-number bins. All five classical iterative solvers maintain <1 mm error across bins [1 , 5) (n=324 ), 
+
+[5 , 20) (n=161 ), and [20 , 100) (n=15 ), spanning the full range of positional-Jacobian conditioning observed under our target generation protocol ( κmax ≈ 58 ). Higher κ bins are unpopu-lated because our near-singular generator biases toward wrist singularities, which do not degrade the translational Jacobian (see Limitations). QuIK (Halley) converges in ∼5 iterations vs.                                                                                                      
+
+> TABLE III SOLVER IMPLEMENTATION DETAILS
+> Solver Hyperparameters Budget Data
+> PINV α=0 .380 iters –Fixed DLS λ=0 .05 80 iters –Adap. DLS λmax =0 .5,λbase =0 .005 80 iters –QuIK (Halley) λ2=10 −10 100 iters –QuIK-NR λ2=10 −10 100 iters –MLP 3→[512 ,512 ,512] →7, LR cosine Feedfwd 20k IKFlow [24] N=100 latent samples Feedfwd 2.5m CycleIK [26] Latent size 32 Feedfwd ∼1m GGIK [18] N=50 latent samples Feedfwd 160k MLP+DLS DLS λ=0 .05 50 iters 20k Cycle+DLS DLS λ=0 .05 50 iters ∼1m GGIK+DLS DLS λ=0 .05 30 iters 160k TABLE IV SOLVER PERFORMANCE SUMMARY (P ANEL ATARGETS ,SAFE +
+> NEAR -SINGULAR ).
+> Solver Type Succ. (%) Time (ms)
+> Pseudoinverse Class. 100.0 0.35 Fixed DLS Class. 100.0 0.16 Adaptive DLS Class. 100.0 0.21 QuIK (Halley) Class. 100.0 1.09 QuIK-NR (Newton) †Class. 100.0 0.09 MLP Pure 0.0 0.37 IKFlow ( N=100 )Pure 58.6 33.45 CycleIK MLP Pure 0.0 4.26 GGIK ( N=50 )Pure 0.0 117.82 Hybrid MLP+DLS Hybrid 100.0 0.30 CycleIK Full Hybrid 98.6 4.31 GGIK+DLS ( N=50 )Hybrid 100.0 119.03
+> †QuIK (Halley) converges in ∼5iterations due to cubic convergence; the 100-iteration setting is a budget cap, not actual iterations executed. Pseudoinverse uses a conservative step size ( α=0 .3), requiring more iterations.
+
+∼10 for Newton-Raphson, confirming the value of the Hessian correction [32]. Panel B velocity amplification ( ∥ ˙q∥/∥ ˙x∥,Fig. 3) remains below 1.03 × for all solvers along the elbow sweep. This trajectory stays in moderately-conditioned space (w ≥ 0.019 ) and therefore does not stress-test the velocity-bound guarantees of DLS variants—a deeper singularity sweep is required to differentiate solvers on this axis and is identified as an immediate next step. 
+
+Pure learning fails near singularities. MLP achieves 0% success ( ∼10 mm mean error across all κ bins); CycleIK MLP achieves 0% ( ∼18 mm). Notably, MLP error is elevated 
+
+uniformly across bins (7 mm at κ ∈ [1 , 5) vs. 15 mm at 
+
+κ ∈ [5 , 20) ), indicating that the single-pass architecture fails even in well-conditioned regions because it cannot iteratively close the gap. IKFlow achieves 58.6% overall (Panel A) but degrades to 33% on near-singular OOD targets (Fig. 4). These confirm that learned regressors inherit the ill-conditioning of the inverse map [35]. 
+
+Warm-start paradigm validated across three architec-tures. 
+
+DLS refinement consistently rescues learned solvers re-[1,5) [5,20) [20,100)  
+
+> Condition number κ(J) bin
+> 10 −4
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> Mean position error (mm)  Position Error vs Condition Number
+> Pseudoinverse
+> Fixed DLS
+> Adaptive DLS
+> QuIK (Halley)
+> QuIK-NR (Newton)
+> MLP
+> IKFlow (N=100)
+> CycleIK MLP
+> GGIK (N=50)
+> Hybrid MLP+DLS
+> CycleIK Full
+> GGIK+DLS (N=50)
+> 1 mm threshold
+
+Fig. 2. Position error vs. condition number: mean position error (mm, log scale) vs. κ(J) for all 12 solvers. Classical iterative solvers remain well below 1 mm across all bins. MLP and CycleIK MLP fail uniformly ( >5 mm). IKFlow shows partial success at low κ but degrades at high κ. QuIK (Halley) achieves 
+
+<0.001 mm across all bins. Bins [100 , 500) and [500 , ∞) contain no targets: position-only evaluation uses the 3×7 translational Jacobian, which remains well-conditioned even at wrist singularities (see Limitations). Shaded bands: 
+
+±1 std. 0     
+
+> 10
+> 20
+> 30
+> Position error (mm)  Elbow-Singularity Sweep
+> Pseudoinverse
+> Fixed DLS
+> Adaptive DLS
+> QuIK (Halley)
+> QuIK-NR (Newton)
+> MLP
+> IKFlow (N=100)
+> CycleIK MLP
+> GGIK (N=50)
+> Hybrid MLP+DLS
+> CycleIK Full
+> GGIK+DLS (N=50)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Velocity amplification ‖̇ q‖/‖̇ x‖
+> 010 20 30 40 50
+> Waypoint index
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> Manipulability  w(q)
+
+Fig. 3. Elbow-singularity sweep (300 waypoints, joint 4). Top: position error; 
+
+Middle: velocity amplification ∥ ˙q∥/∥ ˙x∥; Bottom: manipulability w(q). All solvers remain below 1.03 × amplification in this moderately-conditioned region ( w ≥ 0.019 ). 
+
+gardless of architecture (normalizing flow, deterministic MLP, graph-based VAE). To characterize this effect quantitatively, we log the initial position error ∥F K (q0) − x∗∥ of each neu-ral warm-start before DLS refinement. For MLP+DLS, DLS converges from initial errors up to 207 mm (median 7.4 mm, 99th percentile 48 mm), averaging 3.4 iterations compared to 11.1 for from-scratch DLS; even CycleIK’s coarse predictions (∼18 mm mean error) are rescued in 98.6% of cases. The 1.4% CycleIK failures are not simply the largest initial errors— 
+
+TABLE V WARM -START BENEFIT : RAW VS . DLS-REFINED SUCCESS (%). 
+
+Solver Raw +DLS 
+
+IKFlow ( N =100 ) 58.6 100.0 CycleIK MLP 0.0 98.6 GGIK ( N =50 ) 0.0 100.0 
+
+convergence depends on the geometry of the DLS basin, not purely on distance. Among these failures, initial errors ranged from 5 to 40 mm, completely overlapping with the distribution of successful cases. We abstract this as a design observation: 
+
+DLS convergence basins are empirically wide (up to ∼200 mm initial error) due to the damping factor λ that regularizes step sizes [4], but convergence is not guaranteed for all warm-starts; occasional failures occur when q0 lands in a region where the damped iteration converges to a local minimum above the success threshold. 
+
+Generative models show singularity-dependent diversity. 
+
+IKFlow’s solution diversity collapses near singularities as the normalizing flow’s latent space is “pinched” along degenerate Jacobian modes. GGIK’s graph-based VAE maintains higher diversity ( ∼1.0–1.8 rad std) because the distance-geometry representation preserves kinematic structure. Quantitatively, IKFlow’s joint-space standard deviation drops from ∼2.3 rad at κ < 5 to ∼0.4 rad at κ > 100 , while GGIK maintains 1.0–1.8 rad across all bins. 
+
+OOD robustness separates paradigms. Fig. 4 decomposes success by test distribution. Classical solvers are distribution-agnostic (no training data dependency). IKFlow’s ∼48% rel-ative degradation on near-singular targets (63% →33%) re-veals that its normalizing flow was not trained with suf-ficient singular-region coverage. GGIK+DLS drops from 100% to 93% on near-singular targets—occasional graph-based warm-starts fall outside the DLS basin of convergence. Hybrid MLP+DLS achieves 100%/100%/97%, with the 3% workspace-shift drop reflecting the MLP’s limited spatial generalization. VII. I NDUSTRY TRENDS 
+
+Public industrial adoption of AI in robotics is currently most visible in perception, task planning, simulation, and higher-level autonomy [39], [40], while direct evidence of AI-based singularity handling or learned low-level control in deployed systems remains limited. Vendor-facing material continues to treat singularities as a practical operational concern in de-ployed manipulators [41], suggesting that classical singularity-handling methods remain the execution-layer default. A no-table exception is Agility Robotics, which describes a whole-body control foundation model that explicitly interfaces with execution-level control traditionally handled by model-based inverse kinematics and inverse dynamics [42]. This does not constitute direct evidence of learned singularity avoidance in production, but it signals that learned methods are beginning to move beyond perception and planning toward the control Training 
+
+> Near-Singular OOD
+> Workspace Shift OOD
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success (%)
+> MLP , CycleIK MLP , GGIK:
+> 0% across all distributions
+> (a) Pure Learning — raw
+> MLP
+> IKFlow (N=100)
+> CycleIK MLP
+> GGIK (N=50)
+> Training
+> Near-Singular OOD
+> Workspace Shift OOD
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success (%)
+> (b) Classical & Hybrid
+> Pseudoinverse
+> Fixed DLS
+> Adaptive DLS
+> QuIK (Halley)
+> QuIK-NR (Newton)
+> Hybrid MLP+DLS
+> CycleIK Full
+> GGIK+DLS (N=50)
+
+Fig. 4. OOD robustness decomposed by solver family. (a) Pure learn-ing (raw): MLP, CycleIK MLP, and GGIK ( N =50 ) achieve 0% on all distributions (bars at baseline); IKFlow drops from 63% (training) to 33% (near-singular OOD). (b) Classical & hybrid: all achieve ≥93% across distributions. 
+
+layer itself—reinforcing the relevance of hybrid classical-neural approaches as a plausible bridge between classical reliability and learned adaptivity. VIII. D ISCUSSION AND OPEN PROBLEMS 
+
+Limitations. As detailed in the Scope of Empirical Claims paragraph (Section VI), the current benchmark uses position-only IK, leaving wrist singularities and full-pose failure modes outside its scope. Results should be interpreted as an optimistic bound; full-pose IK would expose additional singularity struc-ture and harder conditioning. Extensions to 6-DoF evaluation, additional platforms, and real hardware are immediate next steps. 
+
+Cross-Family Assessment. Our taxonomy and benchmark reveal a clear hierarchy: classical iterative solvers provide the strongest reliability (100% success, <1 ms, structural ve-locity bounds); optimization-based methods (QP, MPC) offer the strongest formal guarantees at higher computational cost (2–50 ms); pure learning methods are fast ( <2 ms) but fail near singularities with no recovery mechanism; and hybrid methods offer the most favorable trade-off—Med–High accu-racy, structural velocity bounds, 5–20 ms—with learned warm-starts reducing iteration counts by ∼3× (MLP+DLS: 3.4 vs. DLS: 11.1 iterations) while the classical backbone guarantees convergence. The warm-start paradigm holds across three fundamentally different architectures (Table V), suggesting it is architecture-agnostic. 
+
+Open Problems. Key open problems include: (i) formal velocity bounds for learned IK via control barrier func-tions (enforcing w(q) ≥ wmin ) or Lyapunov verification; (ii) morphology-agnostic singularity handling, where GNN-based architectures [18], [19] and Riemannian manipulability transfer [11] are initial steps toward a general-purpose module across arbitrary serial chains; (iii) bidirectional singularity-aware interfaces between foundation-model planners and low-level solvers [13]; and (iv) benchmark extensions to full 6-DoF pose, additional platforms, and real hardware. IX. C ONCLUSION 
+
+This survey has traced singularity-robust IK from DLS [4] through Riemannian manipulability [11] and constrained op-timization [9] to modern learning-based methods. Our cen-tral finding is that the “classical versus learned” framing is unproductive: the most effective methods embed learned components within classical solver backbones, as empirically validated by our proposed benchmark. Moving forward, we be-lieve singularity-conditioned evaluation must become standard practice for IK solver development to ensure safe deployment. REFERENCES [1] Y. Nakamura, H. Hanafusa, and T. Yoshikawa, “Task-priority based redundancy control of robot manipulators,” The International Journal of Robotics Research , 1987. [2] B. Siciliano and J.-J. Slotine, “A general framework for managing multiple tasks in highly redundant robotic systems,” in ICAR , 1991. [3] L. Sentis and O. Khatib, “Synthesis of whole-body behaviors through hierarchical control of behavioral primitives,” International Journal of Humanoid Robotics , vol. 2, no. 4, pp. 505–518, 2005. [4] C. W. Wampler, “Manipulator inverse kinematic solutions based on vec-tor formulations and damped least-squares methods,” IEEE Transactions on Systems, Man, and Cybernetics , 1986. [5] I. Dul˛ eba, “Singularity-robust inverse kinematics for serial manipula-tors,” IEEE Access , 2023. [6] S. Chiaverini, B. Siciliano, and O. Egeland, “Review of the damped least-squares inverse kinematics with experiments on an industrial robot manipulator,” IEEE Transactions on Control Systems Technology , 1994. [7] L. Nielsen, C. Canudas de Wit, and P. Hagander, “Controllability issues of robots near singular configurations,” in Advanced Robot Control .Springer, 1991, pp. 307–314. [8] S. Chiaverini, “Singularity-robust task-priority redundancy resolution for real-time kinematic control of robot manipulators,” IEEE Transactions on Robotics and Automation , 1997. [9] O. Kanoun, F. Lamiraux, and P.-B. Wieber, “Kinematic control of redundant manipulators: Generalizing the task-priority framework to inequality task,” IEEE Transactions on Robotics , vol. 27, no. 4, pp. 785–792, 2011. [10] A. Escande, N. Mansard, and P.-B. Wieber, “Hierarchical quadratic programming: Fast online humanoid-robot motion generation,” The International Journal of Robotics Research , vol. 33, no. 7, pp. 1006– 1028, 2014. [11] N. Jaquier, L. Rozo, D. G. Caldwell, and S. Calinon, “Geometry-aware manipulability learning, tracking, and transfer,” The International Journal of Robotics Research , vol. 40, no. 2–3, pp. 624–650, 2021. [12] A. Müller, “Analytically informed inverse kinematics solution at singu-larities,” in Advances in Robot Kinematics , ser. Springer Proceedings in Advanced Robotics. Springer, 2024, vol. 31, pp. 249–259. [13] Y. Jin et al. , “A survey of foundation models in robot learning,” 
+
+Neurocomputing , 2025. [14] A. Calzada-Garcia, J. G. Victores, F. J. Naranjo-Campos, and C. Bala-guer, “A review on inverse kinematics, control and planning for robotic manipulators with and without obstacles via deep neural networks,” 
+
+Algorithms , vol. 18, no. 1, p. 23, 2025. [15] S. Kalaycioglu, A. De Ruiter, E. Fung, H. Zhang, and H. Xie, “Explor-ing analytical and deep learning solutions for high-degree-of-freedom inverse kinematics,” Journal of Physics: Conference Series , vol. 3027, no. 1, p. 012039, 2024. [16] A. Calzada-Garcia, J. G. Victores, F. J. Naranjo-Campos, and C. Bal-aguer, “Inverse kinematics for robotic manipulators via deep neural networks: Experiments and results,” Applied Sciences , vol. 15, no. 13, p. 7226, 2025. [17] X. Wang, X. Liu, L. Chen, and H. Hu, “Deep-learning damped least squares method for inverse kinematics of redundant robots,” Measure-ment , vol. 171, p. 108821, 2021. [18] O. Limoyo, F. Mari´ c, M. Giamou, P. Alexson, I. Petrovi´ c, and J. Kelly, “Generative graphical inverse kinematics,” IEEE Transactions on Robotics , vol. 41, pp. 1002–1018, 2025. [19] A. Jlidi, R. Benotsmane, L. Kovács, and A. Trohak, “A novel graph neural network approach for inverse kinematics in robotic arms,” in 
+
+2025 26th International Carpathian Control Conference (ICCC) , 2025, pp. 1–6. [20] S. R. Buss and J.-S. Kim, “Selectively damped least squares for inverse kinematics,” Journal of Graphics Tools , 2004. [21] K. Dufour and W. Suleiman, “On integrating manipulability index into inverse kinematics solver,” in 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2017, pp. 1234–1240. [22] P. Beeson and B. Ames, “TRAC-IK: An open-source library for im-proved solving of generic inverse kinematics,” in 2015 IEEE-RAS 15th International Conference on Humanoid Robots (Humanoids) , 2015, pp. 928–935. [23] J. Lu, T. Zou, and X. Jiang, “A neural network based approach to inverse kinematics problem for general six-axis robots,” Sensors , vol. 22, no. 22, p. 8909, 2022. [24] B. Ames, J. Morgan, and G. Konidaris, “IKFlow: Generating diverse inverse kinematics solutions,” IEEE Robotics and Automation Letters ,vol. 7, no. 3, pp. 7111–7118, 2022. [25] J. Urain, N. Funk, J. Peters, and G. Chalvatzaki, “SE(3)-DiffusionFields: Learning smooth cost functions for joint grasp and motion optimization through diffusion,” in 2023 IEEE International Conference on Robotics and Automation (ICRA) , 2023, pp. 5923–5930. [26] J.-G. Habekost, E. Strahl, P. Allgeuer, M. Kerzel, and S. Wermter, “Cycleik: Neuro-inspired inverse kinematics,” in Proceedings of the International Conference on Artificial Neural Networks (ICANN) , 2023, arXiv:2307.11554. [27] V. Kumar, D. Hoeller, B. Sundaralingam, J. Tremblay, and S. Birchfield, “Joint space control via deep reinforcement learning,” in Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2021, pp. 3619–3626. [28] D. Kato, N. Maeda, A. Takeuchi, M. Sekioka, T. Hirogaki, and E. Aoyama, “Selection of inverse kinematics solution type for coopera-tive robots and singularity avoidance based on reinforcement learning,” in Proceedings of the ASME IDETC-CIE , 2023, p. V002T02A019. [29] D. K. Pai and M. C. Leu, “Genericity and singularities of robot manipulators,” IEEE Transactions on Robotics and Automation , vol. 5, no. 3, pp. 349–359, 1989. [30] T. Sugihara, “Solvability-unconcerned inverse kinematics by the Levenberg–Marquardt method,” IEEE Transactions on Robotics , vol. 27, no. 5, pp. 984–991, 2011. [31] S. Moe, G. Antonelli et al. , “Set-based tasks within the singularity-robust multiple task-priority inverse kinematics framework: General formulation, stability analysis, and experimental results,” IEEE/ASME Transactions on Mechatronics , 2016. [32] S. Lloyd, R. A. Irani, and M. Ahmadi, “Fast and robust inverse kinematics of serial robots using halley’s method,” IEEE Transactions on Robotics , 2022. [33] F. Flacco, A. De Luca, and O. Khatib, “Control of redundant robots under hard joint constraints: Saturation in the null space,” IEEE Trans-actions on Robotics , vol. 31, no. 3, pp. 637–654, 2015. [34] PickNik Robotics, “pick_ik: A moveit 2 inverse kinematics plugin,” https://github.com/PickNikRobotics/pick_ik, 2023, accessed: 2026-04-01. [35] R. Bensadoun, S. Gur, N. Blau, and L. Wolf, “Neural inverse kinematic,” in Proceedings of the International Conference on Machine Learning (ICML) , ser. Proceedings of Machine Learning Research, vol. 162, 2022, pp. 1787–1797. [36] J. Li, C. Xu, Z. Chen, S. Bian, L. Yang, and C. Lu, “Hybrik: A hybrid analytical-neural inverse kinematics solution for 3d human pose and shape estimation,” in Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) , 2021, arXiv:2011.14672. [37] S. Phaniteja, P. Dewangan, P. Guhan, A. Sarkar, and K. M. Krishna, “A deep reinforcement learning approach for dynamically stable inverse kinematics of humanoid robots,” arXiv:1801.10425, 2018. [38] A. Malik, Y. Lischuk, T. Henderson, and R. Prazenica, “A deep reinforcement-learning approach for inverse kinematics solution of a high degree of freedom robotic manipulator,” Robotics , vol. 11, no. 2, p. 44, 2022. [39] International Federation of Robotics, “Record of 4 million robots work-ing in factories worldwide,” 2024, https://ifr.org/ifr-press-releases/news/ record-of-4-million-robots-working-in-factories-worldwide. Accessed: 2026-03-30. [40] ——, “Top 5 global robotics trends 2025,” 2025, https: //ifr.org/ifr-press-releases/news/top-5-global-robotics-trends-2025. Accessed: 2026-03-30. [41] ABB Robotics Community, “Checking for singularity,” 2016, https: //tech-community.robotics.abb.com/t/checking-for-singularity/7306. Ac-cessed: 2026-04-05. [42] Agility Robotics, “Training a whole-body control founda-tion model,” 2025, https://www.agilityrobotics.com/content/ training-a-whole-body-control-foundation-model.
