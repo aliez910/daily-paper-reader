@@ -1,0 +1,576 @@
+Title: ShapeGen: Robotic Data Generation for Category-Level Manipulation
+
+URL Source: https://arxiv.org/pdf/2604.15569v1
+
+Published Time: Mon, 20 Apr 2026 00:24:47 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# ShapeGen: Robotic Data Generation for Category-Level Manipulation 
+
+Yirui Wang, Xiuwei Xu, Angyuan Ma, Bingyao Yu, Jie Zhou, Jiwen Lu 
+
+Tsinghua University 
+
+Fig. 1: ShapeGen overview. Given a source demo with minimal human annotation, ShapeGen automatically generates novel manipulation data with complex shape variations of manipulated objects while maintaining their functionality. Policies trained with ShapeGen-augmented data can generalize to objects of different shapes in the same category, enabling acquisition of category-level skills. 
+
+Abstract —Manipulation policies deployed in uncontrolled real-world scenarios are faced with great in-category geometric diversity of everyday objects. In order to function robustly under such variations, policies need to work in a category-level manner, i.e. knowing how to interact with any object in a certain category, instead of only a specific one seen during training. This in-category generalizability is usually nurtured with shape-diversified training data; however, manually collecting such a corpus of data is infeasible due to the requirement of intense human labor and large collections of divergent objects at hand. In this paper, we propose ShapeGen, a data generation method that aims at generating shape-variated manipulation data in a simulator-free and 3D manner. ShapeGen decomposes the process into two stages: Shape Library curation and Function-Aware Generation. In the first stage, we train spatial warp-ings between shapes mapping points to points that correspond functionally, and aggregate 3D models along with the warpings into a plug-and-play Shape Library. In the second stage, we design a pipeline that, leveraging established Libraries, requires only minimal human annotation to generate physically plausible and functionally correct novel demonstrations. Experiments in the real world demonstrate the effectiveness of ShapeGen to boost policies’ in-category shape generalizability. Project page: https://wangyr22.github.io/ShapeGen/. 
+
+I. I NTRODUCTION 
+
+With recent advances [8, 43, 44, 38, 3, 12, 16], visuomotor robotic policies are gaining more capability at being deployed in real-world manipulation scenarios, which brings to them the full complexity of everyday objects. In this context, mastering a manipulation skill requires knowing how to perform that skill to any object in a specific category: for example, being able to ‘pour water from a kettle to a mug’ means being able to pour water from any kettle to any mug, regardless of their appearance: color, texture, and most importantly, shape–since the feasible action trajectories are ultimately dependent on the shapes. Such generalizability of end-to-end policies are usually cultivated by providing training data with sufficient in-category shape diversity [11, 15, 24, 28, 4], which is usually formidable to collect in real-world for its labour-intensive nature and demand for rich collections of objects to manipulate. Against this background, robotic data generation provides for a practical solution. Leveraging techniques such as 3D reconstruction, video inpainting and world models [32, 20, 26, 47, 14, 22], comprehensive research has been done for augmenting visual textural appearance [41, 2, 42, 19], spatial configuration [37, 36, 45, 40, 21], viewpoint [45] and embod-iment [5], while leaving in-category shape mostly underex-plored. Methods like RoboSplat [39] and ReBot [9] approach augmenting shape of manipulated objects by replaying a task trajectory on a novel object, but are confined to simple pick-and-place-level tasks, since they do not process affordance-relevant information. To enable generation for finer-grained manipulation tasks such as mug-hanging, CP-Gen [18] models the skill as keypoint-trajectory constraints, i.e. keypoints on the robot or grasped object should track a reference tra-
+
+> arXiv:2604.15569v1 [cs.RO] 16 Apr 2026
+
+jectory. In the generation process, the method requires that new shapes as well as new robot actions comply with such constraints. However, CP-Gen works solely in simulation, and only supports axis-aligned scaling, which can transform explicitly keypoints to those corresponding points on the new shape, for shape variation, thus introducing far less diversity compared to complex, non-linear shape deformations in real-world scenarios. For boosting stronger in-category shape generalizability to empower fully category-level skills for real-world deployment, we want a method that is simulator-free, works for fine-grained manipulation skills, and supports complex shape variations. We adopt a straightforward data generation idea of substituting manipulated objects with novel ones to composite data. We observe that performing fine-grained skills requires exploiting correctly the functional part of an object, and generating physically plausible novel data means its way of placement and manner of being gripped should conform to its affordances. Both requirements indicate that the generation method should be able to place the novel shape in the right place, and this can be instinctively reduced to finding the optimal alignment between the novel shape and the real object appearing in col-lected demo; and the alignment problem can further be reduced to finding point correspondence, for aligning transformations can be solved by minimizing a points-based cost. Built on thes observations, in this paper, we propose a framework, ShapeGen, as a solution. We decompose the generation task into two stages: Shape Library Curation 
+
+and Function-Aware Generation . In the first stage, we use geometric information to train spatial warpings that establish function-aware correspondence between 3D shapes of the same category, as the foundation for solving automatically optimal alignments. We further aggregate a diverse collection of 3D models and trained spatial warpings into an extendable, plug-and-play Shape Library. In the second stage, we design an effective generation pipeline that requires only minimal human annotation, provided once for each source demonstration, and leverages curated Shape Libraries to compose physically plausible and functionally correct novel manipulation data. Our system is real-to-real and time-efficient. As demonstrated in Fig. 1, ShapeGen can generate highly realistic manipu-lation data. Through real-world experiments, we show the effectiveness of our system to boost shape generalizability of manipulation policies. II. R ELATED WORKS 
+
+A. Robotic Data Generation 
+
+Most existing researches on robotic data generation aims at generating diversified data from one or a few source demonstrations. A line of research [41, 42, 19, 1, 2] focuses on diversifying the textural apperance of visual observation while keeping actions and geometry of manipulated object unchanged. Another outstanding line of works [21, 37, 40, 36, 45] targets at diversifying spatial configuration via tech-niques such as Task and Motion Planning (TAMP), pointcloud editing, 3D reconstruction and 3D-controlled video generation. There have also been works addressing shape diversity within training data. RoboSplat [39] uses 3D content gener-ation model to provide a collection of data for manipulation, and adopts an off-the-shelf grasping algorithm for synthesiz-ing grasp pose. ReBot [9] diversify manipulated objects by replaying a human-demonstrated trajectory in simulation with different object configuration. Lacking mechanics to process object functionality and affordance, these methods can only augment data for pick-and-place-level tasks. In contrast, CP-Gen [18] generates shape-augmented data for fine-grained manipulation tasks in a simulator. Modelling skill segments as keypoint-trajectory constraints, given an annotated source trajectory, CP-Gen is able to adopt it to a novel shape by syn-thesizing an action trajectory that satisfies the same constraints as the source. However, CP-Gen can only variate the shape up to an axis-aligned scaling, since it relies on an explicit transformation to obtain corresponding keypoints on the new shapes. Thus, the level of shape complexity it introduces is not on par with complexity observed in real-world settings. 
+
+B. Inter-object Correspondence in Manipulation 
+
+Extracting inter-object correspondence has proved useful for robotic manipulation. Usually derived from semantic feature, correspondence is widely used for transferring object affor-dance such as contact point for interaction [13, 17]. Aside of this, [34, 33] use similarity of feature to build planning cost for obtaining optimal trajectory. Correspondence can also be used to retarget finer-grained skills. Like the way CP-Gen [18] utilizes keypoint trajectory constraints, CorDex [10] transfers fingertip contact points in simulation to generate functional dexterous grasping data. MimicFunc [31] leverages an VLM for transferring functional keypoints, enabling one-shot tool usage in real-world scenarios. However, most methods primarily focus on discrete cor-respondence. Lacking global regularization methods, discrete correspondence may be inaccurate, necessitating subsequent refinement or validation [10]. In contrast with the sparse setting, DenseMatcher [48] builds dense correspondence that maps vertices of one mesh to those of another, optimized under a cost that considers both semantics and regulariza-tion. Though comprehensive, the formulation of vertex cor-respondence still poses limitations. It is worth noticing that semantic-aware dense correspondence can be established on pure geometric foundations, as demonstrated by works [25, 46] targeting at category-level geometric representations. Methods built on Neural Descriptor Fields (NDFs) [30, 7] also exploits this observation by training category-level descriptors with pure occupancy supervision. Based on the same assumption and taking a step further to dense correspondence, ShapeGen uses geometric clues to prepare and aggregate dense inter-object correspondence for an efficient data generation system. III. M ETHOD 
+
+A. Problem Statement 
+
+A visualmotor policy is a mapping π : O → A from observation space to action space. To train a policy fulfilling Fig. 2: Shape Library curation overview . (a) Spatial warpings are trained with geometric supervision including SDF loss, point-wise regularization loss and point-pair regularization loss. (b) Shape Library is constructed by aggregating warpings stemming from a common template. Given a scanned shape, the Library can be used in a plug-and-play manner by solely training an additional warping. When calculating the composite warping, extra refining steps are added to mitigate error. a specific task, usually a corpus of data D = {D1, ..., D N }
+
+is prepared, with each D = (d0, d 1, ..., d L−1) a sequence of observation-action pairs dt = (ot, a t). In order for a policy to obtain certain generalizability , the data should hold the corresponding type of diversity . Our proposed method, ShapeGen, aims at augmenting the shape diversity of task-relevant objects via data generation, thus reducing the human effort as well as requirement for possessing shape-diversified assets for collecting data. Given a source demonstration Dsrc 
+
+with minimal human annotation, ShapeGen automatically sub-stitutes task-relevant objects in Dsrc with objects of the same category but different shapes (shapes for short) in a physically plausible and functionally correct manner, yielding a large corpus of novel training data. 
+
+Overview. In this work, we capture raw observation with a calibrated RGB-D camera, and train policies taking uncol-ored pointcloud observation. To generate data, ShapeGen first curate a Shape Library for each relevant category of object that contains not only 3D shapes, but also spatial warpings to them from a common template shape, detailed in III-B. Given a sequence of raw observation-action pairs, we ask an annotator to recognize keypoints on the actual objects used, designate methods for inter-shape alignment, then uses the established Shape Library to automatically calculate optimal alignment and correct action, detailed in III-C. 
+
+B. Shape Library Curation 
+
+In this section, we aim to develop an automatic mechanism to, given the actual object appearing in source demo and keypoints attached to it, find on every shapes in a Library the points corresponding to them. This will enable point-based alignment in the generation pipeline. Such correspondence should be function-aware, e.g. given a mug and a point on inner side of its handle, the mapped point should too be on the inner side of mug handles. In III-B1, we introduce method for finding such correspondence between two shapes. In III-B2, we introduce the way to aggregate correspondence into a plug-and-play Shape Library. 
+
+1) Spatial Warping Training: Given two 3D shapes Si and 
+
+Sj belonging to the same category, we seek to find dense function-aware correspondence, i.e. a spatial warping Wij :
+
+R3 → R3 between them. We notice that, across divergent in-category shapes, functional correspondence is generally derived from geometric correspondence. This is natural, since function of an object as well as of its specific parts themselves are usually deduced from the very geometric shape of the object. Based on this observation, we propose to establish 
+
+Wij ’s via geometric clues. Since the final correspondence may be complex, we use neural networks to fit W’s, and use pure geometric information for supervision. Specifically, we adopt Signed Distance Function (SDF) as the supervising signal. Given a 3D shape S and a point x ∈
+
+R3, the absolute value of SDF( x, S ) represents the distance from x to the surface of S, while the sign indicates whether 
+
+x is inside or outside of S. To establish correspondence, we hope that given xi near surface of Si, Wij sends it to Wij (xi)
+
+such that 
+
+SDF( xi, S i) = SDF( Wij (xi), S j ) (1) Note that in this way, SDF( xi, S i) = 0 indicates 
+
+SDF( Wij (xi), S j ) = 0, which means points on surface are mapped to points on surface. Additional requirements from non-surface points may provide more comprehensive geometric supervision. In order to train Wij in an end-to-end manner, we first fit nerual SDF model for Sj to obtain spatial-differentiable SDF function, noted f sdf  
+
+> j
+
+. Then, we fix f sdf  
+
+> j
+
+’s and train Wij . The primary training loss is 
+
+Lsdf = ∥f sdf  
+
+> i
+
+(xi, S i) − f sdf  
+
+> j
+
+(Wij (xi), S j )∥1 (2) Fig. 3: Data generation pipeline. A human annotator is only required to annotate once for each demo. With 3D shapes and warping networks provided by Shape Libraries, function-aware alignment and gripper action correction can be performed in a fully automated manner. In which, letting y := Wij (xi) and z := f sdf  
+
+> j
+
+(y) and denote by θ parameters of Wij , the gradiant can be calculated as 
+
+∂Lsdf 
+
+∂θ = ∂Lsdf 
+
+∂z · ∂z ∂y · ∂y ∂xi
+
+(3) Where the spatial derivative of SDF function ∂z/∂y =
+
+∂f sdf  
+
+> j
+
+/∂y can be easily obtained, as f sdf  
+
+> j
+
+is in form of a neural network. Following [46], we also add point-wise and point-pair regularization losses to avoid getting overly deformed warpings: 
+
+Lpw = h(∥W ij (xi) − wi∥2) (4) 
+
+Lpp = max ∥∆x(1)  
+
+> i
+
+− ∆x(2)  
+
+> i
+
+∥2
+
+∥x(1)  
+
+> i
+
+− x(2)  
+
+> i
+
+∥2
+
+− ε, 0
+
+!
+
+(5) Where h(·) is a Huber kernel, superscripts in x(1)  
+
+> i
+
+, x(2)  
+
+> i
+
+denote different samples in a batch, and ∆xi := Wij (xi) − xi. The final training loss is a weighted sum: 
+
+L = Lsdf + αpw Lpw + αpp Lpp (6) as illustrated in Fig. 2 (a). 
+
+2) Shape Library Construction and Usage: We assemble divergent shapes and warping functions between them into a plug-and-play Shape Library, as illustrated in Fig. 2 (b). For a fixed category, we pick out a template shape S0, and train warpings W0j from it to all other shapes. This allows for adding new shape to the Library in O(1) time, and also enables ‘plugging’ the Library to any shape Sa: by training warping Wa0 from Sa to S0 and compositing the warpings we seamlessly get Waj = W0j ◦ W a0 . In the data generation process to be introduced, Sa is a scanned model of actual object being manipulated, and in this way we get information for substituting it with any shape from the Library. When calculating the composite warping function, we add an refining optimization step to find the nearest point on surface to hone outputs of W0j and Wa0 , for mitigating error caused by imperfect W’s. 
+
+refine( x, S ) = arg min 
+
+> y∈S
+
+∥x − y∥2 (7) 
+
+Waj (x) = refine( W0j (refine( Wa0 (x), S 0)) , S j ) (8) The optimization problem in 7 can be easily solve approxi-mately via SDF network and spatial gradients, as detailed in appendix A-D. 
+
+C. Function-Aware Generation 
+
+In this section, built upon curated Shape Libraries, we introduce the data generation pipeline, in which task-relevant objects in Dsrc are substituted with shapes from the Libraries. For simplicity, we assume here that there is only 1 relevant object, with shape Sa, in the source demonstration, and we wish to substitute it with Sj from the library, in a realistic manner. Before running the pipeline, we scan a 3D model Sa
+
+of the actual shape used using a mobile application. Then, beginning with raw RGB-D observation (with known camera intrinsics) and robot arm action, we first run an out-of-the-box, model-based object tracking method [35] to obtain the object pose trajectory T a = ( T0, ..., T L−1), T t ∈ SE(3) of Sa.Then, we ask a human annotator to provide a small amount of annotation, detailed in III-C1. After this, for each shape in the Library, we perform first function-aware alignment (III-C2) and then gripper action correction (III-C3), getting the modified action sequence. At last, using the calculated alignments and poses, we generate novel observation (III-C4), yielding a new demonstration episode on a different object shape. The generation pipeline is outlined in Fig. 3. 
+
+1) Minimal Human Annotation: Given the source demon-stration, we ask a human annotator to provide annotations 
+
+{(ti, Pti , G ti )}, where Pti = ( xn ∈ R3) is a orderd set of points fixed to task-relevant objects appearing in the demon-stration, ti a timestamp, and Gti a alignment cost function. The purpose of such annotations is to guide the subsequent aligning step for putting a new shape in the ‘right’ place. Take the task hang_mug for example: in the hanging process, the upper corner of the mug handle should be on the exact spot in order for inserting it onto the rack, thus the annotator can take 
+
+ti = the timestamp when hanging begin, and Pti the singleton set of a point on the upper corner of the mug handle. Gti can be a simple square error, indicating that the keypoint position should be preserved. Usage of Gti and the specific aligning process will be introduced in the subsequent section. Aside of this, we also ask the annotator to recognize a gripper keypoint 
+
+xg that represent the position of object gripped by the gripper. The aforementioned annotation need only be performed once 
+
+for each source demo, taking only about 1 minute. Annotaion process is detailed in appendix A-C. 
+
+2) Function-Aware Alignment: With annotations provided, we solve for an optimal alignment transformation ˜Tti via 
+
+˜Tti = arg min  
+
+> T∈SE(3)
+
+Gti (Pti , T [Waj [Pti ]]) (9) Where Waj [Pti ] is the image of ordered set Pti under function Waj , and T [Waj [Pti ]] its subsequent image under transformation T . As a result, ˜Tti is the transformation that optimally aligns points on Sj to their corresponding points on Sa, and henceforth aligns Sj to Sa. In our experiments, 
+
+Gti are usually square distances, and Pti singletons. In these cases, where the optimal solution is not unique, we impose an additional constraint that the rotation component of ˜Tti be identity. 1
+
+Upon obtaining ˜Tti ’s, we interpolate them to get the align-ment sequence ( ˜T0, ..., ˜TL−1), and furthur calculate the desired object pose trajectory of Sj as 
+
+T j = ( T0 ˜T0, ..., T L−1 ˜TL−1) (10) In some cases, we not only want Sa and Sj aligned in the shared object space, but also need the attached points Pti
+
+and Waj [Pti ] aligned in the same manner to an anchor point attached to another variable shape: e.g. when performing the task pour_water we want the kettle mouths aligned to a point on the mug rim, which itself may be transformed elsewhere. Under these circumstances, we calculate similarly a sequence of alignments ˆTt in camera space, and get 
+
+T j = ( ˆT0T0 ˜T0, ..., ˆTL−1TL−1 ˜TL−1) (11) 
+
+3) Gripper Action Correction: As the size as well as exact position of gripped part varies between shapes, in order for the novel demonstration to be physically correct, the action of gripper should also be modified accordingly. Using T a
+
+and T j we get trajectories of the annotated gripper keypoint 
+
+xg as well as its corresponding point Waj (xg) in camera space, from which we calculate a sequence of translation-only transformation T g = ( T g0 , ..., T g
+
+> L−1
+
+) that best aligns the points and henceforth transforms the observed gripper to a new position where it grips the substituted shape well. We represent the gripper action at as a SE(3) transformation from end-effector frame to robot base frame, and calibrate beforehand a     
+
+> 1The shapes Saand Sjare aligned in advance to canonical orientation as a preprocessing step, like in most 3D shape datasets.
+
+transformation from camera frame to robot base frame Tc2b ;consequently, we get modified action 
+
+a′ 
+
+> t
+
+= Tc2b T g 
+
+> t
+
+T −1c2b at (12) We require that T g 
+
+> t
+
+be translation-only mainly for two reasons. First, this avoid the need to render the arm and gripper from a new angle, because the visual fidelity is usually well-preserved under a small translation. Second, in this way we only need the rotation component of Tc2b for calculating a′ 
+
+> t
+
+(detailed in appendix A-E), hence reducing the negative impact of imprecise hand-eye calibration. 
+
+4) Novel Observation Generation: After calculating T j and 
+
+T g, we composite the new observation by manipulating repre-sentation in 3D space. Using a video segmentation model [27], we obtain masks for each task-relevant object. Also, assuming a static environment, we capture an RGB-D image of the empty workspace. We obtain mask of the robotic arm by first segmenting the foreground regions via comparing depth values and then extracting masks of all other objects. We use T g to directly transform the segmented arm pointcloud, and use T j
+
+to put the 3D model of Sj in correct place. In our experiments, we adopt a 3D policy that takes pointcloud as observation, so we directly sample points from composited scene with a camera-aware 3D post-processing method proposed in [36]. However, our system also works for 2D policies if the scene is rendered into images. IV. E XPERIMENTS 
+
+In this part, we conduct experiments to validate the ef-fectiveness of ShapeGen method. In IV-B, we verify that ShapeGen can boost the in-category shape generalizability of manipulation policies across 4 manipulation tasks. In IV-C, we validate that data generated by ShapeGen hold sufficient realism. In IV-D, we analyze the efficiency of ShapeGen over manual data collection. In IV-E, we compare our spatial warping method with naive feature matching. In IV-F, we pro-vide visualizations for correspondence established via Shape Libraries and data generated by our system. 
+
+A. Implementation Details 1) ShapeGen and Manipulation Policy: We utilize the efficient library Instant-NGP [23] to fit neural SDF networks. We adopt the LSTM architecture used in DIT [46] with an ad-ditional residual connection for our spatial warping networks. To extend Shape Libraries, we collect Internet-source images and use SAM3D [6] to generate 3D models. We scan 3D models of manipulated objects with the mobile application RealityComposer, segment video observation with SAM2 [27] and track objects with FoundationPose [35]. To validate our method, we adopt the policy architecture ManiFlow [38] with uncolored pointcloud input for eliminating the influence of colors and focusing majorly on shape. Data generation and all network trainings are performed on a single RTX A6000 GPU. Details on spatial warping training and policy training are provided in appendix A-A and A-D. TABLE I: Results of ShapeGen for shape generalizability. #i denote the i-th novel object instance, tested once for each of 5 spatial configurations. Success rate is reported. 
+
+hang mug hang mug hard serve kettle pour water 
+
+#1 #2 #3 #4 total #1 #2 #3 #4 total #1 #2 #3 #4 total #1 #2 #3 #4 total 
+
+source 0/5 0/5 0/5 1/5 1/20 1/5 0/5 0/5 0/5 1/20 1/5 5/5 1/5 0/5 7/20 5/5 2/5 2/5 2/5 11/20 
+
++ShapeGen 3/5 3/5 1/5 2/5 9/20 3/5 4/5 2/5 1/5 10/20 4/5 3/5 5/5 3/5 15/20 5/5 1/5 3/5 3/5 12/20 
+
+Fig. 4: Visualization of tasks. We conduct real-world experiments on 4 tasks requiring exploitation of object functionality. For each task, 5 demos are collected with the same object instance and different spatial configurations. Tests are conducted on novel object instances unseen in either source or generated data. 
+
+2) Hardware Setup: We collect data and deploy policies on a single-arm fixed-base robot platform. The platdorm consists of a 7-DoF UR5 robotic arm with a parallel jaw gripper. An ORBBEC femto bot RGB-D camera is fixed to the base. 
+
+B. Shape Generalizability of Policy 
+
+To verify that ShapeGen-augmented data can boost in-category shape generalizability of manipulation policies, we selected 4 tasks as illustrated in Fig. 4 concerning 2 cat-egories of everyday objects, mug and kettle . For every task, 5 demonstrations are collected via teleoperation with same object instances and different spatial configurations. Leveraging ShapeGen, we generate 15 novel demos from each source demo. We train ManiFlow [38] policies from source demos only ( source ) and from both source and generated data (+ShapeGen ). To evaluate their in-category generalizability, we conduct tests on object instances unseen in either source or generated data, placed at approximately the same positions as objects in source demos to decouple shape generalizability with spatial generalizability. For each unseen object instance, one test is carried out for each spatial configuration, since we empirically find that results are highly repeatable given same initial setup (detailed in appendix B-D). As shown in Table I, ShapeGen significantly enhances generalizability of policies for the mug-hanging tasks and also brings performance gain for kettle-related tasks, the former being considerably more difficult since placing the mug onto rack requires more precise alignment. Fig. 5 summarizes 
+
+Fig. 5: Typical failure cases. Policies commonly suffer from imprecise exploitation of objects’ functions and out-of-distribution effect. For example, the mug being manipulated cannot be inserted onto the rack without collision, and the kettle being gripped is frequently dropped amidst execution. typical failure cases. Policies trained solely on source demos most commonly suffer from imprecise functioning, in which cases failure is caused by an imprecise exploitation of objects’ function: for instance, in mug-hanging tasks, they fail to insert mug handles into the rack without collision; or, in the task 
+
+serve_kettle , the spout is not aligned with the mug’s rim. These are also the problems leading to failure when simply replaying the action trajectory on a shape-variated object, because due to shape variation, the same trajectory cannot precisely align the functional parts. Another common reason for failure is out-of-distribution effect. For example, in the task serve_kettle , policy trained on only source data frequently drops the kettle amidst execution. By enriching the training corpora with functionally-correct shape-augmented TABLE II: System runtime analysis. Typical time cost for each system components is given.                        
+
+> shape library curation data collection preparation data collection data generation
+> train nerual SDF Tsdf train warping Twrp scan SaTscan train W network Twrp collect demo Tdemo annotate demo Tann generate Tgen
+> 5s 3min 5min 3min 1min 1min 20s
+
+Fig. 6: Qualitative comparison with feature-matching method. Feature-matching is prone to imprecise single-point matches; examples are highlighted with red arrows. Corresponding points are marked with the same color. TABLE III: Results of data realism. ShapeGen generates feasible trajectory and enables policies to learn successfully from them.             
+
+> task/replay task/policy hang mug hang mug hard hang mug hang mug hard source 0/5 0/5 0/5 0/5
+> ShapeGen 5/5 5/5 5/5 5/5
+
+data, ShapeGen enables policies to better exploit functions of unseen objects. Also, the diversity injected into training data helps policies reduce O.O.D. failures. 
+
+C. Realism of Generated Data 
+
+We verify the realism of generated data by running Shape-Gen pipeline with scanned model of a test object mug_white 
+
+used as the model from a Shape Library, generating demos containing only the object scanned. Then, we train policies with these generated data ( policy-ShapeGen ) and compare them with policies trained on source demos only ( policy-source ), tested on the scanned object. We also directly replay the collected as well as generated action trajectories ( replay-source , replay-ShapeGen ) on the scanned object, yielding results in Table III. While both the source trajectory and the source policy fail altogether, trajectories generated by ShapeGen can fulfill correctly the task and enable policies to learn from them. This shows that: on the one hand, ShapeGen produces functionally correct trajectories; on the other hand, observation generated by ShapeGen are sufficiently realistic so that the real-world observations during execution are in-distribution for policies trained. 
+
+D. Efficiency Analysis 
+
+ShapeGen provides significant efficiency gain for increasing in-category zero-shot success rate for tasks concerning afixed category of objects. Table II gives typical time require-ments for running each component of the ShapeGen system. Specifically, ShapeGen generates data at about 15 fps, hence 
+
+Tgen = 20 s being a conservative estimation since source episodes contain usually less than 300 frames for our single-skill tasks. Assuming only one category is concerned for simplicity, if we wish to generate data for Nshape shapes for each of Nsrc source demos (yielding a total of Nshape · Nsrc 
+
+novel demonstrations), the overall time cost will be 
+
+T (Nshape , N demo ) =( Tsdf + Twrp ) · Nshape +(Tscan + Twrp ) · 1+ (Tdemo + Tann ) · Ndemo +
+
+Tgen · Nshape · Ndemo 
+
+(13) With Tgen being the dominant coefficient when Nshape ·Ndemo 
+
+grows. In contrast, if we collect all data via teleoperation, the time cost will be 
+
+T ′(Nshape , N demo ) = Tdemo ·Nshape ·Ndemo +t(Nshape ) (14) Where t(Nshape ) is the time cost for collecting Nshape differ-ent objects. Notably Tgen < T demo , making data generation by ShapeGen considerably more time-efficient than manual data collection. 
+
+E. Comparison with Feature Matching 
+
+We compare qualitatively single-point correspondences ex-tracted by our spatial warping network and a naive feature-matching method. For the latter, we use the state-of-the-art image feature extraction model DINOv3 [29] and aggregate a featured pointcloud from rendered images, as detailed in ap-pendix A-F. As shown in Fig. 6, lacking global regularization when extracting correspondence, feature-matching is prone to imprecise matches, hence not robust enough for integration into a fully autonomous data generation system. In contrast, our spatial warping method considers both local and global geometry, producing high-quality single-point correspondence especially for points on rather ‘plain’ regions such as mug rims and lower parts of kettles. Fig. 7: Visualization of Shape Libraries. Visualizations of categories kettle , mug , hammer and scissors are provided. In each category, points of the same color are mapped from a same point on the common template shape. 
+
+Fig. 8: Visualization of generated data. In the generated observations, novel objects are placed correctly on the table in the start and manipulated correctly during execution to fulfill their functionalities; also, the gripper is translated accordingly to the correct location for grasping and manipulation. 
+
+F. Visualizations 
+
+In this section, we provide more visualizations. Fig. 7 shows point correspondence extracted by trained spatial warping networks. Trained solely under geometric supervision, spa-tial warpings in Shape Libraries can satisfactorily establish function-aware point correspondence for different shapes. This enables our pipeline to map automatically annotated keypoints on the actual shape Sa to each shape in the Library, automating the alignment and generation pipeline. Fig. 8 gives rendered pointcloud images of generated observations. In the generated data, novel object shapes are placed correctly on the table in the start, and manipulated correctly by the gripper to fulfill their functionalities. V. C ONCLUSION 
+
+In this paper, we present ShapeGen, a robotic data gener-ation framework designed to enhance the in-category shape generalizability of manipulation policies. Starting from a sin-gle source demonstration, ShapeGen can seamlessly substi-tute objects with diverse in-category shapes and modify the corresponding action trajectories correctly. This allows for automated synthesis of large-scale diversified manipulation data while requiring only a one-minute human annotation on the initial source demo. At its core, we develop an geometry-based, function-aware curation method to construct plug-and-play Shape Libraries with neural-based dense correspondences between object pairs. Notably, this library is highly scalable, supporting integration of new shapes in O(1) time. Leveraging established correspondences, in the data generation pipeline, ShapeGen composites novel 3D point clouds observation by substituting the actually manipulated object with various shapes under proper alignment, and transforms gripper tra-jectories accordingly. Extensive experiments across multiple representative tasks demonstrate that ShapeGen produces high-quality, diverse demonstrations, significantly bolstering the out-of-distribution generalization of state-of-the-art manipula-tion policies. 
+
+Potential Limitations. Although ShapeGen injects complex and flexible geometric diversity into training data, the full potential of this framework has not been exhaustively demon-strated within the current experimental scope. Future work will focus more on intricate tasks that require for policies a deeper understanding of functional parts of objects being manipulated, and further validate the potential of ShapeGen to scale up training data more drastically. Our framework does not support deformation objects, because the complex dynamics normally requires either training a dynamics model or using a physics simulator and is out of the scope of our current research; however, ShapeGen can be extended to support articulated objects via a set of engineering efforts: (a) adopt a mesh reconstruction method that supports articulation; (b) train part-level Shape Libraries and then aggregate the parts under articulation constraints. We plan to implement this in subsequent work as an extension. REFERENCES 
+
+[1] Hassan Abu Alhaija, Jose Alvarez, Maciej Bala, Tiffany Cai, Tianshi Cao, Liz Cha, Joshua Chen, Mike Chen, Francesco Ferroni, Sanja Fidler, et al. Cosmos-transfer1: Conditional world generation with adaptive multimodal control. arXiv preprint arXiv:2503.14492 , 2025. [2] Arslan Ali, Junjie Bai, Maciej Bala, Yogesh Balaji, Aaron Blakeman, Tiffany Cai, Jiaxin Cao, Tianshi Cao, Elizabeth Cha, Yu-Wei Chao, et al. World simulation with video foundation models for physical ai. arXiv preprint arXiv:2511.00062 , 2025. [3] Kevin Black, Noah Brown, Danny Driess, Adnan Es-mail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. π0: A vision-language-action flow model for general robot control. 
+
+arXiv preprint arXiv:2410.24164 , 2024. [4] Qingwen Bu, Jisong Cai, Li Chen, Xiuqi Cui, Yan Ding, Siyuan Feng, Shenyuan Gao, Xindong He, Xuan Hu, Xu Huang, et al. Agibot world colosseo: A large-scale manipulation platform for scalable and intelligent embodied systems. In IROS , 2025. [5] Lawrence Yunliang Chen, Chenfeng Xu, Karthik Dhar-marajan, Muhammad Zubair Irshad, Richard Cheng, Kurt Keutzer, Masayoshi Tomizuka, Quan Vuong, and Ken Goldberg. Rovi-aug: Robot and viewpoint augmentation for cross-embodiment robot learning. In CoRL , 2024. [6] Xingyu Chen, Fu-Jen Chu, Pierre Gleize, Kevin J Liang, Alexander Sax, Hao Tang, Weiyao Wang, Michelle Guo, Thibaut Hardin, Xiang Li, et al. Sam 3d: 3dfy anything in images. arXiv preprint arXiv:2511.16624 , 2025. [7] Shuo Cheng, Caelan Garrett, Ajay Mandlekar, and Dan-fei Xu. Nod-tamp: Generalizable long-horizon planning with neural object descriptors. In CoRL , 2024. [8] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. The International Journal of Robotics Research , 44(10-11):1684–1704, 2025. [9] Yu Fang, Yue Yang, Xinghao Zhu, Kaiyuan Zheng, Gedas Bertasius, Daniel Szafir, and Mingyu Ding. Rebot: Scaling robot learning with real-to-sim-to-real robotic video synthesis. In IROS , 2025. [10] Xingyi He, Adhitya Polavaram, Yunhao Cao, Om Desh-mukh, Tianrui Wang, Xiaowei Zhou, and Kuan Fang. Generate, transfer, adapt: Learning functional dexterous grasping from a single human demonstration. arXiv preprint arXiv:2601.05243 , 2026. [11] Yingdong Hu, Fanqi Lin, Pingyue Sheng, Chuan Wen, Jiacheng You, and Yang Gao. Data scaling laws in imitation learning for robotic manipulation. In ICLR ,2025. [12] Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Es-mail, Michael Equi, Chelsea Finn, Niccolo Fusai, et al. 
+
+π0.5: a vision-language-action model with open-world generalization. arXiv preprint arXiv:2504.16054 , 2025. [13] Yuanchen Ju, Kaizhe Hu, Guowei Zhang, Gu Zhang, Mingrun Jiang, and Huazhe Xu. Robo-abc: Affordance generalization beyond categories via semantic correspon-dence for robot manipulation. In ECCV , 2024. [14] Bernhard Kerbl, Georgios Kopanas, Thomas Leimk¨ uhler, and George Drettakis. 3d gaussian splatting for real-time radiance field rendering. ACM Trans. Graph. , 42(4):139– 1, 2023. [15] Alexander Khazatsky, Karl Pertsch, Suraj Nair, Ash-win Balakrishna, Sudeep Dasari, Siddharth Karam-cheti, Soroush Nasiriany, Mohan Kumar Srirama, Lawrence Yunliang Chen, Kirsty Ellis, et al. Droid: A large-scale in-the-wild robot manipulation dataset. In 
+
+RSS , 2024. [16] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An open-source vision-language-action model. In CoRL ,2024. [17] Yuxuan Kuang, Junjie Ye, Haoran Geng, Jiageng Mao, Congyue Deng, Leonidas Guibas, He Wang, and Yue Wang. Ram: Retrieval-based affordance transfer for generalizable zero-shot robotic manipulation. In CoRL ,2024. [18] Kevin Lin, Varun Ragunath, Andrew McAlinden, Aa-ditya Prasad, Jimmy Wu, Yuke Zhu, and Jeannette Bohg. Constraint-preserving data generation for visuomotor policy learning. arXiv preprint arXiv:2508.03944 , 2025. [19] Liu Liu, Xiaofeng Wang, Guosheng Zhao, Keyu Li, Wenkang Qin, Jiaxiong Qiu, Zheng Zhu, Guan Huang, and Zhizhong Su. Robotransfer: Geometry-consistent video diffusion for robotic visual policy transfer. arXiv preprint arXiv:2505.23171 , 2025. [20] Zeyi Liu, Shuang Li, Eric Cousineau, Siyuan Feng, Ben-jamin Burchfiel, and Shuran Song. Geometry-aware 4d video generation for robot manipulation. arXiv preprint arXiv:2507.01099 , 2025. [21] Ajay Mandlekar, Soroush Nasiriany, Bowen Wen, Ireti-ayo Akinola, Yashraj Narang, Linxi Fan, Yuke Zhu, and Dieter Fox. Mimicgen: A data generation system for scalable robot learning using human demonstrations. In 
+
+CoRL , 2023. [22] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik, Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. Nerf: Representing scenes as neural radiance fields for view synthesis. Communications of the ACM , 65(1):99– 106, 2021. [23] Thomas M¨ uller, Alex Evans, Christoph Schied, and Alexander Keller. Instant neural graphics primitives with a multiresolution hash encoding. ACM transactions on graphics (TOG) , 41(4):1–15, 2022. [24] Abby O’Neill, Abdul Rehman, Abhiram Maddukuri, Ab-hishek Gupta, Abhishek Padalkar, Abraham Lee, Acorn Pooley, Agrim Gupta, Ajay Mandlekar, Ajinkya Jain, et al. Open x-embodiment: Robotic learning datasets and rt-x models: Open x-embodiment collaboration 0. In ICRA , 2024. [25] Jeong Joon Park, Peter Florence, Julian Straub, Richard Newcombe, and Steven Lovegrove. Deepsdf: Learning continuous signed distance functions for shape represen-tation. In CVPR , 2019. [26] Zezhong Qian, Xiaowei Chi, Yuming Li, Shizun Wang, Zhiyuan Qin, Xiaozhu Ju, Sirui Han, and Shanghang Zhang. Wristworld: Generating wrist-views via 4d world models for robotic manipulation. arXiv preprint arXiv:2510.07313 , 2025. [27] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Ro-man R¨ adle, Chloe Rolland, Laura Gustafson, et al. Sam 2: Segment anything in images and videos. In ICLR ,2025. [28] Vaibhav Saxena, Matthew Bronars, Nadun Ranawaka Arachchige, Kuancheng Wang, Woo Chul Shin, Soroush Nasiriany, Ajay Mandlekar, and Danfei Xu. What matters in learning from large-scale datasets for robot manipula-tion. In ICLR , 2025. [29] Oriane Sim´ eoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Micha¨ el Ramamonjisoa, et al. Dinov3. arXiv preprint arXiv:2508.10104 , 2025. [30] Anthony Simeonov, Yilun Du, Andrea Tagliasac-chi, Joshua B Tenenbaum, Alberto Rodriguez, Pulkit Agrawal, and Vincent Sitzmann. Neural descriptor fields: Se (3)-equivariant object representations for manipula-tion. In ICRA , 2022. [31] Chao Tang, Anxing Xiao, Yuhong Deng, Tianrun Hu, Wenlong Dong, Hanbo Zhang, David Hsu, and Hong Zhang. Mimicfunc: Imitating tool manipulation from a single human video via functional correspondence. arXiv preprint arXiv:2508.13534 , 2025. [32] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. Vggt: Visual geometry grounded transformer. In CVPR , 2025. [33] Qianxu Wang, Haotong Zhang, Congyue Deng, Yang You, Hao Dong, Yixin Zhu, and Leonidas Guibas. Sparsedff: Sparse-view feature distillation for one-shot dexterous manipulation. In ICLR , 2024. [34] Yixuan Wang, Mingtong Zhang, Zhuoran Li, Tarik Ke-lestemur, Katherine Driggs-Campbell, Jiajun Wu, Li Fei-Fei, and Yunzhu Li. D 3 fields: Dynamic 3d descriptor fields for zero-shot generalizable rearrangement. In 
+
+CoRL , 2024. [35] Bowen Wen, Wei Yang, Jan Kautz, and Stan Birchfield. Foundationpose: Unified 6d pose estimation and tracking of novel objects. In CVPR , 2024. [36] Xiuwei Xu, Angyuan Ma, Hankun Li, Bingyao Yu, Zheng Zhu, Jie Zhou, and Jiwen Lu. R2rgen: Real-to-real 3d data generation for spatially generalized manipulation. 
+
+arXiv preprint arXiv:2510.08547 , 2025. [37] Zhengrong Xue, Shuying Deng, Zhenyang Chen, Yixuan Wang, Zhecheng Yuan, and Huazhe Xu. Demogen: Synthetic demonstration generation for data-efficient vi-suomotor policy learning. In RSS , 2025. [38] Ge Yan, Jiyue Zhu, Yuquan Deng, Shiqi Yang, Ri-Zhao Qiu, Xuxin Cheng, Marius Memmel, Ranjay Krishna, Ankit Goyal, Xiaolong Wang, et al. Maniflow: A general robot manipulation policy via consistency flow training. 
+
+arXiv preprint arXiv:2509.01819 , 2025. [39] Sizhe Yang, Wenye Yu, Jia Zeng, Jun Lv, Kerui Ren, Cewu Lu, Dahua Lin, and Jiangmiao Pang. Novel demonstration generation with gaussian splatting en-ables robust one-shot manipulation. arXiv preprint arXiv:2504.13175 , 2025. [40] Justin Yu, Letian Fu, Huang Huang, Karim El-Refai, Rares Andrei Ambrus, Richard Cheng, Muham-mad Zubair Irshad, and Ken Goldberg. Real2render2real: Scaling robot data without dynamics simulation or robot hardware. In CoRL , 2025. [41] Tianhe Yu, Ted Xiao, Austin Stone, Jonathan Tompson, Anthony Brohan, Su Wang, Jaspiar Singh, Clayton Tan, Jodilyn Peralta, Brian Ichter, et al. Scaling robot learning with semantically imagined experience. In RSS , 2023. [42] Chengbo Yuan, Suraj Joshi, Shaoting Zhu, Hang Su, Hang Zhao, and Yang Gao. Roboengine: Plug-and-play robot data augmentation with semantic robot segmenta-tion and background generation. In IROS , 2025. [43] Yanjie Ze, Zixuan Chen, Wenhao Wang, Tianyi Chen, Xialin He, Ying Yuan, Xue Bin Peng, and Jiajun Wu. Generalizable humanoid manipulation with improved 3d diffusion policies. arXiv preprint arXiv:410.10803 , 2024. [44] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan Wang, and Huazhe Xu. 3d diffusion policy: Generalizable visuomotor policy learning via simple 3d representations. arXiv preprint arXiv:2403.03954 , 2024. [45] Yujie Zhao, Hongwei Fan, Di Chen, Shengcong Chen, Liliang Chen, Xiaoqi Li, Guanghui Ren, and Hao Dong. Real2edit2real: Generating robotic demonstrations via a 3d control interface. In CVPR , 2026. [46] Zerong Zheng, Tao Yu, Qionghai Dai, and Yebin Liu. Deep implicit templates for 3d shape representation. In 
+
+CVPR , 2021. [47] Siyuan Zhou, Yilun Du, Jiaben Chen, Yandong Li, Dit-Yan Yeung, and Chuang Gan. Robodreamer: Learning compositional world models for robot imagination. In 
+
+ICML , 2024. [48] Junzhe Zhu, Yuanchen Ju, Junyi Zhang, Muhan Wang, Zhecheng Yuan, Kaizhe Hu, and Huazhe Xu. Dense-matcher: Learning 3d semantic correspondence for category-level manipulation from a single demo. In 
+
+ICLR , 2025. APPENDIX AIMPLEMENTATION DETAILS 
+
+A. Warping Training 
+
+We adopt the LSTM network architecture used in DIT [46] with an additional residual connection as the spatial warping architecture. Training inputs are sampled on a 256 ×256 ×256 
+
+grid on the cube [−0.05 , 1.05] 3 given that the 3D shape is normalized to be within the unit cube. We discard points with groundtruth SDF values greater than 0.2 to ensure that the warping focuses mainly on points near the surface. We train all warpings using Adam and DIT-like learning rate scheduling, with batch size 8196 for a total of 2 epochs. Training each warping takes about 5 minutes on a single RTX A6000 GPU. 
+
+B. Policy Training and Deployment 
+
+We use ManiFlow [38] that takes robot state with N =8192 uncolored points observation as input. We discard points that are over Dmax = 0 .8 metres from the origin of camera frame before sampling pointcloud from depth image. We take action prediction horizon Tp = 16 , observation horizon To =2, and execute all actions in each action chunk at 6 Hz before inferring new actions in deployment. All policies are trained on a single RTX A6000 GPU using AdamW (learning rate 
+
+1×10 −4, betas (0 .9, 0.95) , weight decay 1×10 −3) with batch size 256 for 16k iterations regardless of dataset size. Training each policy takes about 5 hours. 
+
+C. Annotation Procedure 
+
+We ask an annotator to provide an annotation.json 
+
+for each source demonstration. Here is an example:                  
+
+> {
+> aa"objects": {
+> aaaa"mug_pink": {
+> aaaaaa"category": "mug", aaaaaa"gripped": true, aaaaaa"gripper_keypoint": [aaaaaaaa[ aaaaaaaaaa-0.03592510148882866, aaaaaaaaaa0.10562200099229813, aaaaaaaaaa0.023572899401187897 aaaaaaaa] aaaaaa], aaaaaa"functionals": [aaaaaaaa {
+> aaaaaaaaaa"tstamp": 0, aaaaaaaaaa"keypoints": {
+> aaaaaaaaaaaa"mode": "simple", aaaaaaaaaaaa"points": [aaaaaaaaaaaaaa[ aaaaaaaaaaaaaaaa-0.001282079960219562, aaaaaaaaaaaaaaaa0.0028379999566823244, aaaaaaaaaaaaaaaa0.003494200063869357 aaaaaaaaaaaaaa] aaaaaaaaaaaa] aaaaaaaaaa }
+> aaaaaaaa },aaaaaaaa {
+> aaaaaaaaaa"tstamp": 100, aaaaaaaaaa"keypoints": "ditto"
+> aaaaaaaa },aaaaaaaa {
+> aaaaaaaaaa"tstamp": 115, aaaaaaaaaa"keypoints": {
+> aaaaaaaaaaaa"mode": "simple", aaaaaaaaaaaa"points": [aaaaaaaaaaaaaa[ aaaaaaaaaaaaaaaa-0.0020681601017713547, aaaaaaaaaaaaaaaa0.08404900133609772, aaaaaaaaaaaaaaaa-0.049066800624132156 aaaaaaaaaaaaaa] aaaaaaaaaaaa] aaaaaaaaaa }
+> aaaaaaaa }
+> aaaaaa] aaaa }
+> aa },aa"other_foreground_objects": ["tree"]
+> }
+
+Generally, the annotator only needs to provide 
+
+"gripper_keypoint" and several entries in 
+
+"functionals" . "gripper_keypoint" should be a point in the gripped part on Sa . As for the latter, in each entry, "tstamp" stands for timestamp ti, "points" 
+
+the points Pti , and "mode" a key designating one of several alignment cost functions Gti ’s we have implemented. Here, "simple" stands for the simple square error (plus a restriction that both shapes are aligned to the canonical orientation), where the optimal alignment is the translation-only transformation that aligns the center of Waj [Pti ] to that of Pti . "ditto" means using the same keypoints entry as the previous one. The annotation provided here requires to align the mug by a point on its bottom strictly from t1 = 0 
+
+to t1 = 100 (interpolation is actually performed between two identical alignments), interpolate between two alignments from t2 = 100 to t3 = 115 , and align by a point on its handle strictly from t3 = 115 on. The point coordinate can be obtained via clicking on the 3D model in Blender. We use a simple script to get coordinate of the clicked point. 
+
+D. Warping Refinement 
+
+We use a refining step, 
+
+refine( x, S ) = arg min 
+
+> y∈S
+
+∥x − y∥2 (15) to mitigate error caused by imperfect W when calculating composite warping functions Waj = W0j ◦ W a0 . To find the nearest point y on surface of S efficiently, we use a simple Line Search method over the gradient direction: 
+
+t∗ = min 
+
+n
+
+t ∈ R+ :
+
+f sdf  x − t · ∇ xf sdf (x) · sgn( f sdf (x))  = 0 
+
+o
+
+(16) 
+
+refine( x, S ) = x − t∗ · ∇ xf sdf (x) · sgn( f sdf (x)) (17) which is illustrated in Fig. 9. Fig. 9: Refining step. A Line Search is done along the negative derivative direction to find a point on surface. 
+
+E. Action Correction 
+
+In this section, we detail the calculation of 
+
+a′ 
+
+> t
+
+= Tc2b T g 
+
+> t
+
+T −1c2b at (18) Where Tc2b is the SE(3) transformation matrix from robot base frame to camera frame, at, a ′ 
+
+> t
+
+end-effector pose in robot base frame, and T g 
+
+> t
+
+a translation-only transformation in camera frame. Note that letting 
+
+Tc2b =
+
+Rc2b tc2b 
+
+0 1
+
+
+
+, T g 
+
+> t
+
+=
+
+I t
+
+0 1
+
+
+
+(19) we get 
+
+Tc2b T g 
+
+> t
+
+T −1c2b =
+
+Rc2b tc2b 
+
+0 1
+
+  I t
+
+0 1
+
+  R⊤ 
+
+> c2b
+
+−R⊤
+
+> c2b
+
+tc2b 
+
+0 1
+
+
+
+=
+
+Rc2b tc2b + Rc2b t
+
+0 1
+
+  R⊤ 
+
+> c2b
+
+−R⊤
+
+> c2b
+
+tc2b 
+
+0 1
+
+
+
+=
+
+I −tc2b + tc2b + Rc2b t
+
+0 1
+
+
+
+=
+
+I Rc2b t
+
+0 1
+
+
+
+(20) which is also translation-only. Thus, to obtain a′
+
+> t
+
+, we only need to add a translation Rc2b t to the translation component of at.
+
+F. Feature Matching with DINOv3 
+
+We derive feature-matching correspondence with DINOv3 by aggregating pixel features into pointcloud features in the following way: first, Nimg = 16 images are rendered from different viewpoints of a shape (with colored texture) from the Library; then, N 0pcd = 5000 points are sampled from the shape surface, which are subsequently filtered to remove points invisible from every rendered image (mostly points on the inner surfaces), resulting in about Npcd = 3000 valid points. Each valid point gets its final feature by averaging all pixel features retrieved by visible 2D projections of the point. For each designated point on a source shape Si, we use the feature of its spatially closest neighbor from the sample pointcloud of 
+
+Si to query that of Sj and accept directly the closest neighbor in feature space as the matched point. APPENDIX BREAL -WORLD EXPERIMENTS 
+
+A. Task Definition 
+
+We design 4 tasks for evaluating the effectiveness of Shape-Gen. The tasks are described as follows:  
+
+> •
+
+hang_mug . The gripper grasps the mug by its rim, transports it and plugs the mug handle into the rack.  
+
+> •
+
+hang_mug_hard . The gripper grasps the mug by its rim, rotates and transports it, then plugs the mug handle into the rack.  
+
+> •
+
+serve_kettle . The gripper grasps the kettle by its handle, rotates and transports it, then puts it onto a wooden block.  
+
+> •
+
+pour_water . The gripper grasps the kettle by its han-dle, transports it then tilts it for pouring water into a static mug. 
+
+B. Evaluation Protocol 
+
+In evaluation, we identify an execution a success if every step of the task is completed. If the policy fails to grasp the relevant object, or drops it amidst execution, then it is identified as a failure. Beside these, there are also task-specific requirements:  
+
+> •
+
+hang_mug and hang_mug_hard . The mug handle should be inserted onto the rack.  
+
+> •
+
+serve_kettle . The kettle should not drop down when the gripper releases.  
+
+> •
+
+pour_water . The vertical projection of the spout ori-fice should be within the inner diameter of the mug’s rim. Cases not fulfilling these requirements will also be identified as failure. 
+
+C. Data Generation 
+
+For each task, we generate 15x more data with ShapeGen, each with a different shape. These 15x shapes are actually derived from 5 different 3D models, each at 3 distinct scales. The models are generated via SAM3D [6] from Internet-sourced images. Scales are selected based on the actual scale of source object. Let lsrc be diagonal length of the axis-aligned bounding box of source object shape Sa, we scale shapes in the Library such that their bounding box diagonal length equals to 0.8lsrc , l src and 1.2lsrc respectively. We visualize in detail the selected shapes as well as the picked template shape in Fig. 10. Fig. 10: Shapes in Library used for data generation. The leftmost column shows the shape reserved as common template, while other 5 columns show shapes used to generate novel data. 
+
+Fig. 11: Visualization of generation results with system component omission. Omitting f.w.a. leads to misalignment, while omitting g.a.c. causes wrong gripping action in the case shown. TABLE IV: Analysis of SR Variance. Success rate is reported for the task hang_mug .                                
+
+> instance mug blackandwhite (#1) mug white (#2)
+> position #1 #2 #3 #4 #5 #1 #2 #3 #4 #5
+> SR/real 0/5 0/5 0/5 0/5 0/5 0/5 0/5 0/5 0/5 0/5
+> SR/real+ShapeGen 5/5 5/5 0/5 0/5 5/5 0/5 5/5 5/5 0/5 5/5
+
+D. Analysis of SR Variance 
+
+We cut down on the number of trials for an observation that same initial configuration leads to highly repeatable outcomes. This can be demonstrated by results shown in Table IV, obtained by running multiple rollouts on the same initial con-figuration (with full reset to inject inevitable small variations) of the task hang_mug . The method by which most existing manipulation research extends evaluation rollouts, i.e. random-izing spatial configuration, does not suit our work because our primary concern is augmenting shape generalizability. APPENDIX CABLATION ON SYSTEM COMPONENTS 
+
+TABLE V: Ablation on system components. Success rate is reported. 
+
+method hang mug 
+
+#1 #2 #3 #4 total 
+
+5 source 0/5 0/5 0/5 1/5 1/20 
+
++ShapeGen w/o f.w.a. 0/5 0/5 0/5 0/5 0/20 
+
++ShapeGen w/o g.a.c. 1/5 0/5 0/5 3/5 4/20 
+
++ShapeGen 3/5 3/5 1/5 2/5 9/20 We conduct ablation study on ShapeGen system components with the task hang_mug . Specifically, we study the influence of function-aware alignment and gripper action correction on performance of policies trained with ShapeGen-augmented data. In the ShapeGen w/o f.w.a. modification, we remove the function-aware alignment process, solely aligning the shapes to a common canonical orientation (which is equivalent to setting the warping to a uniform scaling), and carry out other procedures, including gripper action correction, as usual. In the ShapeGen w/o g.a.c. modification, we omit gripper action correction and keep all other procedures unchanged. Experimental result presented in Table V shows that removing either component results in significant performance drop. As shown in Fig. 11, omitting f.w.a. means manipulated objects in generated demos are not properly aligned for fulfilling their functionalities, which in our experiments results in that the mug being manipulated frequently collides with the rack, and that at times the gripper fails to pick up the mug altogether. Removing g.a.c. also leads to the latter problem, and at the same time means that all generated demos share the same action trajectory with the source demo. We observe in experiment that policies trained on ShapeGen w/o g.a.c. data fail in patterns similar to those trained with source data only.
