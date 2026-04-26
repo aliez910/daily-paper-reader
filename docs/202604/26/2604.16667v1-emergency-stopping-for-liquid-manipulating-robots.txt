@@ -1,0 +1,278 @@
+Title: Emergency Stopping for Liquid-manipulating Robots
+
+URL Source: https://arxiv.org/pdf/2604.16667v1
+
+Published Time: Tue, 21 Apr 2026 00:17:16 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Emergency Stopping for Liquid-manipulating Robots 
+
+Samuli Hynninen 1, Ville Kyrki 1
+
+Fig. 1: Overview of the proposed emergency stop architecture. The real-time control loop (yellow) communicates with the robot and updates the liquid state estimate, while the optimization loop (blue) continuously computes time-optimal, spill-free stopping trajectories. Green boxes denote shared-memory variables. Before emergency-stop activation, the liquid surface estimate is initialized such that the surface normal is perpendicular to the container’s vertical axis. 
+
+Abstract — Manipulating open liquid containers is challenging because liquids are highly sensitive to vessel accelerations and jerks. Although spill-free liquid manipulation has been widely studied, emergency stopping under unexpected hazards has received little attention, despite the fact that abrupt braking may cause hazardous spills. This letter presents an emergency stop system for robots manipulating liquids in open contain-ers. We formulate emergency stopping as an optimal control problem and solve it in a model predictive control framework to generate time-optimal, spill-free stopping trajectories. The method operates as a plug-and-play safety layer on top of ex-isting slosh-free motion planning methods, enabling immediate reaction to detected hazards while accounting for nonlinear liquid dynamics. We demonstrate, through simulation and on a 7-DoF Franka Emika Panda robot, that the proposed approach achieves fast emergency stopping without spilling.   
+
+> We acknowledge the financial support of the Finnish Ministry of Educa-tion and Culture through the Intelligent Work Machines Doctoral Education Pilot Program (IWM VN/3137/2024-OKM-4). V. Kyrki acknowledges the research environment provided by ELLIS Institute Finland
+> 1Intelligent Robotics Group at the Department of Electrical Engineer-ing and Automation, School of Electrical Engineering, Aalto University, Finland. {firstname.lastname }@aalto.fi
+
+I. I NTRODUCTION 
+
+The ability to manipulate open liquid containers is vital in various applications of robotics, for example, when assistant robots serve beverages or industrial robots transfer chemicals in factory settings. However, manipulating such containers is notoriously difficult because liquids exhibit complex nonlin-ear dynamics and react easily to even small accelerations of the container. For that reason, slosh suppression, as well as spill- and slosh-free manipulation, are widely studied problems in robotic manipulation [1]–[13]. Proposed solutions mostly rely on simplified mechanical slosh models to avoid compu-tationally heavy fluid dynamics simulations, or omit model-ing and focus on minimizing the slosh-inducing forces acting on the container. Despite extensive research, none of the existing methods account for unexpected execution-time collision hazards, such as those caused by unpredictable human behavior, that necessitate rapid stopping of the robot for safety. Even if the collision can be avoided by a prompt reaction, the liquid inside the container (e.g., hot coffee) may cause severe damage if spilled due to overly aggressive emergency 
+
+> arXiv:2604.16667v1 [cs.RO] 17 Apr 2026
+
+braking. For this reason, stopping must be performed both quickly and safely. Such a stopping strategy requires careful consideration of the trade-off between rapid deceleration and induced slosh. Furthermore, the problem is particularly chal-lenging because the complex, nonlinear liquid dynamics must be incorporated into a real-time model that provides optimal stopping trajectories for arbitrary initial states without delay. To this end, we propose an emergency stopping method that enables immediate reaction and brings a liquid-carrying robot to rest in a time-optimal manner while ensuring that no liquid is spilled. We achieve this by formulating the emergency stop as an optimal control problem and solving it repeatedly in a model predictive control (MPC) fashion. The proposed method works as a plug-and-play safety feature on top of existing slosh-free motion planning methods, such as [3], [7]. Furthermore, we carefully address the nonlinearities of our liquid dynamics model to enable fast computations without compromising the model’s predictive power or lim-iting the robot’s motion directions in 6D space. The proposed method is robust to moderate modeling errors, and the liquid model used can be applied to various container sizes and shapes [14], [15]. To summarize, this work makes the following contribu-tions  
+
+> •
+
+We formalize the problem of emergency stopping in liq-uid manipulation. The problem has applications across various domains, from household robotics to industrial manufacturing.  
+
+> •
+
+We propose an MPC-style emergency stopping ap-proach that achieves rapid stopping while preventing liquid spillage. The approach serves as a plug-and-play safety layer atop existing slosh-free motion planning methods.  
+
+> •
+
+We provide a comprehensive analysis of the proposed method through simulation experiments and demon-strate its performance on real robot hardware using actual water as an example liquid. II. R ELATED WORK 
+
+A. Liquid manipulation 
+
+Spill-free liquid manipulation and slosh suppression are extensively studied problems in robotics and automation. Contributions include input shaping methods [2], [6], [9]– [11], which analyze the liquid’s natural sloshing frequencies in the given container and use filtering techniques to adjust control inputs that would otherwise excite sloshing. Slosh-modeling-based trajectory optimization methods are intro-duced in [4], [5], [8], [13]. In these methods, a simplified mechanical model of liquid dynamics is used, and the goal is to plan the trajectory from the beginning so that slosh is minimized or remains within given limits while still being time-efficient. An alternative trajectory optimization approach is introduced in [7], in which the authors use a concept of virtual pendulum to mimic the behaviour of a me-chanical slosh-free tray called SpillNot [16]. Furthermore, [3] introduces a trajectory optimization approach that uses the idea of a virtual quadrotor to ensure that accelerations acting on the container are perpendicular to the liquid surface, and thus, slosh-free. A recent work [1] utilizes learned dynamics and a transformer-based neural network to generate clutter-aware paths and trajectories without spill. Despite numerous methods for spill-free liquid manipula-tion, none of the existing methods accounts for the possibility that the planned path and trajectory may become hazardous during execution, necessitating real-time adaptation and re-planning to ensure safety. The current work introduces an emergency trajectory planning method that enables an im-mediate reaction to a detected hazard and brings the system to a stop in a safe, time-optimal manner. Our method falls into a similar category of trajectory optimization to [3]–[5], [7], [8], [13], but unlike these works, we do not have a pre-specified reference path or goal pose to follow. To ensure spill-freeness of the emergency stop trajectory, we use a similar slosh modeling approach to [4], [5], [8], [13]. 
+
+B. Emergency stop 
+
+The emergency stop problem has been extensively studied in fields such as autonomous driving [17]–[22]. While these works share the same goal of halting the system safely and as quickly as possible, the environment and related assumptions differ significantly from our case. Meanwhile, emergency stopping has received very limited attention in robotic manipulation. In this context, works such as [23], [24] have considered an emergency stop as one option for reacting to a detected collision. Still, because these works consider only an empty manipulator and have no non-prehensile or unactuated components, the emergency stop strategy reduces to a trivial full-force braking. Conceptually, the closest case to ours is emergency brak-ing systems for overhead cranes [25]–[28], where payload swing poses a challenge analogous to liquid slosh. However, due to the hardware environment, these systems consider only 1D linear motion and one-directional swinging, making the task significantly simpler than our case of 6D motions, 2 DoF sloshing, and a multi-DoF robotic manipulator. III. B ACKGROUND 
+
+A. Problem description and solution overview 
+
+We address the problem of bringing a robotic manipulator arm carrying a liquid container to rest as quickly as possible, without spilling the liquid, after an emergency stop is trig-gered. Formally, this means minimizing the cumulative sum of the Cartesian velocities while obeying no-spill constraints for the allowed liquid-surface inclination. Importantly, our emergency stop system builds on existing slosh-free motion generation methods, such as [3], [7]. Slosh-free motion planning guarantees that, at the start of the emergency stop, the liquid surface normal is aligned with the container’s vertical axis. Thus, we know the liquid’s initial state without challenging real-time perception, and we have a starting point for modeling its evolution. The proposed method uses a standard model predictive control approach, in which we repeatedly solve optimal control problems with a receding time horizon. We use a well-established spherical pendulum model of liquid slosh for its computational efficiency and reasonable modeling accuracy. Even with the simplified fluid dynamics model, the prob-lem remains highly nonlinear and thus requires intricate linearization efforts to enable real-time tractability without sacrificing modeling power. Ultimately, we formulate the problem as a Quadratic Program (QP) and first solve it in the task space. The task-space solution is then converted into the joint-space using the Resolved Acceleration Control (RAC) approach [29], that is, by solving another small-scale QP. 
+
+B. Liquid slosh modelling 
+
+Mechanical models, such as the spherical pendulum model or mass-spring model, are well-established methods for an-alyzing and predicting liquid slosh [14]. Mechanical models provide a way of modeling slosh in real-time applications, where sophisticated computational fluid dynamics models are infeasible due to computational time constraints. 
+
+1) Spherical pendulum model: In this work, we use the spherical pendulum model, whose state is parametrized by two tilt angles ( θ, ϕ ) about the horizontal axes in the world frame and the pendulum rod length ( l). The dynamics of the system describe how the pendulum behaves when the pendulum’s pivot point accelerates in space. The dynamic equations can be derived by building the Euler-Lagrange equations for the system, and the result can be written 
+
+l¨θ = ( g + ¨ z) sin θ cos ϕ + ¨ x cos θ + ¨ y sin ϕ sin θ
+
+− l cos θ sin θ ˙ϕ2 (1) 
+
+l cos θ ¨ϕ = ( g + ¨ z) sin ϕ − ¨y cos ϕ + 2 l ˙ϕ ˙θ sin θ (2) where ¨x, ¨y, ¨z refer to pendulum pivot point accelerations. Solving the full nonlinear equations in real-time applica-tions is infeasible, and therefore, we linearize the equations. However, we make an important distinction from previous work, in which the equations are usually linearized simply by assuming small angles and using the first-order Taylor approximation. The first-order Taylor approximation loses the coupling between vertical accelerations and the pen-dulum state, effectively ignoring vertical dynamics. While restricting to planar motions might be reasonable in some applications, for an emergency stop system, this would be an unacceptable oversimplification. For this reason, we maintain the bilinear coupling terms between ¨zp and θ, ϕ so that we end up with bilinear small-angle dynamics 
+
+¨θ = g + ¨ zl θ + 1
+
+l ¨x (3) 
+
+¨ϕ = g + ¨ zl ϕ − 1
+
+l ¨y. (4) When we solve the optimal control problem, we linearize the problematic bilinear terms around a nominal trajectory (solution from the previous round) for each time step in the optimization horizon. 
+
+2) Rod length estimation: To use the pendulum model, the rod length must be estimated based on the container’s shape and size. A well-established [14], [15] method to determine the rod length l uses the natural frequencies of slosh. For a cylindrical container, the natural frequency of the first sloshing mode is 
+
+fn =
+
+r gξ R tanh 
+
+ hξ R
+
+
+
+, (5) where ξ is the first root of the derivative of the Bessel function of the first kind, R is the radius of the container, and 
+
+h is the liquid height. This is related to the rod length by an equality fn = pg/l , which we can solve for l. This approach can be easily extended to non-cylindrical containers, but we refer the reader to [14] for further details. 
+
+C. Robot manipulator model 
+
+The relation between the Cartesian task space and the robot joint space is determined by forward kinematics 
+
+x = f (q), f : Rn → SE (3) , (6) where f can be determined from Denavit-Hartenberg param-eters [30] or elementary transform sequences [31]. For velocities, the relation is derived through robot’s Jacobian J(q) ∈ R6×n, and can be written as 
+
+˙x = J(q) ˙ q. (7) By derivating Eq. (7), we get the expression 
+
+¨x = ˙J(q) ˙ q + J(q)¨ q, (8) for accelerations. IV. M ETHODOLOGY 
+
+A. State-space model 
+
+The state space of our model comprises the pendu-lum angles and angular velocities, the end-effector’s 6-DoF Cartesian velocities, and the end-effector’s 3-DoF Cartesian orientation, totaling 13 state variables. We can write x = [ ˙ x, ˙y, ˙z, θ p, ϕ p, ˙θp, ˙ϕp, θ c, ϕ c, ψ c, ˙θc, ˙ϕc, ˙ψc], where 
+
+θp, ϕ p and their derivatives refer to pendulum angles, and 
+
+θc, ϕ c, ψ c and their derivatives refer to those of the container. We have six control variables, namely the container’s Carte-sian accelerations, u = [¨ x, ¨y, ¨z, ¨θc, ¨ϕc, ¨ψc].We have a discretized time-varying state-equation 
+
+xk+1 = Akxk + Bkuk, (9) where the state transition matrix Ak ∈ R13 ×13 is defined 
+
+Ak =
+
+I3 0 00 A1,k 00 0 A2
+
+ , (10) with 
+
+A1,k =
+
+αkI2 dt I 2
+
+βkI2 I2
+
+
+
+, A2 =
+
+ I3 ∆tI3
+
+03×3 I3
+
+
+
+, (11) where 
+
+αk = 1 + ( g + ¯ ¨zk) ∆2
+
+> t
+
+2l (12) βk = ( g + ¯ ¨zk) ∆t
+
+l , (13) where ¯¨zk is the nominal vertical acceleration, around which we linearize. The control matrix Bk ∈ R13 ×6 is defined 
+
+Bk =
+
+B1,k 07×3
+
+06×3 B2
+
+
+
+(14) with 
+
+B1,k =
+
+
+
+∆tI3
+
+γ 0 γ ¯θp,k 
+
+0 −γ γ ¯ϕp,k 
+
+∆t/l 0 ∆t 
+
+> l
+
+¯θp,k 
+
+0 −∆t/l ∆t 
+
+> l
+
+¯ϕp,k 
+
+ , B2 =
+
+" ∆2 
+
+> t
+> 2
+
+I3
+
+∆tI3
+
+#
+
+,γ = ∆2
+
+> t
+
+2l ,
+
+(15) where ¯θp,k , ¯ϕp,k are the nominal angles for linearization. 
+
+B. QP formulation 
+
+We formulate the optimal control problem as a quadratic program. Our objective is to minimize the cumulative sum of the end-effector’s (container’s) Cartesian velocities, while re-specting the robot’s kinematic limits and no-spill constraints. No-spill constraints are introduced as soft constraints, with a high cost on the non-negative slack variables. Additionally, we add a small jerk cost to smooth the solution space. However, we emphasize that the jerk cost alone is insufficient for planning spill-free stop trajectories, as we will show in the experimental results. By denoting Cartesian velocities by v and jerk by j, we can write 
+
+min 
+
+> uN
+
+X
+
+> k=1
+
+c1|| vk|| 2 + c2|| jk|| 2 + c3δθ,k + c4δϕ,k (16) s.t. xk+1 = Akxk + Bkuk (17) 
+
+θmin ≤ θp,k − θc,k − δθ,k ≤ θmax (18) 
+
+ϕmin ≤ ϕp,k − ϕc,k − δϕ,k ≤ ϕmax (19) 
+
+vmin ≤ vk ≤ vmax (20) 
+
+amin ≤ uk ≤ amax (21) 
+
+δθ,k , δ ϕ,k ≥ 0 (22) where (18), (19) are the no-spill constraints and (20) - (21) are the robot’s kinematic constraints in Cartesian space. For the constants c1, c 2, c 3, c 4 we have c1 < c 2 ≪ c3 = c4. We set c2 at least an order of magnitude smaller than c1, which is set to be at least three orders of magnitude smaller than 
+
+c3, c 4.
+
+C. Resolved Acceleration Control 
+
+To convert the task space control actions into the robot’s joint space while respecting the joint-wise kinematic limits, we rely on Resolved Acceleration Control (RAC) [29] with slack variables, similarly to [3]. This formulation yields another linear quadratic program, which can be solved very fast due to its convexity and small size. Formally, the optimization problem can be written 
+
+min  
+
+> q,˙q,¨q,δ
+
+[q, ˙q, ¨q, δ]P [q, ˙q, ¨q, δ]⊤ (23) s.t. q = q0 + ˙q∆t (24) 
+
+˙q = ˙ q0 + ¨q∆t (25) 
+
+u + δ = ˙J(q0) ˙q + J(q0)¨ q (26) 
+
+qmin ≤ q ≤ qmax (27) 
+
+˙qmin ≤ ˙q ≤ ˙qmax (28) 
+
+¨qmin ≤ ¨q ≤ ¨qmax , (29) where P ∈ R27 ×27 is a diagonal cost matrix defining the weighting between variables. The weights for slack variables are set significantly higher (by orders of magnitude) than those for the other variables. 
+
+D. Implementation 
+
+We run the optimization in a loop in receding horizon fashion with 20 Hz frequency (accordingly, we set ∆t =1/20 ), while a high-frequency real-time control loop (e.g., 1000 Hz for a Franka Emika Panda robot) reads the solution from shared memory and always communicates the first control action to the robot, as in standard model predictive control. This architecture enables an immediate reaction when an emergency stop is triggered, while the stopping plan continues to be optimized continuously. The high-frequency control loop is also responsible for reading the robot’s current state and writing it to shared memory, since the state is used as input to the optimization loop. Moreover, we always use the solution from the previous iteration of the optimization loop as the nominal trajectory, around which we linearize the bilinear terms in the system dynamics. We use a 2-second time horizon in optimization, totaling 40 time steps. Until the emergency stop is initiated, we assume that the liquid surface is perpendicular to the container’s vertical axis, as described in Section III-A. After the emergency stop is initiated, we switch to integrating the pendulum state using the realized Cartesian accelerations. For integration, we use the full nonlinear dynamics of (1) and (2) to improve precision. V. E XPERIMENTS 
+
+A. Simulation analysis 
+
+The goal of the simulation analysis was to investigate how the stopping time behaves as a function of the pendulum rod length and allowed slosh and how robust is the proposed method for modeling errors. We performed the analysis in a custom-made simulator. The simulator models the liquid as a spherical pendulum using the full nonlinear dynamics. The simulator’s update frequency was set to 60 Hz. We did not include a robotic arm for simplicity. Thus, the simulation analysis was limited to the Cartesian task space. As kinematic constraints, we used the Cartesian kinematic constraints of Franka Emika Panda robotic arm to match the later real-world experiments. Fig. 2: Heatmap of stopping times with respect to rod length and maximum allowed slosh In the first experiment, we analyzed how rod length and allowed maximum slosh (maximum inclination angle), determined by the container size and geometry, affect the stopping time. We also studied violations of the no-spill constraints. As a test motion trajectory, we accelerated the container uniformly along each axis so that it reached the speed of 1 m/s during 1 second acceleration period. The acceleration was ramped up smoothly during the period to facilitate smooth pendulum behaviour during the acceleration phase. The stopping was considered complete when the container’s speed reached zero within a tolerance of 10 −2
+
+m/s. We used this tolerance because the system exhibits small-amplitude oscillations around zero. Thus, results with a small tolerance represent the most significant part of the speed curve more accurately. The results are depicted in Figure 2. Here, we report all angles in degrees for ease of understanding. The figure shows that the stopping time was highest for small rod lengths, and unsurprisingly, for small allowed slosh. For small allowed sloshes, the longer rod lengths enabled faster stops. However, when the allowed slosh increased, stopping became faster for small rod lengths. Violations of the no-spill constraints remained small, with the maximum violation averaging 0.29 degrees, and peaking at 0.81 degrees (for rod length 10 mm and allowed slosh of 11 degrees). Average time for which the slosh constraints were violated was 0.63 seconds (max 1.82 seconds for rod length 100 mm and allowed slosh of 1 degree), while average time for the constraints violated by more than 0.2 degrees was 0.11 seconds (max 0.42 seconds for rod length 30 mm and allowed slosh of 9 degrees). While the relative violation of the allowed slosh can be significant when the allowed slosh is very small, in practice, the issue can be addressed by slightly underestimating the allowed slosh and using tighter slosh constraints. The second simulation experiment aimed to assess the robustness of the proposed method to modeling errors. In this experiment, the method received an incorrect rod length as an optimization input and used the same incorrect model 
+
+Fig. 3: The maximum absolute and relative slosh constraint violations with respect to the severity of modeling error for liquid-state integration. We used 50 mm as the true rod length and set the maximum allowed slosh to 5 degrees. We then intentionally misspecified the rod length in the model by 10 %, 20 %, 30 %, 40 %, and 50 %, in both the longer and shorter directions, and analyzed the maximum violation. The results are depicted in Figure 3 The maximum slosh violation increased steadily as the modeling error worsened. The highest maximum slosh vi-olation was 2.03 degrees with a modeling error of +25 mm (+50 %). The maximum slosh violation behaved fairly similarly regardless of whether the modeling error is in the positive or negative direction. Although the severity of violations steadily increased with the modeling error, the model remained relatively robust to parameter uncertainty, with the worst case resulting in a violation of 2 degrees. Although our experiment showed good robustness to relative modeling errors up to 50 %, the relative robustness also depends on the true rod length. 
+
+B. Real-world experiments 
+
+The real-world experiments aimed to validate the proposed method with real hardware and liquid and investigated how well the simulation matches with reality. We conducted the experiments using a 7-DoF Franka Emika Panda robot. For the liquid, we used a cylindrical container with an inner diameter of 80 mm and filled it with water to a height of 100 mm (this results in a rod length of 21 mm). We marked the original surface height on the outer edge of the container with a red marking to facilitate later analysis of the slosh angles. We set a maximum slosh angle of 5 degrees. We measured the realized maximum slosh angles from video recordings of the experiments. We compared the proposed method with a baseline that does not include slosh modeling. The baseline method sim-ply minimizes the cumulative velocity while keeping the same cost for jerk as in the proposed method. The same jerk cost ensures that the differences between the proposed Method Real World Simulation Stopping Time Max Slosh Stopping Time Max Slosh                 
+
+> Ours (exact) 0.87 s 5.3° 0.86 s 5.1° Baseline 0.73 s 22.3° --Ours (-50 %) 0.99 s 1.8° 1.03 s 4.9° Ours (+50 %) 0.86 s 8.1° 0.70 s 5.5°
+
+TABLE I: Results from the experiments with the Lissajous trajectory. Allowed slosh was 5 degrees, and the velocity tolerance for the stopping time measurements was 10 −2
+
+m/s. Comparing simulated and real-world stopping times is slightly complicated, as the simulations exhibit deceleration overshooting that does not occur in real-world experiments method and the baseline are attributable to slosh modeling, not merely to acceleration smoothing. Furthermore, earlier works on slosh-free and spill-free liquid manipulation do not provide a suitable baseline, as they rely on a predefined trajectory or goal pose and cannot be used to stop optimally from an arbitrary initial state when the goal is unknown a priori. In these experiments, we used the Lissajous trajec-tory from [3] as an example motion, and performed an emergency stop after 2/3 seconds, approximately the point of the highest velocity in the whole trajectory (v = [−0.12 , 0.32 , 0.35 , 0.35 , 0.06 , −0.01] ). We also ran the same experiments in simulation for comparison. Table I summarizes the quantitative results, while Figure 4 depicts a qualitative comparison of the maximum slosh be-tween the proposed method and the baseline. The figure and the table show that the proposed method kept the maximum slosh essentially within the given limit of 5 degrees, only violating it by practically negligible 0.3 degrees. On the other hand, the baseline method significantly exceeded this limit and produced maximum slosh of 22.3 degrees. Velocity profiles during the experiment for both methods are illustrated in Figure 5. Naturally, the baseline method brought the system to a stop significantly faster. This is because it does not account for sloshing dynamics or slosh constraints. The velocity profile in the real world matched that of the simulation relatively closely, but was slightly less aggressive and did not exhibit overshoots as in the simulation. The differences are most likely due to small velocity oscillations visible in the real-world motion profile. The measured velocities are used as input parameters in the optimization loop, and the accelerations are incorporated into the liquid dynamics model. Thus, the optimizer easily needs to compensate for these rapid velocity oscillations by adopting less aggressive solutions than in the simulation, where the velocity profile is perfectly smooth. We also tested the method’s robustness to modeling errors in the real world by deliberately over- and under-specifying the rod length by 50 %. Similarly to the first experiment, we measured the maximum slosh angles from a video. As a result, a rod length set too large caused overly aggressive braking that led to a slosh constraint violation. However, the overly aggressive braking primarily affected the velocity in the x-direction, and therefore, the overall stopping time was not significantly shortened. The velocity profile is visualized in Figure 6b. The measured maximum slosh was 5.7 mm, or 8.1 degrees, exceeding the 5-degree limit by 62 %. When this exact experiment with the same modeling error was run in the simulation, the maximum slosh angle remained at 5.5 degrees, and the stopping time dropped to only 0.70 seconds. However, the short stopping time is directly attributable to reduced overshoot compared to the case with no modeling error (real-world experiments did not exhibit overshoot at all). Further, the measured relative violation was also bigger than what was found in the simulation experiment in V-A. This indicates a moderate sim-to-real gap in robustness for modeling errors. Interestingly, misspecifying the rod length to the shorter direction suppressed almost all sloshing. The maximum mea-sured slosh was only 1.3 mm or 1.8 degrees. Theoretically, a shorter rod length makes the pendulum react more strongly to lateral accelerations. For this reason, the robot appeared to perform overly smooth braking, generating only almost negligible sloshing. The velocity profile is visualized in Figure 6a. As in the first real-world experiment, we attribute this finding to the velocity oscillations in the real world. The modeling error makes the pendulum increasingly sensitive to these oscillations, forcing the controller to compensate with a less aggressive deceleration profile to the extent that the liquid exhibits only very small-amplitude sloshing. A similar excessive slosh suppression did not occur in the simulation, although the simulated stopping time was still slightly longer than in the real world due to overshooting. Furthermore, the result is interesting in light of the simulation experiments in V-A, where modeling errors in both directions led to similar slosh constraint violations. To summarize, our real-world experiments validated that the proposed method works with real robot hardware and real liquid. Our method kept the maximum allowed slosh within the given limits, whereas the jerk-penalized baseline without slosh modeling produced braking profiles that were radically overly aggressive and led to spilling. The model remained fairly robust to modeling errors also in the real world, although a moderate sim-to-real gap was detected in the robustness tests. Still, the measured slosh constraint violations were small enough to be acceptable in many real-world applications. VI. C ONCLUSIONS 
+
+We proposed an emergency stop system for robots that manipulate liquids in open containers. The proposed method brings the robot to a stop in a time-optimal manner upon an emergency stop trigger, while ensuring that no liquid is spilled, as validated through both simulation and real-world experiments. By formulating the task as a quadratic optimization problem, the method runs in real time and enables an instant reaction when needed. The proposed method assumes that the robot is free to move in any direction during stopping and that all di-(a) Ours. The measured maximum slosh is 3.7 mm, meaning 5.3 degrees 
+
+> (b) Baseline. The measured maximum slosh is 16.4 mm, meaning 22.3 degrees
+
+Fig. 4: Maximum sloshes for the proposed method and baseline  
+
+> (a) Ours (b) Baseline
+
+Fig. 5: Emergency stop velocity profiles for the proposed method and baseline. The red vertical line marks the start of the emergency stop  
+
+> (a) -50 % modeling error (b) +50 % modeling error
+
+Fig. 6: Emergency stop velocity profiles with modeling error. The red vertical line marks the start of the emergency stop rections are equally hazardous. In some applications, the robot workspace may be constrained, limiting its ability to select optimal braking actions. Moreover, hazards can be directional, such that motions along certain directions should be penalized more than others. Further research is needed to expand the current work in this direction. Another limitation of the method is that it implicitly assumes the containers to be filled close to the brim, keeping the allowed slosh within the range where the small-angle approximation of the pendulum model is valid. In addition, the spherical pendulum model can be analytically fitted only to containers with simple geometries, such as cylinders or rectangular cuboids. However, real-world containers, such as coffee or beer mugs, often have more complex geometries. This complicates parameter tuning, making it largely exper-imental or even rendering the model inapplicable. To date, complex container geometries have received little attention in the literature, and future work is needed to understand their effect on both planning of slosh-free trajectories as well as emergency stop behaviors. An interesting avenue for exploration is the role of sensing and feedback in this context. REFERENCES [1] A. Abderezaei, A. Pasricha, A. Klausenstock, and A. Roncone, “Clutter-aware spill-free liquid transport via learned dynamics,” in 
+
+2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2024, pp. 9908–9915. [2] W. Aribowo, T. Yamashita, and K. Terashima, “Integrated trajectory planning and sloshing suppression for three-dimensional motion of liquid container transfer robot arm,” Journal of Robotics , vol. 2015, no. 1, p. 279460, 2015. [3] J. Arrizabalaga, L. Pries, R. Laha, R. Li, S. Haddadin, and M. Ryll, “Geometric slosh-free tracking for robotic manipulators,” in 2024 IEEE International Conference on Robotics and Automation (ICRA) .IEEE, 2024, pp. 1226–1232. [4] R. Di Leva, M. Carricato, H. Gattringer, and A. M¨ uller, “Time-optimal trajectory planning for anti-sloshing 2-dimensional motions of an industrial robot,” in 2021 20th International Conference on Advanced Robotics (ICAR) . IEEE, 2021, pp. 32–37. [5] R. Maderna, A. Casalino, A. M. Zanchettin, and P. Rocco, “Robotic handling of liquids with spilling avoidance: a constraint-based control approach,” in 2018 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2018, pp. 7414–7420. [6] L. Moriello, L. Biagiotti, C. Melchiorri, and A. Paoli, “Control of liquid handling robotic systems: A feed-forward approach to suppress sloshing,” in 2017 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2017, pp. 4286–4291. [7] R. I. C. Muchacho, R. Laha, L. F. Figueredo, and S. Haddadin, “A solution to slosh-free robot trajectory optimization,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) .IEEE, 2022, pp. 223–230. [8] J. Reinhold, M. Amersdorfer, and T. Meurer, “A dynamic optimization approach for sloshing free transport of liquid filled containers using an industrial robot,” in 2019 IEEE/RSJ international conference on intelligent robots and systems (IROS) . IEEE, 2019, pp. 2336–2341. [9] L. Biagiotti, D. Chiaravalli, L. Moriello, and C. Melchiorri, “A plug-in feed-forward control for sloshing suppression in robotic teleoperation tasks,” in 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2018, pp. 5855–5860. [10] Q. Zang and J. Huang, “Dynamics and control of three-dimensional slosh in a moving rectangular liquid container undergoing planar excitations,” IEEE Transactions on Industrial Electronics , vol. 62, no. 4, pp. 2309–2318, 2014. [11] B. Pridgen, K. Bai, and W. Singhose, “Slosh suppression by robust input shaping,” in 49th IEEE conference on decision and control (CDC) . IEEE, 2010, pp. 2316–2321. [12] S. J. Chen, B. Hein, and H. Worn, “Using acceleration compensation to reduce liquid surface oscillation during a high speed transfer,” in 
+
+Proceedings 2007 IEEE International Conference on Robotics and Automation . IEEE, 2007, pp. 2951–2956. [13] L. Consolini, A. Costalunga, A. Piazzi, and M. Vezzosi, “Minimum-time feedforward control of an open liquid container,” in IECON 2013-39th Annual Conference of the IEEE Industrial Electronics Society .IEEE, 2013, pp. 3592–3597. [14] R. A. Ibrahim, Liquid sloshing dynamics: theory and applications .Cambridge university press, 2005. [15] R. A. Ibrahim, V. N. Pilipchuk, and T. Ikeda, “Recent advances in liquid sloshing dynamics,” 2001. [16] J. Millstein, “Hanging tray for single open beverage,” U.S. Patent US8 220 655B2. [Online]. Available: https://patents.google. com/patent/US8220655B2 [17] L. Svensson, L. Masson, N. Mohan, E. Ward, A. P. Brenden, L. Feng, and M. T¨ orngren, “Safe stop trajectory planning for highly automated vehicles: An optimal control problem formulation,” in 2018 IEEE Intelligent Vehicles Symposium (IV) . IEEE, 2018, pp. 517–522. [18] L. Wang, Z. Wu, J. Li, and C. Stiller, “Real-time safe stop trajectory planning via multidimensional hybrid a*-algorithm,” in 2020 IEEE 23rd International Conference on Intelligent Transportation Systems (ITSC) . IEEE, 2020, pp. 1–7. [19] J. Krook, L. Svensson, Y. Li, L. Feng, and M. Fabian, “Design and formal verification of a safe stop supervisor for an automated vehicle,” in 2019 International Conference on Robotics and Automation (ICRA) .IEEE, 2019, pp. 5607–5613. [20] L. Yang, T. Furukawa, L. Zuo, and Z. Doerzaph, “Control design for automated vehicle emergency safe stop system based on differential dynamic programming,” in Dynamic Systems and Control Conference ,vol. 84270. American Society of Mechanical Engineers, 2020, p. V001T02A006. [21] S. Kwon, C. Jung, T. Choi, Y. Oh, and B. You, “Autonomous emergency stop system,” in 2014 IEEE Intelligent Vehicles Symposium Proceedings . IEEE, 2014, pp. 444–449. [22] F. Duerr, J. Ziehn, R. Kohlhaas, M. Roschani, M. Ruf, and J. Beyerer, “Realtime global optimization of a fail-safe emergency stop maneuver for arbitrary electrical/electronical failures in automated driving,” in 
+
+2020 IEEE 23rd International Conference on Intelligent Transporta-tion Systems (ITSC) . IEEE, 2020, pp. 1–8. [23] A. De Luca, A. Albu-Schaffer, S. Haddadin, and G. Hirzinger, “Colli-sion detection and safe reaction with the dlr-iii lightweight manipulator arm,” in 2006 IEEE/RSJ international conference on intelligent robots and systems . IEEE, 2006, pp. 1623–1630. [24] S. Haddadin, A. Albu-Schaffer, A. De Luca, and G. Hirzinger, “Collision detection and reaction: A contribution to safe physical human-robot interaction,” in 2008 IEEE/RSJ international conference on intelligent robots and systems . IEEE, 2008, pp. 3356–3363. [25] H. Chen, B. Xuan, P. Yang, and H. Chen, “A new overhead crane emergency braking method with theoretical analysis and experimental verification,” Nonlinear Dynamics , vol. 98, no. 3, pp. 2211–2225, 2019. [26] B. Ma, Y. Fang, and Y. Zhang, “Switching-based emergency braking control for an overhead crane system,” IET control theory & applica-tions , vol. 4, no. 9, pp. 1739–1747, 2010. [27] B. S. Reddy, “Emergency braking in an overhead crane using sliding mode control under unknown uncertainties and disturbances,” in 2024 24th International Conference on Control, Automation and Systems (ICCAS) . IEEE, 2024, pp. 1371–1376. [28] S. Raj and B. S. Reddy, “Emergency braking control design for a dual cart-trolley overhead crane,” in 2023 3rd International Conference on Electrical, Computer, Communications and Mechatronics Engineering (ICECCME) . IEEE, 2023, pp. 1–6. [29] J. Luh, M. Walker, and R. Paul, “Resolved-acceleration control of mechanical manipulators,” IEEE Transactions on Automatic Control ,vol. 25, no. 3, pp. 468–474, 2003. [30] J. Denavit and R. S. Hartenberg, “A kinematic notation for lower-pair mechanisms based on matrices,” 1955. [31] P. I. Corke, “A simple and systematic approach to assigning denavit– hartenberg parameters,” IEEE transactions on robotics , vol. 23, no. 3, pp. 590–594, 2007.
