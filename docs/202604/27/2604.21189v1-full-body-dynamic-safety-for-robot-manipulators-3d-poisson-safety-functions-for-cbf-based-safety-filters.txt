@@ -1,0 +1,337 @@
+Title: Full-Body Dynamic Safety for Robot Manipulators: 3D Poisson Safety Functions for CBF-Based Safety Filters
+
+URL Source: https://arxiv.org/pdf/2604.21189v1
+
+Published Time: Fri, 24 Apr 2026 00:27:42 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Full-Body Dynamic Safety for Robot Manipulators: 3D Poisson Safety Functions for CBF-Based Safety Filters 
+
+Meg Wilkinson 1, Gilbert Bahati 2, Ryan M. Bena 2, Emily Fourney 1, Joel W. Burdick 1,2, Aaron D. Ames 1,2
+
+Abstract — Collision avoidance for robotic manipulators requires enforcing full-body safety constraints in high-dimensional configuration spaces. Control Barrier Function (CBF) based safety filters have proven effective in enabling safe behaviors, but enforcing the high number of constraints needed for safe manipulation leads to theoretic and computational challenges. This work presents a framework for full-body collision avoidance for manipulators in dynamic environments by leveraging 3D Poisson Safety Functions (PSFs). In particular, given environmental occupancy data, we sample the manipu-lator surface at a prescribed resolution and shrink free space via a Pontryagin difference according to this resolution. On this buffered domain, we synthesize a globally smooth CBF by solving Poisson’s equation—yielding a single safety function for the entire environment. This safety function, evaluated at each sampled point, yields task-space CBF constraints enforced by a real-time safety filter via a multi-constraint quadratic program. We prove that keeping the sample points safe in the buffered region guarantees collision avoidance for the entire continuous robot surface. The framework is validated on a 7-degree-of-freedom manipulator in dynamic environments. 
+
+I. INTRODUCTION Robotic manipulators operating in unstructured and dy-namic environments must avoid collisions—not just at the end-effector, but over the entire robot body. This full-body requirement is fundamental, yet achieving provably safe full-body collision avoidance in real time remains challenging. This is primarily due to the fact that the controller must operate in high-dimensional joint spaces, while enforcing a prohibitively large number of safety constraints—ensuring collision avoidance between every point on the robot and the environment. Planning safe manipulator trajectories around dynamic obstacles has been well explored [1], but there re-mains computational and theoretical bottlenecks in achieving dynamic safety in unknown a priori environments. Control Barrier Functions (CBFs) [2] offer an attractive framework for this problem due to their efficient online com-putational benefits. Given a safe set that encodes collision-free configurations, a CBF-based safety filter minimally modifies a nominal control input by solving a quadratic program (QP) to guarantee forward invariance of the safe set. This reactive approach—which adjusts commands only when necessary and preserves the nominal behavior otherwise— has been applied to manipulators [3], and a variety of robotic platforms [4]–[8]. For manipulators specifically, [3] demon-strated real-time CBF-based trajectory modification for food   
+
+> 1Computing and Mathematical Sciences, California Institute of Technol-ogy. 2Mechanical and Civil Engineering, California Institute of Technology. Email:
+
+{mwilkins,gbahati,ryanbena,efourney, burdick,ames }@caltech.edu Robotic System 
+
+Fig. 1: Full-body collision avoidance with Poisson-based CBF Safety Filters. An occupancy map is buffered by the sampling resolution ε. Solving Poisson’s equation on this domain generates a globally smooth safety function. A multi-constraint CBF-QP is composed of a single PSF evaluated at the sample points, enabling full body collision avoidance in dynamic environments. 
+
+preparation, and proved that safety guarantees established at the kinematic level extend to the full-order dynamics under accurate velocity tracking. Yet this work introduced conservatism to account for non-smoothness of the CBF-based safety filter. This paper addresses two challenges that arise when extending CBFs to full-body manipulator safety. The first challenge is that CBF-based safety constraints must be continuously differentiable (i.e., ideally smooth) as the CBF-QP requires well-defined gradients at every point where a constraint is evaluated. Signed distance functions (SDFs), while geometrically natural, lose differentiability within safe regions where their gradients become ill-conditioned. Recent work has addressed this problem through post-processing methods that yield smooth approximations of SDFs [3], [9], or through operational-space formulations that scale to hun-dreds of analytically defined constraints [10]. However, these approaches require ad-hoc geometric primitives (spheres, rectangles, ellipses) that over-approximate the true robot or obstacle geometry, introducing conservatism, and require a separate barrier construction for each obstacle. The second challenge is that enforcing safety at finitely many body points does not, by itself, guarantee safety for the continuous surface between those points—a gap that existing multi-constraint CBF formulations [3], [8], [9] leave unaddressed. While [11] provides probabilistic bounds on safety, it does not provide full body safety guarantees. CBFs defined independently for each safety objective or sample 
+
+> arXiv:2604.21189v1 [cs.RO] 23 Apr 2026
+
+point can yield a large number of constraints. Enforcing all these constraints in the QP can quickly result in infeasibility. A solution used in practice is to introduce a slack variable to the safety constraints and penalizing these violations heavily in the objective function. While relaxation improves nu-merical feasibility and performance, it weakens the forward invariance guarantees. Learning based pipelines also lack these guarantees, but yield impressive success rates in static and dynamic environments [12]. However, these can be prone to failing unpredictably out of the training distribution [13]. We present a framework for full-body collision avoidance of manipulators in dynamic environments by addressing the above challenges simultaneously. For continuously differen-tiable safety constraints, we employ Poisson Safety Func-tions (PSFs) [14]—functional safety representations obtained by solving an elliptic partial differential equation (PDE), Poisson’s equation, on the obstacle-free region provided by occupancy data. Solving this PDE produces a single globally smooth safety function for the entire environment, whose zero level set is aligned to obstacle surfaces by construction. Unlike SDFs, PSFs are smooth everywhere in the inte-rior (by elliptic regularity [15]), and unlike primitive-based methods, they represent arbitrary obstacle geometry without over-approximation. Furthermore, PSFs allow for temporal parameterizations to account for dynamic environments [16], [17] and semantic-aware control synthesis [18]. To achieve full-body safety, we propose a sampling-and-buffering method with provable full-body safety guarantees by sampling the manipulator surface, and shrinking the safe region via a Pontryagin difference according to the sampling resolution, and prove that keeping the sample points safe in the buffered region implies safety for the entire continuous surface. This unified safety representation of the environment avoids conflicting constraints and eliminates infeasibility issues in the QP, allowing for a high number of hard safety constraints. Our contributions are summarized as follows: 1) PSF-based CBF safety filter for n-DOF manipulators :We show how a single smooth task-space PSF, eval-uated at finitely many body points, achieves real-time safety on n-DOF manipulators in dynamic scenarios. 2) Formal guarantee for full-body collision avoidance: 
+
+We prove that sampling the robot surface at a pre-scribed resolution and buffering the obstacles by that resolution is sufficient to guarantee forward invariance of the full robot body. 3) Hardware validation. We demonstrate this pipeline on hardware on a 7-degree-of-freedom manipulator in dynamic environments. II. S AFETY WITH CONTROL BARRIER FUNCTIONS 
+
+A. Background: Control Barrier Functions 
+
+Consider the nonlinear control-affine system of the form: 
+
+˙x = f (x) + g(x)u, (1) where x ∈ Rn is the system’s state, u ∈ Rm is the control input, and f : Rn → Rn, g : Rn → Rn×m are the drift and actuation terms, respectively, both assumed to be locally Lipschitz continuous. A locally Lipschitz continuous control law k : Rn × R+ → Rm yields a closed loop system 
+
+˙x = f (x) + g(x)k(x, t ) for which, given an initial condition 
+
+x(0) = x0, admits a unique solution t 7 → x(t), which we assume exist for all t > 0 [19]. Our goal is to construct a controller that keeps the tra-jectories t 7 → x(t) within a safe set for all t > 0. In manipulation tasks, the safe set is typically encoded by subsets of unoccupied space. In particular, we consider a time-varying safe set Ct ⊂ Rn defined as the 0-super level set of a continuously differentiable function h : Rn × R+ → R
+
+defined as: 
+
+Ct = {x ∈ Rn : h(x, t ) ≥ 0}. (2) Achieving safety implies keeping value of h positive along the trajectories t 7 → x(t) ∀t > 0, formalized by the notion of forward invariance . Control Barrier Functions (CBFs) provide a constructive tool for synthesizing controllers that enforce forward invariance of safe sets. 
+
+Definition 1. (Control Barrier Functions [20]) Let Ct ⊂ Rn
+
+be the time-varying 0-super-level set of a continuously differ-entiable function h : Rn × R+ → R satisfying ∇h(x, t )̸ = 0
+
+when h(x, t ) = 0 . We call h a time-varying Control Barrier Function (CBF) for (1) if there exists 1 α ∈ K e 
+
+> ∞
+
+such that for all (x, t ) ∈ Rn × R+:
+
+sup 
+
+> u∈Rm
+
+˙h(x, t, u) ∆
+
+= ∇h(x, t ) · (f (x) + g(x)u)+ ∂h ∂t (x, t ) ≥ − α(h(x, t )) . (3) Given a nominal controller knom : Rn × R+ → Rm, one standard way of constructing a safe controller is via the CBF-QP that adjusts knom to its nearest safe action: 
+
+k(x, t ) = arg min 
+
+> u∈Rm
+
+∥u − knom (x, t )∥22 (CBF-QP) 
+
+s.t. ˙h(x, t, u) ≥ − α(h(x, t )) .
+
+B. Application to Manipulators 
+
+Robotic manipulators are high degree of freedom (DOF) systems that require safety guarantees across their full 3D geometric structure. Consider an n-DOF manipulator whose state x = ( q, ˙q) consists of configurations q ∈ Rn and joint velocities ˙q ∈ Rn, governed by the dynamics: 
+
+M (q)¨ q + C(q, ˙q) ˙ q + G(q) = Bu, (4) where M (q) ∈ Rn×n, C(q, ˙q) ∈ Rn×n, G(q) ∈ Rn
+
+denote the inertia matrix, Coriolis matrix, and gravity terms, respectively, u ∈ Rm is the control input (i.e., joint torques), and B ∈ Rn×n is invertible, assuming full actuation. Motivated by [3], we interpret safety-critical control at the 
+
+kinematic level. That is, we consider the system: 
+
+˙q = v, (5)              
+
+> 1A continuous function α:R→Rbelongs to the extended class
+> Ke
+> ∞if it is monotonically increasing, α(0) = 0 ,lim s→∞ α(s) =
+> ∞, and lim s→−∞ α(s) = −∞ .
+
+wherein we assume direct control over the joint velocities via the commanded velocity v ∈ Rn. We design safe velocities for (5), and, as verified in [3], these safety guarantees extend to the full dynamics (4) provided the commanded velocity is accurately tracked by a low-level controller. Collision avoidance specifications for manipulators are typically described in the task space (i.e., 3D Euclidean space 
+
+R3) while the control input acts in the joint (configuration) space Rn, related via a kinematic map φ : Rn → R3.For a point y ∈ R3 on the manipulator body, the forward kinematics relate the joint and task space coordinates via 
+
+y = φ(q), yielding ˙y = ∂φ ∂q (q) ˙ q := J(q) ˙ q, where J(q) ∈
+
+R3×n is the corresponding Jacobian. Given a continuously differentiable function h : R3 × R+ → R whose 0-superlevel set defines collision-free space, we define a joint-space safety function by the composition h(φ(q), t ) := h(y, t ) with corresponding safe set in configuration space: 
+
+Cq(t) = {q ∈ Rn | h(φ(q), t ) ≥ 0}. (6) The time derivative of h is given by: 
+
+˙h(φ(q), t, v) = ∂h ∂y (φ(q), t ) · J(q)v + ∂h ∂t (φ(q), t ) (7) 
+
+> ∆
+
+= ∂h ∂q (q, t ) · v + ∂h ∂t (q, t ). (8) Safe joint velocities are synthesized by solving a CBF-QP. Since the robot is a continuous surface, directly enforcing safety at every point is computationally intractable. Instead, safety is typically enforced point-wise on a collection of N
+
+sample points on the robot body yi = φi(q), i ∈ { 1, . . . , N },each querying the barrier function h, yielding a multi-constraint safety filter: 
+
+vsafe = arg min 
+
+> v∈Rn
+
+∥v − vnom ∥22 (MC-CBF-QP) 
+
+s.t. ˙h(φi(q), t, v) ≥ − αi(h(φi(q), t )) ,
+
+for all i ∈ { 1, · · · , N } and αi ∈ K e
+
+> ∞
+
+, where vnom is a desired, nominal joint velocity command, and ∂h ∂q (q, t ) =  
+
+> ∂h ∂y
+
+(φi(q), t ) · Ji(q).The above formulation exposes two requirements that are difficult to satisfy simultaneously. First, the single task-space safety function h must be continuously differentiable to guar-antee well-defined gradients in (7) for the QP, yet common representations such as signed distance functions (SDFs) lose differentiability in regions where the nearest obstacle is not unique [3]. Additionally, smooth ad-hoc barrier constructions (i.e., analytical expressions where “obstacles” are described by implicit geometric shapes, e.g., circles, ellipses, polygons) require a separate barrier function for each obstacle, and fail to accurately represent obstacles of arbitrary geometry. Their composition into a single h struggles to generalize to complex environments without introducing excessive conser-vatism [21]. Second, the MC-CBF-QP enforces safety only at 
+
+selected points yi on the robot surface—leaving the question of how to constructively select these points to guarantee full-body safety (i.e., including unsampled points). The next subsection addresses the first requirement while Section III addresses the second. 
+
+C. Occupancy-Based Safety with Poisson Safety Functions 
+
+While CBFs provide a framework for synthesizing safe control actions, their success relies on the availability of a continuously differentiable function h characterizing safety specifications. In practice, h must be derived from enviro-mental data encoding obstacle occupancy information in task space. Since sensors sample continuous spatial structures of the physical environment, an occupancy map is best understood as a discrete approximation of an underlying continuous representation, whose fidelity depends on the grid resolution. Poisson Safety Functions [14] bridge this gap by providing a smooth function h0 constructed directly from the occupancy map, enabling the systematic synthesis of CBFs. 
+
+Definition 2. (Poisson Safety Function [14]) Given occu-pancy information, let Ω ⊂ R3 denote the open, bounded, and connected free space with smooth boundary ∂Ω cor-responding to obstacle surfaces. We call h0 : R3 → R aPoisson Safety Function if it is the unique solution to the Dirichlet problem for Poisson’s equation: 
+
+
+
+∂2h0
+
+∂x 2 (y) + ∂2h0
+
+∂y 2 (y) + ∂2h0
+
+∂z 2 (y) = f (y) ∀y ∈ Ω,h0(y) = 0 ∀y ∈ ∂Ω,
+
+(9) where f : Ω → R<0 is a prescribed forcing function. The boundary condition in (9) places the 0-level set on obstacle surfaces, and f (y) < 0 ensures h0(y) > 0 in free-space. A smooth forcing function f ∈ C∞(Ω) yields a smooth solution h0 ∈ C∞(Ω) [15]. As demonstrated in [14], h0 is a CBF for single integrator systems (5), i.e., h0 := h, and its smoothness enables CBF extensions for high-order systems. Notably, (9) naturally extends to dynamic environments with moving obstacles Ω = Ω( t),resulting in a moving boundary value problem solved in real time yielding t 7 → h0(y, t ) [16]. PSFs resolve the differentiability requirement in (7) en-abling the CBF condition to be enforced classically in the QP. That is, a single PDE solve produces a globally smooth CBF 
+
+h0 for environments with obstacles of arbitrary geometry, without requiring a separate barrier construction for each obstacle. Thus, in the multi-constraint safety filter (MC-CBF-QP), the same h0 is simply evaluated at each sample point 
+
+yi 7 → h0(yi, t ) = h0(φi(q), t ).III. F ULL -B ODY SAFETY FOR ROBOTIC MANIPULATORS 
+
+Building on the foundations of CBF-based safety filters and PSFs, we now develop a constructive framework for full-body safety-critical manipulation in dynamic environments. Specifically, we sample points on the manipulator surface at a specified resolution and buffer all obstacles in the environment according to that resolution. We prove that enforcing safety at the sampled points on the buffered map extends to the entire robot surface on the true (unbuffered) map, guaranteeing full-body collision avoidance with respect to the true obstacle boundaries. Fig. 2: A dense point cloud offers an approximation of the robot’s geometry. This is down-sampled via the Poisson Disk Algorithm to generate a sample set that contains all surface points in the union of ε balls centered at each sample. The final two figures demonstrate the relationship between the sample radius ε and the inflated buffered occupancy representation of an obstacle. 
+
+A. Sampling: Finite Approximation of the Robot Surface 
+
+Since the robot presents a continuous surface, directly enforcing safety at every point on its body is computationally intractable. Instead, safety is enforced on a finite set of sample points, which serve as a discrete approximation of the robot surface. To this end, let S(q) ⊂ R3 denote the manipulator surface in task-space at configuration q, and let Y = {y1, . . . , yN } ⊂ S (q) be a set of sample points approximating the surface at a sampling resolution ε > 0.To provide safety guarantees, we require the set Y to satisfy a coverage condition, where every point on the surface, 
+
+p ∈ S (q), lies within ε of at least one sample point yi ∈ Y ,expressed as: 
+
+∀ p ∈ S (q), min    
+
+> i∈{ 1,··· ,N }
+
+∥p − yi∥ < ε. (10) Equivalently, (10) implies the entire robot surface is con-tained in the union of ε-balls centered at each sample point. 
+
+S(q) ⊂
+
+> N
+
+[
+
+> i=1
+
+Bε(yi), (11) 
+
+Bε(yi) ≜ yi + Bε = {y ∈ R3 : ∥y − yi∥ < ε }, (12) where Bε = {y ∈ R3 : ∥y∥ < ε } is the open ε-ball centered at the origin. This reveals that the union of the ε-balls is an over-approximation of the true robot surface. To achieve full-body collision avoidance, rather than enforcing safety directly on this over-approximation, we instead buffer the obstacles by ε, an equivalent and more tractable formulation, which we discuss in the next subsection. To construct Y in practice, we assume a dense point cloud approximating the robot surface is available, as in Figure 2. While this point cloud could serve directly as sample points naturally satisfying the coverage condition (10) at a fine resolution δ ≪ ε, doing so yields a large number of CBF constraints, which becomes computationally prohibitive and potentially infeasible in real time. The point cloud, therefore, is used as an intermediate representation from which a sparser sample set is constructed. In this work, we employ 
+
+Poisson disk sampling [22] to down-sample the point cloud                
+
+> εNQP (s) Buffer (s) 0.01 1699 0.0144 0.0002 0.05 116 0.0037 0.0003 0.10 28 0.0034 0.0007 0.20 10 0.0034 0.0040 0.50 70.0033 0.0542
+
+Fig. 3: (Left ) Relationship between buffering of the occupancy map by the sampling resolution ε and full-body safety. (Right) Effect of sampling distance on computational performance, showing number of sample points N , QP solve times, and occupancy buffering times over a repeated dynamic experiment. Note ε ≥ 0.2 produced some infeasibility due to the large buffering in the restricted workspace. 
+
+by enforcing a minimum distance ε between each sample. The algorithm retains a point only if no previously accepted points lies within this distance ε, producing a sample set 
+
+Y that satisfies (10) by construction, with approximately uniform surface coverage. 
+
+B. Buffered Safe Region 
+
+The coverage condition (10) guarantees that every unsam-pled point on the surface is within ε of a sample. Therefore, given a task-space safe set C ⊂ R3 (i.e., provided by an occupancy map defining free space), if every sample is kept at least ε away from the safe boundary ∂C, the entire ε-ball around each sample lies inside the safe region C—and with it, every unsampled point that the ball covers, as illustrated in Figure 3. We enforce this margin by shrinking the safe region C via the Pontryagin difference [16]: 
+
+Cε = C ⊖ Bε, (13) where Bε is the ε-ball centered at the origin (12) so that: 
+
+yi ∈ C ε =⇒ Bε(yi) ⊂ C . (14) Any point in Cε ⊂ C is at least ε from the boundary ∂C.C. Poisson Safety Function Synthesis in 3D 
+
+Given the buffered safe region Cε, our next goal is to construct a time-varying continuously differentiable safety function hε : R3 × [0 , T ] → R for some T > 0, whose 
+
+0-superlevel set characterizes the safe set Cε(t) for all t ∈
+
+[0 , T ]. To this end, we define a non-cylindrical domain Ωt
+
+via the lifting operation [16]: 
+
+Ωt = [ 
+
+> t∈[0 ,T ]
+
+Cε(t) × { t} ⊂ R3 × [0 , T ], (15) allowing us to formulate the time parameterized Dirichlet problem for Poisson’s equation in the space-time domain: 
+
+
+
+∂2hε
+
+∂x 2 + ∂2hε
+
+∂y 2 + ∂2hε
+
+∂z 2 = f (y, t ) ∀(y, t ) ∈ Ωt,hε(y, t ) = 0 ∀(y, t ) ∈ ∂Ωt,
+
+(16) with f (y, t ) < 0 for all (y, t ) ∈ Ωt. Solving (16) yields a PSF (y, t ) 7 → hε(y, t ) that characterizes Cε(t) according to: 
+
+Cε(t) = {y ∈ R3 : hε(y, t ) ≥ 0}. (17) As demonstrated in [14], hε is a CBF for the kinematic model (5). The following subsection establishes that the forward invariance of Cε(t) with respect to the sample points guarantees full-body collision avoidance on C(t).
+
+D. Multi-Constraint Safety Filter 
+
+Poisson’s equation yields a single globally smooth solution 
+
+hε characterizing safety for the entire environment. Thus, at each time t ∈ [0 , T ], each sample point yi ∈ Y ⊂ S (q)
+
+simply queries the same hε, giving rise to a structured family of N joint-space CBF constraints. Each safety constraint is derived from a single function, evaluated at different points on the robot body in the world frame, hε(yi) := 
+
+hε(φi(q)) . Enforcing this family simultaneously yields the multi-constraint safety filter: 
+
+vsafe = arg min 
+
+> v∈Rn
+
+∥v − vnom ∥22 (MC-CBF-QP) 
+
+s.t. ˙hε(φi(q), t, v) ≥ − αihε(φi(q), t ),
+
+for all i ∈ { 1, · · · N }, where αi > 0, and ∂h ε 
+
+> ∂q
+
+(q, t ) =  
+
+> ∂h ε
+> ∂y
+
+(φi(q), t ) · Ji(q). The multi-constraint safety filter (MC-CBF-QP) generates safe joint velocities that enforce the forward invariance of Cε. Forward invariance of Cε under this filter ensures that all sample points yi remain in Cε
+
+for all time t ∈ [0 , T ]. In particular, the buffer ε ensures safety enforced at the samples extends to the full continuous surface. Using the coverage condition, we demonstrate this is sufficient for full-body safety with the following theorem: 
+
+Theorem 1 (Full-body Collision Avoidance) . Let S(q) ⊂ R3
+
+be the manipulator surface at configuration q ∈ Rn and let 
+
+Y = {y1, . . . , yN } ⊂ S (q) be sample points satisfying the coverage condition (10) for some ε > 0, and let C(t) ⊂ R3
+
+be a time-varying safe set defined by an occupancy map whose interior represents free space and boundary represents obstacle surfaces in dynamic environments. Consider an open ball Bε ⊂ R3 of radius ε as in (12) and the reduced safe set via the Pontryagin difference Cε(t) = C(t) ⊖ Bε as in (13) . If the following condition holds: 
+
+yi ∈ C ε(t) ∀ i ∈ { 1, . . . , N }, (18) 
+
+holds for all t ≥ 0, then the entire robot surface satisfies: 
+
+S(q) ⊂ C (t) ∀ t ≥ 0. (19) 
+
+Hence, C(t) is rendered forward invariant with respect to the full robot body. Proof. Fix any t ≥ 0 and any point p ∈ S (q). By coverage, there exists yi ∈ Y ⊂ S (q) with ∥p − yi∥ < ε . Since yi ∈Cε(t) = C(t) ⊖ Bε from the condition (18), by definition of the Pontryagin difference, we have Bε+yi = Bε(yi) ⊂ C (t).That is, every point within distance ε of yi lies in C(t). It then follows from ∥p − yi∥ < ε that p ∈ C (t). As p and t
+
+were arbitrary, this implies S(q) ⊂ C (t) for all t ≥ 0 .The above theorem establishes full-body collision avoid-ance as illustrated in Figure 3. The sampling resolution ε
+
+provides a tradeoff between computational efficiency and ge-ometric fidelity—a larger ε results in fewer CBF constraints but a coarser geometric approximation of the robot surface, and consequently, a larger safety buffer. We highlight the relationship between the number of constraints and solve times in Figure 3; sampling resolutions ε ∈ [0 .05 , 0.1] are used in practice for reliability and real-time solvability. 
+
+Remark 1. (Additional Constraints) In practice, while the MC-CBF-QP provides safety guarantees against collision avoidance in the environment, increased performance may be desired. For example, with a three dimensional end effector control objective, joint-space velocity commands may not accurately capture the task goal. In other works, the objective is altered to capture Cartesian proximity via Jacobians and component weighting, as in [10]. Instead of tuning parameters directly, we leverage a Control Lyapunov function (CLF) to add a further constraint to the MC-CBF-QP. As it is not required for safety, the CLF is added as a soft constraint to bias the filtered command to move in a desired direction [23]. We define our CLF to keep the end-effector near a desired position: V (x) = 12 ∥x − xd∥2, with x, xd ∈
+
+R3 the current and desired end-effector position based off the nominal command. Thus, we introduce the constraint 
+
+˙V (x) ≤ − γV (x)+ δ, with δ a linear optimization variable in the objective function. This could be replaced with another CLF designed to preference the user’s priorities for the given task. Additionally, joint limits, encoded as half-space constraints h+ 
+
+> j
+
+(q) = qj − qj, min and h− 
+
+> j
+
+(q) = qj, max − qj ,are appended directly to the QP at negligible computational cost, which prevent the robot from being driven to a joint angle out of its range. Further constraints could be added to avoid all forms of self collision [3]. IV. H ARDWARE EXPERIMENTS 
+
+A. Experimental Setup 
+
+We validate the proposed framework on a Franka Emika FR3, a seven degree of freedom (7-DOF) robotic arm, in Fig. 4: Sample experimental runs with a static environment consisting of boxes and spheres. (Left) Front & side view of sample pose, with key body samples labeled. Sample 18, on the base, is close to the boundary, and has a consistently low h value. Sample 26 attains the lowest h value across both experiments, and is also highlighted. (Top) Minimum h across non-base samples, and highlights when sample 26 has the lowest h. (Bottom) Commanded vs. filtered end effector velocities in R3 (transformed using desired and filtered joint velocities using forward kinematics). These plots show that filtering keeps the entire body safe, while not being overly restrictive of motions. 
+
+both static and dynamic environments. The safety filter operates on joint velocity commands at 50 − 100 Hz. The FR3 workspace is limited to a cube spanning (−1.0, 1.0) ×
+
+(−1.0, 1.0) × (0 .0, 2.0) meters with the origin at the FR3 base frame. This workspace is uniformly discretized into a 
+
+100 × 100 × 100 voxel grid. Body surface points are obtained from the URDF geo-metric approximation of the FR3, visualized in Fig. 2 [24]. The sample set Y is chosen as described in Section 3. The sampling distance used for static and dynamic experiments was ε = 0 .1 resulting in 30 sample points across the robot body. Each sample point is defined in the local link frame, with base frame representation calculated at each control step via forward kinematics from the FR3’s joint configuration. The occupancy grid over which Poisson is solved must encode only fully free voxels at least ε + δ away from obsta-cles as open. An initial grid, with obstacles fully contained in the occupied regions, is consequently buffered by ε + δ,with δ negligible in the following experiments. Buffering can be parallelized and only requires linear complexity, and is thus not a computational bottleneck for reasonable ε, see Figure 3. The Poisson safety function is computed using a successive over relaxation (SOR) method [25] with an alternating checkerboard scheme. Coupled with a warm start from the previous solve, the numerical PDE solve time is on average 0.002 s across static and dynamic environments. The occupancy map composition, buffering, and Poisson safety filter synthesis are executed on a NVIDIA RTX GeForce 5090. The multi-constraint quadratic program was solved, on average, in 0.003 s using OSQP [26]. The state measurements utilized in the Poisson synthesis introduce uncertainty due to latency and encoder error. To account for this, we enforce an input-to-state safe control barrier function (ISSf - CBF) in our MC-CBF-QP [27]. We introduce an adaptive robustness term into the CBF constraint  
+
+> ∂h ε
+> ∂y
+
++ ∂h ε 
+
+> ∂t
+
++ αihε ≥ ε0∥ ∂h ε 
+
+> ∂y
+
+∥2, with ε0 > 0; this accounts for uncertainty without over-conservatism [28]. 
+
+B. Static Environment 
+
+Robotic manipulators are often required to perform tasks in cluttered environments [29]. When executing pick-and-place operations or more generally manipulating objects, robots must safely navigate such environments while execut-ing a nominal closed-form controller or deploying a learned policy [30]. We thus evaluate our proposed framework in a range of static environments and controllers. The obstacles are assumed to be known, prescribed a priori or obtained from perception data. As the obstacles are fixed, the occu-pancy grid and resulting Poisson Safety function are obtained once at initialization and queried throughout. In static experiments, we test our safety filter on both naive and adversarial controls. For adversarial commands, the FR3 is teleoperated via joint velocity commands at 100 Hz to track desired end effector cartesian positions. The user commanded nominal controller generates trajectories into obstacles in the environment, attempting to violate safety and drive the robot into unsafe regions where h(yi) ≤ 0 at one or more sampled points yi. These nominal commands are passed through the safety filter, returning safe joint velocity commands. In Figure 4, the minimum across h(yi) is plotted alongside desired vs. filtered end effector velocity commands. It is clear that the Poisson Safety function is strictly positive for the sampled set of points and preserves safety of the entire robotic arm in spite of adversarial commands. Additionally, a simple controller pushes the end effector to visit points A and B in the robot workspace. Over 25 back-and forth-traversals are completed in under 4 minutes while maintaining safety, showing the filtering is not overly conservative. 
+
+C. Dynamic Environment 
+
+During manipulation tasks, beyond avoiding the static environment, it is desired that the robot can react safely to dynamic objects outside the system’s control, with unknown intentions, such as a human or another robot entering the workspace. We validate our proposed safety filter framework A B DCCBAD
+
+# A B
+
+# C DFig. 5: Hardware validation in a dynamic environment. (Top) We teleop the UR10e into the FR3’s workspace. Panels A,B,C and D show different movements along the experiment. (Middle) Poisson Safety function hε. The heatmaps depict the 3D Poisson safety Function at the highlighted times. (Bottom) The values of the Poisson safety function evaluated at all 30 sample points; it remains strictly positive demonstrating the safe behavior of the FR3 in an unpredictable, dynamic environment. Note the plot is grouped by the link number, and observe how different sample points decrease dependent on the UR10e’s movements. 
+
+in a live, dynamic environment and assess the real time performance of the full-body collision avoidance. A spherical object is rigidly attached to a UR10e, a 6-DOF robotic arm, to serve as the dynamic obstacle for the FR3. The UR10e is teleoperated, freedriven, or executing a nominal controller, in real time and guided into the FR3 workspace to induce potential collisions, and the FR3 is only considered safe if every link on the FR3 does not collide with any portion of the UR10e or its spherical object. The dynamic motion is unknown to the FR3 beyond state measurements, and is not pre-planned during teleoperation or freedrive mode. The UR10e joint state is sampled at 
+
+100 Hz and, using forward kinematics and a simplified robot model, is used to build the occupancy grid as the UR10e moves throughout the workspace. The occupancy grid thus contains the entire UR10e geometry as well as the attached ball. During each control cycle the occupancy grid is updated according to the current state and the Poisson safety function is computed online, in real time, at an average of 100 Hz. In these experiments, the FR3’s goal is to maintain a fixed joint position, using proportional control, which the safety filter augments to send safe joint velocity commands. The UR10e was commanded into the FR3’s workspace from a range of positions and angles to fully test the full body collision avoidance. Across these trials, the FR3 was able to execute full body collision avoidance in real-time. Figure 5 shows an example obstacle trajectory teleoped live and the FR3 is able to successfully avoid the obstacle with the Fig. 6: In freedrive, a human moves the UR10e at higher speeds into the FR3’s workspace. In this run ε = 0 .05 with 121 samples on the robot’s body, colored by link. The FR3 is able to maintain safety of the entire sample set as well as demonstrate effective collision avoidance in unpredictable human-driven obstacle motions. 
+
+Poisson safety function positive consistently across sample points. It can also handle faster, more unpredictable motions, as seen in Figure 6, where a human drives the UR10e into the workspace. Note effective collision avoidance is restricted to bounded obstacle velocities relative to the control rate and FR3 speed and acceleration limits. Additionally, given that the FR3 is a serial-chain manipulator, initial links lack sufficient degrees of freedom to guarantee avoidance. For example, no control action can keep the base safe from obstacles approaching the base-frame origin. V. C ONCLUSION 
+
+In this work, we have presented a framework for full-body collision avoidance for manipulation. By sampling the robot surface at a prescribed resolution and buffering the environment accordingly, a single smooth Poisson Safety Function, constructed directly from onboard sensing, yields a structured family of CBF constraints suitable for real-time safety filtering. We validate the proposed framework on a 7-DOF manipulator in both static and dynamic environments. Future work includes dynamically synthesizing occupancy maps from 3D perception data, incorporating semantic rea-soning for context-aware safety applications and adaptive sampling techniques for improved computational efficiency. 
+
+Acknowledgments - This research was supported by The Dow Chemical Company through project #227027AW. Chat-GPT 5.2 was used as an aid to develop helper functions in the code. REFERENCES [1] A. A. Maciejewski and C. A. Klein, “Obstacle avoidance for kinemat-ically redundant manipulators in dynamically varying environments,” 
+
+The Int. Journal of Robotics Research , 1985. [2] A. D. Ames, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs with application to adaptive cruise control,” Los Angeles,CA, Dec. 2014, pp. 6271–6278. [3] A. Singletary, W. Guffey, T. G. Molnar, R. Sinnet, and A. D. Ames, “Safety-critical manipulation for collision-free food prepara-tion,” IEEE Robotics and Automation Letters , 2022. [4] G. Bahati, R. K. Cosner, M. H. Cohen, R. M. Bena, and A. D. Ames, “Control barrier function synthesis for nonlinear systems with dual relative degree,” in IEEE 64th Conf. on Decision and Control , 2025. [5] T. G. Molnar, R. K. Cosner, A. W. Singletary, W. Ubellacker, and A. D. Ames, “Model-free safety-critical control for robotic systems,” 
+
+IEEE Robotics & Automation Letters , 2022. [6] R. Grandia, A. J. Taylor, A. Singletary, M. Hutter, and A. D. Ames, “Nonlinear model predictive control of robotic systems with control lyapunov functions,” arXiv preprint arXiv:2006.01229 , 2020. [7] M. H. Cohen, N. Csomay-Shanklin, W. D. Compton, T. G. Molnar, and A. D. Ames, “Safety-critical controller synthesis with reduced-order models,” in American Control Conference . IEEE, 2025. [8] C. Khazoom, D. Gonzalez-Diaz, Y. Ding, and S. Kim, “Humanoid self-collision avoidance using whole-body control with control barrier functions,” in IEEE-RAS 21st Int. Conf. on Humanoid Robots , 2022. [9] H. Zhao, L. Brunke, O. Lagerquist, S. Zhou, and A. P. Schoellig, “Sq-cbf: Signed distance functions for numerically stable superquadric-based safety filtering,” arXiv preprint arXiv:2602.11049 , 2026. [10] D. Morton and M. Pavone, “Safe, task-consistent manipulation with operational space control barrier functions,” in 2025 IEEE/RSJ Int. Conf. on Intelligent Robots and Systems , 2025. [11] X. Ding, H. Wang, Y. Ren, Y. Zheng, C. Chen, and J. He, “Online control barrier function construction for safety-critical motion control of manipulators,” IEEE Transactions on Systems Man and Cybernetics Systems , vol. 54, pp. 4761–4771, 04 2024. [Online]. Available: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=10510639 [12] J. Yang, J. J. Liu, Y. Li, Y. Khaky, and D. Pathak, “Deep reactive policy: Learning reactive manipulator motion planning for dynamic environments,” 9th Annual Conference on Robot Learning , 2025. [13] A. Fishman et al. , “Motion policy networks,” 2022. [14] G. Bahati, R. M. Bena, and A. D. Ames, “Dynamic safety in complex environments: Synthesizing safety filters with poisson’s equation,” in 
+
+Robotics: Science and Systems , 2025. [15] D. Gilbarg and N. S. Trudinger, Elliptic partial differential equations of second order . Springer, 1977, vol. 224, no. 2. [16] R. M. Bena, G. Bahati, B. Werner, R. K. Cosner, L. Yang, and A. D. Ames, “Geometry-aware predictive safety filters on humanoids: From poisson safety functions to cbf constrained mpc,” IEEE-RAS 24th Int. Conf. on Humanoid Robots , 2025. [17] E. Yamaguchi, R. M. Bena, G. Bahati, and A. D. Ames, “Layered safety: Enhancing autonomous collision avoidance via multistage cbf safety filters,” https://arxiv.org/pdf/2603.00338 (Submitted) , 2026. [18] G. Bahati, R. M. Bena, M. Wilkinson, P. Mestres, R. K. Cosner, and A. D. Ames, “Risk-aware safety filters with poisson safety functions and laplace guidance fields,” American Control Conference (To appear) , 2026. [19] L. Perko, Differential equations and dynamical systems . Springer Science & Business Media, 2013, vol. 7. [20] A. Ames, X. Xu, J. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs for safety critical systems,” vol. 62, no. 8, pp. 3861–3876, 2017. [21] T. G. Molnar and A. D. Ames, “Composing control barrier functions for complex safety specifications,” IEEE Control Systems Letters ,2023. [22] R. Bridson, “Fast poisson disk sampling in arbitrary dimensions.” 
+
+SIGGRAPH sketches , vol. 10, no. 1, p. 1, 2007. [23] A. D. Ames and M. Powell, “Towards the unification of locomotion and manipulation through control lyapunov functions and quadratic programs,” Lecture notes in control and information sciences , 2013. [24] E. Todorov, T. Erez, and Y. Tassa, “Mujoco: A physics engine for model-based control,” in IEEE/RSJ Int. Conf. on Intelligent Robots and Systems , 2012. [25] J. David M. ˜ Young, “Iterative methods for solving partial difference equations of elliptic type,” Ph.D. dissertation, Harvard University, Cambridge, MA, USA, 1950. [26] B. Stellato, G. Banjac, P. Goulart, A. Bemporad, and S. Boyd, “Osqp: An operator splitting solver for quadratic programs,” Mathematical Programming Computation , vol. 12, pp. 637–672, 2020. [27] S. Kolathaya and A. D. Ames, “Input-to-state safety with control barrier functions,” IEEE Control Systems Letters , vol. 3, 01 2019. [28] E. Das ¸ et al. , “Safe navigation under state uncertainty: Online adaptation for robust control barrier functions,” IEEE Robotics and Automation Letters , vol. 11, 2026. [29] A. S. Morgan et al. , “Benchmarking cluttered robot pick-and-place manipulation with the box and blocks test,” IEEE Robotics and Automation Letters , vol. 5, no. 2, pp. 4549–4556, 2019. [30] R. Wolf, Y. Shi, S. Liu, and R. Rayyes, “Diffusion models for robotic manipulation: a survey,” Frontiers in Robotics and AI , vol. 12, 2025.
