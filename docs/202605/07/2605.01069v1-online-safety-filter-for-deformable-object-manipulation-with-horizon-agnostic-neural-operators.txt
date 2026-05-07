@@ -1,0 +1,451 @@
+Title: Online Safety Filter for Deformable Object Manipulation with Horizon Agnostic Neural Operators
+
+URL Source: https://arxiv.org/pdf/2605.01069v1
+
+Published Time: Tue, 05 May 2026 00:12:30 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Online Safety Filter for Deformable Object Manipulation with Horizon Agnostic Neural Operators 
+
+Jiaxing Li ∗1, Hanjiang Hu ∗1, Zhuoyuan Wang 1, Yorie Nakahira 1, Changliu Liu 1
+
+Abstract — Safety-critical control of robotic manipulation tasks involving deformable media—such as fluids, cloth, and soft objects—remains challenging because existing learning-based approaches encode safety indirectly through reward shaping, which provides no guarantee of constraint satisfaction at deployment. We present a constraint-driven online safety filter for deformable-object manipulation that enforces explicit task-level safety constraints in real time by minimally modifying any nominal control policy. Our approach combines two key components: a horizon-agnostic neural operator that learns the boundary input-output mapping of the underlying PDE dynamics and generalizes across variable rollout lengths with-out retraining, and a boundary control barrier function that certifies safety at the task-relevant output level via a lightweight quadratic program. The resulting safety constraint is affine in the boundary-input rate, enabling real-time online filtering. We evaluate the proposed method on fluid manipulation tasks in FluidLab, where the filter improves safe-trajectory rates by up to 22% over unfiltered base policies while also reducing the number of steps required to reach the safe set, demonstrating that constraint-driven safety enforcement is both more reliable and more efficient than reward-shaping approaches. 
+
+I. I NTRODUCTION 
+
+Robots are increasingly deployed in manipulation tasks involving highly deformable media such as fluids, cloth, and soft objects. In these settings, safety is not merely about stability but about satisfying task-level constraints— avoiding spill, maintaining contact conditions, or keeping objects within designated regions—throughout execution. Most existing learning-based approaches for deformable ma-nipulation are reward-driven [1]–[4]: policies are trained to maximize task performance with safety encoded indirectly through penalties or data filtering. However, reward shap-ing does not guarantee constraint satisfaction, and policies often exhibit unsafe transient behaviors under disturbances or distribution shifts. This limitation becomes particularly pronounced when the underlying dynamics are governed by complex distributed phenomena, such as fluid–rigid interac-tion [5], where small control deviations can induce large state changes. These challenges call for a constraint-driven safety mechanism that operates online, enforces explicit task-level safety sets, and remains compatible with learned policies. Achieving such constraint-driven safety for deformable manipulation requires two ingredients: a dynamics model that can predict task-relevant outcomes in real time, and a safety filter that can translate those predictions into hard 
+
+> *Equal contribution.
+> 1All authors are with Carnegie Mellon University, Pittsburgh, PA, USA.
+
+{jiaxingl, hanjianghu, zhuoyuaw, ynakahir, cliu6 }@andrew.cmu.edu 
+
+constraints on the robot’s control actions. For manipulation tasks involving fluids or other deformable media, the under-lying dynamics are governed by partial differential equations (PDEs), where the robot’s action enters as a boundary input and safety-relevant signals (e.g., object position, separa-tion distance) are low-dimensional outputs of the temporal-spatial plant [6], [7]. Neural operators [8]–[10] can act as function-space approximators that learn input-to-output mappings of PDE systems, offering a promising route to fast, generalizable surrogate models for such dynamics [11]. In parallel, control barrier functions (CBFs) provide a prin-cipled, modular approach to safety filtering: they minimally modify a nominal control signal to enforce forward invari-ance of a user-defined safe set, typically via a lightweight quadratic program (QP) [12], [13]. However, combining neural-operator dynamics models with CBF-based safety fil-ters for real-time, online use in robotic manipulation remains an open challenge. In this paper, we address this challenge by developing an 
+
+online constraint-driven safety filter for deformable-object manipulation, built around a horizon-agnostic neural operator and a boundary control barrier function (BCBF). The key insight is that, by training the neural operator on variable-length input prefixes, a single model can support safety filtering across arbitrary rollout lengths without retraining, enabling fully online deployment. The BCBF then operates at the boundary-output level, providing real-time safety cer-tification that is compatible with any nominal policy while imposing only a minimal modification to the control signal. Our contributions are as follows:  
+
+> •
+
+We develop an online QP safety filter that pairs a time-dependent BCBF with a differentiable neural-operator surrogate. The resulting safety constraint is affine in the boundary input rate, making it solvable in real time.  
+
+> •
+
+We introduce a horizon-agnostic training scheme for neural operators, enabling the same model to support online filtering at any rollout length without retraining.  
+
+> •
+
+We evaluate the proposed method on complex fluid manipulation tasks, demonstrating that the online constraint-driven filter consistently outperforms both unfiltered base policies and an offline filter baseline by up to 22% while reducing the number of steps needed to reach the safe set. II. R ELATED WORK 
+
+A. Deformable Object Manipulation in Robotics 
+
+Robotic manipulation of deformable objects—including cloth, fluids, and soft bodies—has attracted significant atten-
+
+> arXiv:2605.01069v1 [cs.RO] 1 May 2026
+
+tion due to its relevance in household assistance, manufac-turing, and laboratory automation. Compared to rigid-body manipulation, deformable systems exhibit high-dimensional, nonlinear, and often partially observed dynamics, making modeling and control substantially more challenging [2], [3]. Textile manipulation has been extensively studied, emphasiz-ing variability in material properties, perception under occlu-sion, and long-horizon planning [1], [2]. Recent benchmarks such as SoftGym [4] and FluidLab [5] enable reproducible evaluation of learning-based policies for cloth folding, fluid transport, and object gathering tasks. Complementary toolkits for soft and continuum robots, including SoMoGym [14] and SofaGym [15], further broaden the spectrum of deformable systems and control interfaces. Most existing approaches rely on imitation learning or reinforcement learning to optimize task performance through reward maximization [1]–[4]. While these methods have demonstrated promising results, safety is typically encoded indirectly via reward shaping, penalty terms, or data filtering. As a result, policies may exhibit unsafe transient behaviors, especially under long-horizon execution, disturbances, or distribution shift. This limitation is particularly acute in fluid manipulation, where small control deviations can induce large, irreversible state changes [5]. Explicit enforcement of task-level safety constraints during online execution remains underexplored in deformable manipulation settings. 
+
+Research Gap: Prior work in deformable manipulation focuses primarily on reward-driven policy optimization rather than constraint-driven safety enforcement, motivating the need for online safety mechanisms compatible with learned controllers. 
+
+B. Neural Operators for Modeling PDE-Governed Dynamics 
+
+Many deformable manipulation tasks are naturally gov-erned by distributed dynamics that can be modeled by partial differential equations (PDEs), such as fluid–rigid interaction and continuum deformation [6], [7]. Neural op-erators, including DeepONet [8] and Fourier neural op-erator (FNO) [10], have emerged as powerful tools for learning mappings between function spaces and approximat-ing PDE solution operators [9]. These models generalize across discretizations and domain configurations, making them attractive for high-dimensional physical systems. More advanced neural operator architectures include graph-based neural operators [16], spectral neural operators [17], and physics-informed variants that combine data fitting with PDE constraints to achieve parametric PDE learning [18]. Recent work has explored neural operators for accelerating simulation, model-based control synthesis, and data-driven PDE prediction, including bypassing computationally heavy gain calculations in PDE backstepping [19], [20]. However, most applications focus on forward modeling or policy training rather than embedding neural operator models within real-time safety enforcement frameworks. In particular, their integration with constraint-based filtering mechanisms for robotics tasks remains limited.  
+
+> Fig. 1. Overall framework of the proposed boundary-safe neural operator control architecture comparing with the offline filtering baseline.
+
+Research Gap: While neural operators provide scalable surrogates for distributed dynamics, their use in online safety filtering for robotics manipulation tasks has not been system-atically studied. 
+
+C. Model-Based Safety Filters for Robotics 
+
+Model-based safety filters provide a principled mechanism for enforcing state or output constraints by minimally mod-ifying nominal control inputs at runtime. Control barrier functions (CBFs) [12], [13] have been widely applied to robotic systems to guarantee forward invariance of safe sets, typically by solving a quadratic program at each control step to project nominal actions onto a constraint-satisfying region. Extensions of CBF address high relative-degree constraints [21], [22], sampled-data and delay effects [23], as well as robust and adaptive settings [24]. Reachability-based filters and safety-constrained model predictive control offer complementary perspectives and are surveyed alongside CBF-based methods in [25], [26]. Recent work further ex-plores constructing robust safety filters online in challenging settings [27]. Most existing safety filters are developed for finite-dimensional dynamical systems and assume explicit state-space models. Extensions to infinite-dimensional or partially observed systems are more limited, and few works address safety enforcement when dynamics are governed by dis-tributed PDE models [6], [7]. Recent safe PDE boundary control work proposes neural boundary control barrier func-tions (BCBFs) combined with differentiable neural operators to derive QP-based safety filtering for boundary outputs [11], providing the theoretical foundation our method builds upon. However, this prior work operates offline with fixed rollout lengths, limiting its applicability to robotics settings that require online, horizon-agnostic deployment. 
+
+Research Gap: Existing safety filters largely assume finite-dimensional models and do not address online con-straint enforcement for PDE-governed deformable manipu-lation systems. III. M ETHODOLOGY 
+
+A. Problem Formulation 
+
+We consider a general safety-critical control problem for systems governed by unknown partial differential equations (PDEs), where control is applied through boundary actuation and safety is specified on task-relevant outputs over a finite horizon. As a representative instance of this class, we focus on robotic manipulation with deformable media (e.g., fluid– rigid interaction). In this setting, we denote the overall coupled state as z(x, t ) : X × T → S , where x ∈ X is the spatial coordinate, t ∈ T := [0 , T ] is time, and S is the state space of the coupled robot–environment system. Similar modeling paradigm is widely adopted in robotics for deformable object manipulation and soft robotic sys-tems, where continuum theories (e.g., elasticity, Cosserat rod models, or fluid dynamics) [28] provide PDE descriptions of deformation and interaction with robots. Following the settings in [6], we model the deformable dynamics as 
+
+∂tz(x, t ) = D z(x, t ), ∇z(x, t ), ∇2z(x, t ) , (1) where D(·) denotes unknown closed-loop PDE dynamics. The system is actuated through a Dirichlet boundary condi-tion, 
+
+z(0 , t ) = U (t), (2) with a fixed initial condition z(x, 0) = z0(x), where U (t)
+
+is the control input of the robot agent that is applied to the dynamics of the PDE. We define the task-relevant boundary output as 
+
+Y (t) := z(xb, t ), (3) where xb ∈ X denotes a designated boundary or observation location of interest. The output Y (t) may represent, as Figure 2 shows, the position of a transported object on XY plane, or a deformation magnitude, or a distance metric derived from the deformable state.        
+
+> Fig. 2. The boundary control input U(linear and angular velocities), and boundary state Y(object’s XY coordinate) for the transporting task.
+
+Classical state-dependent control barrier functions (CBFs) are difficult to apply directly in our setting. In PDE-governed robotic manipulation, safety is imposed on a low-dimensional task output Y (t), while the underlying state z(x, t ) is infinite-dimensional and only partially observed. To bridge this mismatch, we adopt the boundary control barrier function (BCBF) framework from prior work [11], which certifies safety directly at the output boundary level. Let S0 ⊂ S denote the user-defined safe set for the task output. Boundary-output safety over T = [0 , T ] is character-ized by a finite-time feasibility condition: there exists t0 ∈ T 
+
+such that 
+
+∀ t ∈ [t0, T ], Y (t) ∈ S 0. (4) This formulation serves as the theoretical safety foundation of our method. However, existing usage remains offline because direct neural operator-based BCBF construction typically assumes access to full trajectories, which is incom-patible with real-time robotics execution. 
+
+B. Horizon Agnostic Neural Operator 
+
+We model the boundary input-output mapping using a neural operator Fθ : U (t) → Y (t) parameterized by θ,which learns the transfer function from the boundary control input trajectory U (t) to the boundary output trajectory Y (t).Following the construction in [9], the neural operator used is defined as 
+
+Fθ = Q ◦ I L−1 ◦ · · · ◦ I 0 ◦ P , (5) where P and Q are pointwise lifting and projection operators (e.g., Fourier and inverse Fourier transforms in FNO [10]), and each Iℓ is an integral kernel operator. Specifically, the 
+
+ℓ-th kernel integration layer is defined as 
+
+vℓ+1 (t) = Iℓ(vℓ)( t)= σℓ+1 
+
+
+
+Wℓvℓ(t) + 
+
+Z
+
+> T
+
+κ(ℓ)(t, s ) vℓ(s) ds + bℓ(t)
+
+
+
+,
+
+(6) for ℓ = 0 , . . . , L −1, where vℓ : T → Rdℓ denotes the hidden representation at layer ℓ, σℓ+1 (·) is a nonlinear activation function, Wℓ ∈ Rdℓ+1 ×dℓ is a local linear operator, κ(ℓ) ∈
+
+C(T ×T ; Rdℓ+1 ×dℓ ) is a learnable kernel function, and bℓ(t)
+
+is a bias term. To enable real-time safety filtering in robotics without committing to a fixed rollout length, we train a single horizon-agnostic neural operator that is valid over variable-horizon prefixes. This design allows deployment under receding-horizon execution and avoids retraining when task duration changes. Let D = {(Uk, Y k)}Kk=1 be trajectory pairs sampled from the unknown closed-loop PDE dynamics and discretized at {tm}Mm=1 , where Uk = {Uk(tm)}Mm=1 and 
+
+Yk = {Yk(tm)}Mm=1 . During training, we sample a prefix length ˜M ∈ [Mmin , M max ] and feed U 1: ˜Mk into Fθ , which induces the horizon-agnostic empirical risk. 
+
+L = E ˜M ∼U [Mmin ,M max ]
+
+"
+
+1
+
+K
+
+> K
+
+X
+
+> k=1
+
+1˜M
+
+> ˜M
+
+X
+
+> m=1
+
+Yk(tm) − F θ
+
+
+
+U 1: ˜Mk
+
+
+
+(tm) 22
+
+#
+
+.
+
+(7) Hence, the same Fθ is optimized over a distribution of prefix lengths and queried online with ascending-length control histories. In practice, this turns horizon-agnostic learning into a deployment capability for prefix-based real-time safety certification without fixed-horizon assumptions. C. Online Filtering 
+
+We implement online filtering in a receding one-step manner at each discrete time ti = i∆t. Let ui denote the nominal boundary control from the base policy, and let ˆui
+
+denote the filtered control applied to the system. At step i,the filter keeps the previously applied filtered sequence and appends the current nominal control ui, and forms the prefix input 
+
+˜U0: i := {ˆu0, . . . , ˆui−1, u i}. (8) The neural operator then predicts the boundary-output prefix 
+
+ˆY0: i = Fθ ( ˜U0: i),Using the current observation yi, we evaluate the BCBF terms ϕi := ϕ(yi, t i) and solve the following one-step quadratic programming (QP) for the safe control gradient 
+
+˙Usafe (ti):
+
+˙Usafe (ti) = arg min 
+
+> ˙U
+
+˙U − ˙Unominal (ti) ,
+
+s.t. ˙ϕ(yi, t i) + αϕ (yi, t i) + Cϕ 0 ≤ 0,
+
+(9) where ϕ0 = ϕ(0 , Y 0) and ˙ϕ is composed by 
+
+˙ϕ = ∂y ϕ · ˙Y + ∂tϕ. (10) Here, ˙Y can be obtained from the trained neural operator with the linear dependence on ˙U (t), which has been proven by [11]. Given that the BCBF constraint (9) is linear with respect to ˙U , it can thus be framed and solved by a QP solver. Given the solved ˙Usafe (ti), we address the potential model mismatch between the trained neural operator Fθ and real underlying PDE dynamics with a filtering threshold β such that 
+
+˙U (ti) = 
+
+( ˙Usafe (ti), ∥ ˙Usafe (ti) − ˙Unominal (ti)∥ ≤ β, 
+
+˙Unominal (ti), otherwise .
+
+(11) with the final control signal at the time step ti is calculated by ui = ui−1 + ∆ t · ˙U (ti).The online filtering procedures are summarized in Algo-rithm 1. IV. E XPERIMENTAL RESULTS 
+
+A. Experimental Setup 
+
+We evaluate the proposed method in FluidLab [5], a differentiable fluid-rigid interaction simulator. FluidLab is a testbed for safe boundary control of PDE-governed robotic manipulation, where coupled high-dimensional deformable dynamics can be simulated. With this testbed, we learn the input-output operator U 7 → Y and train BCBFs from data, and evaluate online filtering under matched nominal/filtered conditions. In all experiments, we use 200 control steps for data collection rollouts and execute real-time control at a frequency of 500 Hz. Trajectory-level and step-level safety metrics are used for analysis. 
+
+Algorithm 1 Safe Online Filtering with Horizon Agnostic Neural Operator 
+
+Require: Horizon Agnostic Neural operator F : U 7 → Y ,time–dependent CBF ϕ(y, t ), total time steps M , step time interval ∆t
+
+Ensure: Filtered boundary control sequence {ˆui}Mi=1  
+
+> 1:
+
+Initialize:  
+
+> 2:
+
+π(yi) ▷ The base policy  
+
+> 3:
+
+yi ∈ Rn ▷ boundary state at time step i 
+
+> 4:
+
+ui ∈ Rm ▷ boundary control at time step i 
+
+> 5:
+
+Yi = {y0, y 1, . . . , y i} ▷ state history of one trajectory  
+
+> 6:
+
+ˆYi = F(Ui) ▷ predicted state from neural operator  
+
+> 7:
+
+for i = 1 to M do  
+
+> 8:
+
+ui = π(yi) 
+
+> 9:
+
+˜Ui ← { ˆu0, ˆu1, . . . , u i} 
+
+> 10:
+
+ˆYi ← F ( ˜Ui) 
+
+> 11:
+
+Compute CBF time derivative: 
+
+˙ϕ(yi, t i) = ∇y ϕ(yi, t i) · ˙Yi + ∂tϕ(yi, t i) 
+
+> 12:
+
+Compute safe control rate: 
+
+˙Usafe (ti) = arg min 
+
+> ˙U
+
+˙U − ˙Unominal (ti)
+
+s.t. ˙ϕ(yi, t i) + αϕ (yi, t i) + Cϕ 0 ≤ 0 
+
+> 13:
+
+if ∥ ˙Usafe (ti) − ˙Unominal (ti)∥2 < β then  
+
+> 14:
+
+ˆui ← ui−1 + ˙Usafe (ti)∆ t 
+
+> 15:
+
+else  
+
+> 16:
+
+ˆui ← ui 
+
+> 17:
+
+end if  
+
+> 18:
+
+end for 
+
+1) Transporting Task: The transporting environment con-tains a rigid cube interacting with surrounding fluid in a planar boundary-locked workspace. The robot agent ejects water with constant speed and is required to transport the target cube into the specified region, and through which the policy is able to control the robot’s linear speed on the x
+
+axis and the angular speed, which we denote by U (t) ∈ R2.The task-relevant boundary state Y (t) is constructed from cube planar coordinates and used by the learned model and BCBF. The safe set is defined as a geometric target region in the x-y plane: 
+
+Strans 0 = {Y : x ∈ [0 .05 , 0.25] , y ∈ [0 .65 , 0.95] }.
+
+A rollout is safe at a step if the cube center lies in Strans 0 ;distance to this set is additionally recorded as a continuous safety margin. 
+
+2) Gathering Task: The gathering environment contains two rigid bodies immersed in fluid, and the robot equipped with a rigid spatula that is able to paddle the water and specified to reduce the rigid bodies’ separation. The policy Safe  Se t        
+
+> Safe Set
+> Safe Se tSafe Se tSafe Se tSafe Se t
+> Safe Se tSafe Se tSafe Se tSafe Se t
+
+Time(s) 
+
+0.0  0.1  0.3  0.4 0.2    
+
+> Base Policy Filtere d Policy Fig. 3. Base and filtered target trajectories in the transporting task.
+
+outputs boundary control signal U (t) ∈ R2 which commands its linear speed on X, Y plane. The boundary state Y (t) is defined from object-relative quantities (difference of object positions) and, in the scalar setting, by an auxiliary safety variable s(t) that is the distance between the two bodies. The safe set is defined by a distance threshold: 
+
+Sgather 0 = {Y : ∥p1 − p2∥2 < δ }, δ = 0 .2.
+
+B. Implementation Details 
+
+Base policy and data generation. The base policy is a noisy proportional controller with task-specific geometric priors. Let clip [ℓ,u ](·) denote component-wise clipping to 
+
+[ℓ, u ], and let ηi ∼ N (0 , Σ) denote injected control noise. For transporting , define robot planar position pri =[xri , y ri ]⊤, yaw ψi, and target point pci = [ xci , y ci ]⊤ (cube-related reference from the simulator state). The two effective control channels are forward velocity and yaw rate, Ui =[vi, ω i]⊤. The translational component is 
+
+vi =
+
+
+
+clip [−vmax ,v max ](kp(xci − xri ) + ηx,i ) , xri < x ci ,
+
+clip [−vmax ,v max ](kp(xci − xri ) + ηx,i ) , xri > x ci + d, 
+
+0, otherwise ,
+
+(12) where d > 0 is the distance margin that keeps the robot behind the cube before pushing and kp is the gain. The yaw channel aligns the robot heading to the target: 
+
+ψ⋆i = atan2( yci −yri , x ci −xri ), eψ,i = mod( θ+π, 2π)−π, 
+
+(13) 
+
+ωi =
+
+(
+
+clip [−ωmax ,ω max ](kω eψ,i + ηω,i ) , |eψ,i | > ε ψ ,
+
+0, otherwise .
+
+(14) where eψ,i is the mismatch between robot’s heading and the actual robot-to-target angle. In our implementation, vmax =
+
+ωmax = 1 , d = 0 .15 , and εψ = 0 .05 .For gathering , the robot tracks an elliptical reference trajectory in the horizontal plane. Let (xc, y c) be the ellipse center, a, b the semi-axes, ϑ the ellipse orientation, and ρ the speed-scale factor. With θi ∈ [0 , 2πρ ], the reference is 
+
+xref 
+
+> i
+
+yref 
+
+> i
+
+
+
+=
+
+xc
+
+yc
+
+
+
++
+
+cos ϑ − sin ϑ
+
+sin ϑ cos ϑ
+
+  a cos θi
+
+b sin θi
+
+
+
+. (15) The effective boundary control Ui = [ vx,i , v y,i ]⊤ is 
+
+vx,i = clip [umin ,u max ]
+
+ kp(xref  
+
+> i
+
+− xri ) + ηx,i 
+
+ ,vy,i = clip [umin ,u max ]
+
+ kp(yref  
+
+> i
+
+− yri ) + ηy,i 
+
+ . (16) 
+
+Horizon-agnostic neural operator training. The NO training pipeline uses preprocessed task trajectories and selects ntrain and ntest episodes for training and testing, respectively. Each episode has horizon M = 200 before op-tional temporal subsampling. Let one batch contain episodes 
+
+{(Ub, Y b)}Bb=1 , where Ub ∈ RM ×2 and Yb ∈ RM ×dy (task-dependent dy ). The collate function samples one prefix length per batch 
+
+˜M ∼ U{ Mmin , . . . , M max }, (17) and crops all trajectories to the first ˜M steps 
+
+˜Ub = Ub[1 : ˜M ], ˜Yb = Yb[1 : ˜M ].Base       
+
+> Policy
+> Filtered
+> Policy
+> Velocity X
+> (U1)
+> Velocity Z
+> (U2)
+> Target
+> Distance
+> (S)
+> Unsafe: 0.26
+> Safe:0.15
+> XY Trajectory of Objects Fig. 4. Comparison between the base policy and the filtered safe policy on the gathering task. The original and filtered control inputs, the evolution of the target distance, and the object trajectories in the XY plane are presented. The base policy induces turbulence near the end of the task, which pushes the objects farther apart and increases the distance around t≈0.25 s. The filtered policy mitigates this disturbance, maintains convergence toward the desired distance, and improves overall safety performance.
+
+Hence, all samples in one batch share the same length, while ˜M changes across batches, which directly realizes horizon-agnostic training. The Fourier neural operator used has 64 hidden channels, 4 layers and the frequency latent embeddings is truncated to keep the lowest 16 frequency modes. The model is trained using the AdamW optimizer with a learning rate of 1e −3 and a weight decay of 1e −3.
+
+BCBF network and optimization. The BCBF model is an MLP ϕψ : R1+ dy → R with hidden widths [32 , 128 , 64 , 32] ,where the input is [t, Y ]. Training data are the same task rollouts sampled by ntrain , ntest , reshaped over all time points in each trajectory. For each batch, we construct 
+
+ytt = [ t, Y ], U0 = [ t0, Y 0], ˙Y =
+
+
+
+1, dY dt 
+
+
+
+,
+
+where dY /dt is computed through finite difference. We followed the BCBF loss formulation in [11], with NAdam optimizer with betas 0.9, 0.999 , weight decay 0.1, and learn-ing rate 0.01 .
+
+C. Results 
+
+Table I shows safety and convergence comparison be-tween nominal and filtered policies, where online filtering consistently improves safety in both tasks at the trajectory level. In transporting , the filtered policy increases the safe-trajectory rate from 57 .8% to 80 .2% , which is a gain of 
+
+22 .4% over the base policy. Figure 3 shows the base and filtered target trajectories, where the base policy results in                           
+
+> TABLE I SAFETY AND CONVERGENCE COMPARISON BETWEEN NOMINAL AND FILTERED POLICIES .
+> Metric Transporting Gathering
+> Base policy safe rate 57.8% 45.5% Offline filter safe rate 18.2% ( ↓39 .6)27.3% ( ↓18 .2)Filtered policy safe rate 80.2% (↑22 .3)63.6% (↑18 .1)Base avg. unsafe steps 179.18 166.81 Offline filter avg. unsafe steps 195.51 ( ↑16 .33 )186.30 ( ↑19 .49 )Filtered avg. unsafe steps 169.54 (↓9.64 )160.36 (↓6.45 )
+
+stagnation and the filtered policy successfully transported to the set of targets. In gathering , the safe-trajectory rate increases from 45 .5% to 63 .6% , which is an improvement of 18 .1% . These gains indicate that the filter improves the probability that an entire rollout remains or becomes safe under the same base policy backbone. Figure 4 visualizes the control inputs, distance evolution, and the trajectories of the two target objects in the XY plane. The base policy fails to converge to the required target distance and, at a later stage, pushes the objects farther apart. This behavior is confirmed by the distance evolution plot in Figure 4, where the distance increases around t ≈ 0.25 s. To better understand this phenomenon, we examine simulation snapshots sampled at 0.1s intervals. Around t = 0 .3s, the base policy generates noticeable turbulence while maneuvering the spatula back to-ward the paddle position. This disturbance induces additional water flow that pushes the objects away from each other, preventing convergence. In contrast, the filtered policy avoids this behavior by adaptively steering the spatula to mitigate water disturbance, thereby maintaining stable convergence toward the desired distance. At the step level, the filtered policy also reduces the average number of steps required to reach convergence to the safe condition. In transporting , this metric drops from 179 .18 
+
+to 169 .54 (9.64 fewer steps, ≈ 5.4% reduction). In gathering ,it decreases from 166 .81 to 160 .36 (6.45 fewer steps, ≈ 3.9% 
+
+reduction). Since trajectories that reach the safe set earlier spend fewer timesteps in unsafe transients, this reduction provides evidence of improved cumulative step-level safety behavior in addition to higher trajectory-level safety rates. Moreover, for both transporting and gathering , we observe that applying a neural operator trained offline as a fixed filter degrades performance, as shown in Table I. The safety rate decreases, and convergence requires more steps than the base policy. This result highlights that the safety filter must be adapted online to the current base policy and environment dynamics in order to provide consistent improvement. Taken together, these results demonstrate the effectiveness of the proposed online filter, across different safety ge-ometries including region-reaching safety ( transporting ) and pairwise-distance safety ( gathering ). The proposed method improves rollout-level safety success rates while simultane-ously reducing cumulative unsafe exposure over time. V. C ONCLUSION 
+
+This paper presents an online safety filtering framework for manipulating deformable objects whose dynamics is governed by a PDE system. We combine a horizon-agnostic neural operator for variable-horizon boundary input-output modeling with a BCBF-based quadratic-program safety filter that runs at each control cycle. The resulting pipeline pre-serves the nominal policy structure while enforcing task-level safety constraints through minimal control modification. Experiments on FluidLab transporting and gathering tasks show improved safe-trajectory rates and reduced steps to safety convergence compared with the nominal policy. Future work will study transfer to broader deformable manipulation domains and hardware-in-the-loop deployment with tighter real-time guarantees. REFERENCES [1] A. Longhini, Y. Wang, I. Garcia-Camacho, D. Blanco-Mulero, M. Mo-letta, M. Welle, G. Aleny` a, H. Yin, Z. Erickson, D. Held et al. ,“Unfolding the literature: A review of robotic cloth manipulation,” 
+
+Annual Review of Control, Robotics, and Autonomous Systems , vol. 8, no. 1, pp. 295–322, 2025. [2] J. Zhu, A. Cherubini, C. Dune, D. Navarro-Alarcon, F. Alambeigi, D. Berenson, F. Ficuciello, K. Harada, J. Kober, X. Li et al. , “Chal-lenges and outlook in robotic manipulation of deformable objects,” 
+
+IEEE Robotics & Automation Magazine , vol. 29, no. 3, pp. 67–77, 2022. [3] F. Gu, Y. Zhou, Z. Wang, S. Jiang, and B. He, “A survey on robotic manipulation of deformable objects: Recent advances, open challenges and new frontiers,” arXiv preprint arXiv:2312.10419 , 2023. [4] X. Lin, Y. Wang, J. Olkin, and D. Held, “Softgym: Benchmarking deep reinforcement learning for deformable object manipulation,” in 
+
+Conference on Robot Learning . PMLR, 2021, pp. 432–448. [5] Z. Xian, B. Zhu, Z. Xu, H.-Y. Tung, A. Torralba, K. Fragkiadaki, and C. Gan, “Fluidlab: A differentiable environment for benchmarking complex fluid manipulation,” arXiv preprint arXiv:2303.02346 , 2023. [6] L. Bhan, Y. Bian, M. Krstic, and Y. Shi, “Pde control gym: A benchmark for data-driven boundary control of partial differential equations,” in 6th Annual Learning for Dynamics & Control Con-ference . PMLR, 2024, pp. 1083–1095. [7] M. Krstic and A. Smyshlyaev, Boundary control of PDEs: A course on backstepping designs . SIAM, 2008. [8] L. Lu, P. Jin, G. Pang, Z. Zhang, and G. E. Karniadakis, “Learning nonlinear operators via deeponet based on the universal approximation theorem of operators,” Nature machine intelligence , vol. 3, no. 3, pp. 218–229, 2021. [9] N. Kovachki, Z. Li, B. Liu, K. Azizzadenesheli, K. Bhattacharya, A. Stuart, and A. Anandkumar, “Neural operator: Learning maps be-tween function spaces with applications to pdes,” Journal of Machine Learning Research , vol. 24, no. 89, pp. 1–97, 2023. [10] Z. Li, N. Kovachki, K. Azizzadenesheli, B. Liu, K. Bhattacharya, A. Stuart, and A. Anandkumar, “Fourier neural operator for parametric partial differential equations,” arXiv preprint arXiv:2010.08895 , 2020. [11] H. Hu and C. Liu, “Safe pde boundary control with neural operators,” 
+
+arXiv preprint arXiv:2411.15643 , 2024. [12] A. D. Ames, X. Xu, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs for safety critical systems,” IEEE Transactions on Automatic Control , vol. 62, no. 8, pp. 3861–3876, 2016. [13] A. D. Ames, S. Coogan, M. Egerstedt, G. Notomista, K. Sreenath, and P. Tabuada, “Control barrier functions: Theory and applications,” in 2019 18th European control conference (ECC) . Ieee, 2019, pp. 3420–3431. [14] M. A. Graule, T. P. McCarthy, C. B. Teeple, J. Werfel, and R. J. Wood, “Somogym: A toolkit for developing and evaluating controllers and reinforcement learning algorithms for soft robots,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 4071–4078, 2022. [15] P. Schegg, E. M´ enager, E. Khairallah, D. Marchal, J. Dequidt, P. Preux, and C. Duriez, “Sofagym: An open platform for reinforcement learning based on soft robot simulations,” Soft Robotics , vol. 10, no. 2, pp. 410–430, 2023. [16] Z. Li, N. Kovachki, K. Azizzadenesheli, B. Liu, A. Stuart, K. Bhat-tacharya, and A. Anandkumar, “Multipole graph neural operator for parametric partial differential equations,” Advances in Neural Infor-mation Processing Systems , vol. 33, pp. 6755–6766, 2020. [17] V. S. Fanaskov and I. V. Oseledets, “Spectral neural operators,” in 
+
+Doklady Mathematics , vol. 108, no. Suppl 2. Springer, 2023, pp. S226–S232. [18] Z. Li, H. Zheng, N. Kovachki, D. Jin, H. Chen, B. Liu, K. Aziz-zadenesheli, and A. Anandkumar, “Physics-informed neural operator for learning partial differential equations,” ACM/IMS Journal of Data Science , vol. 1, no. 3, pp. 1–27, 2024. [19] L. Bhan, Y. Shi, and M. Krstic, “Neural operators for bypassing gain and control computations in pde backstepping,” IEEE Transactions on Automatic Control , vol. 69, no. 8, pp. 5310–5325, 2023. [20] M. Krstic, L. Bhan, and Y. Shi, “Neural operators of backstepping controller and observer gain functions for reaction–diffusion pdes,” 
+
+Automatica , vol. 164, p. 111649, 2024. [21] Q. Nguyen and K. Sreenath, “Exponential control barrier functions for enforcing high relative-degree safety-critical constraints,” in 2016 American Control Conference (ACC) . IEEE, 2016, pp. 322–328. [22] W. Xiao and C. Belta, “High-order control barrier functions,” IEEE Transactions on Automatic Control , vol. 67, no. 7, pp. 3655–3662, 2021. [23] A. Singletary, Y. Chen, and A. D. Ames, “Control barrier functions for sampled-data systems with input delays,” in 2020 59th IEEE Conference on Decision and Control (CDC) . IEEE, 2020, pp. 804– 809. [24] K. Garg, J. Usevitch, J. Breeden, M. Black, D. Agrawal, H. Parwana, and D. Panagou, “Advances in the theory of control barrier func-tions: Addressing practical challenges in safe control synthesis for autonomous and robotic systems,” Annual Reviews in Control , vol. 57, p. 100945, 2024. [25] K. P. Wabersich, A. J. Taylor, J. J. Choi, K. Sreenath, C. J. Tom-lin, A. D. Ames, and M. N. Zeilinger, “Data-driven safety filters: Hamilton-jacobi reachability, control barrier functions, and predictive methods for uncertain systems,” IEEE Control Systems Magazine ,vol. 43, no. 5, pp. 137–177, 2023. [26] K.-C. Hsu, H. Hu, and J. F. Fisac, “The safety filter: A unified view of safety-critical control in autonomous systems,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 7, 2023. [27] L. Knoedler, O. So, J. Yin, M. Black, Z. Serlin, P. Tsiotras, J. Alonso-Mora, and C. Fan, “Safety on the fly: Constructing robust safety filters via policy control barrier functions at runtime,” IEEE Robotics and Automation Letters , 2025. [28] A. J. M. Spencer, Continuum mechanics . Courier Corporation, 2004.

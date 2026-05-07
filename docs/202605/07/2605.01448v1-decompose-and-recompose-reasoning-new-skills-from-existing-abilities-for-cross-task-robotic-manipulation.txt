@@ -1,0 +1,781 @@
+Title: Decompose and Recompose: Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation
+
+URL Source: https://arxiv.org/pdf/2605.01448v1
+
+Published Time: Tue, 05 May 2026 00:40:02 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Decompose and Recompose: Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+Xitie Zhang 1 Aming Wu 2 Yahong Han 1
+
+## Abstract 
+
+Cross-task generalization is a core challenge in open-world robotic manipulation, and the key lies in extracting transferable manipulation knowl-edge from seen tasks. Recent in-context learn-ing approaches leverage seen task demonstra-tions to generate actions for unseen tasks with-out parameter updates. However, existing meth-ods provide only low-level continuous action se-quences as context, failing to capture composable skill knowledge and causing models to degener-ate into superficial trajectory imitation. We pro-pose Decompose and Recompose , a skill reason-ing framework using atomic skill–action pairs as intermediate representations. Our approach de-composes seen demonstrations into interpretable skill–action alignments, enabling the model to recompose these skills for unseen tasks through compositional reasoning. Specifically, we con-struct a task-adaptive dynamic demonstration li-brary via visual-semantic retrieval combined with skill sequences from a planning agent, comple-mented by a coverage-aware static library to fill missing skill patterns. Together, these yield skill-comprehensive demonstrations that explic-itly elicit compositional reasoning for skill compo-sition and execution ordering. Experiments on the AGNOSTOS benchmark and real-world environ-ments validate our method’s zero-shot cross-task generalization capability. 
+
+## 1. Introduction 
+
+With the rapid development of Vision-Language-Action (VLA) models (Brohan et al., 2023; Kim et al., 2024; Black et al., 2024; Team et al., 2024), robotic manipulation has achieved significant progress in handling visual perturba-
+
+> 1
+
+School of Artificial Intelligence, College of Intelligence and Computing, Tianjin University, China 2School of Computer Sci-ence and Information Engineering, Hefei University of Technology, China. Correspondence to: Yahong Han <yahong@tju.edu.cn >.
+
+Preprint. May 5, 2026. 
+
+tions within known tasks. However, real-world deployment inevitably involves novel objects, new goals, and action compositions that were never observed. (Zhou et al., 2025) introduces the cross-task generalization setting, which re-quires robots to transfer manipulation knowledge from seen tasks to entirely unseen tasks without parameter updates, as illustrated in Figure 1(a). Compared to within-task gen-eralization that focuses on visual robustness under fixed task semantics, cross-task generalization requires transfer-able skill understanding, which is essential for deploying general-purpose robots in open-world environments. The core challenge of cross-task generalization lies in ex-tracting transferable manipulation knowledge from seen tasks and reasoning over unseen tasks. Existing meth-ods such as X-ICM (Zhou et al., 2025) train a diffusion-based dynamics-guided sample selection module to retrieve demonstrations from seen tasks based on dynamics simi-larity, and use them to prompt LLMs for action prediction. However, these methods require training on specific task distributions, weakening cross-domain transferability, and provide only low-level numerical action sequences as con-text, relying on direct alignment of trajectory shapes without explicit skill semantics. Such numerical representations fail to express causal and procedural information, including what skill is being performed at each step, why it is exe-cuted, and how it connects to subsequent steps. This causes LLMs to only perform trajectory pattern matching rather than skill reasoning, limiting their generalization capability to tasks with novel skill compositions. To address these issues, as shown in Figure 1(b), we propose 
+
+Decompose and Recompose , a compositional skill reasoning framework that reasons new skills from existing abilities for cross-task manipulation generalization. We decompose each task demonstration into atomic skill sequences and atomic skill label–action alignment pairs, where the former enables skill sequence similarity retrieval and reasoning, and the lat-ter provides composable skill structures for inference, while maintaining executable low-level actions as the final output. This elevates cross-task transfer from trajectory shape sim-ilarity to composable skill structures, explicitly activating the model’s reasoning capabilities for skill composition and execution ordering. 1
+
+> arXiv:2605.01448v1 [cs.RO] 2 May 2026
+
+Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation Unseen Task       
+
+> Planning
+> Agent
+> Visual
+> Encoder
+> Atomic Skills
+> Step_n... ←S tep_2←Step_1
+> Seen Task
+> Zero-
+> Shot
+> Transfer
+> Novel Objects: unseen object categories and spatial
+> configurations
+> New Goals : different goal specifications and task
+> requirements
+> LLM
+> LLM
+> Scenario
+> Abstract
+> Awareness
+> Action_0, Action_1, ..., Action_n ......
+> Seen Task Unseen Task
+> (a) Zero-Shot Cross-Task Robotic Manipulation Setting (b) Our methods: Decompose and recompose skills from seen tasks to
+> accomplish unseen task goals
+> Decompose
+> Recompose
+
+Figure 1. Overview of cross-task robotic manipulation. (a) The zero-shot cross-task setting requires transferring knowledge from seen tasks to unseen tasks involving novel objects and new goals. (b) Our Decompose and Recompose framework extracts atomic skills from seen task demonstrations, uses a planning agent to predict skill sequences for unseen tasks, and leverages visual encoding for scene-aware retrieval. The LLM then reasons over skill–action aligned demonstrations to generate executable action sequences for the target task. 
+
+Specifically, we employ a general vision model (Sim ´eoni et al., 2025) to extract static visual-semantic representa-tions for scene similarity retrieval, and use a planning agent to predict atomic skill sequences for unseen tasks. Based on these predicted sequences, we retrieve and rerank demonstrations with similar action logic from the candi-date pool, constructing a task-adaptive dynamic demon-stration library. However, relying solely on dynamic re-trieval may still result in incomplete demonstration cover-age: even if the retrieved demonstrations have high overall similarity, they may lack critical skill patterns required for task completion. To address this, we introduce an offline-constructed coverage-aware static demonstration library, converting planner-output skill sequences into structured to-kens (e.g., verb skills, skill chains) and normalizing the skill token space through Inverse Document Frequency (IDF) based Token Weighting and Length Regularization strate-gies. During inference, we compute the covered token set from the dynamic library, explicitly identify gaps, and greedily supplement missing tokens from the static library. This yields demonstrations that are both task-adaptive and skill-coverage sufficient, making in-context demonstrations a more helpful skill evidence collection for unseen tasks, thereby enhancing cross-task compositional generalization. In summary, our main contributions are as follows: • We construct atomic skill label-action aligned data, providing LLMs with composable and interpretable atomic skill sets that enable structured reasoning over manipulation sequences. • We propose Decompose and Recompose , a composi-tional skill reasoning framework for zero-shot cross-task manipulation that obtains task-adaptive and skill-comprehensive demonstration sets through the synergy of a dynamic demonstration library for task relevance and a static demonstration library for skill coverage. • We validate our method’s effectiveness on cross-task zero-shot generalization toward unseen tasks on the AGNOSTOS benchmark and real-world environments, achieving competitive performance. 
+
+## 2. Related Works 
+
+Vision-Language-Action Models. Vision-Language-Action (VLA) models enable robots to understand instruc-tions and interact with the physical world, achieving signif-icant progress in general-purpose manipulation. Existing VLA models primarily follow two paradigms. Modular ap-proaches decompose perception, language understanding, planning, and action execution into separate components, such as VoxPoser (Huang et al., 2023), MOKA (Liu et al., 2024a), COPA (Huang et al., 2024a), and ReKep (Huang et al., 2024b), which typically require task-specific prompt engineering or hand-crafted designs. End-to-end approaches train policy models to directly map raw sensory inputs to robot actions, with success heavily dependent on training data scale and diversity. Representative works include RT-2 (Brohan et al., 2023) and RT-2-X (Vuong et al., 2023) trained on large-scale robotic datasets, OpenVLA (Kim et al., 2024) as the first fully open-source VLA model, and recent advances like π0 (Black et al., 2024), RDT (Liu et al., 2024b), LLARVA (Niu et al., 2024), and HPT (Wang et al., 2024) that incorporate sophisticated architectures and train-ing objectives. Despite progress in visual robustness within 2Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation Atomic Skills Collection Coverage-aware Demonstrations Library 
+
+Unseen Tasks 
+
+Dynamic Demonstrations Library 
+
+Verb Tokens:   
+
+> [Push], [Release ],
+> [Move ],[PickUp ]
+> ...
+
+Verb Chains: 
+
+> [Move->grasp]
+> ，
+> [PutDown->Release]
+> ...
+
+IDF-based Token Weighting 
+
+Length Regularization Weighting 
+
+Task Quota Constraint 
+
+Greedy Selection Algorithm      
+
+> Verb Tokens
+> Index
+> Verb Chains
+> Index
+> Inference and Plan
+> ①Reach[knife]
+> ②Grasp[knife]
+> ③Move[knife,chop-
+> ping board]
+> ④Release[knife]
+> Visual Abstract
+
+Rank 
+
+Coverage-Demos 
+
+Skill-Augmented In-Context Learning      
+
+> 1).[ Close[first cup]->Grasp[first cup]->......->Release[first cup]
+> {'label': 'Close[first cup]', 'action': [45, 64, 34, 0, 36, 18, 1]},
+> {'label': 'Grasp[first cup]', 'action': [45, 64, 21, 0, 36, 18, 0]},
+> {'label': 'Place[first cup,first holder]', 'action': [45, 64, 33, 0, 36, 18, 0]},
+> ...
+> {'label': 'Release[first cup]', 'action': [54, 22, 32, 62, 40, 2, 1]}]
+> 2)[{......}]
+> Semantic Similarity
+> 1. demo1
+> 2. demo2
+> 3. demo3
+> 4. ...
+
+Rank     
+
+> 1. demo1
+> 2. demo2
+> 3. demo3
+> 4. ...
+
+Rerank  
+
+> Score(rerank)
+> =
+> α*sim_visual
+> +
+> (1-α)*sim_plan
+> 1).place_cups_episode85
+> 2).stack_blocks_episode109
+> 3). ...
+> ......
+> Image Observation
+> Task Instruction
+> Put the knife on the
+> chopping board
+> Planning
+> Agent
+> Visual Encoder Action_0 ，Action_1 ，Action_2
+> ，... ，Action_n
+> LLM
+> Visual Abstract Bank
+> Coverage-
+> aware
+> Skill
+> Demos
+
+... ...   
+
+> Key Frames
+> Planning
+> Agent
+> Atomic Skills
+> "Move[lid]"
+> "Grasp[lid]"
+> Related Actions
+> [46, 72, 32, 0, 36, 3, 1]
+> [46, 7 3, 15, 0, 36, 3, 0]
+> . . . . . .
+> [52, 25, 26, 0, 36, 57, 1] "Release[lid]"
+> . . . . . .
+
+. . . . . . 
+
+Figure 2. Overview of our method. Our framework consists of four components: (1) Atomic Skills Collection extracts skill–action pairs from seen demonstrations as composable intermediate representations; (2) Coverage-aware Static Library uses IDF-based token weighting to ensure skill pattern coverage; (3) Dynamic Demonstrations Library retrieves task-adaptive examples via visual and plan-based similarity; (4) Skill-Augmented In-Context Learning feeds retrieved demonstrations to an LLM for compositional skill reasoning to predict action sequences. 
+
+known tasks, existing VLA models remain limited in zero-shot cross-task generalization. AGNOSTOS (Zhou et al., 2025) provides the first systematic evaluation, revealing widespread degradation on unseen tasks and indicating that large-scale pre-training alone is insufficient for cross-task transfer. 
+
+In-Context Learning. Large language models demonstrate remarkable in-context learning (ICL) capabilities (Brown et al., 2020), generalizing to new tasks from few demonstra-tions without parameter updates. ICL has been successfully applied across various domains (Dong et al., 2022; Wies et al., 2023; Rubin et al., 2021; Min et al., 2022; Zhang et al., 2023). In robotics, RoboPrompt (Yin et al., 2024) first showed that text-only LLMs can directly predict robot actions through ICL by converting episodes into textual de-scriptions. Subsequent works like KAT (Di Palo & Johns, 2024), InCoRo (Zhu et al., 2024), and Instant Policy (Vo-sylius & Johns, 2025) further explored ICL for robotic con-trol, but primarily focused on within-task generalization. Since demonstration quality significantly affects ICL per-formance (Rubin et al., 2021; Min et al., 2022), and long contexts may cause degradation (Dong et al., 2022; Wies et al., 2023), selecting effective examples is crucial. Re-cently, X-ICM (Zhou et al., 2025) first extended ICL to the zero-shot cross-task setting with dynamics-guided sample selection. However, it provides only low-level action se-quences as context, which lack explicit composable skill structures and causal information, causing LLMs to de-grade into surface-similarity-based trajectory imitation. In contrast, our method constructs aligned representations of atomic skill labels and low-level actions, providing com-posable and interpretable intermediate structures that ele-vate cross-task transfer from ”trajectory similarity” to ”skill composability,” explicitly activating reasoning over skill composition and execution order. 
+
+## 3. Method 
+
+We propose a framework for zero-shot cross-task robotic manipulation that addresses the fundamental challenge of transferring operational knowledge from seen tasks to un-seen tasks. Unlike prior approaches that rely on training dynamics-guided retrievers on specific task distributions, our method achieves cross-task generalization through a training-free pipeline that leverages pretrained visual en-coders and large language models. The core insight is that providing LLMs with composable and interpretable inter-mediate representations—atomic skill labels aligned with low-level actions—is more effective for cross-task transfer than simply presenting raw numerical action sequences. 3Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+As illustrated in Figure 2, our approach consists of three tightly integrated components: (1) atomic skill collection 
+
+that constructs label-action aligned data for seen task demon-strations; (2) dual-library demonstration retrieval that combines visual scene similarity with plan-based skill cov-erage; and (3) skill-augmented in-context learning that en-ables compositional reasoning while outputting executable low-level actions. 
+
+3.1. Problem Formulation 
+
+Consider a robot manipulation setting where we have access to a demonstration library Dseen collected from a set of seen tasks T seen . Each demonstration d ∈ D seen consists of a task instruction ℓd, a sequence of keyframe observations 
+
+(od
+
+> 0
+
+, o d
+
+> 1
+
+, . . . , o dK ) extracted based on gripper state changes and motion stopping criteria, and the corresponding 7-DoF actions (ad
+
+> 1
+
+, . . . , a dK ). Each action at specifies discretized end-effector position (3D voxel indices), rotation (Euler angles discretized into bins), and binary gripper state. Given an unseen task τ unseen /∈ T seen with instruction ℓq
+
+and initial observation oq
+
+> 0
+
+, our goal is to generate an action sequence {aq
+
+> 1
+
+, . . . , a qT } that successfully accomplishes the task. The key challenge lies in the distribution shift: unseen tasks may involve novel object configurations, different goal specifications, or new combinations of primitive skills not directly observed during training. 
+
+3.2. Atomic Skill Collection 
+
+To enable compositional reasoning, we construct atomic skill labels for each demonstration in the seen task library, transforming opaque numerical action sequences into in-terpretable skill–action pairs. As illustrated in Figure 3, our pipeline extracts keyframes from demonstrations, anno-tates each segment with atomic skill labels, and produces a diverse vocabulary of reusable skills. 
+
+Keyframe Extraction. Given a demonstration episode, we identify keyframes using: (1) gripper state changes (open to closed or vice versa); (2) motion stopping events, de-tected when joint velocities fall below a threshold; and (3) episode termination. This produces segmented demon-strations where each segment (ok, o k+1 , a k) represents a coherent atomic action. 
+
+VLM-based Annotation. For each action segment, we employ a vision-language model to annotate it with an atomic skill label following the format Verb [obj ] or 
+
+Verb [obj 1, obj 2], where: 
+
+Verb ∈ V = {Reach , Move , Grasp , Release , . . . }
+
+(1) The VLM receives the start and end keyframe images 
+
+(ok, o k+1 ), gripper state transition (gk, g k+1 ), object names from segmentation masks, and task instruction. Init State Move  
+
+> [cube]
+> Grasp
+> [cube]
+> Insert[cube,
+> shapesorter]
+> PutDown
+> [cube]
+> Release
+> [cube]
+> (a) (b)
+> (c)
+
+Figure 3. Atomic Skill Collection. (a) Frequency distribution of extracted atomic skills across seen demonstrations. (b) Word cloud of the atomic skill vocabulary. (c) Visualization of keyframe detection and atomic skill labeling for a sample demonstration, showing the progression from initial state through intermediate keyframes with corresponding skill annotations. 
+
+Gripper-Constrained Labeling. We leverage gripper tran-sitions as hard constraints: when the gripper changes from open to closed ( gk = 1 , g k+1 = 0 ), the label is forced to be Grasp [·]; when it changes from closed to open, the la-bel is Release [·]. This ensures physical consistency and reduces annotation errors. 
+
+Post-processing. We apply rule-based post-processing: (1) for relational verbs like Close , Insert , Place , we en-force argument order as (movable object, target object); (2) for Grasp /Release , we verify the object belongs to the movable category; (3) when the gripper remains open during a relational action, we downgrade to Move . This produces clean label-action pairs {(sk, a k)}Kk=1 .
+
+3.3. Dual-Library Demonstration Retrieval 
+
+We address the challenge of selecting demonstrations that are both relevant and skill-complete through a dual-library system: a dynamic library for task-adaptive retrieval and a static library for skill coverage completion. 3.3.1. D YNAMIC DEMONSTRATIONS LIBRARY 
+
+The dynamic library retrieves task-relevant demonstrations by fusing visual similarity with plan-based skill matching. For visual similarity, we extract a global feature from the query observation oq using a pretrained DINOv3 (Sim ´eoni et al., 2025) encoder: f q = ϕvis (oq )/∥ϕvis (oq )∥2, and com-pute cosine similarity svis  
+
+> i
+
+= f q · fi with each demonstration 
+
+di.For plan-based similarity, a planning agent πplan first gen-erates a predicted atomic skill sequence ˆS = (ˆ s1, . . . , ˆsM )
+
+based on the instruction and scene state, e.g., discretized object coordinates and gripper state, and more details in 4Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+Appendix A. We then measure the alignment between the predicted plan and each demonstration’s skill labels Si using Jaccard similarity over both verb sets and bigram chains: 
+
+splan  
+
+> i
+
+= λ · J(V( ˆS), V(Si)) + (1 − λ) · J(B( ˆS), B(Si)) (2) where V(·) extracts verb sets and B(·) extracts verb bigrams. The final ranking score fuses both similarities as si = α ·
+
+˜svis  
+
+> i
+
++ (1 − α) · splan  
+
+> i
+
+, where ˜svis  
+
+> i
+
+is min-max normalized. We select the top-ksim demonstrations to form Ddyn .3.3.2. COVERAGE -A WARE DEMONSTRATIONS LIBRARY 
+
+While the dynamic library provides task-relevant demonstra-tions, it may still lack critical skill patterns required for task completion. To ensure comprehensive skill coverage, we maintain an offline-constructed Coverage-aware Demonstra-tions Library Lcov that supplements missing skill patterns through object-agnostic coverage tokens and IDF-weighted selection. Each demonstration is represented by tokens that abstract away object identities, capturing only the verb-level skill structure: 
+
+T (d) = {V: v | v ∈ V (Sd)}∪{ B: v1 → v2 | (v1, v 2) ∈ B (Sd)}
+
+(3) To prioritize rare but potentially critical skills, we assign IDF-based weights to each token: wt = (log N +1  
+
+> df (t)+1
+
++ 1) β ,where N is the total number of demonstrations, df (t) is document frequency, and β controls the weighting inten-sity. The selection score balances coverage gain against demonstration length: Score (d) = 
+
+P  
+
+> t∈T (d)\C
+
+wt
+
+1 + γ · |S d| (4) where C denotes currently covered tokens and γ is a length penalty. During inference, we compute the coverage gap G = T ( ˆS)\S 
+
+> d∈D dyn
+
+T (d) between the predicted plan’s required tokens and those already covered by the dynamic library. We then greedily select up to kcov demonstrations from Lcov to fill missing tokens, yielding the final demonstration set D =
+
+Ddyn ∪ D cov .
+
+3.4. Skill-Augmented In-Context Learning 
+
+Retrieved demonstrations are formatted with skill–action alignment: 
+
+[instr i, obs i, plan i] → [( s1, a 1), . . . , (sK , a K )] (5) The skill labels serve as interpretable intermediate represen-tations explaining what each action accomplishes and how it connects to the task goal. For the query task, we present instruction, observation, and the suggested plan from the planning agent. Crucially, while labels guide understanding of action seman-tics and execution order, the LLM outputs only executable actions without labels. This ensures: (1) direct compatibility with the robot controller; (2) implicit skill-level reasoning even when exact decomposition is uncertain; (3) generaliza-tion to novel skill combinations. The system prompt emphasizes that demonstrations include skill annotations for reasoning guidance, but the model should output only action sequences. Through this for-mulation, our approach elevates cross-task transfer from trajectory similarity to composable skill structures, explic-itly activating reasoning about skill composition rather than superficial pattern matching. 
+
+## 4. Experiments 
+
+4.1. Implementation Details 
+
+We evaluate our approach for zero-shot cross-task robotic manipulation generalization across two settings: the AG-NOSTOS benchmark, which is the first simulation testbed specifically designed for cross-task zero-shot manipulation evaluation, and a real-world experimental setup using a UFACTORY xArm6 robotic arm. The hyperparameters 
+
+λ, α, β, and γ in Dual-Library Demonstration Retrieval are 0.7, 0.5, 0.5, and 0.03, respectively. We use 20 in-context demonstrations in total, with ksim = 17 dynami-cally retrieved demonstrations and kcov = 3 coverage-aware demonstrations. We primarily employ Qwen2.5-VL as the planning agent in offline Atomic Skill Collection, and we use the Qwen-2.5-7B-Instruct model as the planning agent and LLM in the reasoning phase. These models are de-ployed on two A6000 GPUs. 
+
+4.2. Main Results 
+
+To systematically assess the performance of our method, we conduct experiments on the AGNOSTOS benchmark (Zhou et al., 2025), which comprises 23 unseen tasks organized into two difficulty tiers: Level-1 and Level-2. 
+
+Baseline Methods. We compare against diverse Vision-Language-Action (VLA) approaches spanning four distinct categories: 
+
+(1) Foundation VLA Models. This category encompasses models that leverage either large-scale cross-embodiment robotic datasets or are architecturally grounded in pre-trained LLMs/VLMs. These approaches aim to achieve broad manipulation capabilities through scale and language-vision grounding. Representative methods include Open-VLA (Kim et al., 2024), which pioneers open-source VLA 5Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+Table 1. Cross-task zero-shot manipulation performance on 23 unseen tasks from the AGNOSTOS benchmark. We report success rates (%) for each task, grouped by difficulty level (Level-1 and Level-2). Column headers show task abbreviations (full names in Appendix). N/A indicates tasks overlapping with training data. Best results are in bold , second best marked with *. 
+
+Level-1 Tasks Category Method Toilet Knife Fridge Micro. Laptop Phone Seat LampOff LampOn Book Umb. Grill Bin 
+
+PerAct 0.0 5.3 37.3 64.0 2.7 0.0 72.0 0.0 1.3 0.0 1.3 8.0 54.7 RVT 0.0 2.7 50.7 26.7 50.7 2.7 40.0 0.0 1.3 0.0 1.3 0.0 6.7 In-Domain Sigma-Agent 0.0 9.3 56.0 9.3 30.7 1.3 65.3 1.3 0.0 0.0 0.0 1.3 4.0 RVT2 0.0 1.3 0.0 17.3 42.7 1.3 62.7 2.7 1.3 0.0 1.3 5.3 34.7 InstantPolicy 0.0 1.3 13.3 4.0 4.0 18.7 24.0 0.0 0.0 0.0 0.0 0.0 0.0 D4R 0.0 8.0 32.0 30.7 24.0 0.0 65.3 20.0 4.0 0.0 0.0 0.0 0.0 Human-Video R3M 0.0 0.0 37.3 22.7 25.3 1.3 62.7 6.7 4.0 0.0 0.0 0.0 0.0 D4R-Align 0.0 2.7 45.3 74.7 24.0 0.0 41.3 0.0 0.0 1.3 0.0 0.0 0.0 R3M-Align 0.0 4.0 49.3 25.3 21.3 0.0 49.3 0.0 5.3 0.0 0.0 1.3 1.3 OpenVLA 0.0 5.3 38.7 40.0 57.3 0.0 53.3 12.0 1.3 1.3 0.0 10.7 0.0 RDT 0.0 0.0 46.7 13.3 14.7 0.0 50.7 0.0 0.0 1.3 0.0 8.0 0.0 
+
+π0 0.0 5.3 85.3 24.0 40.0 1.3 64.0 18.7 8.0 1.3 0.0 33.3 1.3 Foundation LLARVA 0.0 0.0 12.0 0.0 6.7 0.0 40.0 0.0 0.0 0.0 0.0 0.0 0.0 VLA 3D-LOTUS 0.0 6.7 N/A N/A N/A 0.0 6.7 0.0 0.0 0.0 0.0 13.3 5.3 3D-LOTUS++ 0.0 5.3 N/A N/A N/A 9.3 68.0 10.7 0.0 0.0 0.0 29.3 13.3 SAM2Act 0.0 0.0 36.0 40.0 6.7 6.7 62.7 6.7 0.0 1.3 1.3 9.3 0.0 VoxPoser 0.0 0.0 0.0 0.0 5.3 8.0 28.0 88.7 25.3 0.0 0.0 0.0 82.7 ICL-based X-ICM 1.3 26.7 22.7 45.3 33.3 57.3 48.0 58.7 50.7 1.3 0.0 8.0 18.7 
+
+Ours 1.3 21.3 34.7 62.7 34.7 42.7 72.0 67.0 52.3 1.3 0.0 12.0 20.0 
+
+Level-2 Tasks Average Category Method USB Lid Plate Ball Scoop Rope Oven Buzz Plants Charger L-1 L-2 All 
+
+PerAct 58.7 2.7 0.0 0.0 0.0 0.0 1.3 4.0 6.7 2.7 19.0 ±1.4 7.6 ±1.1 14.0 ±0.9
+
+RVT 89.3 2.7 0.0 0.0 0.0 0.0 4.0 8.0 5.3 4.0 14.0 ±1.4 11.3 ±1.6 12.8 ±0.2
+
+In-Domain Sigma-Agent 88.0 0.0 0.0 0.0 0.0 0.0 4.0 8.0 5.3 1.3 13.7 ±1.6 10.7 ±1.7 12.4 ±0.4
+
+RVT2 22.7 40.0 0.0 0.0 0.0 0.0 0.0 1.3 1.3 1.3 13.1 ±0.4 6.7 ±1.3 10.3 ±0.6
+
+InstantPolicy 26.7 1.3 0.0 0.0 0.0 0.0 0.0 1.3 0.0 0.0 4.3 ±4.2 2.9 ±1.4 3.7 ±3.0
+
+D4R 98.7 0.0 0.0 0.0 0.0 0.0 1.3 1.3 1.3 4.0 14.1 ±0.3 10.7 ±0.2 12.6 ±0.2
+
+Human-Video R3M 48.0 0.0 0.0 0.0 0.0 0.0 8.0 2.7 2.7 1.3 12.3 ±1.4 6.3 ±0.9 9.7 ±0.6
+
+D4R-Align 89.3 1.3 0.0 0.0 0.0 0.0 8.0 6.7 0.0 1.3 14.5 ±1.0 10.7 ±0.2 12.8 ±0.6
+
+R3M-Align 90.7 0.0 1.3 0.0 0.0 0.0 2.7 13.3 4.0 0.0 12.9 ±0.7 11.2 ±0.7 12.2 ±0.3
+
+OpenVLA 77.3 0.0 0.0 0.0 0.0 0.0 6.7 5.3 2.7 0.0 16.9 ±1.3 9.2 ±0.7 13.6 ±0.8
+
+RDT 100.0 29.3 4.0 0.0 0.0 0.0 8.0 2.7 0.0 0.0 10.4 ±0.5 14.4 ±0.9 12.1 ±0.4
+
+π0 97.3 0.0 1.3 0.0 0.0 0.0 14.7 5.3 1.3 0.0 *21.7 ±0.4 12.0 ±0.9 *17.5 ±0.4
+
+Foundation LLARVA 24.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 4.5 ±0.1 2.4 ±0.0 3.6 ±0.1
+
+VLA 3D-LOTUS 85.3 0.0 1.3 0.0 0.0 0.0 0.0 4.0 0.0 0.0 3.2 ±0.5 9.1 ±0.7 6.2 ±0.5
+
+3D-LOTUS++ 90.7 30.7 0.0 0.0 5.3 1.3 8.0 8.7 6.7 0.0 13.6 ±1.0 *15.1 ±1.1 14.4 ±1.0
+
+SAM2Act 92.0 49.3 0.0 0.0 0.0 0.0 1.3 6.7 4.0 5.3 13.1 ±0.4 15.9 ±1.3 14.0 ±0.7
+
+VoxPoser 32.0 76.0 0.0 8.0 0.0 0.0 0.0 1.3 0.0 4.0 18.1 ±0.4 12.1 ±0.4 15.6 ±0.2
+
+ICL-based X-ICM 98.7 20.0 6.7 9.3 0.0 6.7 16.0 2.7 5.3 4.0 28.6 ±1.9 16.9 ±1.3 23.5 ±1.6
+
+Ours 96.0 20.3 6.7 10.0 0.0 16.0 24.0 8.0 0.0 4.0 32.5 ±1.5 18.5 ±1.0 26.4 ±1.3
+
+development; RDT (Liu et al., 2024b), employing robot-specific transformers; π0 (Black et al., 2024), combining VLM-based flow matching with multi-platform training; LLARVA (Niu et al., 2024), utilizing instruction tuning on cross-embodiment data; SAM2Act (Fang et al., 2025) and 3D-LOTUS++ (Garcia et al., 2024), leveraging advanced visual representations; and VoxPoser (Huang et al., 2023), synthesizing composable value maps via MLLMs. 
+
+(2) Human-Video Pretrained VLA Models. These meth-ods exploit large-scale human activity video datasets (Grau-man et al., 2022; Goyal et al., 2017) to learn rich object-interaction priors, subsequently adapting these representa-tions for robotic control through downstream finetuning. 6Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation Beat the    
+
+> buzz
+> Reach
+> [pole]
+> Grasp
+> [pole] Push[pole]
+> Push
+> [button]
+> Grasp
+> [button]
+> Reach
+> [button]
+> Lamp off
+> Straighten
+> rope
+> Grasp[toilet_
+> seat_up_seat]
+> Toilet seat
+> down
+> Pull[rope
+> head,rope
+> head target]
+> Push[toilet_seat_up_seat,
+> toilet]
+> Init State Task Progress Task Progress Init State
+> Grasp
+> [rope head]
+> Reach
+> [rope head]
+> Reach[toilet_
+> seat_up_seat]
+
+Figure 4. Visualization of our compositional skill reasoning process on four representative unseen tasks from the AGNOSTOS benchmark. 
+
+We evaluate R3M (Nair et al., 2022) and D4R (Zhou et al., 2024), along with their RLBench-adapted variants R3M-Align (Zhou et al., 2024) and D4R-Align (Zhou et al., 2024). 
+
+(3) In-Domain Trained VLA Models. This category in-cludes methods trained from scratch on RLBench’s 18 standard training tasks using task-specialized architectures. These approaches serve as strong upper bounds since they operate without cross-domain distribution shift. We evaluate PerAct (Shridhar et al., 2023), RVT (Goyal et al., 2023), RVT2 (Goyal et al., 2024), Sigma-Agent (Chen et al., 2024), and Instant Policy (Vosylius & Johns, 2025)—the latter be-ing a within-task in-context learning method based on graph diffusion over structured demonstrations. 
+
+(4) In-Context Learning Approaches for Cross-Task Ma-nipulation. We include X-ICM (Zhou et al., 2025) as a representative method that constructs in-context prompts from seen task demonstrations to drive LLM-based action prediction for unseen tasks in a zero-shot manner. As shown in Table 1, we conduct comprehensive evaluation across all 23 unseen tasks from the AGNOSTOS benchmark to assess both accuracy and generalization capability. For fair comparison, we follow the standard AGNOSTOS eval-uation protocol, running 25 rollouts for each of 3 different seeds per task, resulting in 75 episodes per task. Our method achieves the highest overall success rates across both dif-ficulty levels. Notably, we attain success rates exceeding 60% on four distinct tasks, including Microwave, Seat, Lam-pOff, and USB, whereas other individual baselines achieve this threshold on at most three tasks. This demonstrates that our approach of constructing atomic skill-action align-ment pairs, which preserves executable low-level actions while providing compositional and reasoned intermediate representations, effectively stimulates the model’s reason-ing capabilities over skill composition and execution or-dering, thereby enhancing zero-shot cross-task generaliza-tion. Figure 4 visualizes our method’s reasoning process on four unseen tasks: lamp off , straighten rope ,
+
+beat the buzz , and toilet seat down , providing intuitive illustration of our compositional skill reasoning for cross-task manipulation generalization. 
+
+4.3. Ablation Analysis 
+
+In Table 2, we progressively incorporate each core com-ponent to demonstrate the effectiveness of our framework. 
+
+Baseline (BS.): The first row presents the baseline that ran-domly selects in-context demonstrations from seen tasks without any retrieval strategy, achieving 21.6% overall suc-cess rate. 
+
+Dynamic Demonstrations Library (DDL.): Adding task-adaptive retrieval based on visual-semantic and skill-sequence matching improves performance to 23.3%, vali-dating that relevant demonstration selection enhances trans-ferable action patterns. 
+
+Coverage-aware Demonstrations Library (CDL.): Further incorporating the static library that supplements missing skill patterns raises performance to 24.9%, demonstrating the importance of skill coverage completeness. 
+
+Skill-Augmented In-Context Learning (SA-ICL): Finally, ex-plicit skill–action alignment annotations yield our best per-formance of 26.4%, confirming that structured skill repre-sentations effectively elicit compositional reasoning beyond trajectory imitation. Furthermore, we analyze the impact of visual encoders and LLM backbones. Table 3 (upper portion) compares per-formance when replacing DINOv3 (Sim ´eoni et al., 2025) with alternative general-purpose visual models such as CLIP (Radford et al., 2021) and DINOv2 (Oquab et al., 2023), demonstrating that static scene semantic extrac-tion capability influences our method’s zero-shot cross-task 7Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation xArm6 Robotic Arm 
+
+> RealSense RGB-D
+> Camera L515
+> xArm Gripper G2
+
+(a) Real world experimental platform (b) Real world Manipulation 
+
+> Stack cups
+> Put a bunch of
+> grapes on a plate
+> Place the spoon on
+> the di nner plate
+
+Figure 5. Visualization of our real world experiments.(a) Our real world experimental platform, consisting of a 6-DoF xArm6 arm equipped with a gripper and a RGB-D camera. (b) The results on real-world manipulation tasks. 
+
+Table 2. Ablation study on core components. BS is Baseline, DDL denotes the Dynamic Demonstrations Library; CDL denotes the Coverage-aware Demonstrations Library; SA-ICL denotes Skill-Augmented In-Context Learning. 
+
+BS. DDL. CDL. SA-ICL L-1 L-2 All 
+
+✓ 26.9 14.8 21.6 
+
+✓ ✓ 29.5 17.2 23.3 
+
+✓ ✓ ✓ 30.2 18.1 24.9 
+
+✓ ✓ ✓ ✓ 32.5 18.5 26.4 
+
+Table 3. Impact of visual encoders (upper) and LLM backbones (lower) on cross-task generalization performance. 
+
+Component L-1 L-2 Overall 
+
+Visual Encoder 
+
+CLIP 30.5 17.4 24.8 DINOv2 31.7 17.9 25.7 DINOv3 32.5 18.5 26.4 
+
+LLM Backbone 
+
+Llama3.0-8B 28.4 14.6 22.4 Ministral-8B 24.3 14.8 20.2 InternLM3-8B 30.1 16.3 24.1 Qwen2.5-7B 32.5 18.5 26.4 
+
+generalization, underscoring the importance of scene un-derstanding. The lower portion examines different LLM backbones: Llama3.0-8B-Instruct (Grattafiori et al., 2024), Ministral-8B-Instruct (Jiang et al., 2023), and InternLM3-8B-Instruct (Cai et al., 2024). Results reveal that backbone capability significantly impacts generalization, emphasizing that cross-task generalization improves with enhanced LLM reasoning ability. Additional ablation details are provided in Appendix B. 
+
+4.4. Real-World Experiments 
+
+To validate real-world efficacy, we conduct real-world ma-nipulation experiments. As shown in Figure 5(a), we use a UFACTORY xArm6 arm equipped with an UFACTORY 
+
+Table 4. Real-world zero-shot cross-task manipulation results. Success rates (%) over 25 trials per task. 
+
+Task Success Rate (%) 
+
+Stack cups 30 Put a bunch of grapes on a plate 70 Place the spoon on the dinner plate 20 Stack blocks 20 Throw the garbage into the trash can 40 
+
+Average 36 
+
+xArm Gripper G2, with RGB images and depth maps cap-tured via a RealSense L515 camera. We provide additional details in Appendix C. We evaluate five physical manipulation tasks: stacking cups, putting a bunch of grapes on a plate, placing the spoon on the dinner plate, stacking blocks, and throwing the garbage into the trash can. Results shown in Table 4 demonstrate our method’s zero-shot cross-task performance in real-world settings. Figure 5(b) illustrates a subset of successful cases, with additional visualization results that include both suc-cessful and failed cases can be found in Appendix C and videos are provided in the supplementary materials. 
+
+## 5. Conclusion 
+
+We present Decompose and Recompose , a skill reasoning framework for zero-shot cross-task robotic manipulation. Our core contribution is introducing atomic skill–action pairs as intermediate representations, bridging high-level task semantics and low-level controls. Through a dual-library retrieval strategy combining task-adaptive dynamic retrieval with coverage-aware static complementation, we construct skill-comprehensive demonstration sets that ex-plicitly elicit the LLM’s compositional reasoning capabili-ties. Experiments on the AGNOSTOS benchmark and real-world environments validate our method’s effectiveness for cross-task generalization. 8Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+## Impact Statement 
+
+This paper presents work that aims to advance the field of Cross-Task Robotic Manipulation Generalization. There are many potential societal consequences of our work, none of which we feel must be specifically highlighted here. 
+
+## References 
+
+Black, K., Brown, N., Driess, D., Esmail, A., Equi, M., Finn, C., Fusai, N., Groom, L., Hausman, K., Ichter, B., et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 ,2024. Brohan, A., Brown, N., Carbajal, J., Chebotar, Y., Chen, X., Choromanski, K., Ding, T., Driess, D., Dubey, A., Finn, C., et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. arXiv preprint arXiv:2307.15818 , 2023. Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J., Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G., Askell, A., et al. Language models are few-shot learners, 2020. Cai, Z., Cao, M., Chen, H., Chen, K., Chen, K., Chen, X., Chen, X., Chen, Z., Chen, Z., Chu, P., et al. Internlm2 technical report. arXiv preprint arXiv:2403.17297 , 2024. Chen, Z., Yin, J., Chen, Y., Huo, J., Tian, P., Shi, J., and Gao, Y. Sigma-agent: A vision-language-action model for robotic manipulation. arXiv preprint arXiv:2411.04376 ,2024. Di Palo, N. and Johns, E. Keypoint action tokens enable in-context imitation learning in robotics. arXiv preprint arXiv:2403.19578 , 2024. Dong, Q., Li, L., Dai, D., Zheng, C., Ma, J., Li, R., Xia, H., Xu, J., Wu, Z., Liu, T., et al. A survey on in-context learning. arXiv preprint arXiv:2301.00234 , 2022. Fang, H., Grotz, M., Pumacay, W., Wang, Y. R., Fox, D., Krishna, R., and Duan, J. Sam2act: Integrating visual foundation model with a memory architecture for robotic manipulation. arXiv preprint arXiv:2501.18564 , 2025. Garcia, R., Chen, S., and Schmid, C. Towards generalizable vision-language robotic manipulation: A benchmark and llm-guided 3d policy. arXiv preprint arXiv:2410.01345 ,2024. Goyal, A., Xu, J., Guo, Y., Blukis, V., Chao, Y.-W., and Fox, D. Rvt: Robotic view transformer for 3d object manipulation. In Conference on Robot Learning , pp. 694– 710. PMLR, 2023. Goyal, A., Blukis, V., Xu, J., Guo, Y., Chao, Y.-W., and Fox, D. Rvt-2: Learning precise manipulation from few demonstrations. arXiv preprint arXiv:2406.08545 , 2024. Goyal, R., Ebrahimi Kahou, S., Michalski, V., Materzynska, J., Westphal, S., Kim, H., Haenel, V., Fruend, I., Yianilos, P., Mueller-Freitag, M., et al. The” something something” video database for learning and evaluating visual com-mon sense. In Proceedings of the IEEE international conference on computer vision , pp. 5842–5850, 2017. Grattafiori, A., Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., Schelten, A., Vaughan, A., et al. The llama 3 herd of models. arXiv preprint arXiv:2407.21783 , 2024. Grauman, K., Westbury, A., Byrne, E., Chavis, Z., Furnari, A., Girdhar, R., Hamburger, J., Jiang, H., Liu, M., Liu, X., et al. Ego4d: Around the world in 3,000 hours of egocentric video. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pp. 18995–19012, 2022. Huang, H., Lin, F., Hu, Y., Wang, S., and Gao, Y. Copa: General robotic manipulation through spatial constraints of parts with foundation models. In 2024 IEEE/RSJ Inter-national Conference on Intelligent Robots and Systems (IROS) , pp. 9488–9495. IEEE, 2024a. Huang, W., Wang, C., Zhang, R., Li, Y., Wu, J., and Fei-Fei, L. Voxposer: Composable 3d value maps for robotic manipulation with language models. arXiv preprint arXiv:2307.05973 , 2023. Huang, W., Wang, C., Li, Y., Zhang, R., and Fei-Fei, L. Rekep: Spatio-temporal reasoning of relational keypoint constraints for robotic manipulation. arXiv preprint arXiv:2409.01652 , 2024b. Jiang, A. Q., Sablayrolles, A., Mensch, A., Bamford, C., Chaplot, D. S., de las Casas, D., Bressand, F., Lengyel, G., Lample, G., Saulnier, L., Lavaud, L. R., Lachaux, M.-A., Stock, P., Scao, T. L., Lavril, T., Wang, T., Lacroix, T., and Sayed, W. E. Mistral 7b, 2023. Kim, M. J., Pertsch, K., Karamcheti, S., Xiao, T., Balakr-ishna, A., Nair, S., Rafailov, R., Foster, E., Lam, G., San-keti, P., et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. Liu, F., Fang, K., Abbeel, P., and Levine, S. Moka: Open-vocabulary robotic manipulation through mark-based vi-sual prompting. In First Workshop on Vision-Language Models for Navigation and Manipulation at ICRA 2024 ,2024a. 9Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+Liu, S., Wu, L., Li, B., Tan, H., Chen, H., Wang, Z., Xu, K., Su, H., and Zhu, J. Rdt-1b: a diffusion founda-tion model for bimanual manipulation. arXiv preprint arXiv:2410.07864 , 2024b. Min, S., Lyu, X., Holtzman, A., Artetxe, M., Lewis, M., Hajishirzi, H., and Zettlemoyer, L. Rethinking the role of demonstrations: What makes in-context learning work? 
+
+arXiv preprint arXiv:2202.12837 , 2022. Nair, S., Rajeswaran, A., Kumar, V., Finn, C., and Gupta, A. R3m: A universal visual representation for robot manipulation. arXiv preprint arXiv:2203.12601 , 2022. Niu, D., Sharma, Y., Biamby, G., Quenum, J., Bai, Y., Shi, B., Darrell, T., and Herzig, R. Llarva: Vision-action instruction tuning enhances robot learning. arXiv preprint arXiv:2406.11815 , 2024. Oquab, M., Darcet, T., Moutakanni, T., Vo, H., Szafraniec, M., Khalidov, V., Fernandez, P., Haziza, D., Massa, F., El-Nouby, A., et al. Dinov2: Learning robust visual features without supervision. arXiv preprint arXiv:2304.07193 ,2023. Radford, A., Kim, J. W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., et al. Learning transferable visual models from natural language supervision. In International conference on machine learning , pp. 8748–8763. PMLR, 2021. Rubin, O., Herzig, J., and Berant, J. Learning to re-trieve prompts for in-context learning. arXiv preprint arXiv:2112.08633 , 2021. Shridhar, M., Manuelli, L., and Fox, D. Perceiver-actor: A multi-task transformer for robotic manipulation. In 
+
+Conference on Robot Learning , pp. 785–799. PMLR, 2023. Sim ´eoni, O., Vo, H. V., Seitzer, M., Baldassarre, F., Oquab, M., Jose, C., Khalidov, V., Szafraniec, M., Yi, S., Ramamonjisoa, M., et al. Dinov3. arXiv preprint arXiv:2508.10104 , 2025. Team, O. M., Ghosh, D., Walke, H., Pertsch, K., Black, K., Mees, O., Dasari, S., Hejna, J., Kreiman, T., Xu, C., et al. Octo: An open-source generalist robot policy. arXiv preprint arXiv:2405.12213 , 2024. Vosylius, V. and Johns, E. Instant policy: In-context imita-tion learning via graph diffusion. In Proceedings of the International Conference on Learning Representations (ICLR) , 2025. Vuong, Q., Levine, S., Walke, H. R., Pertsch, K., Singh, A., Doshi, R., Xu, C., Luo, J., Tan, L., Shah, D., et al. Open x-embodiment: Robotic learning datasets and rt-x models. In Towards Generalist Robots: Learning Paradigms for Scalable Skill Acquisition@ CoRL2023 , 2023. Wang, L., Huang, X., Song, J., Sinha, S., Xu, J., Zhang, Q., Xu, K., Darrell, T., and Abbeel, P. Scaling proprioceptive-visual learning with heterogeneous pre-trained transform-ers. Advances in Neural Information Processing Systems ,37, 2024. Wies, N., Levine, Y., and Shashua, A. The learnability of in-context learning. Advances in Neural Information Processing Systems , 36:36637–36651, 2023. Yin, Y., Wang, Z., Sharma, Y., Niu, D., Darrell, T., and Herzig, R. In-context learning enables robot action pre-diction in llms. arXiv preprint arXiv:2410.12782 , 2024. Zhang, Y., Zhou, K., and Liu, Z. What makes good exam-ples for visual in-context learning? Advances in Neural Information Processing Systems , 36:17773–17794, 2023. Zhou, J., Ma, T., Lin, K.-Y., Wang, Z., Qiu, R., and Liang, J. Mitigating the human-robot domain discrepancy in visual pre-training for robotic manipulation. arXiv preprint arXiv:2406.14235 , 2024. Zhou, J., Ye, K., Liu, J., Ma, T., Wang, Z., Qiu, R., Lin, K.-Y., Zhao, Z., and Liang, J. Exploring the limits of vision-language-action manipulations in cross-task gener-alization. arXiv preprint arXiv:2505.15660 , 2025. Zhu, J. Y., Cano, C. G., Bermudez, D. V., and Drozdzal, M. Incoro: In-context learning for robotics control with feedback loops. arXiv preprint arXiv:2402.05188 , 2024. 10 Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+## A. Methodology and Implementation Details 
+
+A.1. Low-level control interface 
+
+We use a standard RLBench control interface that executes an end-effector target pose via motion planning and applies a discrete gripper open/close command. Concretely, each continuous control step is represented as 
+
+u = [ p, q, g ] ∈ R3 × H × { 0, 1}, (6) where p ∈ R3 is the end-effector position in the robot base frame, q ∈ H is a unit quaternion specifying orientation, and g
+
+is a binary gripper command (e.g., g=1 for open, g=0 for close). 
+
+A.2. Discrete action format for the LLM 
+
+For LLM interaction, we discretize translation and rotation into integer bins and represent each action as a 7-tuple: 
+
+a = [ ix, i y , i z , i r , i p, i ψ , g ], (7) where (ix, i y , i z ) are voxel indices for translation, (ir , i p, i ψ ) are discrete bins for Euler angles (roll, pitch, yaw), and g is the gripper command. 
+
+A.3. Encoding: continuous control → discrete LLM tokens Translation discretization. Let the workspace bounds be an axis-aligned box 
+
+bmin ∈ R3, bmax ∈ R3, (8) and let V be the number of uniform bins per axis (we use V =100 ). Define per-axis resolution 
+
+r = ( bmax − bmin )/V. (9) Given a continuous position p, the voxel index is computed as 
+
+i = (p − bmin ) ⊘ r, (10) where ⊘ denotes elementwise division and the result is clipped to [0 , V −1] per axis. 
+
+Rotation discretization. We convert the quaternion q into Euler angles (degrees) θ = [ θr , θ p, θ y ] in a fixed convention. We then quantize angles with resolution ∆ (we use ∆=5 ◦): 
+
+k = (θ + 180 ◦)/∆, (11) and clip each element to [0 , ⌊360 ◦/∆⌋ − 1] .
+
+Gripper. The gripper command is kept discrete as g ∈ { 0, 1}.
+
+A.4. Decoding: discrete LLM tokens → continuous control 
+
+Given an LLM-predicted discrete action a = [ i, k, g ], we recover a continuous control target as follows. 
+
+Translation reconstruction. We map voxel indices to the center of the corresponding voxel cell: 
+
+p = bmin + r ⊙ i + r/2, (12) where ⊙ denotes elementwise multiplication. 
+
+Rotation reconstruction. We recover Euler angles from bins by 
+
+θ = ∆ · k − 180 ◦, (13) then convert θ back to a quaternion q using the same Euler convention as in the encoding step. 11 Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+Algorithm 1 Decompose and Recompose: Skill-Based Cross-Task Manipulation 
+
+Require: Query observation oq , instruction ℓq , demonstration library Dseen , Coverage-aware Demonstrations Library Lcov 
+
+Ensure: Predicted action sequence {aq
+
+> 1
+
+, . . . , a qT } 
+
+> 1:
+
+// Phase 1: Plan Generation  
+
+> 2:
+
+Extract scene state from oq ; generate skill sequence ˆS ← πplan (ℓq , scene state ) 
+
+> 3:
+
+// Phase 2: Dynamic Library Retrieval  
+
+> 4:
+
+Encode query image: f q ← ϕvis (oq )/∥ϕvis (oq )∥2 
+
+> 5:
+
+for each demonstration di ∈ D seen do  
+
+> 6:
+
+Compute visual similarity svis  
+
+> i
+
+and plan similarity splan  
+
+> i
+> 7:
+
+Fuse scores: si ← α · ˜svis  
+
+> i
+
++ (1 − α) · splan  
+
+> i
+> 8:
+
+end for  
+
+> 9:
+
+Select top-ksim demonstrations: Ddyn  
+
+> 10:
+
+// Phase 3: Static Library Coverage Completion  
+
+> 11:
+
+Compute covered tokens C and missing patterns G ← T ( ˆS) \ C  
+
+> 12:
+
+while |D cov | < k cov and G̸ = ∅ do  
+
+> 13:
+
+Select d∗ ← arg max d Score (d) from Lcov ; update Dcov , C, G 
+
+> 14:
+
+end while  
+
+> 15:
+
+// Phase 4: Skill-Augmented In-Context Learning  
+
+> 16:
+
+Merge demonstrations: D ← D dyn ∪ D cov  
+
+> 17:
+
+Return {aq
+
+> 1
+
+, . . . , a qT } ← LLM (ℓq , o q , ˆS, D)
+
+Execution. Finally, the low-level control command is assembled as u = [ p, q, g ] and executed by the RLBench action mode (end-effector pose via planning + discrete gripper). This completes the closed loop between the LLM interface and the robot controller. 
+
+A.5. Practical notes 
+
+In practice, clipping ensures indices remain valid even when the predicted pose slightly exceeds workspace limits. Using voxel centers provides a consistent inverse mapping and reduces discretization bias. Rotation discretization is similarly bounded to guarantee valid bins, while quaternion normalization is applied after reconstruction to ensure a valid rotation. 
+
+A.6. Algorithm details 
+
+Algorithm 1 summarizes our complete pipeline. The algorithm proceeds in four phases: (1) Plan Generation produces a predicted skill sequence ˆS that guides subsequent retrieval; (2) Dynamic Demonstrations Library selects task-adaptive demonstrations by fusing visual similarity with plan-based similarity; (3) Coverage-Aware Completion greedily sup-plements missing skill patterns from the static library using IDF-weighted scoring with length regularization; (4) Skill-Augmented ICL constructs the final prompt where skill labels provide compositional reasoning guidance while the model outputs only executable actions. The dual-library design achieves complementary objectives: the dynamic library provides task-adaptive demonstrations based on visual and semantic relevance, while the static library ensures skill-coverage sufficiency . This combination enables the LLM to reason over composable skill structures rather than merely imitating trajectory patterns. 
+
+A.7. More visual results 
+
+Figure 6 illustrates the reasoning process of our method on six unseen task of the AGNOSTOS benchmark. 
+
+## B. More Ablation 
+
+We conduct additional ablation studies to analyze the impact of demonstration quantity on cross-task generalization performance. Results are summarized in Table 5. 12 Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation 
+
+Table 5. Ablation study on the number of demonstrations (upper) and coverage-aware demonstrations (lower) in in-context learning. 
+
+Component L-1 L-2 Overall 
+
+Demos per ICL 
+
+0 0.0 0.0 0.0 5 27.3 13.1 19.8 10 30.0 15.5 23.7 15 31.2 16.8 24.9 20 32.5 18.5 26.4 
+
+Coverage-aware Demos per ICL 
+
+0 31.0 17.1 24.9 1 31.6 17.7 25.5 2 32.1 18.2 26.0 3 32.5 18.5 26.4 
+
+4 32.3 18.1 26.1 Put knife on 
+
+> chopping
+> board_
+> Reach
+> [knife]
+> Grasp
+> [knife]
+> Turn
+> [button]
+> Grasp
+> [button]
+> Reach
+> [button]
+> Lamp off
+> Take lid off
+> saucepan
+> Grasp
+> [microwave
+> door]
+> Close
+> microwave
+> Lift
+> [saucepan
+> lid]
+> Close
+> [microwave door]
+
+Task Progress Task Progress 
+
+> Grasp
+> [saucepan
+> lid]
+> Reach
+> [saucepan
+> lid]
+> Reach
+> [microwave
+> door]
+> Lamp on
+> Grasp
+> [rubbish]
+> Put rubbish
+> in bin
+> Push
+> [button]
+> Grasp
+> [button]
+> Reach
+> [button]
+> Reach
+> [rubbish]
+> Move
+> [knife,chopp
+> ing board]
+> Release
+> [knife]
+> Move
+> [rubbish,bin]
+> Release
+> [rubbish]
+
+Init State Init State 
+
+Figure 6. Visualization of our compositional skill reasoning process on some representative unseen tasks from the AGNOSTOS benchmark. 
+
+Number of in-context demonstrations. The upper portion of Table 5 examines how the total number of demonstrations in the in-context prompt affects performance. When no demonstrations are provided, the model completely fails to generate valid action sequences, achieving 0% success rate across all tasks. This confirms that in-context demonstrations are essential for cross-task manipulation, as the LLM cannot infer appropriate action patterns from task instructions alone. As the number of demonstrations increases from 5 to 20, we observe consistent improvements: overall success rate rises from 19.8% to 26.4%, with Level-1 tasks improving from 27.3% to 32.5% and Level-2 tasks from 13.1% to 18.5%. This trend indicates that richer demonstration sets provide more comprehensive skill–action patterns for the model to reason over. 
+
+Number of coverage-aware demonstrations. The lower portion of Table 5 investigates the contribution of coverage-aware demonstrations, which supplement missing skill patterns not captured by the dynamic retrieval. Starting from a baseline of 0 coverage-aware demonstrations, i.e., relying solely on dynamically retrieved examples, performance stands at 24.9%. Adding coverage-aware demonstrations yields steady improvements: 1 demo achieves 25.5%, 2 demonstrations reach 26.0%, and 3 demonstrations attain the best overall performance of 26.4%. Notably, performance slightly decreases with 4 demonstrations, suggesting that excessive static demonstrations may introduce noise or dilute the relevance of task-adaptive examples. This indicates an optimal balance exists between ensuring skill coverage completeness and maintaining 13 Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation Put a bunch of 
+
+grapes on a plate 
+
+Throw the garbage 
+
+into the trash can(a) 
+
+Stacking blocks(a) 
+
+Stacking cups 
+
+Place the spoon on 
+
+the dinner plate 
+
+Throw the garbage 
+
+into the trash can(b) 
+
+Stacking blocks(b)  
+
+> Figure 7. Successful cases of our real world experiments.
+
+demonstration relevance. These results validate two key design choices: (1) sufficient demonstration quantity is necessary to expose diverse skill– action patterns, and (2) the coverage-aware static library effectively complements dynamic retrieval by filling critical skill gaps, but should be used judiciously to avoid over-saturation. 
+
+## C. Real-world experiments 
+
+Experimental setup: we use a UFACTORY xArm6 arm equipped with an UFACTORY xArm Gripper G2, with RGB images and depth maps captured via a RealSense L515 camera. We evaluate five physical manipulation tasks: stacking cups, putting a bunch of grapes on a plate, placing the spoon on the dinner plate, stacking blocks, and throwing the garbage into the trash can. We collect 20 demonstrations per task, and during testing, construct cross-task in-context prompts using demonstrations from the remaining four tasks, enabling zero-shot generalization. We employ Qwen2.5-7B-Instruct as the backbone with 20 seen demonstrations. Each task is executed 25 times, with average success rates reported. Figure 7 shows successful examples from our real-world task experiments. Across all five tasks, our method demonstrates the ability to generate appropriate skill sequences and execute precise actions in diverse manipulation scenarios. For instance, in the stack cups and stack blocks tasks, the robot accurately grasps objects and places them at the correct positions. These results indicate that our framework effectively transfers skills learned from seen tasks to novel manipulation scenarios in real-world environments. Additionally, as illustrated in Figure 8, we present several representative failure cases from our real-world experiments. In 14 Reasoning New Skills from Existing Abilities for Cross-Task Robotic Manipulation Stacking cups  
+
+> Place the spoon on
+> the dinner plate
+> Throw the garbage
+> into the trash can
+> Figure 8. Failing cases of our real world experiments.
+
+the first row, during the stack cups task, the robot arm successfully navigates to the stacking location; however, the cup is grasped at a tilted angle, causing the subsequent placement to fail due to misalignment. The second row depicts a failure in the place the spoon on the dinner plate task, where the thin handle of the spoon prevents the gripper from achieving a secure grasp. The third row shows the execution of throw the garbage into the trash can . In this case, although the robot successfully grasps the garbage and moves it above the trash can, the end-effector hovers over the edge rather than the center of the bin. Consequently, when the gripper releases, the garbage falls outside the container. These failure cases highlight critical challenges for cross-task robotic manipulation. First, understanding the 6-DoF pose of real-world objects, including their geometric properties and functional affordances, is essential for reliable grasping and placement. Second, accurate reasoning about 3D spatial relationships, such as determining whether the end-effector is positioned above the center versus the periphery of a target region, remains crucial for successful task completion. In future work, we plan to address these limitations by incorporating explicit 3D spatial reasoning and object affordance understanding into our framework. 15
