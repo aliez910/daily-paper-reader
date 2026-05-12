@@ -1,0 +1,560 @@
+Title: Learning Equivariant Neural-Augmented Object Dynamics From Few Interactions
+
+URL Source: https://arxiv.org/pdf/2605.02699v1
+
+Published Time: Tue, 05 May 2026 02:25:49 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Learning Equivariant Neural-Augmented Object Dynamics from Few Interactions 
+
+Sergio Orozco ∗, Tushar Kusnur †, Brandon May ‡, George Konidaris ∗, Laura Herlant †∗Brown University, Providence, RI 
+
+†Robotics and AI (RAI) Institute, Cambridge, MA 
+
+‡General Motors 
+
+Abstract —Learning data-efficient object dynamics models for robotic manipulation remains challenging, especially for de-formable objects. A popular approach is to model objects as sets of 3D particles and learn their motion using graph neural networks. In practice, this is not enough to maintain physical feasibility over long horizons and may require large amounts of interaction data to learn. We introduce PIEGraph, a novel approach to combining analytical physics and data-driven models to capture object dynamics for both rigid and deformable bodies using limited real-world interaction data. PIEGraph consists of two components: (1) a Physically Informed particle-based analytical model (implemented as a spring–mass system) to enforce physically feasible motion, and (2) an Equivariant Graph Neural Network with a novel action representation that exploits symmetries in particle interactions to guide the analytical model. We evaluate PIEGraph in simulation and on robot hardware for reorientation and repositioning tasks with ropes, cloth, stuffed animals and rigid objects. We show that our method enables accurate dynamics prediction and reliable downstream robotic manipulation planning, which outperforms state of the art baselines. 
+
+I. I NTRODUCTION 
+
+Humans can readily reason about the physical consequences of their actions. For example, pushing a bottle sideways from the neck causes it to topple over, while pushing a rope along a table causes it to deform over time. This intuitive understanding enables efficient goal-directed behavior, and enabling robots to reason similarly about object dynamics is a long-standing goal in robotics. Reasoning about the physical consequences of actions is often called an action-conditioned dynamics model. A model of this form aims to answer the following question: given the current state of the world and a proposed interaction, what is the resultant state? A dynamics model is useful in robotics for planning, in which future states are used to approximate the cost of robot actions. A dynamics model can also be used in model-based reinforcement learning to improve generalization [33, 17] and decrease the amount of training data to train a robot policy [1, 8]. Dynamics models can be hand-specified for simple cases, such as known rigid objects with uniform density, but for com-plex scenarios in environments where physical properties are difficult to measure, the dynamics must be learned from data. In this work, we focus on robot manipulation of deformable objects that are pushed, pulled, and lifted from the surface of a table. initial positions neural model prediction physics model predictions 
+
+Fig. 1: General Overview. We guide physics models toward particle-based neural outputs to guarantee physical plausibility and realistic object motion over long horizons. 
+
+Predicting future states from data is challenging because for many objects and interactions, the physical process is complex and requires a high-dimensional computation. We build on prior work which has identified possible options for representing deformable objects – including video prediction [24], particle-based graph models [19], system identification [13], and latent-space dynamics learning [9]. Recent methods [35, 37] demonstrate that representing objects as sets of 3D particles and modeling their interactions with graph neural networks (GNNs) can outperform many alternative represen-tations, due to the geometric structure and inductive biases provided by particle-based reasoning. Learning accurate particle dynamics with neural models, however, often requires large amounts of interaction data, frequently involving thousands of robot-object interactions. 
+
+> arXiv:2605.02699v1 [cs.RO] 4 May 2026
+
+This is impractical for most robotic applications, so to mitigate this cost, some approaches [35, 18] rely on simulated data, which introduces the additional challenge of bridging the gap between simulation and real-world behavior. Moreover, without explicit physical structure, learned particle dynamics models may violate physical constraints, for example by drift-ing, interpenetrating the environment, or failing to preserve object coherence over time. We introduce PIEGraph , a Physically Informed particle dynamics model that combines analytical physics with an 
+
+Equivariant Graph Neural Network (EGNN). PIEGraph con-sists of two interacting components: (1) an analytical particle-based physics model, such as a spring–mass system, which enforces short-term physical feasibility, and (2) an action-conditioned EGNN that operates over longer horizons to guide particle motion based on observed data (Figure 1). The EGNN exploits symmetries in particle interactions to improve data efficiency, while the physics model provides an explicit prior that constrains the space of feasible dynamics. We evaluate PIEGraph on learned dynamics models from human-object interactions, including ropes, cloth, and soft toys, using only a few minutes of interaction data per object. Our results show that this combination enables accurate dynamics prediction and improves downstream planning performance compared to purely physics-based or learned alternatives. II. B ACKGROUND AND PROBLEM SETTING 
+
+A. Robot-Environment Interface and Problem Formulation 
+
+We formulate our problem as a Markov Decision Process (MDP) [29]. At time step t, the robot constructs a represen-tation of state xt ∈ X and, according to policy π, selects an action at ∈ A, where A is a discrete action space. Conditioned on this action, the dynamics or transition function 
+
+ϕ parameterized by θ determines the most likely next state 
+
+xt+1 = ϕ(xt, a t; θ) (1) 
+
+Action parameterization. Let an action a ∈ A have a duration of ∆t and be parameterized by the 2D coordinates of the robot end-effector at the beginning and end of the action, i.e., (s, e) ∈ R2 ×R2. We assume that the vector −→se is such that the end-effector stays in contact with the object throughout the duration of the action. 
+
+B. Graph Neural Networks for Particle-based Dynamics 
+
+Graph Neural Networks (GNNs) [27] have proven effective at learning interactions between entities parameterized with neural networks. Consider a graph G that models state X as 
+
+X ≜ G = ( V, E) (2) where vertices/nodes V correspond to particles and edges E
+
+to pairwise relations among particles 1. This step typically consists of three basic stages [25]: (1) constructing the graph from the input state, (2) a forward pass as multiple rounds of message-passing, and (3) extracting the output state from the      
+
+> 1ignoring time steps for brevity
+> Fig. 2: Symmetry and Action Canoncialization (a) We apply a linear push to an object (purple arrow), which results in a u-shaped deformation over time. (b) The same linear push can be applied to the object under some world transformation, meaning that actions in (a) and (b) should be invariant to transformations and canonicalizaed to the object. (c) We align both scenes (a) and (b) to the x axis, such that the actions occur along the x axis. To enforce object pose sensitivity, we calculate the difference between each object particle to the aligned action end position.
+
+final graph. Let ϕneural denote a GNN-based dynamics function that performs these stages: XEGNN  
+
+> t+1
+
+= ϕneural (XEGNN  
+
+> t
+
+, a t; θ).
+
+Equivariant GNNs. The neural dynamics function in PIE-Graph is an Equivariant GNN [26]. Besides being invariant to node permutations, EGNNs are additionally translation, rotation and reflection equivariant ( E(n)) with respect to input nodes. The main reason for constraining the neural dynamics function to have equivariant properties is that we are operating in a low-data regime and that we expect the physical motion of the objects to obey the laws of symmetry that equivariance enforces. Namely, the optimal robot action to take with respect to the object will be equivariant under object rotations and translations [32]. 
+
+C. Spring-Mass Systems 
+
+Consider again the graph representation of our particle-based state (Eqn. 2). Let ϕSMS denote a Spring-Mass System (SMS)-based dynamics function: XSMS  
+
+> t+1
+
+= ϕSMS (XSMS  
+
+> t
+
+, a t; θ).Let xi ∈ R3 denote the position, vi ∈ R3 the velocity, and 
+
+mi ∈ R the mass of the particle pi corresponding to vertex 
+
+vi ∈ V . An SMS models these particles as connected by springs with stiffness kij and damping δi coefficients. Let Fi
+
+be the net force acting on pi, i.e., the sum of interaction forces and any external force, 
+
+Fi = X 
+
+> j∈N(i)
+
+Fspring  
+
+> ij
+
++ Fext  
+
+> i
+
+(3) where N (i) is the neighborhood of node i. Spring forces are computed as Fspring  
+
+> ij
+
+= kij (|| xi − xj || − rij ) where rij denotes the rest length of the spring, and Fext  
+
+> i
+
+accounts for gravity and contact. A simulation step Xt+1 = ϕSMS (Xt, Ft) consists of particle velocities vi and positions xi updated via first-order Euler integration: 
+
+vt+1  
+
+> i
+
+= δ(vti + Fi
+
+mi
+
+∆t); xt+1  
+
+> i
+
+= xti + vt∆t (4) Human interaction data Canonicalized Action Constructor Spring Mass System Initialization Segmentation, Point Cloud Reconstruction  
+
+> object point cloud Spring Mass System based Particle Tracking Loss backpropagation
+
+ABC1 DE1 F   
+
+> (only for first timestep) Fig. 3: Illustrative system diagram—training: We train an action-conditioned equivariant graph dynamics model ( E1 ) using MSE loss ( F)from human interaction data captured as an RGBD video. We initialize ( C1 ) a spring mass system from an object point cloud at time t= 0
+> and track it ( D) over multiple actions. We track the human’s hands at each time step to construct a representation of the action ( B).
+
+III. R ELATED WORK 
+
+A. Particle-Based simulation. 
+
+A common dynamics modeling pipeline captures and rep-resents a scene using simulators coupled with system identi-fication on its physical parameters [12, 13, 20, 21, 28, 38]. While effective, system identification often requires com-plex, multi-stage optimization over sparse and partially non-differentiable parameters. By contrast, our approach does not optimize simulator parameters. Instead, we leverage particle-based simulators to enforce physical feasibility constraints such as object connectivity, shape preservation, collisions, and gravity. Recent work has also explored constructing object-centric digital twins [13] using reconstruction techniques such as Gaussian Splatting [14] and modeling them as particles. These methods emphasize accurate 3D reconstruction and tracking, while robotic manipulation is treated as a secondary application with limited quantitative evaluation on their utility for manipulation planning. We focus explicitly on dynamics learning for robotic planning and find that constructing scenes using initial segmented point clouds and learning the dynamics over that is sufficient for our experiments. 
+
+B. Neural-Based simulation. 
+
+A large body of work [37, 35, 36, 31] models object dynam-ics through particle-based motion using graph neural networks. These approaches have demonstrated success on deformable objects including ropes [35, 23], cloth [11], granular piles [35], and stuffed toys [37]. Learning accurate dynamics, however, typically requires thousands of interaction trajectories with long data collection times. This may not be hard to collect in simulation, but bridging the resulting sim-to-real gap often requires additional residual models [31] or material-specific parameter idenification on material-adaptive models [35]. Our approach differs by explicitly exploiting symmetries in object motion through E(n) Graph Neural Networks [26], enabling data efficient learning directly from limited real-world inter-action data. 
+
+C. Neural-Augmented Simulation. 
+
+Hybrid approaches that augment physics simulators with neural networks have been explored for tasks such as planar pushing [2], object throwing [34], and soft robotics [7]. While effective, these methods typically target specific interaction modalities or rigid-body dynamics, and often require large datasets. For example, SAIN [2] requires thousands of interac-tions to learn rigid-body dynamics, and TossBot [34] relies on simple motion primitives and rigid-body assumptions. Particle-Grid Neural Dynamics (PGND) [36] is the state-of-the-art particle dynamics model, which outperforms Graph-Based Neural Dynamics[37], an extension of Propnet [19] for real-world deformable object manipulation. PGND is most closely related to our work, as it incorporates physics priors to stabilize particle-based prediction. Their model predicts velocity fields on an Eulerian grid which are interpolated back to particles via grid-to-point transfers. By contrast, PIEGraph predicts per-particle displacements and uses PID-controlled forces to guide a spring-mass system toward neural predictions. Ad-ditionally, PGND does not explicitly enforce equivariance, while PIEGraph leverages equivariant architectures to exploit symmetries in object motion. To our knowledge, no existing neural-augmented simulation method combines particle-based physics, action-conditioned equivariant learning, and data-efficient real-world training at the scale we demonstrate. 
+
+D. Equivariant Dynamics Models. 
+
+A variety of equivariant architectures have been proposed for learning dynamics [26, 10, 15, 4]. EGNN, Steerable-EGNN, and Sub-EGNN guarantee equivariance under SE(3) transformations, but they are typically applied to uncon-trolled dynamical systems such as molecular dynamics or celestial motion. While actions can be incorporated, they are not natively supported in these frameworks. SQPDNet [15] introduces action-conditioned equivariant dynamics for tabletop pushing, but it models objects as collections of rigid superquadrics and predicts pose transformations, limiting its applicability to deformable objects. In contrast, PIEGraph models object state at the particle level, enabling expressive dynamics modeling for both rigid and deformable bodies. IV. N EURAL -A UGMENTED PARTICLE DYNAMICS 
+
+PIEGraph —Physically Informed Equivariant Graph Neu-ral Network—consists of two interacting components: (1) a particle-based physics model implemented as a spring mass system, and (2) an action-conditioned neural model 
+
+implemented as an E( n) equivariant graph neural network (EGNN). The neural model predicts object particle states at the end of an action, providing global targets that guide the physics model. The physics model then enforces particle-level physical consistency, ensuring that the final predicted state is physically feasible. Together, these components predict object state transitions with high spatial accuracy while maintaining physical constraints. 
+
+A. Physics Model 
+
+ϕSMS denotes the spring-mass system update function de-scribed in Eqn. 4 and maps the current particle state XSMS  
+
+> t
+
+and applied forces Ft to the next particle state. External forces are computed by solving the following tracking objective: 
+
+min 
+
+> Fext
+> N
+
+X
+
+> iN
+
+X
+
+> j
+
+xsetpoint  
+
+> i
+
+− ϕSMS (XSMS  
+
+> t
+
+, Fspring  
+
+> j,t
+
+, Fext  
+
+> t
+
+)i 2
+
+, (5) where XSMS  
+
+> i,t
+
+denotes particle positions at time t, and 
+
+Fext ∈ R3×n represents per-particle external forces that min-imize the distance (Figures 3.D and 4.H) to a target setpoint configuration Xsetpoint . We describe Xsetpoint in more detail in Section IV-C. Rather than solving Equation 5 in closed form, we approximate the solution using per-particle PID controllers, 
+
+f ext  
+
+> i,t
+
+= Kpei(t) + KI
+
+Z t
+
+> 0
+
+ei(t) dt + KD
+
+de i(t)
+
+dt ,
+
+where ei(t) = xsetpoint  
+
+> i
+
+− xSMS  
+
+> i,t
+
+, and Kp, Ki, and Kd are the gain terms which define how the controller reacts to error over time. These controllers are applied iteratively until the spring– mass system converges to the target configuration. 
+
+B. Neural Model 
+
+ϕneural denotes the neural dynamics update function (Fig-ures 3.E1 and 4.E2) and maps the current particle state XEGNN 
+
+> t
+
+and action at to the next particle state. Instead of using the raw action at, defined by the start and end positions of the end-effector, we introduce a canonicalized action representation (Figure 3.B) that is invariant to global transformations. Specifically, we decompose at into a start state st and a final state et, and define a particle-wise canonical action as 
+
+acanon  
+
+> i,t
+
+= R−(atan2 (et−st)+2 π)(xi,t − et), ∀xi,t ∈ X, (6) where acanon  
+
+> i,t
+
+represents the transformation-invariant and canonical action applied to particle i. The invariant actions are input into ϕneural as the node features. This canonical-ization process is illustrated in Figure 2, and a proof of its transformation invariance is provided in the Supplementary Material. We canonicalize the action-space at, but not the state-space Xt (shown in equations with a superscript denoting if the particle states came directly from the Spring-Mass System initialization as XSM S t , from the converged Spring-Mass System as ˆXSM S t+∆ t , or from the output of the EGNN as ˆXEGN N t+∆ t ). This is important because there are settings in which state-space canonicalization is difficult or ill-defined, such as in environments with multi-object interactions where no unique canonical frame exists. In these cases, enforcing a canonical representation of the state Xt may require additional assumptions or introduce ambiguities. For this reason, we focus on action-space canonicalization in this work, and use the equivariant structure of the EGNN to take advantage of symmetries in the state-space. 
+
+C. Hierarchical Dynamics 
+
+While ϕneural captures long-horizon, action-conditioned ob-ject motion, it does not explicitly enforce physical feasibility, and predicted particle configurations may violate constraints such as object shape coherence or ground contact. Accord-ingly, during planning we use the neural prediction ˆXEGNN  
+
+> t+∆ t
+
+as a setpoint that guides the spring–mass system. Specifically, we set Xsetpoint = ˆXEGNN  
+
+> t+∆ t
+
+in Equation 5, and optimize external forces so that the spring-mass system converges toward the neural prediction while respecting physical constraints such as spring connectivity, rest lengths, and collisions with the environment. The resulting dual-component prediction is 
+
+Xt+∆ t = min 
+
+> Fext
+> N
+
+X
+
+> iN
+
+X
+
+> j
+
+ˆxEGNN  
+
+> i,t +∆ t
+
+− ϕSMS (ˆ xSMS  
+
+> t
+
+, Fspring  
+
+> j,t
+
+, Fext  
+
+> t
+
+)i .
+
+(7) 
+
+D. Tracking and Data Collection 
+
+For our real-world experiments, we collect video recordings of human-object interactions using four synchronized RGB-D images per frame from different viewpoints at 5 Hz. Our dataset consists of 100 interaction sequences (approximately five minutes of data). We apply a post-processing pipeline using SAM [16] and MediaPipe Hands [30] to extract object segmentations and hand trajectories. At time t = 0 , we con-struct a spring–mass system XSMS  
+
+> 0
+
+from a downsampled point cloud of 50 particles (Figures 3.C1 and 4.C2), with springs being connected based on hand-specified particle distance thresholds. Object motion is tracked by iteratively applying external forces, where the setpoint xsetpoint  
+
+> i
+
+in Equation 5 cor-responds to the closest observed point-cloud point to particle 
+
+xSMS  
+
+> i,t
+
+at time t (Figure 3.D). 
+
+E. Training 
+
+The neural function ϕneural is trained using a mean squared error loss between predicted particle positions ˆXEGNN  
+
+> t+∆ t
+
+and tracked spring-mass states ˆXSMS 
+
+> t+∆ t
+
+, together with a shape consistency loss (3.F) that regularizes relative particle dis-placements: 
+
+Ldynamics = || ˆXEGNN  
+
+> t+∆ t
+
+− ˆXSMS 
+
+> t+∆ t
+
+|| 22 (8) Spring Mass System Initialization Segmentation, Point Cloud Reconstruction object point cloud 
+
+> learned
+> Spring Mass System Forward Simulation MPC Goal Test (Chamfer distance)
+
+C2 E2 GHJ
+
+> scene
+> (only for first timestep)
+
+Fig. 4: Illustrative system diagram—planning. We use a learned equivariant action-conditioned graph dynamics model ( E2 ) to guide ( H)a spring mass system constructed ( C2 ) from an initial point cloud of an object at time t = 0 . This guidance process is used to plan ( G) for robot actions that reach a specified goal configuration ( J) implemented as a point cloud. 
+
+Fig. 5: Simulated Planning Results (Quantitative). For each object, we show the distribution of final state error and steps to solve across all relocation tasks using box plots. Each box displays the 25th percentile, median, and 75th percentile, with whiskers denoting the remaining range while suppressing outliers. Cliff’s delta ( δ)is reported for each object to quantify effect size, measuring the probability that a random task solved by our method outperforms the baseline (PGND). Positive δ indicates improved performance by our method. 
+
+Lshape = X 
+
+> s∈N (r)
+
+|| (ˆ xEGNN ,r t+∆ t − ˆxEGNN ,s t+∆ t ) − (ˆ xSMS ,r t+∆ t − ˆxSMS ,s t+∆ t )|| 22
+
+(9) 
+
+L = Ldynamics + Lshape (10) where N (r) denotes the neighborhood of particle r.Training data consists of a limited number of prehensile and non-prehensile interactions, which provide only partial coverage of the object’s full interaction space. As a result, evaluation includes object motions and action configurations not explicitly observed during training. Generalization in this setting is facilitated by the use of equivariant representations that exploit symmetries in object motion. 
+
+F. Planning 
+
+We perform model-predictive control (MPC) using the Cross Entropy Method (CEM) [6] to optimize for action sequences. At each planning step, we sample 500 candidate action trajectories, simulate their outcomes using PIEGraph, and retain the top-performing trajectories over 30 iterations. Trajectory quality is evaluated based on the distance between predicted particle states and a target goal configuration repre-sented as a fused point cloud (Figure 4.J). V. E XPERIMENTS 
+
+We evaluate PIEGraph in both simulated environments and real-world robotic tabletop settings. Simulation experiments isolate dynamics prediction and planning behavior under controlled conditions, while real-world experiments evaluate performance under sensing noise, contact variability, and model mismatch. Our experiments are designed to answer the following questions:  
+
+> •
+
+How well does PIEGraph support manipulation planning compared to neural, neural-augmented, and analytical baselines?  
+
+> •
+
+What data scales are sufficient for effective planning?  
+
+> •
+
+How do architectural choices such as guidance, equivari-ance, and action representation affect performance? 
+
+A. Simulated Experiments 
+
+We evaluate in two simulation platforms, namely DaXBench [5], an MPM-based simulator for deformable object manipu-lation, and Pymunk [3], a 2D rigid-body physics engine. 
+
+Experiment Setup. We perform data collection and evalua-tion using pusher and picker agents. Pusher agents move along the tabletop and interact via collisions, while picker agents grasp objects and translate them along the surface. Objects include a TBlock, Stiff Rope, Bendy Rope, and a T-Shirt. For model learning, we collect random agent-object interaction sequences. The number of interactions was chosen based on the complexity of the task as follows:  
+
+> •
+
+TBlock : A pusher agent manipulates the TBlock, produc-ing unexpected rotations due to its asymmetric center of mass. 10 interaction sequences are used for training. Fig. 6: Simulated Planning Results (Qualitative). For each object, we visualize the goal in the first column and the terminal state after planning using Ours and PGND, respectively. For each terminal state, we manually overlay the goal image in red as a visual indicator for terminal error. We also provide the Particle Distance (PD) value and total steps taken before termination. Values around 0.1 can be safely regarded as failures in planning.  
+
+> •
+
+Rope : A pusher agent manipulates stiff and bendy ropes, differentiated by Young’s modulus in DaXBench. 20 and 40 interactions are used for the stiff and bendy rope, respectively.  
+
+> •
+
+TShirt : A picker agent grasps and moves the cloth, producing large deformations including folds and self-contacts. 20 interactions are used. 
+
+Baselines. We compare against Particle Grid Neural Dy-namics (PGND), a SoTA particle-based neural dynamics model that incorporates physics priors to stabilize long-horizon prediction. This comparison helps assess the impacts of equiv-ariance and action representation against a similar neural-augmented method in small data regimes. 
+
+Manipulation Planning Results. Given a goal configura-tion g ∈ R3×n represented as a particle set, we plan using either PGND or PIEGraph. For each object, we define 10 goal configurations and execute up to 30 planned actions. Each model is evaluated 10 times per goal using different random seeds, which vary the starting location of the object, totaling 100 seeded runs per object. Planning performance is measured using Particle Distance , defined as the mean Euclidean dis-tance between terminal and goal particle configurations. PIEGraph achieves lower terminal particle distance (and steps to completion) than PGND for the TBlock, Stiff Rope, and TShirt (Figure 5). We see negligible performance increase for the bendy rope experiments. Qualitative inspection reveals that PGND frequently selects suboptimal contact interactions that fail to induce intended object motions. For rigid objects such as the TBlock, PGND often produces contact forces that induce rotation without sufficient translation, leading to longer or incomplete plans. For deformable objects, particularly cloth, PGND tends to apply actions that causes excessive local deformation, resulting in bunching and preventing the cloth from flattening toward the goal configuration. In contrast, PIEGraph selects interactions that more reliably translate the object towards the target configuration, yielding smoother and more goal-directed plans. To quantify these improvements beyond summary statistics, we report Cliff’s Delta, δ = P (xours < x pgnd ) − P (xours >xpgnd ), where xours and xpgnd denote samples of terminal particle distance (or steps to completion) from PIEGraph and PGND, respectively. Positive δ values indicate that PIEGraph outperforms PGND in a majority of seeded trials, confirming that the observed gains reflect consistent improvements in planning accuracy and efficiency rather than isolated suc-cesses. We also visualize goal and terminal states in Figure 6 to contextualize the quantitative results. In these environments, terminal particle distances above 0.1 typically correspond to task failure, which PGND exceeds more frequently. 
+
+B. Real-World Experiments 
+
+We evaluate on a Franka Research 3 robot with a Finray gripper on a 35 ×40 inch tabletop. Objects include a TBlock, Stiff Rope, Bendy Rope, Cloth, and a Stuffed Sloth. For each object, we collect 100 human-object interaction sequences using 4 Intel RealSense D455 cameras, assuming full object observability. 
+
+Experiment Setup. The robot operates in pusher and picker modes and may autonomously switch between them during planning based on the goal configuration.  
+
+> •
+
+TBlock : Pushing interactions induce coupled rotation and translation.  
+
+> •
+
+Rope : Pushing interactions generate complex deforma-tions. Stiff ropes and bendy ropes differ in material stiffness.  
+
+> •
+
+Cloth : Pushing and picking interactions produce folding and self-contact.  
+
+> •
+
+Sloth : Pushing interactions induce large, highly compliant deformations of a sloth-shaped soft toy. Visualizations of each of these tasks is shown on the left side of Figure 7. 
+
+Ablations. We compare PIEGraph to neural, neural-augmented, and analytical ablations. Ours (NG) removes physics guidance while retaining equivariant dynamics and canonicalized actions. SMS (NO) uses a spring-mass system, Step: 7 CD: 1.0e-3 Step: 9 CD: 56.5e-3          
+
+> Step: 10 CD: 1.2e-3 Step: 8 CD: 2.6e-3
+> Ours EGNN+G SMS(NO) SMS(O)
+> Step: 8 CD: 1.1e-3
+> Step: 12 CD: 11.6e-3 Step: 11 CD: 1.9e-3 Step: 11 CD: 2.1e-3
+> Step: 9 CD: 2.5e-3
+> CD vs. time, success rate vs. goal threshold
+> Step: 10 CD: 3.7e-3
+> Step: 10 CD: 37.5e-3
+> Step: 8 CD: 0.7e-3
+> Step: 6 CD: 4.3e-3 Step: 6 CD: 13.6e-3 Step: 8 CD: 9.5e-3 Step: 8 CD: 6.2e-3
+> Step: 10 CD: 5.6e-3
+> Step: 8 CD: 3.3e-3
+> Step: 2 CD: 5.7e-3
+> Step: 2 CD: 3.3e-3
+> TBlock (T) Bendy Rope (BR)  Stiff Rope (SR) Sloth (S) Cloth (C)
+
+Fig. 7: Robot Planning Results. For each object, we plan action sequences to reach a goal configuration implemented as a point cloud. We plan using MPC for 3 separate goals and repeat each experiment 3 times. On the left, we hand-selected qualitative planning results. On the right, we visualize the chamfer distance over time (up to 13 pushes) and task success with varying goal thresholds. We also display the 40th and 60th percentiles as shaded regions to capture variance in performance. 
+
+but with non-optimized parameters. EGNN+G replaces the canonicalized action representation with particle-based action encodings. SMS(O) optimizes spring stiffness and damping coefficients using first-order gradient descent in simulation using Warp [22]. It is trained using the same training data as our method. Together, these baselines disentangle the roles of guidance, action representation, and physics priors. 
+
+Dynamics Results. Table I reports dynamics prediction performance over multiple horizons using the CD+S metric, which combines chamfer distance (dissimilarity between point clouds) and shape consistency loss defined in the second half of Equation 9. While shape regularization improves short-term prediction, Ours (NG) exhibits significant error accumulation over long horizons. In contrast, guidance through the spring-mass system yields substantially more stable predictions. 
+
+Robotic Manipulation Results. For each object, we define 
+
+H Tblock Stiff Rope Bendy Rope Sloth Cloth 
+
+1 (4 .1, 1.3) (5 .1, 2.5) (5 .5, 2.4) (10 .9, 6.4) (7 .2, 2.6)
+
+2 (9 .9, 2.8) (11 .7, 6.0) (13 .3, 5.5) (26 .3, 14 .5) (15 .7, 5.4)
+
+4 (23 .2, 5.7) (27 .1, 12 .8) (31 .9, 13 .8) (63 .9, 33 .7) (34 .6, 15 .7)
+
+TABLE I: Dynamics Results. We present a custom chamfer distance and shape loss metric ( CD+S ) (See Equation 9), for our neural model without and with guidance, respectively — (Ours(NG), Ours) — for TBlock, Stiff Rope, Bendy Rope, Sloth, and Cloth for horizon lengths (H) 1, 2, 4.
+
+3 goal configurations and execute up to 13 planned actions. Each model is evaluated 3 times per goal, for nine total runs per object. Planning performance is measured using chamfer distance. Across all objects, PIEGraph achieves higher success rates with fewer planning steps (Figure 7). Comparisons with EGNN+G indicate that the proposed canonicalized action space is critical for learning equivariant dynamics. Com-parisons with SMS(NO) and SMS(O) suggest that purely analytical solutions may struggle to capture subtle object-specific physical effects observed in real-world interactions. For example, the stiff rope has shape memory that forces it to bend more in one direction. While the simulator baselines fail to model this behavior, PIEGraph properly learns it from interaction data and executes better plans as a result. 
+
+Learning with Different Data Fidelities. All real-world experiments use models trained on 100 interaction sequences per object. We evaluate data efficiency by reducing training data. Figure 8 shows only modest performance degradation when training data is reduced by more than half. For the tblock, as few as 20 interactions (approximately one minute of data) remain sufficient for effective planning. We attribute our model’s apparent data efficiency to its exploitation of symme-tries in object motion through equivariant representations, as described in Figure 2. VI. C ONCLUSION 
+
+We presented PIEGraph, a flexible, data-efficient, and phys-ically grounded framework for learning object dynamics from limited real-world interaction data. By combining equivariant graph neural networks with particle-based physics simulators, PIEGraph enables long-horizon dynamics prediction while maintaining physical feasibility across rigid and deformable objects. Across both simulated and real-world robotic manip-ulation tasks, we showed that PIEGraph enables more reliable planning compared to state-of-the-art baselines and mitigates the accumulation of autoregressive prediction errors common in neural dynamics models. VII. L IMITATIONS AND FUTURE WORK .Our experiments assume full observability of object point clouds, and handling partial observations, occlusions, or severe sensing noise remains an important direction for future work. While PIEGraph can learn dynamics from few human demon-strations, the current formulation primarily targets single-object, non-prehensile manipulation. This limitation stems in part from the simplicity of the action representation, which models interactions using start and end end-effector positions. Extending the framework to richer contact mod-eling and fully three-dimensional prehensile manipulation is a promising avenue for future research. Additionally, gravity breaks full SE(3) equivariance, which restricts the applicability of standard equivariant architectures in certain manipulation scenarios. Future work may address this limitation through sub-equivariant graph neural networks [10], which explicitly account for gravity. Finally, our planning evaluation in the real world experiments relies on chamfer distance, which can exhibit geometric ambiguity. Exploring alternative goal representations, such as image-based objectives and particle rendering via Gaussian splatting [14], is an exciting direction for extending the framework.          
+
+> (a) TBlock(20)
+> (b) Bendy Rope(40)
+> (c) Stiff Rope(40)
+> (d) Sloth(40)
+> (e) Cloth (40)
+> Fig. 8: Robot Planning with Different Data Fidelities. We plan actions using MPC for 2 separate goals, and repeat each experiment 3 times. We compare various versions of our models, namely Ours(N)
+> where Nis the number of human interactions our model is trained on. For each object we show quantitative results which visualize the chamfer distance over time and task success with varying goal thresholds. We display the 40th and 60th percentiles as shaded regions to capture variance in performance.
+
+REFERENCES 
+
+[1] Bo Ai, Stephen Tian, Haochen Shi, Yixuan Wang, Tobias Pfaff, Cheston Tan, Henrik I Christensen, Hao Su, Jiajun Wu, and Yunzhu Li. A review of learning-based dynam-ics models for robotic manipulation. Science Robotics ,10(106):eadt1497, 2025. [2] Anurag Ajay, Maria Bauza, Jiajun Wu, Nima Fazeli, Joshua B Tenenbaum, Alberto Rodriguez, and Leslie P Kaelbling. Combining physical simulators and object-based networks for control. In 2019 International Confer-ence on Robotics and Automation (ICRA) , pages 3217– 3223. IEEE, 2019. [3] Victor Blomqvist. Pymunk. URL https://pymunk.org. [4] Johannes Brandstetter, Rob D. Hesselink, Elise van der Pol, Erik J. Bekkers, and Max Welling. Geometric and physical quantities improve e(3) equivariant message passing. International Conference on Learning Represen-tations (ICLR) , 2021. [5] Siwei Chen*, Yiqing Xu*, Cunjun Yu*, Linfeng Li, Xiao Ma, Zhongwen Xu, and David Hsu. Daxbench: Benchmarking deformable object manipulation with dif-ferentiable physics. In ICLR , 2023. [6] Lih-Yuan Deng. The cross-entropy method: A uni-fied approach to combinatorial optimization, monte-carlo simulation, and machine learning. Technometrics , 48(1): 147–148, 2006. [7] Junpeng Gao, Mike Y Michelis, Andrew Spielberg, and Robert K Katzschmann. Sim-to-real of soft robots with learned residual physics. IEEE Robotics and Automation Letters , 2024. [8] Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Villegas, David Ha, Honglak Lee, and James Davidson. Learning latent dynamics for planning from pixels. In Kamalika Chaudhuri and Ruslan Salakhutdinov, editors, 
+
+Proceedings of the 36th International Conference on Ma-chine Learning , volume 97 of Proceedings of Machine Learning Research , pages 2555–2565. PMLR, 09–15 Jun 2019. URL https://proceedings.mlr.press/v97/hafner19a. html. [9] Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timo-thy Lillicrap. Mastering diverse domains through world models. Nature , 2023. [10] Jiaqi Han, Wenbing Huang, Hengbo Ma, Jiachen Li, Josh Tenenbaum, and Chuang Gan. Learning physical dynamics with subequivariant graph neural networks. In S. Koyejo, S. Mohamed, A. Agarwal, D. Belgrave, K. Cho, and A. Oh, editors, Advances in Neural Informa-tion Processing Systems , volume 35, pages 26256–26268. Curran Associates, Inc., 2022. [11] Zixuan Huang, Xingyu Lin, and David Held. Mesh-based dynamics with occlusion reasoning for cloth manipula-tion. In Robotics: Science and Systems (RSS) , 2022. [12] Krishna Murthy Jatavallabhula, Miles Macklin, Florian Golemo, Vikram Voleti, Linda Petrini, Martin Weiss, Breandan Considine, Jerome Parent-Levesque, Kevin Xie, Kenny Erleben, Liam Paull, Florian Shkurti, Derek Nowrouzezahrai, and Sanja Fidler. gradsim: Differen-tiable simulation for system identification and visuo-motor control. International Conference on Learning Representations (ICLR) , 2021. [13] Hanxiao Jiang, Hao-Yu Hsu, Kaifeng Zhang, Hsin-Ni Yu, Shenlong Wang, and Yunzhu Li. PhysTwin: Physics-informed reconstruction and simulation of deformable objects from videos. ICCV , 2025. [14] Bernhard Kerbl, Georgios Kopanas, Thomas Leimk¨ uhler, and George Drettakis. 3D gaussian splatting for real-time radiance field rendering. ACM Transactions on Graphics ,42(4), July 2023. [15] Seungyeon Kim, Byeongdo Lim, Yonghyeon Lee, and Frank C Park. Se (2)-equivariant pushing dynamics models for tabletop object manipulations. In Conference on Robot Learning , pages 427–436. PMLR, 2023. [16] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao, Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer Whitehead, Alexander C. Berg, Wan-Yen Lo, Piotr Doll´ ar, and Ross Girshick. Segment anything. 
+
+arXiv:2304.02643 , 2023. [17] Kimin Lee, Younggyo Seo, Seunghyun Lee, Honglak Lee, and Jinwoo Shin. Context-aware dynamics model for generalization in model-based reinforcement learning. In International Conference on Machine Learning , pages 5757–5766. PMLR, 2020. [18] Yunzhu Li, Jiajun Wu, Russ Tedrake, Joshua B Tenen-baum, and Antonio Torralba. Learning particle dynamics for manipulating rigid bodies, deformable objects, and fluids. In ICLR , 2019. [19] Yunzhu Li, Jiajun Wu, Jun-Yan Zhu, Joshua B Tenen-baum, Antonio Torralba, and Russ Tedrake. Propagation networks for model-based control under partial observa-tion. In ICRA , 2019. [20] Fei Liu, Entong Su, Jingpei Lu, Mingen Li, and Michael C. Yip. Robotic manipulation of deformable rope-like objects using differentiable compliant position-based dynamics. IEEE Robotics and Automation Letters ,8(7):3964–3971, 2023. [21] Min Liu, Gang Yang, Siyuan Luo, and Lin Shao. Soft-MAC: Differentiable soft body simulation with forecast-based contact model and two-way coupling with articu-lated rigid bodies and clothes. In IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,2024. [22] Miles Macklin. Warp: A high-performance python frame-work for gpu simulation and graphics, March 2022. NVIDIA GPU Technology Conference (GTC). [23] Peter Mitrano, Alex LaGrassa, Oliver Kroemer, and Dmitry Berenson. Focused adaptation of dynamics mod-els for deformable object manipulation. In 2023 IEEE International Conference on Robotics and Automation (ICRA) , pages 5931–5937, 2023. [24] Suraj Nair and Chelsea Finn. Hierarchical foresight: Self-supervised learning of long-horizon tasks via visual sub-goal generation. International Conference on Learning Representations (ICLR) , 2019. [25] Alvaro Sanchez-Gonzalez, Jonathan Godwin, Tobias Pfaff, Rex Ying, Jure Leskovec, and Peter Battaglia. Learning to simulate complex physics with graph net-works. In International conference on machine learning ,pages 8459–8468. PMLR, 2020. [26] Vıctor Garcia Satorras, Emiel Hoogeboom, and Max Welling. E (n) equivariant graph neural networks. In 
+
+International conference on machine learning , pages 9323–9332. PMLR, 2021. [27] Franco Scarselli, Marco Gori, Ah Chung Tsoi, Markus Hagenbuchner, and Gabriele Monfardini. The graph neural network model. IEEE transactions on neural networks , 20(1):61–80, 2008. [28] Yinghao Shuai, Ran Yu, Yuantao Chen, Zijian Jiang, Xiaowei Song, Nan Wang, Jv Zheng, Jianzhu Ma, Meng Yang, Zhicheng Wang, et al. Pugs: Zero-shot physi-cal understanding with gaussian splatting. 2025 IEEE International Conference on Robotics and Automation (ICRA) , 2025. [29] Richard S Sutton, Andrew G Barto, et al. Reinforcement learning: An introduction , volume 1. MIT press Cam-bridge, 1998. [30] Andrey Vakunov, Chuo-Ling Chang, Fan Zhang, George Sung, Matthias Grundmann, and Valentin Bazarevsky. Mediapipe hands: On-device real-time hand tracking. In CV4ARVR , 2020. https://mixedreality.cs.cornell.edu/workshop. [31] Changhao Wang, Yuyou Zhang, Xiang Zhang, Zheng Wu, Xinghao Zhu, Shiyu Jin, Te Tang, and Masayoshi Tomizuka. Offline-online learning of deformation model for cable manipulation with graph neural networks. IEEE Robotics and Automation Letters , 7(2):5544–5551, 2022. [32] Dian Wang, Robin Walters, Xupeng Zhu, and Robert Platt. Equivariant $q$ learning in spatial action spaces. In 
+
+5th Annual Conference on Robot Learning , 2021. URL https://openreview.net/forum?id=IScz42A3iCI. [33] Kenny Young, Aditya Ramesh, Louis Kirsch, and J¨ urgen Schmidhuber. The benefits of model-based gener-alization in reinforcement learning. arXiv preprint arXiv:2211.02222 , 2022. [34] Andy Zeng, Shuran Song, Johnny Lee, Alberto Ro-driguez, and Thomas Funkhouser. Tossingbot: Learning to throw arbitrary objects with residual physics. In 
+
+Robotics: Science and Systems (RSS) , 2019. [35] Kaifeng Zhang, Baoyu Li, Kris Hauser, and Yunzhu Li. Adaptigraph: Material-adaptive graph-based neural dynamics for robotic manipulation. In Proceedings of Robotics: Science and Systems (RSS) , 2024. [36] Kaifeng Zhang, Baoyu Li, Kris Hauser, and Yunzhu Li. Particle-grid neural dynamics for learning deformable object models from rgb-d videos. In Proceedings of Robotics: Science and Systems (RSS) , 2025. [37] Mingtong Zhang, Kaifeng Zhang, and Yunzhu Li. Dy-namic 3d gaussian tracking for graph-based neural dy-namics modeling. In 8th Annual Conference on Robot Learning , 2024. [38] Licheng Zhong, Hong-Xing Yu, Jiajun Wu, and Yunzhu Li. Reconstruction and simulation of elastic objects with spring-mass 3D gaussians. In European Conference on Computer Vision , pages 407–423. Springer, 2024. VIII. A PPENDIX 
+
+A. Invariant Action Space 
+
+Let x be our input state, s be our initial end-effector position, and e be our final end-effector position. We need to develop an action that is invariant to translations and rotations such that the following statement is true: 
+
+f (x, s, e) = f (Rθ x + g, Rθ s + g, Rθ e + g) = a.
+
+1) Proof: Let’s define our action like so: 
+
+a = R−(atan 2( e−s)+2 π)(x − e).
+
+We need to prove the following equivalence 
+
+a = R−(atan 2( e−s)+2 π)(x − e)= R−(atan 2( Rθ e+g−(Rθ s+g)+2 π)(Rθ x + g − (Rθ e + g)) .
+
+We begin by simplifying, 
+
+a = R−(atan 2( Rθ (v))+2 π)(Rθ (x − e)) , where v = e − s.
+
+We show that atan 2( Rθ (v)) = θ + atan 2( v) by first convert-ing v into polar coordinates like so: 
+
+v = r. 
+
+cos (ϕ)
+
+sin (ϕ)
+
+
+
+, where ϕ = atan 2( v).
+
+Apply Rθ ,
+
+Rθ v = r. Rθ
+
+cos (ϕ)
+
+sin (ϕ)
+
+
+
+= r
+
+cos (θ), −sin (θ)
+
+sin (θ), cos (θ)
+
+  cos (ϕ)
+
+sin (ϕ)
+
+
+
+= r
+
+cos (θ + ϕ)
+
+sin (θ + ϕ)
+
+
+
+.
+
+So, 
+
+Rθ v = r. 
+
+cos (θ + atan 2( v)) 
+
+sin (θ + atan 2( v)) 
+
+
+
+.
+
+Thus, 
+
+atan 2( Rθ v) = θ + ϕ. 
+
+We can now rewrite our action as: 
+
+a = R−(θ+ϕ+2 π)(Rθ (x − e)) , where ϕ = atan 2( e − s),
+
+and simplify, 
+
+a = R−(atan 2( e−s)+2 π)(x − e).
+
+■
