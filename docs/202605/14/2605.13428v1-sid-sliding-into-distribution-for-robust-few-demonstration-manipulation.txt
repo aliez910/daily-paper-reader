@@ -1,0 +1,833 @@
+Title: SID: Sliding into Distribution for Robust Few-Demonstration Manipulation
+
+URL Source: https://arxiv.org/pdf/2605.13428v1
+
+Published Time: Thu, 14 May 2026 01:23:30 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# SID: Sliding into Distribution for Robust Few-Demonstration Manipulation 
+
+Yicheng Ma 1,2 ∗, Wei Yu 1,2 ∗, Zhian Su 1,2 , Xidan Zhang 1,2 , Huixu Dong 1,2 †
+
+> 1
+
+Grasp Lab, Zhejiang University 2Torch Kernel Co., Ltd. 
+
+∗Equal contribution †Corresponding author, e-mail: huixudong@zju.edu.cn 
+
+Abstract —Generalizing robotic manipulation across object poses, viewpoints, and dynamic disturbances is difficult, espe-cially with only a few demonstrations. End-to-end visuomotor policies are expressive but data-hungry, while planning and op-timization satisfy explicit constraints but do not directly capture the interaction strategies demonstrated by humans. We propose 
+
+Sliding into Distribution (SID), a structured framework that learns an object-centric motion field from canonicalized demon-strations to iteratively slide the system toward the demonstrated manifold and into the reliable operating region of a lightweight egocentric execution policy, mitigating out-of-distribution (OOD) execution. The motion field provides large corrective motions when far from the demonstration manifold and naturally van-ishes near convergence, enabling robust reaching under sub-stantial pose and viewpoint shifts. Within the reached regime, an egocentric policy trained with conditioned flow matching performs task-specific manipulation, supported by kinematically consistent point-cloud reprojection augmentation that preserves action–observation consistency. Across six real-world tasks, SID achieves approximately 90% success under OOD initializations with only two demonstrations, with under a 10% drop under distractors and external disturbances. Overall, SID provides a new paradigm for few-shot manipulation: explicitly managing distribution shift via online distribution recovery. Project website: https://sliding-into-distribution.github.io/. 
+
+I. I NTRODUCTION 
+
+Robust robotic manipulation requires policies that remain reliable under changes in object pose, camera viewpoint, and dynamic disturbances. Achieving such robustness from limited demonstrations is highly desirable in real deployments but re-mains challenging [8, 47]. In low-coverage datasets, a common failure mode is distribution shift—policies encounter states or observations not supported by the demonstrations—often dominating over architectural expressivity limitations [30, 29]. Moreover, a manipulation episode is rarely homogeneous: it typically contains two qualitatively different regimes (e.g., the approach phase versus execution). During the approach phase, the robot must recover global geometry to approach a task-relevant target (e.g., a handle or an edge). This stage is often underdetermined, admitting multiple feasible approach trajectories and alignments that are consistent with the demonstrations. During execution, behav-ior becomes local and interaction-rich, operating in a more constrained regime where it is sensitive to small deviations. When a single end-to-end visuomotor policy [23, 6] is trained to cover both regimes with limited demonstrations, it must simultaneously resolve approach-phase ambiguity and execute precise interaction, making generalization under pose shifts 
+
+Fig. 1: SID combines an object-centric motion field with an egocentric execution policy. From a few demonstrations, the field defines a smooth descent that slides OOD states toward the demonstrated support, bringing execution back into the policy’s reliable operating region. and perturbations brittle—a failure mode frequently observed in offline imitation with low-coverage data [30]. Existing learning-based approaches have made steady progress on generalization and data efficiency, including long-horizon imitation from demonstrations [29, 42] and multi-task policy architectures such as transformer-based visuomotor policies [37]. These methods often treat the episode as a homogeneous control problem. Meanwhile, diffusion-based visuomotor policies [6, 51] can represent complex, multi-modal behaviors, but typically require substantial coverage of approach and interaction variations to remain reliable. Equivariant policy designs [49, 50, 44, 55] often provide strong OOD robustness when the dominant test-time shift aligns with an underlying symmetry (e.g., rigid SE(3) transforms). That said, enforcing equivariance usually comes with architectural commitments that restrict the hypothesis class and introduce additional design/implementation complexity, potentially trad-ing off some expressive power and ease of deployment for symmetry-consistent generalization. Coarse-to-fine decompo-sition is particularly effective in one-shot settings [20, 7], suggesting that explicitly structuring the control problem can mitigate OOD failures when data are scarce. However, such coarse-to-fine pipelines are often open-loop at execution time 
+
+> arXiv:2605.13428v1 [cs.RO] 13 May 2026
+
+and can be sensitive to the initial state being close to the first demonstrated waypoint. Building on this observation, we propose SID, a structured framework that combines (i) an object-centric motion field learned from a small set of canonicalized demonstrations and (ii) an egocentric execution policy. We first canonicalize demonstrations, yielding a consistent motion manifold that suppresses scene- and camera-specific variation. In practice, this canonicalization can be supported by modern 6D pose estimation and tracking [46] and object-level segmentation [2]. From the resulting manifold, we learn a continuous motion field over monotonic approach-phase segments, implemented as a gradient-descent-style dynamical system that attracts states toward the demonstrated support. At test time, inte-grating the field produces large corrective motions when far from demonstrations and naturally vanishes near convergence, thereby sliding the system back into the reliable operating region of the execution policy—a process we refer to as sliding into distribution .To make the egocentric policy robust under sparse data with-out corrupting supervision, we introduce kinematically consis-tent augmentation through point cloud reprojection: we perturb the end-effector pose, reproject segmented wrist-camera point clouds using fixed hand–eye calibration, and update relative actions consistently to preserve action–observation validity. This design is aligned with counterfactual and controllable augmentation paradigms for robot learning [4, 5, 1], while explicitly enforcing geometric consistency. Augmentation is applied only to approach-phase segments, leaving interaction-heavy execution segments unchanged. We also sample a dis-joint outer perturbation range to generate OOD observations, which provide negative examples for learning when observa-tions leave the policy’s local support. Finally, within the reached regime, an egocentric execution policy trained via conditioned flow matching performs task-specific manipulation, building on recent progress in flow-based visuomotor policies [53, 15, 38]. Beyond a simple open-loop handoff from the motion field to the policy, SID also supports a closed-loop variant that uses an auxiliary ID-confidence head, trained from augmentation-induced ID/OOD labels, to trigger field-based re-alignment when observations drift from the policy’s local support. Experiments show that SID achieves strong spatial generalization and robustness to object displacement and disturbances with as few as one to two demonstrations per task. Overall, we make the following contributions:  
+
+> •
+
+We propose SID, a structured framework that combines an object-centric motion field for distribution alignment with an egocentric execution policy for task-specific control, and instantiate it with two inference pipelines: an open-loop field-to-policy handoff and a closed-loop re-alignment variant.  
+
+> •
+
+We formulate distribution alignment from few demon-strations as an energy-based dynamical system in object-centric SE(3) space, and learn a smooth motion field that performs gradient-descent-style sliding toward the demonstrated approach manifold.  
+
+> •
+
+We introduce a reprojection-based, stage-aware ego-centric augmentation scheme that preserves action– observation consistency under pose perturbations and provides ID/OOD labels for the auxiliary ID-confidence head used in the closed-loop variant.  
+
+> •
+
+We demonstrate robust generalization across poses, dis-turbances, cluttered scenes, and long-horizon skill com-positions on real-world manipulation tasks with only one to two demonstrations per task. II. R ELATED WORK 
+
+A. Visuomotor Policy Learning 
+
+Visuomotor policy learning trains action-generation poli-cies conditioned on visual observations (e.g., RGB, depth, or point clouds), enabling manipulation with visual feed-back [29, 20, 30, 18, 42, 17, 37]. Prior work includes end-to-end image-to-action learning [23, 24], temporally-extended control via sequence modeling [35] or action chunking [56], and diffusion/flow-based policy formulations for multimodal behaviors [6, 51, 53, 38, 15]. Recent methods also incorporate 3D representations to capture geometric structure [51, 21, 43]. Building on these advances, we adopt an egocentric execution policy (trained with conditioned flow matching) and focus on improving its reliability under sparse supervision. 
+
+B. Data-Efficient Manipulation Learning 
+
+Data-efficient manipulation learning aims to reduce demon-stration requirements. Structured policy representations with explicit spatial/geometric inductive biases (e.g., keypoints, transport operators, discretized 3D actions) improve general-ization from limited data [52, 36, 37, 45, 31, 12]. Equivariant architectures encode symmetry constraints to improve sample efficiency for pose variations [49, 50, 44, 55]. Other directions include one-/few-shot adaptation via meta-learning [11, 9, 54] and synthetic data/augmentation to expand perceptual and behavioral coverage [57, 48, 4, 5, 1]. Coarse-to-fine decompo-sition is also effective in one-/few-shot settings by explicitly structuring the control problem [20, 7, 28]. In this spirit, our approach combines a distribution-alignment stage with a task-execution stage to improve data efficiency without increasing the number of demonstrations. 
+
+C. Object-centric Policy Learning 
+
+Object-centric policy learning improves robustness by rep-resenting goals and behaviors relative to objects rather than the global scene. Prior work obtains object-aligned representations via detectors [3, 25, 39], part/affordance segmentation [33, 13, 27, 22], or keypoint-based geometric cues [40, 41, 14, 10, 34, 26], and may further use latent slots [58] or relational abstractions such as scene graphs [19]. These object-centric representations are commonly used to parameterize skills, define subgoals, or condition policies in long-horizon tasks. We similarly leverage object-centric structure, but use it to define and learn a motion field that aligns states back toward the neighborhood of demonstrated trajectories. Fig. 2: SID Overview: SID comprises three components: (a) an object-centric motion field that predicts sliding steps in object-centric space; (b) an egocentric data augmentation module that generates augmented ID/OOD point-cloud observations via projection and reconstruction; and (c) an egocentric execution policy that predicts actions from point clouds, gripper width, and a task key, with an auxiliary ID-confidence head. III. M ETHOD 
+
+We present Sliding into Distribution (SID), a structured manipulation framework illustrated in Fig. 2, designed to generalize from extremely few demonstrations across large object-pose variation, changing wrist viewpoints, and dy-namic disturbances. SID consists of four components: (i) an object-centric motion field fθ learned from a small set of canonicalized approach demonstrations, (ii) an egocentric data augmentation module that expands perceptual diversity via kinematically consistent point-cloud reprojection, (iii) an 
+
+egocentric execution policy πθ that performs task-specific manipulation once the system is within its reliable operating region, and (iv) two inference pipeline variants: open-loop and closed-loop. 
+
+A. Problem Formulation 
+
+We study few-demonstration robot manipulation under workspace-wide variation and external disturbances. A task is specified by a small demonstration set Dtask = {ζ(i)}Mi=1 with 
+
+M ≤ 2, where each demonstration is a time-indexed sequence 
+
+ζ(i) = {(o(i) 
+
+> t
+
+, a (i) 
+
+> t
+
+)}Ti
+
+> t=1
+
+. At time t, the egocentric observation is ot = ( Pt, g t), where Pt denotes a wrist-centric colored point cloud reconstructed from the wrist-mounted RGB-D camera, and gt ∈ R is the gripper-width signal. The action at is a per-step relative end-effector motion between neighboring frames (represented in SE(3) ). Our goal is to learn a control system that succeeds under large spatial variation and disturbances while using only Dtask as supervision. 
+
+B. Object-Centric Motion Field 
+
+Why a motion field. A major failure mode of egocentric policies under sparse data is distribution shift: at test time, the robot may start from observations that are far from the demonstrated approach states, causing the policy to operate out of distribution. SID addresses this by learning an object-centric motion field fθ that funnels the system toward the demonstrated approach manifold (see Fig. 1). 
+
+Canonicalization. We use a canonicalization operator C to extract an object-centric representation xt and its associated anchor pose ¯xt from an observation: 
+
+(xt, ¯xt) = C(ot; ξt), xt ∈ X , ¯xt ∈ Ω. (1) Here, ξt is a target-object specifier, such as a text prompt. Intu-itively, the anchor pose specifies the pose of the target object, and thus anchors an object-centered frame in the egocentric frame. The representation xt is associated with this anchor, either as an explicit pose or as an object-centric observation, such as segmented RGB or point clouds, associated with the anchor frame. In general, ¯xt ∈ Ω ⊂ SE(3) provides the pose used for pose-aligned geometry, and X denotes the space of object-centric representations anchored by poses in Ω (see Fig. 3). In this work, we use a simple and interpretable instantiation by taking X = Ω , estimating the target-object pose T cobj (t) ∈
+
+SE(3) in the wrist-camera frame, and setting 
+
+xt ≜ ¯xt ≜ T cobj (t) ∈ Ω. (2) This pose is used to construct and execute the motion field and to keep the augmentation geometrically consistent, but is not provided as input to the execution policy. 
+
+Demonstrated approach manifold. We restrict the motion field to the monotonic approach portion of each demonstration, where a single-valued corrective behavior toward an approach goal is well defined. Let Xdemo = {xj }Nj=1 ⊂ X denote the set of object-centric approach states aggregated from Dtask , with corresponding anchor poses ¯xj ∈ Ω. We use the term manifold 
+
+to refer to the lower-dimensional, task-relevant support formed by the approach-phase states in the demonstrations. 
+
+Distance-induced sliding field. We define a pose-aligned potential E(x) using an SE(3) distance between anchor poses. For notational simplicity, we drop the time index and write 
+
+x ∈ X with anchor pose ¯x = [ p, q ] ∈ Ω, and similarly ¯xj =[pj , q j ] ∈ Ω for each xj ∈ X demo . We measure similarity with the normalized SE(3) distance between anchor poses 
+
+d(x, x j ) ≜ dSE(3) (¯ x, ¯xj ) = 
+
+s
+
+p − pj
+
+σp
+
+> 2
+
++
+
+ θ(q, q j )
+
+σr
+
+2
+
+,
+
+(3) where θ(q, q j ) is the quaternion geodesic angle, and σp, σ r
+
+balance translation and rotation. We want the field to be well defined not only near demon-strations but everywhere in the bounded pose domain Ω. To this end, we sample anchor poses ¯x = [ p, q ] ∼ Unif(Ω) 
+
+and instantiate the corresponding input x ∈ X (the network input) anchored at ¯x (e.g., via reconstruction/rendering; when 
+
+X = Ω , we simply take x = ¯ x). We define a potential induced by the demonstrated set, 
+
+E(x) ≜ 12 d(x, Xdemo )2, d(x, Xdemo ) ≜ min  
+
+> xj∈X demo
+
+d(x, x j ),
+
+(4) and perform a gradient-descent-like update without explicitly computing −∇ xE(x). For any query state x, let its nearest demonstrated state be 
+
+x∗(x) = arg min  
+
+> xj∈X demo
+
+d(x, x j ). (5) We compute the SE(3) displacement between anchor poses as a 6D twist 
+
+˜∆( x → x∗) = p∗ − p, ω (q∗, q )⊤ ∈ R6, (6) where ¯x∗ = [ p∗, q ∗] ∈ Ω is the anchor pose of x∗(x), and 
+
+ω(q∗, q ) ∈ R3 is the axis-angle representation of the relative rotation from q to q∗. We then form a unit descent direction 
+
+ˆ∆( x → x∗) = ˜∆( x → x∗)
+
+∥ ˜∆( x → x∗)∥ , (7) and define the target sliding step 
+
+v∗(x) = η(d(x, x ∗(x))) ˆ∆( x → x∗(x)) ∈ R6. (8) Here η(·) is a distance-scheduled step size consistent with the quadratic potential E(x) = 12 d2, e.g., η(d) ∝ d with clipping. Thus, ˆ∆ determines the descent direction while η(·)
+
+determines the magnitude. 
+
+Fig. 3: Illustration of the object-centric representation space X
+
+anchored in SE(3) : different instantiations (e.g., wrist-camera segmented images, segmented point clouds, or explicit object poses) share a common anchor pose in Ω ⊂ SE(3) , enabling pose-aligned distance computations while keeping the network input in the chosen modality. 
+
+Learning and execution. We parameterize the field as fθ :
+
+X → R6 and regress the target steps 
+
+Lfield = Ex∼P (X )
+
+∥fθ (x) − v∗(x)∥2, (9) where P(X ) is the induced sampling mixture obtained by sam-pling anchor poses ¯x ∈ Ω and instantiating the corresponding inputs x ∈ X . At inference time, we obtain the current state xt,query vt = fθ (xt), and execute the corresponding end-effector command with step size α. We repeat until ∥fθ (xt)∥ < ϵ field ,indicating that the system has slid near the demonstrated approach manifold, where ϵfield is a small threshold indicating that the predicted sliding step magnitude is negligible. 
+
+Object key for multi-object fields. In practice, the motion field additionally conditions on an object key kobj ∈ K
+
+that identifies the target object (or instance) within the task, enabling a single network to represent fields for multiple objects: 
+
+fθ : X × K → R6. (10) 
+
+C. Egocentric Data Augmentation 
+
+Egocentric Observation Representation. Following the formulation in Sec. III-A, we use point clouds in the camera frame as the observation, yielding an egocentric represen-tation. This egocentric viewpoint is particularly convenient for data augmentation: we can apply rigid transformations— constrained by the hand–eye calibration—to the non-body component of the observation and the end-effector pose, thereby synthesizing new observations and corresponding end-effector states. 
+
+Data Augmentation via Point Cloud Reprojection. To synthesize an egocentric observation under a perturbed view-point, we sample a random perturbation from a certain range in the end-effector frame, T ee ee aug ∈ SE (3) , and convert it to the corresponding camera-frame perturbation using the fixed hand–eye calibration T ee c :
+
+T ccaug = ( T ee c )−1 T ee ee aug T ee c , (11) which induces the reprojection transform T caug  
+
+> c
+
+= ( T ccaug )−1
+
+mapping points from the original camera frame to the aug-mented camera frame. Crucially, to obtain a physically consistent egocentric ob-servation under viewpoint perturbation, we transform only the target-object point cloud while keeping the gripper point cloud unchanged. We apply a segmentation model to Pt to extract the object point cloud P obj t and the gripper point cloud P grip t ,and define their union as P seg t = P obj t ∪ P grip t . For each point 
+
+pci (t) ∈ P obj t , we compute 
+
+pcaug  
+
+> i
+
+(t) = T caug  
+
+> c
+
+pci (t), (12) where points are represented in homogeneous coordinates. We leave the gripper points unchanged, i.e., 
+
+P grip, c aug  
+
+> t
+
+= P grip, c t , (13) and form the augmented segmented observation by 
+
+P seg, c aug  
+
+> t
+
+= P obj, c aug  
+
+> t
+
+∪ P grip, c aug  
+
+> t
+
+. (14) while keeping the gripper width unchanged, i.e., gaug  
+
+> t
+
+= gt.To preserve action–observation consistency under per-frame perturbations, if we sample T ee ee aug (t) and T ee ′ 
+
+> ee ′
+> aug
+
+(t+1) at con-secutive time steps, we update the relative action by 
+
+aaug  
+
+> t
+
+=
+
+
+
+T ee ee aug (t)
+
+−1
+
+T ee ee ′ (t → t+1) T ee ′ 
+
+> ee ′
+> aug
+
+(t+1) . (15) where T ee ee ′ (t → t+1) = at.Finally, we control the sampling space of T ee ee aug to generate both in-distribution and out-of-distribution augmentations. We define ID/OOD relative to the local egocentric support induced by the demonstrations. ID samples are generated from small bounded perturbations around demonstrated end-effector poses and are used, with their geometrically updated actions, to train the execution policy. OOD samples are generated from a disjoint outer perturbation range outside the ID support; they are not used for action-supervised policy training, but serve as negative examples for the auxiliary ID-confidence head. After augmentation, we attach a binary label pID ∈ { 0, 1} to each sample, where pID =1 indicates ID and pID =0 indicates OOD. 
+
+D. Egocentric Execution Policy 
+
+Egocentric, Base-Free Policy Interface. To promote gener-alization, the execution policy is defined in a purely egocentric, base-free manner (no global views or base-frame states are used as inputs). This design decouples execution from absolute workspace placement; a detailed generalization analysis is provided in Appendix B. It conditions only on oseg t = ( P seg t , g t) and predicts an action sequence At = [at, a t+1 , . . . , a t+H−1] ∈ RH×da ,where H is the action horizon and da is the action dimension. Each per-step action at comprises (i) a relative end-effector motion in SE (3) , (ii) low-dimensional control scalars for the gripper command, and (iii) a termination signal; the rollout stops when this signal exceeds a threshold. To support multiple subtasks with a single model, we additionally condition the policy on a task key ktask (embedded as a global conditioning vector). 
+
+Conditional Flow Matching over Action Chunks. Follow-ing conditional flow matching, we sample a data action chunk 
+
+Fig. 4: Inference pipelines. (a) Open-loop switches from motion-field sliding (stopped by a field-norm threshold) to policy execution. (b) Closed-loop uses ID/pose confidence to route between policy, motion-field sliding, and recovery. 
+
+At ∼ pdata (· | oseg t , k task ) and a base sample A0 
+
+> t
+
+∼ p0(·) with 
+
+p0 = N (0 , I ). We define a linear probability path indexed by the flow time τ ∈ [0 , 1] :
+
+Aτt = (1 − τ ) A0 
+
+> t
+
++ τ A t, τ ∼ U [0 , 1] . (16) The target velocity field along this path is constant: 
+
+u∗(Aτt | At, A 0 
+
+> t
+
+) = dA τt
+
+dτ = At − A0 
+
+> t
+
+. (17) We train a conditional velocity network uθ (Aτt , o t, k task , τ )
+
+by minimizing 
+
+LCFM = EAt, A 0 
+
+> t, τ
+
+h
+
+uθ (Aτt , o seg t , k task , τ ) − (At − A0 
+
+> t
+
+) 22
+
+i
+
+.
+
+(18) At inference time, we sample A0 
+
+> t
+
+∼ N (0 , I ) and integrate the learned ODE dA τt 
+
+> dτ
+
+= uθ (Aτt , o seg t , k task , τ ) from τ = 0 to 
+
+τ = 1 using Euler updates. 
+
+Network Architecture. The velocity network uθ encodes the egocentric observation using a PointNet-style visuomotor encoder that jointly embeds the segmented point cloud and gripper width into a conditioning feature. Conditioned on this feature, the task embedding, and the flow time, an action head predicts the action-space velocity field over the action chunk. We additionally attach an auxiliary ID-confidence head cϕ
+
+to the shared observation encoder. We write its prediction as pID = cϕ(oseg t , k task ), denoting an MLP head applied to the encoder feature produced from oseg t and ktask . The output pID ∈ [0 , 1] estimates whether the current observation lies within the policy’s in-distribution region for the current task/stage. ID samples are used for both action-supervised policy training and ID-confidence prediction, while OOD samples serve only as negative examples for this head. We apply stop-gradient from the auxiliary head to the shared encoder to avoid changing the action-prediction representation. Algorithm 1 Open-Loop Inference Pipeline 
+
+Require: Canonicalization operator C, object alignment an-chor ξt, motion field fθ , execution policy πθ , field-norm threshold ϵf ield , termination threshold ϵterm , step size α,object key kobj , task key ktask .
+
+Ensure: Task termination  
+
+> 1:
+
+Observe ot 
+
+> 2:
+
+xt ← C (ot; ξt) 
+
+> 3:
+
+while ∥fθ (xt, k obj )∥ > ϵ f ield do ▷ Motion field  
+
+> 4:
+
+vt ← fθ (xt, k obj ) 
+
+> 5:
+
+Execute sliding step α · vt 
+
+> 6:
+
+Observe ot 
+
+> 7:
+
+xt ← C (ot; ξt) 
+
+> 8:
+
+end while  
+
+> 9:
+
+TERMINATED ← FALSE 10: while not TERMINATED do ▷ Execution Policy  
+
+> 11:
+
+Observe ot 
+
+> 12:
+
+At ← πθ (ot, k task ) 
+
+> 13:
+
+Execute action At 
+
+> 14:
+
+TERMINATED ← (T ERM DIM (At) > ϵ term ) 
+
+> 15:
+
+end while 
+
+E. Inference Procedures of SID 
+
+SID supports two inference pipelines: an Open-Loop Infer-ence Pipeline and a Closed-Loop Inference Pipeline . The cor-responding procedures are summarized in Alg. 1 and Alg. 2. 
+
+Open-Loop Inference Pipeline. As shown in Alg. 1, we first iterate the motion field: the system repeatedly observes 
+
+ot, canonicalizes to obtain xt, queries vt = fθ (xt, k obj ), and executes the sliding step α · vt until ∥fθ (xt, k obj )∥ ≤ ϵf ield .It then switches to the execution policy, executing action chunks At = πθ (ot, k task ) until termination. Termination is determined by the termination signal embedded as one dimension of the da-dim action, extracted by T ERM DIM (At)
+
+and thresholded by ϵterm .
+
+Closed-Loop Inference Pipeline. As shown in Alg. 2, the closed-loop pipeline uses the ID confidence pID to decide whether to execute the policy. If pID > ϵ ID , the policy action 
+
+At = πθ (ot, k task ) is executed and termination is updated via TERM DIM (At). Otherwise, we canonicalize to obtain 
+
+xt and evaluate the pose confidence ppose = s(xt), where 
+
+s(·) is the score returned by the foundation pose estimator during pose detection. If ppose > ϵ pose , we execute sliding steps from the motion field until ∥fθ (xt, k obj )∥ ≤ ϵf ield ;otherwise, we execute a R ECOVERY action and continue the loop. R ECOVERY is a hand-designed fallback that moves the end-effector to a predefined safe observation pose, typically a lifted wrist-camera viewpoint with the target workspace in view. It does not perform task manipulation; instead, it is used to reacquire a more reliable segmentation and pose estimate before re-evaluating pID and ppose .IV. E XPERIMENTS 
+
+We design experiments to answer the following questions. 
+
+Algorithm 2 Closed-Loop Inference Pipeline 
+
+Require: Canonicalization operator C, target-object specifier 
+
+ξt, pose score model s, pose confidence threshold ϵpose ,motion field fθ , field-norm threshold ϵf ield , execution policy πθ , observation encoder with ID confidence head 
+
+cϕ, ID confidence threshold ϵID , termination threshold 
+
+ϵterm , step size α, object key kobj , task key ktask .
+
+Ensure: Task termination  
+
+> 1:
+
+TERMINATED ← FALSE 2: while not TERMINATED do  
+
+> 3:
+
+Observe ot 
+
+> 4:
+
+pID ← cϕ ▷ ID confidence  
+
+> 5:
+
+if pID > ϵ ID then  
+
+> 6:
+
+At ← πθ (ot, k task ) ▷ Execution Policy  
+
+> 7:
+
+Execute action At 
+
+> 8:
+
+TERMINATED ← (T ERM DIM (At) > ϵ term ) 
+
+> 9:
+
+else  
+
+> 10:
+
+xt ← C (ot; ξt) 
+
+> 11:
+
+ppose ← s(xt) ▷ Pose confidence  
+
+> 12:
+
+if ppose > ϵ pose then  
+
+> 13:
+
+while ∥fθ (xt, k obj )∥ > ϵ f ield do  
+
+> 14:
+
+vt ← fθ (xt, k obj ) 
+
+> 15:
+
+Execute sliding step α · vt 
+
+> 16:
+
+Observe ot 
+
+> 17:
+
+xt ← C (ot; ξt) 
+
+> 18:
+
+end while  
+
+> 19:
+
+else  
+
+> 20:
+
+Execute RECOVERY action  
+
+> 21:
+
+continue  
+
+> 22:
+
+end if  
+
+> 23:
+
+end if  
+
+> 24:
+
+end while  
+
+> •
+
+Q1: Can SID achieve workspace-wide generalization with at most two demonstrations per task, using only augmentation to expand training samples?  
+
+> •
+
+Q2: Can SID handle dynamic settings with external disturbances?  
+
+> •
+
+Q3: Does SID remain reliable in unstructured, cluttered scenes without carefully curated layouts?  
+
+> •
+
+Q4: Can SID scale to long-horizon manipulation tasks that require sustained, multi-step execution?  
+
+> •
+
+Q5: Can SID reuse and compose sub-skills across tasks, enabling modular combination of sub-tasks beyond the original demonstrations? 
+
+A. Experiment Setups 1) Tasks: To cover the above questions, we evaluate SID on six real-world manipulation tasks: O PEN DRAWER , P OUR 
+
+WATER , H ANG CUP , H ANG TAPE , P NP-B OX , and M ULTI -PNP-B OX . These tasks cover articulated objects, deformable containers, and cluttered scenes, and require both prehensile and non-prehensile manipulation skills, including approaching, grasping, non-prehensile nudging (to open a fabric container), hanging, pouring, and placing. Fig. 5: Visualization of the selected tasks. For each task, the robot motion is decomposed into multiple sub-steps, visualized by trajectories whose colors encode the execution order: blue → orange → yellow → dark red → light red → dark green →
+
+light green. 
+
+2) Evaluation Protocol: Across all experiments, SID uses only two raw demonstrations per task, which are expanded through data augmentation to form 100 training samples. We provide MT3 and Ret-BC with 10 demonstrations per task, as retrieval-based methods benefit from a larger demonstration memory for alignment and interaction. All remaining trainable baselines are trained with 100 demonstrations per task to ensure stable learning and competitive performance under their standard training regime. We consider five evaluation settings corresponding to Q1–Q5. First, to test workspace-wide generalization (Q1), each task is executed from varied initial object poses and camera viewpoints across the reachable workspace, while limiting data collection to at most two human demonstrations per task. Second, to assess robustness to dynamics and disturbances (Q2),we apply perturbations to four tasks. For a fair comparison, we evaluate all methods except MT3, Ret-BC, and SID with states constrained to the ID region. Third, to evaluate unstructured and cluttered scenes 
+
+(Q3), we place distractor objects and vary scene layouts with-out careful curation. Fourth, our task suite includes settings that require long-horizon, multi-step execution (Q4). Finally, we include cross-task settings that probe sub-skill reuse and composition (Q5) by combining previously seen sub-steps into new task variants. Concretely, we evaluate SID on two novel long-sequence tasks. The first, B OX RETRIEVAL & H ANGING ,is recomposed from three previously learned skills: P NP-BOX , H ANG TAPE , and H ANG CUP . The second, P ICK NEW 
+
+OBJECTS INTO BOX , is recomposed from P NP-B OX and P ICK 
+
+OBJECTS (a multi-object picking skill that involves grasping several objects). 
+
+3) Baselines: We compare our method against five rep-resentative and strong baselines. (1) π0.5 [16], a vision-language-action (VLA) model trained via co-training on het-erogeneous data sources across robot platforms and language-conditioned behaviors to generalize to new environments. (2) 
+
+MT3 [7], a fully retrieval-based decomposition method that performs both alignment and interaction via demonstration retrieval at test time. (3) Ret-BC [7], a hybrid decomposition baseline that uses retrieval-based alignment followed by be-havioral cloning (BC) for interaction. (4) 3D Diffusion Policy (DP3) [51], a point-cloud diffusion policy that integrates a simplified 3D encoder with robot proprioception for gener-alizable manipulation. (5) Action Chunking Transformer (ACT) [56], a transformer-based policy that predicts tempo-rally extended action chunks from visual observations. All baselines are evaluated under identical experimental conditions for a fair comparison. 
+
+4) Metrics: We report Success Rate for all tasks. Addition-ally, we report Average Length [32] for long-horizon tasks, which measures execution progress as the number of stages successfully completed. Formally, for a K-stage task, each trial is assigned l ∈ { 0, 1, . . . , K }, where l is the index (count) TABLE I: Results in the static setting under both in-distribution (ID) and out-of-distribution (OOD) evaluations. We report the success rate (%) over 50 trials for each task. Training Demos denotes the number of demonstrations used for training. SID-O and SID-C denote SID-open and SID-closed, respectively. †                                                                                                            
+
+> denotes our method. Methods Training Demos Open Drawer Pour Water Hang Tape Hang Cup PnP-Box Multi-PnP-Box ID OOD ID OOD ID OOD ID OOD ID OOD ID OOD ACT 100 82 068 062 052 056 018 0DP3 100 86 10 74 656 246 472 12 24 0
+> π0.5100 92 14 82 484 678 676 10 64 0Ret-BC 10 —56 —54 —36 —62 —44 —36 MT3 10 —76 —78 —46 —74 —58 —52 SID-O †2—90 —86 —82 —86 —84 —82 SID-C †2—92 —90 —88 —90 —92 —86
+
+of the last successfully completed stage; l = K indicates full task completion. 
+
+B. Results Comparison 
+
+(Q1)SID achieves workspace-wide generalization under OOD initializations with at most two demonstrations per task, consistently outperforming strong baselines. Results are summarized in Table I. Under the OOD setting, all base-lines other than MT3 and Ret-BC suffer pronounced perfor-mance degradation. By comparison, both SID-open and SID-closed remain robust in OOD, and outperform these baselines not only in OOD but also relative to their ID performance. We further observe that SID consistently surpasses MT3 and Ret-BC across tasks. We attribute this improvement to SID’s ability to update its motion field online using the latest egocentric observations while transitioning from OOD regions toward the ID manifold, enabling more accurate re-entry into the training distribution. In contrast, MT3 and Ret-BC perform trajectory alignment based on object poses estimated from a single first-frame global observation, making them sensitive to pose estimation errors that can propagate to downstream manipulation accuracy. We also observe from Table I that SID-closed consistently outperforms SID-open. We attribute this gain to the fact that SID-closed corrects distribution shifts not only during the approach phase, but also continues to mitigate distribution drift in the post-contact phase, where inaccuracies in policy actions can otherwise accumulate and push the system further away from the training distribution. Overall, these results provide clear evidence that SID delivers strong workspace-wide generalization with minimal demonstrations: OOD-to-ID motion and augmentation enable effective learning from only two demos per task, and the closed-loop variant further improves robustness by continu-ously correcting distribution drift throughout execution. 
+
+(Q2) SID performs robustly under external disturbances by correcting deviations online. As shown in Table II, π0.5
+
+exhibits the strongest dynamic robustness across all baselines, which we attribute to its closed-loop hierarchical policy with re-planning from fresh observations and its continuous action-expert design. MT3 and Ret-BC suffer substantial performance drops in dynamic scenarios; both degrade severely when perturbations are present, because retrieval-based methods perform alignment only w.r.t. the first observation frame and                                    
+
+> TABLE II: Results in the dynamic setting. We report the success rate (%) over 50 trials per task (aggregated over perturbation cases). Task ACT DP3 π0.5Ret-BC MT3 SID-O †SID-C †
+> Hang Tape 614 80 12 444 84
+> Hang Cup 2868 4036 88
+> PnP-Box 210 74 8252 86
+> Pour Water 410 78 6240 82
+
+do not update the alignment online. Ret-BC performs relatively better, likely because the BC-based execution stage provides additional robustness. SID-open is more robust to disturbances since its motion field is continuously updated from the latest observations in approach phases, guiding the robot back toward in-distribution states. However, SID-open can still degrade under stronger disturbances in execution phases: once the disturbance pushes observations outside the in-distribution region, the execution policy alone often fails to recover. In contrast, SID-closed remains robust across both approach and execution phases; its OOD detection module provides a closed-loop safeguard that effectively handles OOD events induced by disturbances. 
+
+(Q3) SID remains reliable in unstructured, cluttered scenes. As shown in Table III, MT3, Ret-BC, and both SID variants maintain strong performance under cluttered, unstructured layouts. We attribute this robustness primarily to the use of vision foundation models: SAM2/SAM3 provide explicit target-object segmentation, which filters out back-ground clutter and distractors and yields more stable, target-centric visual inputs for downstream planning and control. As a result, these methods are less sensitive to layout curation and remain reliable even with non-canonical object arrange-ments. In contrast, the remaining baselines degrade markedly in clutter, since their visual representations are more easily dominated by irrelevant objects and occlusions when explicit target segmentation is unavailable, leading to mis-localization and cascading execution errors. 
+
+(Q4) SID can handle long-horizon manipulation tasks that require sustained, multi-step execution. As shown in Table I, SID achieves consistently strong performance on two long-horizon tasks with more than three sequential stages, outperforming the baselines. We attribute this advan-tage to SID’s decomposition design: the motion field facilitates TABLE III: Results in cluttered environments with added distractor objects. For each task, we report the success rate (%) over 50 trials per task for each method. Task ACT DP3 π0.5 Ret-BC MT3 SID-O † SID-C †              
+
+> Hang Cup 42 24 72 58 72 86 88
+> PnP-Box 44 28 74 40 54 84 90
+
+transitions between the subtask-specific state distributions of consecutive stages, while the execution policy only needs to operate within each subtask-relevant, narrow distribution. This separation substantially reduces the learning burden of the neural policy, enabling reliable multi-stage execution with a relatively compact model. Overall, the results suggest that de-composing long-horizon manipulation into distribution-aware subtask transitions is key to sustained, multi-step control. 
+
+(Q5) SID can reuse and compose sub-skills across tasks, enabling modular combination of sub-tasks beyond the original demonstrations. Since both components in SID are lightweight, we can load multiple previously trained SID models when solving a new task and invoke them stage-by-stage, enabling practical skill reuse and re-composition. As shown in Fig. 6, SID achieves competitive performance on both recomposed tasks by reusing pre-trained sub-skill models and invoking them on demand at each stage. This result highlights SID’s ability to recombine existing skills to solve novel long-horizon sequences without retraining an end-to-end policy. Meanwhile, the per-stage success rates in Fig. 6 indicate a consistent gap between reuse and the original single-skill success rates. The degradation is most pronounced for Pick tape and Pick cup , because grasping in the original tasks is performed without occlusions, whereas in the recomposed setting the box introduces additional clutter and partial oc-clusion that interferes with perception and approach. We also observe reduced performance in the Place stages: since the manipulated objects differ from those seen in the original PNP-B OX demonstration, the resulting distribution shift fur-ther degrades placement quality. In summary, SID enables effective skill reuse and modular re-composition for new long-horizon tasks, while the remain-ing performance gap is largely explained by occlusion-induced grasping difficulty and distribution deviations introduced by novel objects and interactions. V. C ONCLUSIONS AND LIMITATIONS 
+
+We presented Sliding into Distribution (SID), a few-demonstration manipulation framework that mitigates distribu-tion shift by pairing an object-centric motion field for online alignment with an egocentric execution policy trained via conditioned flow matching. SID learns a smooth descent field from canonicalized approach demonstrations to slide OOD states back toward the demonstrated manifold, and improves data efficiency through kinematically consistent point-cloud reprojection augmentation. Across real-world tasks, SID shows strong workspace-wide generalization and robustness to distur-Open box      
+
+> Pick tape
+> Hang tape on hook
+> Pick cup
+> Hang cup on rack
+> Overall
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Subtask success rate  Recomposed Task 1: Box Retrieval & Hanging
+> Open box
+> Pick obj1
+> Place
+> Pick obj2
+> Place
+> Pick obj3
+> Place
+> Overall
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Subtask success rate  Recomposed Task 2: Pick New Objects into Box
+> 0
+> 2
+> 4
+> Avg. Len.
+> 0
+> 2
+> 4
+> 6
+> Avg. Len.
+> Original SR Reuse SR Recomposed Avg. Len.
+> Pick&Place Hang tape Hang cup Pick objects
+
+Fig. 6: Results on recomposed tasks. We report the success rate for each sub-skill and the Average Length for the overall recomposed tasks, which counts the number of stages success-fully completed. bances with only one to two demonstrations, while the closed-loop variant further uses an auxiliary ID-confidence signal to monitor policy-side distribution drift and route control back to field-based re-alignment or recovery when needed. SID also supports skill reuse and composition for modular long-horizon manipulation. 
+
+Limitations: Pose estimation dependency. SID relies on an off-the-shelf 6D pose estimator; when pose estimates are unreliable, such as for transparent objects or rapid motion, the motion field can degrade. Future work could reduce this dependency by conditioning on object-centric inputs such as segmented point clouds or RGB. Limited scene awareness and approach feasibility. Our method does not explicitly model obstacles or collision constraints, and its motion-field alignment assumes that the demonstrated approach manifold remains observable and reachable. Performance may degrade when feasible approach regions are occluded, blocked, or constrained by cluttered environments. Limited cross-object generalization. We do not yet demonstrate strong general-ization to unseen objects or categories; more object-agnostic representations are a natural next step. ACKNOWLEDGMENTS 
+
+This work was supported in part by the National Natural Science Foundation of China Youth Program under Grant No. 52305037, Zhejiang Provincial Natural Science Foundation of China under Grant No. LD26E050001, the ”Pioneer” and ”Leading Goose” R&D Programs of Zhejiang Province under Grants No. 2025C01072. REFERENCES 
+
+[1] Ezra Ameperosa, Jeremy A. Collins, Mrinal Jain, and Animesh Garg. Rocoda: Counterfactual data augmen-tation for data-efficient robot learning from demonstra-tions, 2025. URL https://arxiv.org/abs/2411.16959. [2] Nicolas Carion, Laura Gustafson, Yuan-Ting Hu, Shoub-hik Debnath, Ronghang Hu, Didac Suris, Chaitanya Ryali, Kalyan Vasudev Alwala, Haitham Khedr, An-drew Huang, Jie Lei, Tengyu Ma, Baishan Guo, Arpit Kalla, Markus Marks, Joseph Greer, Meng Wang, Peize Sun, Roman R¨ adle, Triantafyllos Afouras, Effrosyni Mavroudi, Katherine Xu, Tsung-Han Wu, Yu Zhou, Liliane Momeni, Rishi Hazra, Shuangrui Ding, Sagar Vaze, Francois Porcher, Feng Li, Siyuan Li, Aishwarya Kamath, Ho Kei Cheng, Piotr Doll´ ar, Nikhila Ravi, Kate Saenko, Pengchuan Zhang, and Christoph Feichtenhofer. Sam 3: Segment anything with concepts, 2025. URL https://arxiv.org/abs/2511.16719. [3] Alexandre Chapin, Bruno Machado, Emmanuel Dellan-drea, and Liming Chen. Object-centric representations improve policy generalization in robot manipulation. 
+
+arXiv preprint arXiv:2505.11563 , 2025. [4] Zoey Chen, Sho Kiami, Abhishek Gupta, and Vikash Kumar. Genaug: Retargeting behaviors to unseen situ-ations via generative augmentation, 2023. URL https: //arxiv.org/abs/2302.06671. [5] Zoey Chen, Zhao Mandi, Homanga Bharadhwaj, Mohit Sharma, Shuran Song, Abhishek Gupta, and Vikash Kumar. Semantically controllable augmentations for generalizable robot learning, 2024. URL https://arxiv. org/abs/2409.00951. [6] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion, 2024. URL https://arxiv.org/abs/2303. 04137. [7] Kamil Dreczkowski, Pietro Vitiello, Vitalis Vosylius, and Edward Johns. Learning a thousand tasks in a day. Science Robotics , 10(108), November 2025. ISSN 2470-9476. doi: 10.1126/scirobotics.adv7594. URL http://dx.doi.org/10.1126/scirobotics.adv7594. [8] Maximilian Du, Suraj Nair, Dorsa Sadigh, and Chelsea Finn. Behavior retrieval: Few-shot imitation learning by querying unlabeled datasets, 2023. URL https://arxiv.org/ abs/2304.08742. [9] Yan Duan, Marcin Andrychowicz, Bradly C. Stadie, Jonathan Ho, Jonas Schneider, Ilya Sutskever, Pieter Abbeel, and Wojciech Zaremba. One-shot imitation learning, 2017. URL https://arxiv.org/abs/1703.07326. [10] Xiaolin Fang, Bo-Ruei Huang, Jiayuan Mao, Jasmine Shone, Joshua B Tenenbaum, Tom´ as Lozano-P´ erez, and Leslie Pack Kaelbling. Kalm: Keypoint abstraction using large models for object-relative imitation learning. In 
+
+2025 IEEE International Conference on Robotics and Automation (ICRA) , pages 8307–8314. IEEE, 2025. [11] Chelsea Finn, Tianhe Yu, Tianhao Zhang, Pieter Abbeel, and Sergey Levine. One-shot visual imitation learning via meta-learning, 2017. URL https://arxiv.org/abs/1709. 04905. [12] Jianfeng Gao, Zhi Tao, No´ emie Jaquier, and Tamim Asfour. K-vil: Keypoints-based visual imitation learn-ing. IEEE Transactions on Robotics , 39(5):3888– 3908, October 2023. ISSN 1941-0468. doi: 10.1109/ tro.2023.3286074. URL http://dx.doi.org/10.1109/TRO. 2023.3286074. [13] Haoran Geng, Ziming Li, Yiran Geng, Jiayi Chen, Hao Dong, and He Wang. Partmanip: Learning cross-category generalizable part manipulation policy from point cloud observations. In Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition , pages 2978–2988, 2023. [14] Ankit Goyal, Jie Xu, Yijie Guo, Valts Blukis, Yu-Wei Chao, and Dieter Fox. Rvt: Robotic view transformer for 3d object manipulation. In Conference on Robot Learning , pages 694–710. PMLR, 2023. [15] Xixi Hu, Bo Liu, Xingchao Liu, and Qiang Liu. Adaflow: Imitation learning with variance-adaptive flow-based policies, 2024. URL https://arxiv.org/abs/2402.04292. [16] Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Es-mail, Michael Equi, Chelsea Finn, Niccolo Fusai, Manuel Y. Galliker, Dibya Ghosh, Lachy Groom, Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Devin LeBlanc, Sergey Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Allen Z. Ren, Lucy Xiaoyang Shi, Laura Smith, Jost To-bias Springenberg, Kyle Stachowicz, James Tanner, Quan Vuong, Homer Walke, Anna Walling, Haohuan Wang, Lili Yu, and Ury Zhilinsky. π0.5: a vision-language-action model with open-world generalization, 2025. URL https://arxiv.org/abs/2504.16054. [17] Stephen James, Kentaro Wada, Tristan Laidlow, and Andrew J Davison. Coarse-to-fine q-attention: Efficient learning for visual robotic manipulation via discretisa-tion. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 13739– 13748, 2022. [18] Eric Jang, Alex Irpan, Mohi Khansari, Daniel Kappler, Frederik Ebert, Corey Lynch, Sergey Levine, and Chelsea Finn. Bc-z: Zero-shot task generalization with robotic imitation learning. In Conference on Robot Learning ,pages 991–1002. PMLR, 2022. [19] Hanxiao Jiang, Binghao Huang, Ruihai Wu, Zhuoran Li, Shubham Garg, Hooshang Nayyeri, Shenlong Wang, and Yunzhu Li. Roboexp: Action-conditioned scene graph via interactive exploration for robotic manipulation. arXiv preprint arXiv:2402.15487 , 2024. [20] Edward Johns. Coarse-to-fine imitation learning: Robot manipulation from a single demonstration. In 2021 IEEE international conference on robotics and automation (ICRA) , pages 4613–4619. IEEE, 2021. [21] Tsung-Wei Ke, Nikolaos Gkanatsios, and Katerina Fragkiadaki. 3d diffuser actor: Policy diffusion with 3d scene representations, 2024. URL https://arxiv.org/abs/ 2402.10885. [22] Weijie Kong, Zhaohui Lin, Wei Yu, Haotian Guo, Zhian Su, and Huixu Dong. Affpose: An integrated rgb-based framework for simultaneous pose estimation and affordance detection in robotic tool manipulation. IEEE Robotics and Automation Letters , 10(10):10170–10177, 2025. doi: 10.1109/LRA.2025.3598984. [23] Sergey Levine, Chelsea Finn, Trevor Darrell, and Pieter Abbeel. End-to-end training of deep visuomotor policies, 2016. URL https://arxiv.org/abs/1504.00702. [24] Sergey Levine, Peter Pastor, Alex Krizhevsky, and Deirdre Quillen. Learning hand-eye coordination for robotic grasping with deep learning and large-scale data collection, 2016. URL https://arxiv.org/abs/1603.02199. [25] Hang Li, Qian Feng, Zhi Zheng, Jianxiang Feng, Zhaopeng Chen, and Alois Knoll. Language-guided object-centric diffusion policy for generalizable and collision-aware manipulation. In 2025 IEEE Interna-tional Conference on Robotics and Automation (ICRA) ,pages 12834–12841. IEEE, 2025. [26] Peiyan Li, Yixiang Chen, Hongtao Wu, Xiao Ma, Xiang-nan Wu, Yan Huang, Liang Wang, Tao Kong, and Tieniu Tan. Bridgevla: Input-output alignment for efficient 3d manipulation learning with vision-language models. 
+
+arXiv preprint arXiv:2506.07961 , 2025. [27] Yu Li, Xiaojie Zhang, Ruihai Wu, Zilong Zhang, Yiran Geng, Hao Dong, and Zhaofeng He. Unidoormanip: Learning universal door manipulation policy over large-scale and diverse door manipulation environments. arXiv preprint arXiv:2403.02604 , 2024. [28] Zhaohui Lin, Haonan Dong, Weijie Kong, Haoran Huang, I-Ming Chen, and Huixu Dong. A coarse-to-fine multimodal detection framework based on deep learning for robotic coating tasks. IEEE/ASME Trans-actions on Mechatronics , 31(1):639–650, 2026. doi: 10.1109/TMECH.2025.3595263. [29] Ajay Mandlekar, Danfei Xu, Roberto Mart´ ın-Mart´ ın, Silvio Savarese, and Li Fei-Fei. Learning to generalize across long-horizon tasks from human demonstrations. 
+
+arXiv preprint arXiv:2003.06085 , 2020. [30] Ajay Mandlekar, Danfei Xu, Josiah Wong, Soroush Nasiriany, Chen Wang, Rohun Kulkarni, Li Fei-Fei, Silvio Savarese, Yuke Zhu, and Roberto Mart´ ın-Mart´ ın. What matters in learning from offline human demon-strations for robot manipulation. arXiv preprint arXiv:2108.03298 , 2021. [31] Lucas Manuelli, Wei Gao, Peter Florence, and Russ Tedrake. kpam: Keypoint affordances for category-level robotic manipulation, 2019. URL https://arxiv.org/abs/ 1903.06684. [32] Oier Mees, Lukas Hermann, Erick Rosete-Beas, and Wolfram Burgard. Calvin: A benchmark for language-conditioned policy learning for long-horizon robot ma-nipulation tasks, 2022. URL https://arxiv.org/abs/2112. 03227. [33] Yu Qi, Yuanchen Ju, Tianming Wei, Chi Chu, Lawson LS Wong, and Huazhe Xu. Two by two: Learning multi-task pairwise objects assembly for generalizable robot manipulation. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 17383–17393, 2025. [34] Jianing Qian, Yunshuang Li, Bernadette Bucher, and Dinesh Jayaraman. Task-oriented hierarchical object decomposition for visuomotor control. arXiv preprint arXiv:2411.01284 , 2024. [35] Nur Muhammad Mahi Shafiullah, Zichen Jeff Cui, Ar-iuntuya Altanzaya, and Lerrel Pinto. Behavior trans-formers: Cloning k modes with one stone, 2022. URL https://arxiv.org/abs/2206.11251. [36] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Cliport: What and where pathways for robotic manipulation, 2021. URL https://arxiv.org/abs/2109.12098. [37] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Perceiver-actor: A multi-task transformer for robotic ma-nipulation. In Conference on Robot Learning , pages 785– 799. PMLR, 2023. [38] Andreas Sochopoulos, Nikolay Malkin, Nikolaos Tsagkas, Jo˜ ao Moura, Michael Gienger, and Sethu Vijayakumar. Fast flow-based visuomotor policies via conditional optimal transport couplings, 2025. URL https://arxiv.org/abs/2505.01179. [39] Zhian Su, Yicheng Ma, Haotian Guo, and Huixu Dong. Construction of bin-picking system for logistic applica-tion: A hybrid robotic gripper and vision-based grasp planning. IEEE Robotics and Automation Letters , 10(8): 8300–8307, 2025. doi: 10.1109/LRA.2025.3585393. [40] Priya Sundaresan, Suneel Belkhale, Dorsa Sadigh, and Jeannette Bohg. Kite: Keypoint-conditioned policies for semantic manipulation. arXiv preprint arXiv:2306.16605 , 2023. [41] Chao Tang, Anxing Xiao, Yuhong Deng, Tianrun Hu, Wenlong Dong, Hanbo Zhang, David Hsu, and Hong Zhang. Functo: Function-centric one-shot imi-tation learning for tool manipulation. arXiv preprint arXiv:2502.11744 , 2025. [42] Chen Wang, Linxi Fan, Jiankai Sun, Ruohan Zhang, Li Fei-Fei, Danfei Xu, Yuke Zhu, and Anima Anand-kumar. Mimicplay: Long-horizon imitation learning by watching human play. arXiv preprint arXiv:2302.12422 ,2023. [43] Chenxi Wang, Hongjie Fang, Hao-Shu Fang, and Cewu Lu. Rise: 3d perception makes real-world robot imitation simple and effective, 2024. URL https://arxiv.org/abs/ 2404.12281. [44] Dian Wang, Stephen Hart, David Surovik, Tarik Ke-lestemur, Haojie Huang, Haibo Zhao, Mark Yeatman, Jiuguang Wang, Robin Walters, and Robert Platt. Equiv-ariant diffusion policy, 2024. URL https://arxiv.org/abs/ 2407.01812. [45] Shengjie Wang, Jiacheng You, Yihang Hu, Jiongye Li, and Yang Gao. Skil: Semantic keypoint imitation learn-ing for generalizable data-efficient manipulation, 2025. URL https://arxiv.org/abs/2501.14400. [46] Bowen Wen, Wei Yang, Jan Kautz, and Stan Birchfield. Foundationpose: Unified 6d pose estimation and tracking of novel objects, 2024. URL https://arxiv.org/abs/2312. 08344. [47] Shangning Xia, Hongjie Fang, Cewu Lu, and Hao-Shu Fang. Cage: Causal attention enables data-efficient generalizable robotic manipulation, 2024. URL https: //arxiv.org/abs/2410.14974. [48] Zhengrong Xue, Shuying Deng, Zhenyang Chen, Yixuan Wang, Zhecheng Yuan, and Huazhe Xu. Demogen: Synthetic demonstration generation for data-efficient vi-suomotor policy learning, 2025. URL https://arxiv.org/ abs/2502.16932. [49] Jingyun Yang, Zi ang Cao, Congyue Deng, Rika Antonova, Shuran Song, and Jeannette Bohg. Equibot: Sim(3)-equivariant diffusion policy for generalizable and data efficient learning, 2024. URL https://arxiv.org/abs/ 2407.01479. [50] Jingyun Yang, Congyue Deng, Jimmy Wu, Rika Antonova, Leonidas Guibas, and Jeannette Bohg. Equiv-act: Sim(3)-equivariant visuomotor policies beyond rigid object manipulation, 2024. URL https://arxiv.org/abs/ 2310.16050. [51] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan Wang, and Huazhe Xu. 3d diffusion policy: Generalizable visuomotor policy learning via simple 3d representations, 2024. URL https://arxiv.org/abs/2403. 03954. [52] Andy Zeng, Pete Florence, Jonathan Tompson, Stefan Welker, Jonathan Chien, Maria Attarian, Travis Arm-strong, Ivan Krasin, Dan Duong, Ayzaan Wahid, Vikas Sindhwani, and Johnny Lee. Transporter networks: Rearranging the visual world for robotic manipulation, 2022. URL https://arxiv.org/abs/2010.14406. [53] Qinglun Zhang, Zhen Liu, Haoqiang Fan, Guanghui Liu, Bing Zeng, and Shuaicheng Liu. Flowpolicy: Enabling fast and robust 3d flow-based policy via consistency flow matching for robot manipulation, 2024. URL https://arxiv.org/abs/2412.04987. [54] Xinyu Zhang and Abdeslam Boularias. One-shot imita-tion learning with invariance matching for robotic ma-nipulation, 2024. URL https://arxiv.org/abs/2405.13178. [55] Haibo Zhao, Yu Qi, Boce Hu, Yizhe Zhu, Ziyan Chen, Heng Tian, Xupeng Zhu, Owen Howell, Haojie Huang, Robin Walters, Dian Wang, and Robert Platt. General-izable hierarchical skill learning via object-centric repre-sentation, 2025. URL https://arxiv.org/abs/2510.21121. [56] Tony Z. Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manip-ulation with low-cost hardware, 2023. URL https://arxiv. org/abs/2304.13705. [57] Huayi Zhou, Ruixiang Wang, Yunxin Tai, Yueci Deng, Guiliang Liu, and Kui Jia. You only teach once: Learn one-shot bimanual robotic manipulation from video demonstrations, 2025. URL https://arxiv.org/abs/ 2501.14208. [58] Yifeng Zhu, Zhenyu Jiang, Peter Stone, and Yuke Zhu. Learning generalizable manipulation policies with object-centric 3d representations. arXiv preprint arXiv:2310.14386 , 2023. APPENDIX A
+
+A. Hardware Setup 
+
+Fig. 7: Hardware setup used in our experiments. The platform consists of a UR5e arm with a Robotiq 2F-85 gripper and an Intel RealSense L515 RGB-D camera mounted for egocentric observations. The inset shows a representative camera view used during execution. As shown in Fig. 7, our experimental platform consists of a 6-DoF UR5e robotic manipulator equipped with a Robotiq 2F-85 parallel gripper and an Intel RealSense L515 RGB-D camera. The RealSense L515 is mounted to provide egocentric visual observations of the workspace, while the Robotiq 2F-85 gripper is attached to the end-effector of the UR5e. The camera is calibrated with respect to the robot end-effector frame, enabling pointcloud projection and unprojection under end-effector frame. Additionally, we select the camera mounting location to ensure that, under a suitable end-effector pose, the camera provides near-complete coverage of the workspace while keeping the gripper within view. 
+
+B. Task Description 
+
+The specific task descriptions of six main tasks are as follows:  
+
+> •
+
+OPEN DRAWER : The robot must open the topmost layer of a three-layer drawer, requiring precise positioning and manipulation.  
+
+> •
+
+POUR WATER : The task consists of two steps: first, the robot grasps a teapot, and then it pours water into a cup by tilting the teapot.  
+
+> •
+
+HANG CUP : In this task, the robot grasps a cup and hangs it on a rack, requiring accurate grasping and placement.                            
+
+> Task w/ ego-aug w/o ego-aug ∆
+> Open Drawer 92 18 74 Hang Tape 88 484 Hang Cup 90 090 Pour Water 90 090 PnP-Box 92 092 Multi-PnP-Box 86 086
+> Avg. 89.7 3.7 86
+> TABLE IV: Ablation on egocentric data augmentation. We report per-task success rates (%) under identical settings, with and without egocentric data augmentation. ∆denotes the absolute improvement.
+> •
+
+HANG TAPE : The robot must grasp a roll of tape and hang it on a hook, involving careful handling and placement of the tape.  
+
+> •
+
+PNP-B OX : The robot opens a canvas box, grasps an object from a table, and places it inside the box, testing its ability to handle and place objects.  
+
+> •
+
+MULTI -P NP-B OX : The robot first opens a canvas box, then sequentially grasps multiple objects from a table and places them into the box in a predefined order, testing its ability to execute repeated pick-and-place operations and maintain long-horizon, multi-stage coordination. 
+
+C. OOD and ID Settings for Baselines 
+
+We define in-distribution (ID) and out-of-distribution (OOD) settings specifically for training and evaluating imi-tation baselines . The ID region of each task is the object-placement area from which we collect the baseline training dataset. Concretely, the dashed areas in Fig. 9 visualize the ID regions (one or more regions per task, depending on the scene). OOD settings are created by placing the relevant object(s) 
+
+outside the corresponding ID region(s), while keeping the rest of the setup unchanged. Unless otherwise stated, all baseline results reported under ID/OOD follow this protocol. 
+
+D. Ablation Experiments 
+
+We conduct two ablation studies to quantify the impact of egocentric design choice and data augmentation in SID. The tasks, hardware setup, and evaluation metrics follow the main experiments. 
+
+1) Ablation 1: Effect of Egocentric Data Augmentation: a) Setting.: We compare two training settings: (i) w/ ego-aug , where we apply egocentric data augmentation to expand the dataset from 2 demonstrations to 50 demonstrations, and (ii) w/o ego-aug , where we train using only the original 2 demonstrations without augmentation. All other training and inference configurations are kept identical. 
+
+b) Results.: Table IV reports the per-task success rates with and without egocentric data augmentation. Overall, en-abling ego-aug substantially improves performance across all tasks, with the largest gains observed on long-horizon tasks. Fig. 8: Stage-wise decomposition of the six main tasks, along with the target object associated with each stage. 
+
+c) Analysis.: We attribute the improvements to two com-plementary effects. First, while the motion field is designed to steer the camera toward in-distribution viewpoints, its pose estimation module inevitably incurs error. Without augmen-tation, the training distribution of egocentric observations is extremely narrow, leaving little tolerance for such errors and making it difficult for the system to reliably enter (and remain in) the in-distribution region. Egocentric augmentation artificially broadens the support of the training distribution, effectively enlarging the “capture range” of the motion field such that, even with moderate pose errors, the executed viewpoint can still fall within the learned distribution. Second, the broadened observation distribution also im-proves the robustness of the execution policy itself. By ex-posing the policy to a wider range of camera poses and the resulting appearance/occlusion variations (e.g. partial visibility of the gripper/object), augmentation reduces overfitting to spe-cific viewpoints and increases tolerance to observation noise and small geometric misalignments. These effects become particularly important for long-horizon tasks, where small errors compound over time and the visual input can drift away from the nominal training conditions. 
+
+2) Ablation 2: Egocentric vs. Fixed Camera Viewpoint: a) Setting.: To isolate the effect of observation view-point, we collect demonstrations with the egocentric camera and an external fixed camera mounted simultaneously. This yields paired observations for each timestep from identical trajectories, ensuring that the training data are matched and the only difference between settings is the camera viewpoint. We use the same set of 50 demonstrations for both settings and train two policies with identical architectures and hy-perparameters: one using egocentric RGB-D observations and the other using fixed-camera RGB-D observations. To avoid confounding factors, we do not apply any data augmentation in this comparison. Moreover, to factor out the influence of                           
+
+> Task Fixed camera Egocentric ∆
+> Open Drawer 46 88 42 Hang Tape 24 80 56 Hang Cup 28 82 54 Pour Water 16 76 60 PnP-Box 30 82 52 Multi-PnP-Box 12 74 62
+> Avg. 26 80.3 54.3
+> TABLE V: Ablation on camera viewpoint. We train two policies on the same set of 50 demonstrations with no data augmentation, using either a fixed external RGB-D camera or an egocentric RGB-D camera mounted on the end-effector. We report per-task success rates (%); ∆denotes the absolute improvement of the egocentric setting over the fixed-camera setting.
+
+other components in our pipeline, the motion field is trained and queried using egocentric observations in both settings (including the fixed-camera setting); only the execution policy receives fixed-camera observations in that setting. 
+
+b) Results.: Table V compares policies trained with matched demonstrations but different observation viewpoints. The egocentric setting consistently outperforms the fixed-camera setting by a large margin across all six tasks, yielding a substantially higher average success rate. The performance gap is most pronounced on tasks that require precise close-range interactions and involve frequent self-occlusions during grasping and placement. 
+
+c) Analysis.: The results indicate that the advantage of the egocentric viewpoint stems from its ability to actively correct observation distribution shift during execution. When the policy encounters OOD inputs, the motion field can move the end-effector to reframe the scene in an object-centric manner, bringing the target back to a canonical configuration in the egocentric camera view. This effectively steers the incoming observations back into the training support of the egocentric execution policy, which helps the system recover Fig. 9: ID settings (baselines). Dashed regions indicate the in-distribution (ID) object-placement areas used to collect training data for imitation baselines. OOD evaluations place the relevant object(s) outside these regions while keeping the rest of the setup unchanged. and continue the task. By contrast, the fixed-camera policy operates on aviewpoint-absolute global observation that cannot be altered by the robot’s motion. Although the motion field can still drive the gripper toward an object-centric state that is familiar from the demonstrations, the object’s appearance in the fixed camera (e.g., its image location, scale, and visibility pattern) remains largely dictated by the static viewpoint and therefore cannot be steered toward the in-distribution region. As a consequence, the fixed-camera policy is more likely to remain exposed to OOD observations, which is consistent with its substantially lower success rates observed in Table V. 
+
+3) Summary: Overall, the ablations highlight the impor-tance of egocentric design for robust multi-stage manipulation. Egocentric data augmentation substantially improves perfor-mance, particularly on long-horizon tasks, by broadening the training support and increasing tolerance to motion-field pose estimation errors and observation drift. Moreover, egocentric sensing significantly outperforms a fixed-camera viewpoint, as the motion field can actively reframe egocentric observations back into an object-centric in-distribution regime, whereas fixed global observations cannot be similarly steered. 
+
+E. Cross-Object Generalization Evaluation. 
+
+We further evaluate SID’s ability to generalize across object instances in the PnP-Box task. As shown in Fig. 10, SID is trained using demonstrations with object A and tested on objects B–D, which are arranged from high to low visual similarity with respect to the training object. The task structure is kept unchanged: the robot must open the box, pick the target object, and place it into the box. Therefore, this experiment               
+
+> Method ABCD
+> SID-O †20/25 14/25 9/25 4/25 SID-C †22/25 17/25 11/25 6/25
+> TABLE VI: Cross-object generalization on PnP-Box. SID is trained with object A and evaluated on objects A–D, where B–D are unseen test objects. We report successful trials over 25 evaluations.
+
+isolates the effect of object-level appearance and geometry shift while keeping the surrounding manipulation routine fixed. As shown in Table VI, performance decreases as the test object becomes less visually and geometrically similar to the training object. SID retains partial transfer to visually similar unseen objects, but the success rate drops under larger changes in shape, size, and appearance. This trend is consistent with the roles of the two SID com-ponents. When upstream segmentation and pose estimation remain reliable, the motion field can still guide the end-effector toward a similar pre-grasp distribution across object instances, while the PointNet-style visuomotor encoder provides some robustness to appearance variations in segmented egocentric point clouds. However, large geometry or size changes can make the segmented point-cloud observations substantially dif-ferent from those seen during training, reducing the reliability of the learned local actions. 
+
+F. Effect of the Number of Demonstrations. 
+
+We use two demonstrations in the main experiments because a single demonstration can lead to ambiguous motion-field behavior under certain object-pose variations. With only one demonstration, the motion field may map both the original Fig. 10: Cross-object generalization on PnP-Box. SID is trained with demonstrations using object A and evaluated on unseen test objects B–D in the PnP-Box task. The test objects are arranged from high to low visual similarity with respect to the training object A, covering variations in geometry and appearance.               
+
+> Task 2 demos 10 demos 50 demos
+> Hang Tape 19/25 20/25 22/25 Hang Cup 21/25 20/25 23/25 PnP-Box 20/25 22/25 21/25
+> TABLE VII: Effect of the number of raw demonstrations. We evaluate SID-open with 2, 10, and 50 raw demonstrations on three representative tasks. All settings are augmented to 100 training trajectories using the same egocentric augmentation pipeline. We report successful trials over 25 evaluations.
+
+object state and a 180 ◦-rotated object state to the same demonstrated manifold. Although the resulting trajectories can still complete the task, they are often less natural and less efficient, with noticeable detours before reaching the execution policy’s reliable operating region. This explains why two demonstrations provide a more stable default setting for SID. We further evaluate how SID-open performs as the number of raw demonstrations increases. As shown in Table VIII, SID-open already achieves strong performance with two raw demonstrations after egocentric augmentation. Increasing the number of raw demonstrations consistently improves perfor-mance across the evaluated tasks, but the improvement is modest. In particular, increasing the number of raw demon-strations from 10 to 50 yields only small additional gains. These results suggest that, after egocentric augmentation, SID-open can achieve strong performance from only two raw demonstrations, and the marginal benefit of adding more raw demonstrations becomes relatively small in these evaluated tasks. 
+
+G. Alternative Motion-Field Formulations. 
+
+We study alternative formulations for the pre-policy distribution-alignment stage by comparing the proposed mo-tion field with two explicit pose-based alignment variants. The comparison is conducted on three representative tasks, Hang Tape, Hang Cup, and PnP-Box, using two raw demonstrations per task. All variants use the same execution policy and differ               
+
+> Task Align-O Align-C Motion Field
+> Hang Tape 15/25 19/25 20/25 Hang Cup 16/25 22/25 22/25 PnP-Box 19/25 22/25 21/25
+> TABLE VIII: Comparison with explicit alignment variants. We evaluate SID-open and two pose-based alignment variants on three representative tasks using two raw demonstrations per task. Align-O performs one-shot alignment, while Align-C performs closed-loop alignment with continuously updated pose estimates. We report successful trials over 25 evaluations.
+
+only in the alignment module before policy execution. In Align-O, the robot estimates the current object pose once and moves directly to the corresponding demonstration pose. In Align-C, the robot continuously re-estimates the object pose during alignment and repeatedly corrects its motion toward the same fixed demonstration correspondence. Thus, Align-C can be viewed as an explicit closed-loop alignment variant when object poses and demonstration correspondences are manually available. As shown in Table VIII, Align-C improves over Align-O, indicating that online pose updates are important for reliable alignment. Its performance is close to the learned motion field on these tasks, suggesting that explicit closed-loop alignment can be effective when reliable pose estimates and manually specified correspondences are available. However, Align-C depends on a hand-designed pose-space construction and a fixed alignment target. In contrast, the motion field provides a learned formulation of distribution alignment that retains online correction while avoiding manual specification of a single target correspondence at test time. This also makes the formulation less tied to this particular explicit-alignment heuristic and potentially applicable to other object-centric representations. 
+
+H. Extended Experiment: Make Coffee 
+
+While our previous long-horizon evaluation involves a 7-stage task, it is largely composed of repeated pick-and-place behaviors, resulting in a relatively homogeneous action pat-tern. To further probe the capability of SID on more challeng-ing long-horizon manipulation with richer skill composition and more diverse stage transitions, we conduct an extended experiment on a M AKE COFFEE task. 
+
+a) Task description.: The goal is to complete a full coffee-making routine from a reset tabletop configuration, requiring the system to compose heterogeneous subtasks with diverse interaction modes. Concretely, the task is decomposed into the following stages: (i) grasp the spoon from the coffee jar, (ii) pour coffee powder into the cup and place the spoon into the cup, (iii) grasp the teapot, (iv) pour water into the cup, (v) return the teapot to the tray, and (vi) grasp the spoon and stir the coffee. 
+
+b) Evaluation protocol.: We evaluate SID on the coffee-making task under the same hardware setup and metrics as in the main experiments. We collect only two expert demonstrations for this task and evaluate the resulting system over 25 trials. Fig. 11: Visualization of M AKE COFFEE .               
+
+> S1 S2 S3 S4 S5 S6 Overall Success / 25 24/25 20/25 20/25 16/25 14/25 14/25 14/25
+> TABLE IX: Per-stage success counts on the extended M AKE COFFEE task over 25 trials. S1–S6 correspond to the six stages described before.
+
+c) Results.: Table IX summarizes the quantitative results on the extended task. Despite the increased task complexity and the inclusion of more fine-grained interaction primitives, our method achieves a non-trivial overall success rate, demon-strating its potential for long-horizon, multi-stage manipula-tion. However, the task-level success rate is noticeably lower than that on M ULTI -P NP-B OX , which also consists of seven stages. This gap suggests that, while the proposed pipeline scales to long horizons, further improvements are needed to better handle more precise and contact-rich manipulation subtasks. 
+
+I. Failure Case Analysis 
+
+We summarize typical failure cases observed in our real-world evaluation. In most instances, failures stem from im-perfect perception and limited scene context, rather than systematic breakdowns of the control components. 
+
+Limited wrist-view context. Because perception is driven by a wrist-mounted camera, the available visual context can be constrained by field of view, self-occlusion, and viewpoint geometry. A simple mitigation is to move the end-effector to an elevated “look” pose before execution, which often improves visibility and stabilizes downstream perception. Nonetheless, some tabletop scenes remain visually ambiguous even from a higher viewpoint (e.g., small items, low-texture objects, or visually similar instances), which can occasionally confuse target identity. When this occurs, target isolation becomes less reliable and can affect both object-centric state construction and policy inputs. 
+
+Segmentation imperfections. Our pipeline relies on target isolation to construct both the object-centric state for the motion field and the egocentric observation for the policy. In cluttered scenes or under partial occlusions, segmentation may return incomplete masks, include small background fragments, or miss thin structures (e.g., handles or tape edges). While the system is generally tolerant to mild noise, more pronounced mask errors can degrade the segmented point cloud used by the field and the policy. 
+
+Pose estimation instability. The motion-field module uses an auxiliary object pose estimate to canonicalize pre-contact states. Under challenging viewpoints, reflective sur-faces, texture-poor objects, or heavy occlusion, pose estimation can occasionally become less stable (e.g., jitter or intermittent hypothesis switches). This issue can be further exacerbated in more dynamic situations, such as rapid wrist motion (causing blur or large viewpoint change) or noticeable object motion during execution, where the pose tracker may momentarily lag or produce inconsistent updates. Reduced pose stability weakens object-centric alignment, leading to less accurate field updates and slower or imperfect convergence toward the demonstrated pre-contact manifold. 
+
+Target-centric perception with limited environment awareness. Both the field and the policy primarily operate on target-centric observations. As a result, nearby obstacles and supporting surfaces (e.g., container rims, shelf walls, table edges) may be under-represented when they fall outside the wrist view or are not included by target isolation. In con-strained workspaces or cluttered setups, this can occasionally cause unintended contacts or collisions with the environment during approach or while executing corrective motions, even when the target object itself is correctly perceived. Fig. 12: Visualization of the recomposed tasks. 
+
+J. Additional Figures 
+
+Fig. 12 illustrates the recomposed task variants used to evaluate skill reuse and composition. APPENDIX B
+
+K. Mutil-stage Task Processing 
+
+For multi-stage tasks involving multiple objects, SID de-composes each task into a sequence of stages, where a single object is selected as the target for processing at each stage. Fig 8 presents the decomposition of each mentioned task into its corresponding stages and associated objects. 
+
+Stage-aware Augmentation for Multi-stage Tasks. For multi-stage demonstrations, we first run a heuristic keyframe detection procedure over the full trajectory. Specifically, we identify keyframes by jointly thresholding (i) the magnitude of pose change along the trajectory and (ii) the gripper aperture variation. This produces a sparse set of keyframes that delineates both stage transition boundaries and the on-set/termination of reaching within each stage. We then select the approach segments defined by these keyframes and apply augmentation only within these segments. Each augmented segment is attached with a 
+
+Stage Transition in Inference Time. During inference, SID performs stage transitions based on a termination signal pro-duced by the egocentric execution policy. Specifically, at time step t, the policy outputs a termination score T ERM DIM (At),which is used to decide whether the current stage should end. We denote an ordered sequence of N stages (subtasks) as 
+
+S = {subtask i}Ni=1 . (19) Correspondingly, we maintain a key sequence 
+
+K = {(ki
+
+> obj
+
+, k i
+
+> task
+
+)}Ni=1 , (20) where (ki
+
+> obj
+
+, k i
+
+> task
+
+) specifies the object key and task key associated with subtask i.While executing subtask i, the system monitors TERM DIM (At). Once T ERM DIM (At) > ϵ term , we declare 
+
+subtask i as terminated. The robot then returns to an initial observation pose Tinit , and the active keys are advanced to the next stage, 
+
+(kobj , k task ) ← (ki+1 obj , k i+1 task ). (21) 
+
+L. Convergence Intuition and Capture Region. 
+
+The motion field is best viewed as an approximate descent system over the bounded object-centric pose domain Ω used for field training. Using the potential E(x) = 12 d(x, Xdemo )2,the ideal target field v∗(x) points toward the nearest demon-strated approach state with a distance-scheduled magnitude that vanishes near the demonstrated manifold. Therefore, with sufficiently small execution steps, the ideal sliding dynamics monotonically reduce the distance to Xdemo until reaching its neighborhood. In practice, the learned field only approximates this descent direction, so convergence is empirical and local: SID can recover from perturbations that remain inside the sampled pose domain Ω, with reliable pose estimation and reachable corrective motions. Once perturbations move the object-centric state outside this domain, or make the approach manifold unobservable or unreachable, the state falls outside the capture region and the field no longer provides a conver-gence guarantee. 
+
+M. Generalization Analysis 
+
+We analyze SID along one practical axis: workspace-wide spatial generalization. We focus on concrete design choices and the contribution of each module. 
+
+Workspace-wide spatial generalization. Base-free, ego-centric policy interface. The execution policy conditions only on wrist-centric observations and predicts relative end-effector motions, without using any base-frame states or global coor-dinates. This makes the learned behavior invariant to absolute placement in the workspace and avoids coupling to a particular robot base calibration. 
+
+Why wrist-only is essential for the field–policy pipeline. 
+
+SID relies on using the motion field to bring the current state into a region where the execution policy is reliable. As illustrated in Fig. 13, the global view can vary substantially across workspace locations, while the wrist-centric view re-mains comparable across placements, making “in-distribution” checks and the field-to-policy handoff well-defined. This re-quires that “being in-distribution” is determined by quanti-ties that remain comparable across workspace locations. If the policy (or its training distribution) depended on base-frame states, then the same local interaction geometry could correspond to very different global coordinates across the workspace, breaking the notion of a shared operating region and making the field-to-policy handoff ill-posed. By defining both the policy input and actions in the wrist frame, the field correction and policy execution are aligned through a consistent egocentric interface, so a single demonstration-derived operating region can be reused across workspace-wide object placements. 
+
+Egocentric reprojection augmentation for local robustness. 
+
+Point-cloud reprojection produces kinematically consistent viewpoint perturbations in the wrist frame. This expands the policy’s tolerance to moderate viewpoint and pose changes around the in-distribution region, improving success after the field-guided entry. 
+
+N. Robustness Analysis 
+
+We analyze SID’s robustness along two practical axes: (i) robustness to disturbances and (ii) robustness to distrac-tors/clutter. We focus on concrete design choices and the contribution of each module. 
+
+Robustness to disturbances. Field feedback yields distur-bance tolerance even in open-loop. Although the open-loop pipeline does not alternate between modules, the motion field itself is a feedback mechanism: it continuously evaluates the current pre-contact state and produces a corrective update whose magnitude reflects deviation from the demonstrated manifold (e.g., via field norm/energy). As a result, if a distur-bance displaces the object or shifts the wrist viewpoint during pre-contact, the field naturally increases its corrective action and keeps sliding the system back toward the manifold until a convergence criterion is met. 
+
+Closed-loop recovery with policy-side in-distribution mon-itoring. In the closed-loop pipeline, once the system enters interaction and the execution policy takes over, we additionally equip the policy with an in-distribution confidence pID . When 
+
+pID indicates that the current condition has drifted outside the policy’s reliable region, control returns to the pre-contact correction routine and the field is re-invoked to re-enter the manifold before policy execution resumes. This provides a second, policy-triggered recovery path beyond the field’s own convergence feedback. 
+
+Robustness to distractors and clutter. Target isolation for the field. The motion field operates on an object-centric state constructed from target-object perception (segmentation and, optionally, pose estimation), which suppresses irrelevant geometry from distractors. 
+
+Target-centric observation for the policy. The policy condi-tions on segmented point clouds of the target object together with the gripper geometry (and gripper width) in the wrist frame. This reduces dependence on background layout and 
+
+Fig. 13: Illustration of workspace-wide generalization with an egocentric (wrist-centric) interface. When the object is placed at different workspace locations ( t1 vs. t2), the global 
+
+camera view changes substantially (e.g., object position in the image shifts), whereas the wrist view remains comparatively consistent around the interaction geometry. This motivates conditioning the execution policy on wrist-centric observations and predicting relative end-effector motions, enabling a shared in-distribution operating region across the workspace. lowers sensitivity to arbitrary distractor placement, provided the target object remains at least partially observable. 
+
+O. Details of Upstream Visual Modules. 
+
+We construct the visual perception module using off-the-shelf components to obtain temporally consistent object masks and object poses. In the first frame of each episode, we run SAM3 with text prompts to generate instance masks, and select the target instance according to the task specification. The selected mask serves as the initialization for the mask tracker. For subsequent frames, we use XMem to propagate the target mask over time. By maintaining an explicit memory of past appearances, XMem provides a temporally consistent mask sequence under moderate viewpoint changes and partial occlusions. To reduce tracking drift in challenging sequences, we op-tionally re-run SAM3 to re-initialize the tracker when the propagated mask shows low confidence or abrupt changes. This simple re-initialization strategy improves long-horizon robustness without introducing task-specific training. The propagated mask is further used to interface the seg-mentation module with FoundationPose. Given the RGB-D observation, the target mask, and the object geometry mesh, FoundationPose estimates the object pose in the camera frame. The mask suppresses background clutter and defines the object support region, while the estimated pose provides a metric object-centric representation for downstream manipulation. 
+
+P. Details of Ego-centric Augmentation 
+
+Specifically, for in-distribution data, we design an aug-mentation distribution that gradually contracts toward the demonstration manifold. Concretely, we apply a time-decaying perturbation along each demonstration trajectory: we inject larger perturbations at the beginning of the trajectory and Fig. 14: Illustration of augmented trajectories for OPEN 
+
+DRAWER , visualized in the robot base frame. As shown, we apply a decaying augmentation scheme only to certain segment of the trajectory, corresponding to the approach-to-drawer phase. progressively reduce the perturbation magnitude over time, eventually recovering the original trajectory. Figure 14 illus-trates the resulting schedule and examples of the augmented trajectories. For out-of-distribution data, we apply a bounded random perturbation to each point along the original trajectory, with lower and upper magnitude limits chosen to ensure that the perturbed states lie outside the augmented in-distribution data support.

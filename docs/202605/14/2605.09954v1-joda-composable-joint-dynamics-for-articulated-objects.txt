@@ -1,0 +1,649 @@
+Title: JODA: Composable Joint Dynamics for Articulated Objects
+
+URL Source: https://arxiv.org/pdf/2605.09954v1
+
+Published Time: Tue, 12 May 2026 02:04:14 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# JODA: Composable Joint Dynamics for Articulated Objects 
+
+Tianhong Gao 1, Cheng Yu 1, Yinghao Xu 2, Mengyu Chu 11Peking University 
+
+> 2
+
+Ant Group, Robbyant 
+
+Abstract 
+
+Articulated objects used in simulation and embodied AI are typically specified by geometry and kinematic structure, but lack the fine-grained dynamical effects that govern realistic mechanical behavior, such as frictional holding, detents, soft closing, and snap latching. Existing approaches either ignore the detailed structure of dynamics entirely, or use simple models with limited expressiveness. We introduce JODA, a framework for generating joint-level dynamics as a structured three-channel field over the joint degree of freedom, capturing conservative forces, dry friction, and damping. Instantiated using shape-constrained piecewise cubic interpolation (PCHIP), this formulation defines a compact and expressive function space that is both interpretable and compatible with differentiable simulation. Building on this representation, we develop methods for inferring and refining joint dynamics from multimodal inputs. Given visual observations and joint context, a vision-language model proposes structured dynamical primitives, which are composed into a unified dynamics field. The resulting representation supports both direct manipulation and gradient-based refinement. We demonstrate that JODA enables plausible and controllable modeling of diverse joint behaviors, providing a unified interface for inference, editing, and optimization. Code and example assets with their generated profiles will be released upon publication. 
+
+# 1 Introduction 
+
+Articulated-body assets are a central substrate for physical simulation, robotics, embodied AI, and interactive scene generation. Recent asset pipelines (Mandi et al., 2025; He et al., 2026) can recover or synthesize increasingly rich visual geometry and kinematic structure: parts are separated, joints are assigned axes and ranges, and assets can often be loaded by a physics engine. However, real-world interaction of articulated objects depends on more than kinematics alone. A laptop lid holds at many intermediate angles; a microwave door may pop through a closing latch; a refrigerator door can be pulled into its final closed pose; an oven door may return under a broad spring-like tendency while being resisted by friction. These behaviors reflect not only how objects are geometrically connected, but more importantly, how they behave dynamically. Such dynamic effects are typically absent from automatic pipelines and must instead be manually authored or carefully tuned at significant cost, making them difficult to scale across datasets, scenes, and applications. As a result, automatic pipelines remain largely restricted to geometry and kinematic structure, leaving physical dynamics poorly modeled and leading to a persistent sim-to-real gap. This paper studies the problem of generating dynamical structures for articulated-body assets: the structured, joint-level internal effects that govern motion beyond rigid-body inertia, gravity, and hard joint limits. Rather than recovering the exact hidden mechanical assemblies inside an object (e.g., specific springs or gears), we instead model their equivalent joint-level effects. This distinction is crucial: mechanisms such as magnetic catches or spring latches may not be explicitly encoded by the asset geometry, yet their behavior can be expressed as position-dependent forces, friction, or damping over the joint degree of freedom. This unified representation abstracts away low-level mechanical complexity while preserving macroscopic interactive fidelity. A central question is how such structured dynamics can be initialized without direct supervision or manual design. Interestingly, we find that vision-language models (VLMs) capture useful implicit physical priors about object behavior; for instance, a VLM can infer an oven’s tendency toward a stable closed configuration. However, these priors are latent and unstructured. Our key insight is that the challenge is not in eliciting physical intuition from VLMs, but in grounding it within a structured, composable representation suitable for simulation. We introduce JODA, a framework that combines a composable dynamics representation with multimodal inference and refinement. Given an articulated asset and visual observations across joint configurations, a VLM proposes joint-level dynamical effects as structured hypotheses, including effect types, active intervals, and qualitative strengths. These 1
+
+> arXiv:2605.09954v1 [cs.RO] 11 May 2026
+
+hypotheses are then composed into a unified dynamics field. The resulting representation is compact, interpretable, and compatible with physical simulation, and supports both semantic and continuous refinement, including direct editing and gradient-based optimization. Our approach unifies representation, inference, and optimization within a single framework: • Structured Joint Representation. A composable representation for joint dynamics as a structured function space over the joint degree of freedom, enabling expressive yet interpretable modeling of forces, friction, and damping. • Multimodal Inference. A pipeline that leverages VLMs to instantiate and iteratively refine joint dynamics, enabling reliable and diverse modeling. • Unified Interaction and Optimization. JODA supports flexible interaction and refinement, including direct or semantic editing and gradient-based optimization via differentiable simulation, providing a unified interface for inference, editing, and optimization. 
+
+# 2 Related work 
+
+Articulated object and asset generation Articulated object research has progressed from mobility prediction and part-level datasets to automatic URDF-like reconstruction and generation from images, videos, or language (Hu et al., 2017; Xiang et al., 2020; Chen et al., 2024; Liu et al., 2025; Mandi et al., 2025; Le et al., 2025; Xia et al., 2025; He et al., 2026). These methods primarily recover the geometric and kinematic scaffold of an asset: parts, hierarchy, joint type, axis, origin, and motion limits. JODA is complementary: it assumes this scaffold is available and generates the missing joint-level dynamical structure that determines how the articulation behaves during simulation. 
+
+Simulation-ready assets and differentiable physics Physics simulators provide the substrate for executable articu-lated objects (Xiang et al., 2020; Todorov et al., 2012; Makoviychuk et al., 2021; MuJoCo Team, 2024; Freeman et al., 2021; Howell et al., 2022). They expose primitives such as PD-drive controllers, tendons, and runtime user-specified generalized forces. The built-in mechanisms are well suited to motors or tendon actuation, but are not a convenient way to express everyday object dynamics such as detents, endpoint attraction, or soft-close damping; using external forces still requires hand-designed force laws. Asset-centric benchmarks apply such simulators to large collections of interactive objects and tasks (Gu et al., 2023; Li et al., 2024). Simulation-trained robot policies instantiate the same pattern (Zakka et al., 2023; Zhang et al., 2024). Their articulated assets typically rely on simple target-position control, equivalent to adding springs, together with global friction and damping parameters; this is executable but has limited expressiveness for structured joint dynamics. JODA uses the simulator as the execution substrate, but adds an interpretable and expressive field representation that can be generated, edited, simulated, and optimized. 
+
+Joint-level interaction effects Measurements of everyday doors and drawers show diverse force trajectories with low-dimensional structure, suggesting the potential for compact approximations (Jain et al., 2010). In engineering mechanics, reduced or equivalent force models are also a central tool for representing complex joint interfaces without simulating every contact detail (Brake, 2018). Thus, rather than reconstructing internal mechanisms, JODA models their equivalent joint-level effects. Industrial hinge and lid-support catalogs organize such effects into recurring families, including detent, bi-stable, torque, counterbalance, soft-down, and lift-assist mechanisms (Southco, 2021; Sugatsune, n.d.). They provide engineering grounding for our templates, which compose behavioral priors into force, friction, and damping fields rather than identifying the exact hidden mechanism. 
+
+# 3 Method 
+
+Given joint context and visual observations, JODA infers a structured dynamical representation that captures realistic interaction behavior. Fig. 1 gives an overview of our pipeline. 2Input   
+
+> <joint type=…>
+> <parent link=…>
+> <child link=…>
+> <origin xyz =…>
+> <axis xyz =…>
+> </joint>
+> …
+> Multi -state images
+> Joint context
+> Effect templates
+> VLM
+
+Proposal 
+
+> [{“effect”: “magnetic”,
+> “strength”: {
+> “conservative”: …,
+> “damping”: …,
+> “friction”: …
+> }
+> },
+> {“effect”: …,
+> …
+> ]
+
+Profile  
+
+> Compose
+> Conservative force
+> Damping
+> Friction
+> Simulation
+> Direct editing
+> Further prompting
+> Differentiable
+> optimization
+> t
+> “The closing pull is
+> too strong. Make the
+> attraction softer.”
+> Real trajectory
+> Gradient
+> update
+> conservative
+> damping
+> friction
+> Joint
+> context
+> Propose/
+> Revise
+> Feedback
+> Input
+> Downstream
+> Iterat e
+
+Figure 1: Overview of JODA. A vision-language model proposes and iteratively refines structured joint effects from multimodal inputs, which are composed into a three-channel dynamics profile enabling simulation, editing, and optimization. 
+
+3.1 Problem Formulation 
+
+The input to JODA is an articulated asset with a selected target joint. The asset provides a visual model, a kinematic hierarchy, and a finite joint range. From this asset, we extract joint context, including joint type, parent and child bodies, joint axis, joint range, equivalent inertia or mass, and gravitational effects along the degree of freedom (DOF), which can be directly obtained from standard simulation or modeling tools like MuJoCo. The output represents the internal dynamical structure of that joint. It is internal in the sense that it represents object-specific effects such as hinge drag, latching, or return tendencies, not external forces such as gravity. These effects are expressed as generalized forces or coefficients along a single DOF. Joint-limit behavior is modeled separately, as it is conventionally defined at the kinematic level as boundary conditions. 
+
+3.2 Joint-Level Dynamical Representation 
+
+Let q denote the generalized coordinate of the target joint, with finite range [qmin , q max ]. We use a normalized coordinate 
+
+s = q − qmin 
+
+qmax − qmin 
+
+, s ∈ [0 , 1] .
+
+JODA represents the internal dynamical structure of a joint with three position-dependent fields: 
+
+Fcons (s), Ffric ,max (s), Cdamp (s).
+
+The conservative channel Fcons models position-dependent generalized forces or torques, such as spring return, magnetic-like attraction, detent wells, snap-through barriers, and bistable tendencies. The dry-friction channel Ffric ,max 
+
+models the maximum local friction magnitude. The damping channel Cdamp models a velocity-dependent resistive coefficient, producing a damping force proportional to −Cdamp (s) ˙ q.Each channel is composed from local effect components. A component j is defined by an active interval [aj , b j ] ⊆
+
+[0 , 1] , a set of local control-point positions xj,k ∈ [0 , 1] , and values yj,k . For s ∈ [aj , b j ], the local coordinate is 
+
+u = s − aj
+
+bj − aj
+
+.
+
+The component value is obtained via shape-constrained piecewise cubic interpolation (PCHIP), producing smooth curves over local control points while preserving physically plausible profiles. Outside [aj , b j ], the component contributes zero. 3The channel-level field is obtained by summing or taking a maximum over active components. This representation is low-dimensional, local, interpretable, and editable: changing a few control-point values or an active interval changes a specific portion of the joint behavior without requiring a global curve redesign. 
+
+3.3 Effect Template Library 
+
+JODA uses a composable library of effect-templates . The term effect is deliberate: a template is not a claim that a particular hidden mechanical mechanism exists inside the object. Instead, it specifies an equivalent joint-level behavior that may be produced by many physical designs. For example, an endpoint attraction template may approximate a magnetic catch or a spring-loaded return mechanism. This mechanism-agnostic design makes our effect vocabulary more transferable. Each template contains semantic metadata and prototype curves for the three channels. The metadata includes the effect name, a short description, and typical placement priors. The prototype curves define the shape of the conservative-force, friction, and damping contribution in local normalized coordinates. Instantiating a template means placing it on a selected interval of the target joint and scaling each channel. The current library covers a range of common joint behaviors, including constant friction, constant damping, constant directional conservative force, endpoint magnetic-like return, spring-like return, snap detent, internal detent, and bistable effects. A summary of representative templates and their corresponding behaviors is provided in App. B. Higher-level interaction behaviors can be decomposed into these primitive effect templates. For example, a free-stop experience is typically represented by strong constant friction, possibly accompanied by damping. 
+
+3.4 VLM-guided Effect Proposal 
+
+The VLM stage predicts structured effect proposals. Its inputs are the joint context, rendered images at multiple joint states, and effect-template previews. The prompt asks the VLM to reason about the felt behavior a user would experience while moving the joint across its range. The VLM is explicitly instructed not to output final control points or force curves. Instead, it outputs JSON containing effect proposals. A summary of the prompt design is provided in App. B, with the full prompt and schema in the supplementary material. Each effect proposal specifies an effect name from the library, an active interval (start_ratio , end_ratio ),and qualitative strength labels for the conservative, friction, and damping channels. The proposal also includes descriptions like reasons and evidence which are useful for inspection. The output separates semantic choice from numerical realization. This division reduces the burden on the VLM: it need not synthesize physically scaled curves directly. It only chooses which equivalent effects should exist, where they act, and how strong they are qualitatively. 
+
+3.5 Compilation to Dynamics 
+
+The compiler maps VLM proposals and joint context into a concrete multi-component field. It converts normalized intervals to real joint intervals and scales each channel into physical units. The compiler is semi-deterministic. Qualitative strength labels are mapped to numeric multipliers by sampling within predefined bands, while the sample is generated from a stable key containing some meta-info. This preserves repeatability while avoiding one-to-one mapping from strength labels to a deterministic value. To set physical scale, the compiler computes reference magnitudes from joint context. For conservative force and friction, it uses the larger of an estimated gravity scale and an inertial scale based on equivalent inertia or mass, joint range, and a reference travel time. The damping reference is chosen so that multiplying it by a reference speed yields the reference force. Each template channel is then scaled so that its prototype peak reaches the target channel reference multiplied by the sampled multiplier. The result is a composed.json file containing the final three-channel PCHIP field model. This file is the source for downstream plotting and simulation. 
+
+3.6 Diagnostic Feedback and Iterative Proposal 
+
+After a proposal is compiled, JODA renders a diagnostic visualization of the resulting joint-level dynamics and feeds it back to the VLM. This visualization (e.g., Fig. 2c) illustrates the composed effects across the joint DOF and provides a structured signal for assessing whether the generated dynamics match the intended behavior. We provide detailed 4(a) Sim                 
+
+> (b) Real 0.00 0.25 0.50 0.75 1.00
+> −5
+> 0
+> y [-9.1, 3.51], n=2 Conservative + Friction
+> 0.00 0.25 0.50 0.75 1.00
+> normalized q
+> 2
+> 4
+> 6
+> y [1.36, 6.79], n=1 Damping
+> (c) Generated Profiles (d) Interaction force and resulting trajectory q020 40 60 80 100 120 140
+> Frame (30 fps)
+> 0.00
+> 0.05
+> 0.10
+> q
+> Interaction Force
+> 0
+> 5
+> 10
+
+Figure 2: Lighter-button dynamics: (a) simulated and (b) real-world visuals; (c) JODA generated force and friction profiles; (d) Force and trajectory of the virtual interaction. interpretations of the diagnostic visualization in Sec. 4.2 alongside concrete examples. Based on this feedback, the VLM can iteratively revise the proposal by adjusting the effect types, active intervals, strength labels, or channel-specific refinement factors. This closed-loop iteration enables the system to progressively align the generated dynamics with the desired interaction behavior. 
+
+3.7 Interactive and Differentiable Refinement 
+
+Refinement after VLM generation pipeline may operate on variables include control-point values, channel strengths, active interval anchors, and joint-limit damping parameters. JODA supports three refinement modes. 
+
+Direct editing. An experienced user can directly modify the values mentioned above. 
+
+Human-supervised VLM refinement. A user can describe a problem in language, such as “the final closing pull is too strong”, or “the middle range should hold better”. The VLM then revises its proposals while preserving the overall intended motion when appropriate. The user can also specify the desired effects over the full DOF, guiding the model to choose among multiple plausible effects. 
+
+Differentiable simulation optimization. VLMs provide strong semantic priors for motion, which can be further refined when higher physical accuracy is required. While manual adjustment is possible, it can be time-consuming, especially under quantitative constraints. Differentiable simulation offers a general mechanism for optimizing joint profiles under diverse supervision signals. In particular, leveraging real-world interaction trajectories as supervision targets enables direct alignment with observed motion, eliminating the need for manual tuning. 
+
+# 4 Experiments 
+
+4.1 Experimental setup and baselines 
+
+We evaluate JODA on nontrivial object categories in PartNet-Mobility (Xiang et al., 2020) and Lightwheel Sim-Ready Assets (Lightwheel, 2025), processing one target joint per run. We use two API models, gemini-3.1-pro-preview 
+
+with the default reasoning setting and gpt-5.4 with high reasoning; we did not observe a clear difference in task-level capability between them. Our differentiable dynamics is implemented on top of the MuJoCo/MJX backend (Todorov et al., 2012; MuJoCo Team, 2024). All experiments are run on a laptop with an AMD Ryzen 9 8945HX CPU (16 cores/32 threads) and 32GB RAM. Implementation details are provided in App. A. Our first baseline removes the generated internal dynamical structure and simulates the same articulated asset only with simple constant friction or damping. The second kind of baseline adds a linear return force over the relevant joint interval, i.e., a spring-style model commonly used in simulation-trained manipulation setups (Zakka et al., 2023; Zhang et al., 2024). 50 25 50 75 100 125 
+
+> Frame (30 fps)
+> 0.00
+> 0.05
+> 0.10
+> q
+> Interaction Force
+> 0
+> 5
+> 10
+
+(a) 0 25 50 75 100 125 150 
+
+> Frame (29.9801 fps)
+> 0.0
+> 0.5
+> 1.0
+> q_norm
+> raw
+> smooth
+
+(b) Figure 3: Lighter button trajectories: (a) spring baseline; (b) real-world data ( q_norm : raw, 
+
+> smooth : smoothed).
+
+(a) 0.00 0.25 0.50 0.75 1.00      
+
+> −0.5
+> 0.0
+> y [-0.995, 0.431], n=1 generated
+> 0.00 0.25 0.50 0.75 1.00
+> normalized q
+> −0.25
+> 0.00
+> 0.25
+> y [-0.374, 0.374], n=0 baseline
+
+(b) (c) 0 25 50 75 100 125 150 
+
+> Frame (30 fps)
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> q
+> generated
+> baseline
+
+(d) Figure 4: Refrigerator door: (a) visuals; (b, c) profiles; (d) trajectories. 
+
+4.2 Case analysis 
+
+For clearer comparisons of the dynamic motion, we refer the reader to the supplementary video Results (1/3): Baseline Comparisons . We visualize the generated dynamics using a diagnostic profile (e.g., Fig. 2c). This profile summarizes the composed joint-level dynamics across the DOF and is also used by VLM to determine whether further refinement is needed. In this visualization, the red curve represents the conservative force, while the blue dashed line indicates the gravity-induced equilibrium. The shaded band reflects the friction range, within which small force imbalances may not lead to motion. When the red curve lies above the blue dashed line, the net effect drives the joint in the positive direction; when it lies below, it drives motion in the negative direction. This visualization provides an interpretable link between generated dynamics and the resulting behavior. 
+
+Lighter button We first examine the push button of a cigarette lighter, whose target joint is a short-travel prismatic DOF, as shown in Fig. 2a. Fig. 2c shows the compiled profile. The dominant effect is a full-range spring-like return toward the unpressed state, while an additional internal snap-like structure creates a non-monotone modification of the restoring force in the middle part of the travel. To probe the resulting interaction behavior, we use a virtual-hand interaction. This interaction mode is designed to mimic a human hand: it moves a bounded, rate-limited control target, and the simulator generates the corresponding interaction force needed to push or release the button to reach that target using PD control. Fig. 2d plots the resulting joint trajectory and interaction force over time. The characteristic behavior of this button is that the internal mechanism causes the effective rebound force to vary non-monotonically over the whole DOF. As a result, both pressing and releasing can produce short intervals of sudden high-speed motion, which is consistent with the familiar push-through and pop-back feel of a lighter button. The shaded regions in Fig. 2d mark these sudden high-speed motion intervals. We compare this result with a simple-spring baseline that uses only a broad return spring, without the generated snap-like internal structure. The baseline is evaluated with the same virtual-hand interaction controller. As shown in Fig. 3a, the simple spring restores the button but misses the distinctive push-through and pop-back transients. We also use a real lighter, shown in Fig. 2b, to verify that the button motion under human pressing exhibits a similar push-through and pop-back pattern. As shown in Fig. 3b, the simulated trajectory and the real trajectory share the same qualitative behavior. The shaded regions indicate the two corresponding sudden high-speed motion intervals. 
+
+Refrigerator door We evaluate a refrigerator door (Fig. 4a). Our model captures a magnetic-seal effect that assists closing near the shut configuration, enabling the door to automatically close when nearly closed. In contrast, the baseline lacks such a structure and fails to close under the same condition. Fig. 4d compares the resulting trajectories, while Fig. 4b,c show the generated and baseline profiles, respectively. 60.00 0.25 0.50 0.75 1.00     
+
+> −0.25
+> 0.00
+> y [-0.282, 0.185], n=1 generated
+> 0.00 0.25 0.50 0.75 1.00
+> normalized q
+> −0.05
+> 0.00
+> 0.05
+> y [-0.0747, 0.0747], n=0 baseline
+
+(a) Baseline: unrealistic closing 0 50 100 150 200 250 300           
+
+> Frame (30 fps)
+> 0.0 0.5 1.0 q baseline -contact y
+> 0.45 0.50 0.55 0.00 0.25 0.50 0.75 1.00
+> −0.25
+> 0.00
+> y [-0.282, 0.185], n=1 generated
+> 0.00 0.25 0.50 0.75 1.00
+> normalized q
+> −0.05
+> 0.00
+> 0.05
+> y [-0.0747, 0.0747], n=0 baseline
+
+(b) JODA: realistic rebound.                
+
+> normalized q 050 100 150 200 250 300
+> Frame (30 fps)
+> 0.0 0.5 1.0 q ours -contact y
+> 0.45 0.50 0.55 0.00 0.25 0.50 0.75 1.00
+> −0.25
+> 0.00
+> y [-0.282, 0.185], n=1 generated
+> 0.00 0.25 0.50 0.75 1.00
+> normalized q
+> −0.05
+> 0.00
+> 0.05
+> y [-0.0747, 0.0747], n=0 baseline
+
+(c) JODA: Closing requires an extra push.      
+
+> normalized q 0100 200 300 400
+> Frame (30 fps)
+> 0.0
+> 0.5
+> 1.0 q
+> -contact y
+> 0.3
+> 0.4
+> 0.5
+
+Figure 5: Microwave door dynamics (visuals, profiles, and trajectories). (a) Constant-damping baseline: the door automatically closes under slight pushes, which is unrealistic. (b) JODA with the same robot motion offers a rebound near closure, preventing latching. (c) JODA with an additional push: the door successfully latches after an extra contact. 
+
+Microwave door We evaluate the generated dynamics on a microwave door (Fig. 5). To evaluate interaction, we simulate a robot manipulator executing predefined pushing trajectories. JODA generates a profile that captures a spring-loaded latch near the closed configuration, introducing an energy barrier that must be overcome to fully close. We compare JODA with a constant drag baseline. Under the same slight push, the baseline exhibits unrealistic door closing in a simple slowing-down motion (Fig. 5a), while our model produces a partial door closure with a rebound behavior near the end (Fig. 5b). Our model requires an additional push to fully latch (Fig. 5c), which is consistent with real-world interactions. These results highlight the importance of physically faithful dynamics for reducing sim-to-real discrepancies and enabling better real-world transfer. 
+
+4.3 Quantitative results 
+
+Our representation defines a joint-level dynamics profile, from which we can derive the quasi-static force that opens the door at each configuration. While this profile represents intrinsic joint behavior and is not directly measurable, prior work by Jain et al. (2010) measured the corresponding quasi-static opening forces for everyday objects (e.g., refrigerator doors) in real-world settings. We compare the forces derived from our generated profiles with these measured curves. Specifically, we normalize each curve to [0 , 1] , and evaluate JODA against a linear spring baseline on a common 0–60 ◦
+
+grid. Fig. 6 shows the objects used for this comparison, and the first two images are real object photos from Jain et al. (2010). Fig. 7 compares the quasi-static opening forces (positive values indicate external forces that increase the angle), and Fig. 7c reports the RMSE. JODA more closely matches the measured curves, whereas a linear spring fails to capture the structured, nonlinear behavior, as it is constrained to produce zero force at equilibrium and linear force variation with displacement. This demonstrates that expressive joint-level dynamics are necessary to reproduce real-world forces across configurations beyond simple models. 
+
+(a) Jain fridge. (b) Jain cabinet. (c) Our fridge render. (d) Our cabinet render. 
+
+Figure 6: Visual references for quantitative comparison. We also measure computational cost. With a timestep of dt = 0 .005 s, across all runs with valid timing records, JODA takes 0.062 ms per simulation step on average, which is 1.37x the original MuJoCo cost, indicating only a modest 70 10 20 30 40 50 60 
+
+> angle (degrees)
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> normalized -force  Jain et al.
+> Ours
+> Spring
+
+(a) Refrigerator door. 0 10 20 30 40 50 60  
+
+> angle (degrees)
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> normalized -force  Jain et al.
+> Ours
+> Spring
+
+(b) Kitchen cabinet door. 
+
+Fridge Cabinet Spring 0.240 0.386 JODA 0.121 0.180 
+
+(c) Normalized force error w.r.t. Jain et al. (2010). (Lower is better.) 
+
+Figure 7: Quasi-static opening force comparison against measurements from Jain et al. (2010). 
+
+(a) 
+
+(b) −400 −200 0 200 
+
+frame relative to release (50 fps) 
+
+> 0.0
+> 0.5
+> 1.0
+> normalized q
+> scene 1
+> scene 2
+> scene 3
+
+(c) 0 10 20 30 40 50 
+
+Frame (30 fps) 
+
+> 0.6
+> 0.8
+> 1.0
+> q optimized
+> original
+
+(d) 0.00 0.25 0.50 0.75 1.00 
+
+−1 
+
+0
+
+> y [-1.04, 0.304], n=2
+
+generated 
+
+0.00 0.25 0.50 0.75 1.00 
+
+normalized q 
+
+−0.5 
+
+0.0 
+
+> y [-0.864, 0.288], n=2
+
+optimized 
+
+(e) 
+
+Figure 8: Differentiable refinement. (a,b) real and simulated visuals; (c) target trajectories; (d) release at q=0.8: original closes, optimized matches the observed opening behavior; (e) profiles. simulation overhead. For VLM proposal, across 252 proposal results, each iteration uses on average 25.5K input tokens and produces 4.7K output tokens, where output tokens include reasoning tokens. 
+
+4.4 Refinement experiments and ablatioon studies 
+
+Refinements. We experiment with a cabinet door that opens under gravity (Fig. 8b). In Fig. 8e, the model-generated result provides too much support near the high-q end, preventing the door from opening naturally. We sample three trajectories from a real cabinet instance (Fig. 8a; Fig. 8c, natural release at frame 0). The trajectory MSE loss decreases from 4.10 × 10 −2 to 1.56 × 10 −3 after 9 Adam iterations, and the optimized profile in Fig. 8e opens naturally while retaining part of the support effect, giving a more reasonable cabinet profile. Simulated trajectories with the original generated profile as well as the optimized one are shown in Fig. 8d. 0.00 0.25 0.50 0.75 1.00     
+
+> −0.5
+> 0.0
+> y [-0.995, 0.431], n=1 ours
+> 0.00 0.25 0.50 0.75 1.00
+
+normalized q 
+
+> −0.25
+> 0.00
+> 0.25
+> y [-0.374, 0.344], n=1 ablation
+
+(a) Refrigerator door. 0.00 0.25 0.50 0.75 1.00     
+
+> −5
+> 0
+> 5
+> y [-8.28, 8.28], n=1 ours
+> 0.00 0.25 0.50 0.75 1.00
+
+normalized q  
+
+> −1
+> 0
+> 1
+> y [-1.81, 1.44], n=1 ablation
+
+(b) Switch. 0.00 0.25 0.50 0.75 1.00      
+
+> −0.2
+> 0.0
+> 0.2 y [-0.224, 0.224], n=4 ours
+> 0.00 0.25 0.50 0.75 1.00
+
+normalized q   
+
+> −0.25
+> 0.00
+> 0.25 y [-0.253, 0.253], n=1 ablation
+
+(c) Selector knob. 
+
+Figure 9: Our results vs. No-template ablation results. 
+
+Ablations. We first ablate the template library by directly asking the VLM to output numerical control-point 8(a) Switch (b) Selector (c) Dishwasher 
+
+Figure 10: Prompt images used in the ablation. 0.00 0.25 0.50 0.75 1.00      
+
+> −25
+> 0
+> 25 y [-47.5, 29], n=2 round 1
+> 0.00 0.25 0.50 0.75 1.00
+> normalized q
+> −25
+> 0
+> y [-34.1, 17.9], n=2 round 2
+
+Figure 11: Initial and iterated field profiles for a dishwasher door. coordinates and then interpolating those points into fields. This setting places a much heavier burden on the VLM’s quantitative reasoning and curve-generation ability: it often fails to choose appropriate magnitudes, and without engineering priors it also introduces small but behaviorally important defects. For example, in the refrigerator example (Fig. 9a), the magnetic-attraction force is too weak and acts over an overly broad range. In the switch example (Fig. 9b; Fig. 10a), the conservative force is weak relative to friction, and the force dropping to zero at the balance point makes the return tendency too weak. In the selector-knob example (Fig. 9c; Fig. 10b), the conservative force is again too weak relative to friction. In all these examples, both JODA and the ablations are evaluated without iterative rounds. Furthermore, removing the template library significantly degrades reproducibility. The VLM iteration step is especially useful in scenes with gravity. In the dishwasher-door example (Fig. 10c), Fig. 11 shows that the round-1 near-closed attraction does not overcome friction, while the opening-end assist is too large and creates an early closing tendency that may prevent the door from fully opening. After iteration, the far-end assist decreases and the near-closed assist increases, matching the intended effect. Across gravity scenes, JODA satisfies the initial effect specification in 2.2 proposal rounds on average, showing that iteration is necessary. 
+
+# 5 Conclusion 
+
+We introduced JODA, a framework for synthesizing joint-level dynamics for articulated objects. Instead of modeling hidden mechanisms, it represents interaction behavior as a composition of conservative force, friction, and damping fields. A VLM proposes structured effects from visual and joint context, which are compiled into physically scaled fields and executed in MuJoCo/MJX. This enables direct simulation and multiple refinement modes, including manual editing, language-guided revision, and differentiable optimization. The current representation assumes that the dominant internal behavior can be approximated along a single joint degree of freedom with three position-dependent channels: conservative force, dry-friction magnitude, and damping. This covers many common articulated interactions, but it does not yet support more complex dynamical structures such as hidden-state effects, nonlinear damping, complex or history-dependent friction, high-dimensional DOFs, and multi-joint couplings. Overall, JODA turns joint dynamics into an authorable and composable representation, extending articulated assets beyond geometry to executable interaction behavior. We view this as a step toward physically grounded, behavior-aware asset generation for simulation, robotics, and interactive systems. Future work includes expanding the effect vocabulary, modeling multi-joint and mode-dependent dynamics, improving automatic diagnostics, and evaluating perceptual alignment with human interaction expectations. 
+
+# Acknowledgments 
+
+This work was supported by the National Natural Science Foundation of China (Project Number 62595771) and Ant Group Research Fund. 
+
+# References 
+
+Matthew R. W. Brake, editor. The Mechanics of Jointed Structures: Recent Research and Open Challenges for Developing Predictive Models for Structural Dynamics . Springer, 2018. doi: 10.1007/978-3-319-56818-8. URL 9https://link.springer.com/book/10.1007/978-3-319-56818-8 .Zoey Chen, Aaron Walsman, Marius Memmel, Kaichun Mo, Alex Fang, Karthikeya Vemuri, Alan Wu, Dieter Fox, and Abhishek Gupta. URDFormer: A pipeline for constructing articulated simulation environments from real-world images. arXiv preprint arXiv:2405.11656 , 2024. URL https://arxiv.org/abs/2405.11656 .C. Daniel Freeman, Erik Frey, Anton Raichuk, Sertan Girgin, Igor Mordatch, and Olivier Bachem. Brax: A differentiable physics engine for large scale rigid body simulation. In NeurIPS Datasets and Benchmarks , 2021. URL https: //arxiv.org/abs/2106.13281 .Jiayuan Gu, Fanbo Xiang, Xuanlin Li, Zhan Ling, Xiqiang Liu, Tongzhou Mu, Yihe Tang, Stone Tao, Xinyue Wei, Yunchao Yao, Xiaodi Yuan, Pengwei Xie, Zhiao Huang, Rui Chen, and Hao Su. ManiSkill2: A unified benchmark for generalizable manipulation skills. arXiv preprint arXiv:2302.04659 , 2023. URL https://arxiv.org/abs/ 2302.04659 .Yumeng He, Ying Jiang, Jiayin Lu, Yin Yang, and Chenfanfu Jiang. Spark: Sim-ready part-level articulated reconstruc-tion with vlm knowledge. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026. Oral presentation. Taylor A. Howell, Simon Le Cleac’h, Jan Brudigam, Qianzhong Chen, Jiankai Sun, J. Zico Kolter, Mac Schwager, and Zachary Manchester. Dojo: A differentiable physics engine for robotics. arXiv preprint arXiv:2203.00806 , 2022. URL https://arxiv.org/abs/2203.00806 .Ruizhen Hu, Zong Yan, Jingwei Zhang, Oliver van Kaick, Ariel Shamir, Hao Zhang, and Hui Huang. Learning to predict part mobility from a single static snapshot. ACM Transactions on Graphics , 2017. URL https: //gigl.scs.carleton.ca/papers/mobility.pdf .Advait Jain, Hai Nguyen, Mrinal Rath, Jason Okerman, and Charles C. Kemp. The complex structure of simple devices: A survey of trajectories and forces that open doors and drawers. In IEEE RAS/EMBS International Conference on Biomedical Robotics and Biomechatronics , 2010. URL https://repository.gatech.edu/entities/ publication/3bda8452-1c99-48f3-b85e-89d30b3726b1 .Long Le, Jason Xie, William Liang, Hung-Ju Wang, Yue Yang, Yecheng Jason Ma, Kyle Vedder, Arjun Krishna, Dinesh Jayaraman, and Eric Eaton. Articulate-anything: Automatic modeling of articulated objects via a vision-language foundation model. In International Conference on Learning Representations , 2025. URL https: //arxiv.org/abs/2410.13882 .Chengshu Li, Ruohan Zhang, Josiah Wong, Cem Gokmen, Sanjana Srivastava, Roberto Martin-Martin, Chen Wang, Gabrael Levine, Wensi Ai, Benjamin Martinez, et al. BEHAVIOR-1K: A human-centered, embodied ai benchmark with 1,000 everyday activities and realistic simulation. arXiv preprint arXiv:2403.09227 , 2024. URL https: //arxiv.org/abs/2403.09227 .Lightwheel. Lightwheel sim-ready assets: High-quality USD assets for NVIDIA Isaac sim. GitHub repository, 2025. URL https://github.com/LightwheelAI/Lightwheel-simready-asset . 259 robotics simulation assets under CC BY-NC 4.0. Jiayi Liu, Denys Iliash, Angel X. Chang, Manolis Savva, and Ali Mahdavi-Amiri. SINGAPO: Single image controlled generation of articulated parts in objects. In International Conference on Learning Representations , 2025. URL 
+
+https://arxiv.org/abs/2410.16499 .Viktor Makoviychuk, Lukasz Wawrzyniak, Yunrong Guo, Michelle Lu, Kier Storey, Miles Macklin, David Hoeller, Nikita Rudin, Arthur Allshire, Ankur Handa, and Gavriel State. Isaac Gym: High performance gpu-based physics simulation for robot learning. arXiv preprint arXiv:2108.10470 , 2021. URL https://arxiv.org/abs/2108. 10470 .Zhao Mandi, Yijia Weng, Dominik Bauer, and Shuran Song. Real2Code: Reconstruct articulated objects via code generation. In International Conference on Learning Representations , 2025. URL https://arxiv.org/abs/ 2406.08474 .10 MuJoCo Team. MuJoCo XLA (MJX) documentation, 2024. URL https://mujoco.readthedocs.io/en/ latest/mjx.html .Southco. Hinges and Positioning Technology , 2021. URL https://media.southco.com/media/static/ documents/brochures/202108-BR-Hinges-EN.pdf .Sugatsune. Soft-Down and Lift Assist Stays: Lid Supports , n.d. URL https://www.sugatsune.com/content/ site-assets/Sugatsune_Resources_Catalogs/catalog-300-099-157-lid-supports. pdf .Emanuel Todorov, Tom Erez, and Yuval Tassa. MuJoCo: A physics engine for model-based control. In IEEE/RSJ International Conference on Intelligent Robots and Systems , 2012. URL https://mujoco.org/ .Hongchi Xia, Entong Su, Marius Memmel, Arhan Jain, Raymond Yu, Numfor Mbiziwo-Tiapo, Ali Farhadi, Abhishek Gupta, Shenlong Wang, and Wei-Chiu Ma. Drawer: Digital reconstruction and articulation with environment realism, 2025. URL https://arxiv.org/abs/2504.15278 .Fanbo Xiang, Yuzhe Qin, Kaichun Mo, Yikuan Xia, Hao Zhu, Fangchen Liu, Minghua Liu, Hanxiao Jiang, Yifu Yuan, He Wang, Li Yi, Angel X. Chang, Leonidas J. Guibas, and Hao Su. SAPIEN: A simulated part-based interactive environment. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2020. URL 
+
+https://arxiv.org/abs/2003.08515 .Kevin Zakka, Philipp Wu, Laura Smith, Nimrod Gileadi, Taylor Howell, Xue Bin Peng, Sumeet Singh, Yuval Tassa, Pete Florence, Andy Zeng, and Pieter Abbeel. RoboPianist: Dexterous piano playing with deep reinforcement learning. In Conference on Robot Learning , 2023. URL https://arxiv.org/abs/2304.04150 .Mike Zhang, Yuntao Ma, Takahiro Miki, and Marco Hutter. Learning to open and traverse doors with a legged manipulator. In Conference on Robot Learning , 2024. URL https://arxiv.org/abs/2409.04882 .11 A Implementation of Composed Dynamics Fields 
+
+A.1 MuJoCo-compatible asset realization 
+
+JODA targets executable articulated assets. We use MuJoCo XML as the canonical simulation representation. The MuJoCo model serves as the source of joint context. We extract the target joint’s parent and child bodies, local and world joint axes, range, equivalent generalized inertia or mass from the mass matrix, and an engineering estimate of gravitational scale along the selected degree of freedom. This context anchors the compiler’s numeric scaling and helps the VLM interpret the motion direction shown in rendered images. 
+
+A.2 Differentiable MJX implementation of dynamical fields 
+
+The composed field is executed in an MJX rollout. At each step, the PCHIP components are evaluated, and the three channels are injected into the dynamics. The conservative channel is written as an applied generalized force or torque. The damping channel updates the selected degree of freedom’s damping coefficient. The friction channel updates the local dry-friction loss used by the solver. The joint-limit hint is mapped to MuJoCo/MJX limit solver parameters, such as the damping ratio of the selected joint limit model. This implementation is designed to be differentiable-friendly. Field evaluation uses JAX-compatible PCHIP interpolation, and the conservative and damping channels are directly parameterized by control-point values that can be optimized through MJX rollouts. Dry friction and joint-limit constraints are less smooth and require local smoothing. The same field representation provides a natural parameter space for gradient-based refinement. 
+
+# B VLM Prompt and Effect Proposal Specification 
+
+We design a structured prompting interface that enables the VLM to infer joint-level effects in a physically grounded and compositional form. Given joint context, multi-state rendered images, and effect-template previews, the model infers equivalent joint-level effects across the full joint range. 
+
+B.1 Prompt Excerpt 
+
+We provide a shortened excerpt of the prompt used for VLM-based effect proposal in Fig. 12. The full prompt is provided in the supplementary material. The prompt casts the model as a structured mechanics analyst and enforces physically grounded reasoning and structured output. Table 1: Predefined effect templates defining the joint-level behavior vocabulary. 
+
+Template Behavior description 
+
+constant_friction_hinge Constant dry friction over the interval constant_damping_hinge Constant velocity-dependent damping constant_positive_conservative_hinge Constant drive toward increasing q
+
+constant_negative_conservative_hinge Constant drive toward decreasing q
+
+detent_internal Local click-stop with interior equilibrium bistable_mechanism Two stable regions separated by a barrier bistable_mechanism_internal Two interior stable points magnetic_return_to_low_end Increasing attraction toward low end magnetic_return_to_high_end Increasing attraction toward high end spring_return_to_low_end Spring-like return toward low end spring_return_to_high_end Spring-like return toward high end spring_loaded_snap_detent_to_low_end Snap-in latch near low end spring_loaded_snap_detent_to_high_end Snap-in latch near high end 
+
+12 B.2 Output JSON Schema (Compact) 
+
+The VLM outputs a structured JSON object describing joint-level dynamical effects, which is summarized in List 1. The full JSON schema is provided in the supplementary material. This schema separates semantic effect specification from numerical realization. Qualitative strength labels are later mapped to physically scaled parameters by the compiler. Listing 1: VLM Output JSON Schema. The structured output separates semantic effect specification from numerical realization.  
+
+> 1
+
+{ 
+
+> 2
+
+"joint_summary": { 
+
+> 3
+
+"joint_name": str,  
+
+> 4
+
+"joint_type": "revolute | prismatic",  
+
+> 5
+
+"motion_description": str,  
+
+> 6
+
+"overall_confidence": float  
+
+> 7
+
+},  
+
+> 89
+
+"whole_motion_descrptn": str,  
+
+> 10
+
+"gravity_can_be_ignored": bool,  
+
+> 11 12
+
+"joint_limit_hint": { 
+
+> 13
+
+"selected_side": "low_end | high_end | none",  
+
+> 14
+
+"elasticity": "none | weak | medium | strong"  
+
+> 15
+
+},  
+
+> 16 17
+
+"effect_proposals": [ 
+
+> 18
+
+{ 
+
+> 19
+
+"effect_name": str, // from template library  
+
+> 20
+
+"start_ratio": float, // in [0, 1]  
+
+> 21
+
+"end_ratio": float, // in [0, 1]  
+
+> 22 23
+
+"strength": { 
+
+> 24
+
+"conservative": "none | weak | medium | strong | dominant",  
+
+> 25
+
+"friction": "none | weak | medium | strong | dominant",  
+
+> 26
+
+"damping": "none | weak | medium | strong | dominant"  
+
+> 27
+
+},  
+
+> 28 29
+
+"refineFactor": { 
+
+> 30
+
+"conservative": float,  
+
+> 31
+
+"friction": float,  
+
+> 32
+
+"damping": float  
+
+> 33
+
+},  
+
+> 34 35
+
+"confidence": float,  
+
+> 36
+
+"reason": str  
+
+> 37
+
+} 
+
+> 38
+
+] 
+
+> 39
+
+}
+
+13 Prompt Design 
+
+Role. You are a careful multimodal mechanics analyst working in a high-precision pipeline. Your output will be used as structured input to a downstream compiler. Prioritize correctness, consistency, and physical plausibility over free-form creativity. 
+
+Task. Given one articulated joint, infer the equivalent joint-level effects that describe the felt behavior along the entire motion range. These effects represent observable interaction behavior, not explicit claims about hidden mechanisms. 
+
+Inputs. 
+
+• Joint context (type, axis, range, gravity relation); • multi-state rendered images along the joint coordinate; • template previews showing reference force, friction, and damping profiles. 
+
+Output. Return a JSON object (detailed in App. B.2) describing: • a whole-motion description, • a gravity-importance judgment, • a joint-limit hint, • a set of effect proposals (type, interval, qualitative strength). 
+
+Constraints. 
+
+• Use only predefined effect templates (summarized in Table 1). • Represent behavior as equivalent joint-level effects. • Reason over the full motion range. • Prefer simple explanations when multiple effects are plausible. 
+
+Iterative refinement. When provided with a rendered feedback result, either return complete if the behavior matches the intent, or revise the effect proposals to better match the desired motion. The full prompt is provided in the supplementary material. 
+
+Figure 12: Prompt design for multimodal mechanics analysis. 14
