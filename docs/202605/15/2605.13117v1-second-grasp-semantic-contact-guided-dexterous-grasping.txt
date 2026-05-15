@@ -1,0 +1,580 @@
+Title: SECOND-Grasp: Semantic Contact-guided Dexterous Grasping
+
+URL Source: https://arxiv.org/pdf/2605.13117v1
+
+Published Time: Thu, 14 May 2026 00:55:05 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# SECOND-Grasp: Semantic Contact-guided Dexterous Grasping 
+
+Han Yi Shin 1∗ Heeju Ko 1∗ Jaewon Mun 1 Qixing Huang 2 Jaehyeok Lee 1
+
+Sung June Kim 1 Honglak Lee 3 Sujin Jang 4 Sangpil Kim 1†
+
+> 1
+
+Korea University 2University of Texas at Austin 3University of Michigan 4Hanyang University ERICA 
+
+## Abstract 
+
+Achieving reliable robotic manipulation, such as dexterous grasping, requires a synergy between physically stable interactions and semantic task guidance, yet these objectives are often treated as separate, disjoint goals. In this paper, we investigate how to integrate dexterous grasping techniques, i.e., physically stable grasps for object lifting and language-guided grasp generation, to achieve both physical stability and semantic understanding. To this end, we propose SECOND-Grasp (SEmantic CONtact-guided Dexterous Grasping), a unified framework that enables robotic hands to dynamically adjust grasping strategies based on semantic reasoning while ensuring physical feasibility. We begin by obtaining coarse contact proposals through vision-language reasoning to infer where contacts should occur based on object properties, followed by segmentation to localize these regions across views. To further ensure consistency across multiple viewpoints, we intro-duce Semantic-Geometric Consistency Refinement (SGCR), which refines initial contact predictions by enforcing semantic consistency across views and removing geometrically invalid regions, yielding reliable 3D contact maps. Then, we derive a feasible hand pose for each contact map via inverse kinematics, generating a supervision signal for policy learning. Our approach, trained on DexGraspNet, consistently outperforms baselines in lifting success rate on both seen and un-seen categories, achieving 98.2% and 97.7%, respectively, while also improving intent-aware grasping by 12.8% and 26.2%. We further show promising results on additional datasets and robotic hands, including Shadow Hand and Allegro Hand. 
+
+## 1 Introduction 
+
+Dexterous grasping has been widely studied as a fundamental capability for robotic manipulation, with the primary goal of achieving physically stable object interactions [ 37 , 47 , 36 , 46 , 56 ]. Recent advances have focused on generating multi-fingered hand configurations [ 47 , 46 , 22 ] that satisfy force closure, collision avoidance, and robust object lifting. However, these approaches largely operate in a pose-centric manner, with limited consideration of high-level task intent or semantic guidance. In contrast, vision-language reasoning-based manipulation for multi-fingered hands [ 9, 55 , 13 ] has emerged as a promising direction for leveraging semantic cues in action generation, but it often focuses on producing plausible hand poses without explicitly ensuring physical feasibility [13, 15]. This disconnection raises two fundamental challenges: without semantic grounding, grasp strategies cannot adapt to task-specific requirements [ 17 , 39 , 13 ], and without explicit contact modeling, they fail to ensure physically stable execution in practice [ 18 , 19 , 37 ]. Existing methods address these as separate problems, yet bridging the two remains largely unexplored. We argue that truly capable dexterous manipulation requires bridging this gap through explicit contact-level reasoning that jointly grounds semantic intent and physical feasibility.      
+
+> ∗Equal contribution.
+> †Corresponding author. Preprint.
+> arXiv:2605.13117v1 [cs.RO] 13 May 2026 Where should I grasp?
+> Physical Inconsistency Semantic & Physical Feasibility
+> How can I lift?
+> No Semantic Reasoning
+> ?
+> Grasp the handle and pass me the hair dryer.
+> I know where to grasp and how to lift!
+> Contact Grasping Language-based Grasping Our Contact-Language Grasping 123
+
+Figure 1: Contact-based grasping ensures physical feasibility but lacks semantic reasoning, while language-based grasping captures intent but often fails to lift. SECOND-Grasp bridges both, enabling grasps that are semantically meaningful and physically stable. To address this, we propose SECOND-Grasp (SEmantic CONtact-guided Dexterous Grasping), a unified framework that explicitly models contact-level interactions to couple semantic understanding with physical feasibility in grasp planning. These contact regions correspond to semantic object parts (e.g., handle, body, base), spatially grounding semantic intent to guide grasp planning. Rather than directly predicting grasps from observations, SECOND-Grasp first infers where meaningful contacts should occur, and then uses these contacts to guide robot hand grasping. To this end, it leverages the semantic priors of vision-language models to reason about object-relevant contact regions, and grounds these predictions through segmentation across multi-view observations. However, while vision-language and segmentation models provide strong semantic priors, their pre-dictions are made independently per view and thus may still exhibit misalignment between semantic agreement and geometric consistency across views. We therefore introduce Semantic-Geometric Con-sistency Refinement (SGCR), which enforces cross-view consistency through two sequential stages: (1) a Semantic Refinement Stage that assigns higher confidence to regions consistently predicted across multiple views; and (2) a Geometric Refinement Stage that enforces geometric consistency of the contact map using a local convexity-based criterion, which resolves surface ambiguity by verifying whether predictions lie on the same surface region. Together, these two stages yield contact maps that are both semantically grounded and geometrically coherent, enabling them to capture diverse semantic and geometric interaction intents across object properties. To use these contact intentions for policy learning, we need to translate them into hand-level guidance that supports physical execution. A common strategy is to recover a grasp pose from the contact map using learned grasp generators [ 41 , 21 , 44 ]. However, these models are trained on fixed hand-object datasets and thus inherit hand- and object-specific priors, which can limit generalization to new hands or objects. To address this issue, we adopt contact-based optimization methods [ 18 , 54 , 53 ], which provide an effective way to convert contact representations into hand configurations. However, unlike prior contact-based pipelines that use the recovered configuration as the final grasp, we use analytic inverse kinematics to derive pseudo pose priors from the refined contact maps for policy learning. Together with the refined contact maps, these priors guide policy learning toward semantically aligned and stable grasping behaviors across diverse objects and robotic hands. Experimental results demonstrate that our approach, trained on DexGraspNet dataset [ 52 ], outper-forms existing grasping methods [ 47 , 36 , 38 , 49 , 24 ] in object lifting success rate, achieving 98.2% and 97.7% on seen and unseen categories, respectively. Beyond general grasping performance, we evaluate intention alignment success rate, observing improvements of 12.8% and 26.2% for seen and unseen categories. We further validate the transferability of our framework to different hand embodiments using the Shadow Hand [ 31 ] and Allegro Hand [ 43 ], and evaluate its generalizability across diverse object datasets. Our contributions are summarized as follows: • SECOND-Grasp, a grasping framework that bridges semantic intent with execution by predicting semantically meaningful contact regions and using them to guide physically stable grasping. • Semantic-Geometric Consistency Refinement (SGCR), a two-stage module that enforces cross-view consistency via semantic scoring and local convexity validation, producing consistent contact maps. 2VLM Reasoning   
+
+> “Handle region likely for contact. per-view…”
+> Multi-finger Inverse Kinematics
+> Policy
+> Multi-view Depth Projection  Cross-view Semantic Consistency
+> non-convex pair locally convex pair
+> Local Convexity Filtering
+> Semantic-Geometric Contact Map
+> Multi-view Image Semantic-Geometric Consistency Refinement Pseudo Pose
+> Semantic Refinement
+> Low
+> High
+> Semantic Contact Map
+> Geometric Refinement
+
+Figure 2: Overview. Given multi-view observations, SECOND-Grasp first infers semantic contact regions using vision-language reasoning (Section 4.1). These 2D proposals are then projected into 3D and refined through Semantic-Geometric Consistency Refinement, which enforces cross-view semantic consistency and geometric consistency based on local convexity (Section 4.2). The refined semantic-geometric contact map provides inverse-kinematics-based pseudo pose guidance (Section 4.3) for policy learning (Section 4.4). See individual sections for technical details. • A learning pipeline that leverages pseudo pose priors derived from contact maps, enabling robust grasping performance across diverse objects, tasks, and robotic hands. 
+
+## 2 Related Work 
+
+2.1 Dexterous Grasping 
+
+Dexterous grasping aims to achieve stable object grasping and manipulation with multi-fingered robotic hands. To enable scalable learning of dexterous grasping, prior methods have constructed large-scale datasets that pair objects with physically dexterous hand poses [ 37 , 16 , 20 , 56 , 33 ]. Building on large-scale grasp datasets, policy-learning methods train dexterous hands for object lifting across diverse objects and hand embodiments [ 47 , 36 , 11 , 49 , 24 ]. However, these methods primarily focus on physical feasibility or lifting success, without explicitly considering whether the resulting contacts align with semantically meaningful object regions. Recent language-guided dexterous grasping methods incorporate task intent or object usage into grasp generation [ 39 , 40 , 13 , 12 ], but remain focused on grasp pose synthesis and do not address physically executable lifting. Our work bridges these two directions by grounding dexterous policy learning in contact regions inferred through 2D VLM reasoning, enabling grasps that are semantically meaningful and physically executable. 
+
+2.2 2D-to-3D Affordance Grounding 
+
+Affordance grounding aims to identify object regions that enable specific interactions [ 8, 6 , 28 , 14 , 57 ,25 ]. Understanding affordances in 3D is essential for embodied interaction and robotic manipulation, as it enables agents to reason about how objects can be used in the physical world [ 5, 28 ]. However, object affordance is not always determined by geometry alone, as functional regions often depend on how an object is used. This has motivated approaches to incorporate 2D interaction or semantic cues into 3D affordance grounding. IAGNet [ 48 ] and MIFAG [ 7] use 2D human-object interaction images to guide 3D affordance prediction, while CAST [ 10 ] transfers semantic features from 2D vision foundation models into 3D representations. Together, these methods demonstrate that 2D semantic knowledge provides effective priors for localizing functional regions in 3D. Our work builds on this insight, applying 2D VLM reasoning to infer object-specific contact regions and refining them into 3D contact maps for dexterous grasping. 
+
+2.3 Grasp Pose Generation 
+
+Dexterous grasp generation methods commonly synthesize hand configurations from object ob-servations using learned generative models or analytical solvers. Generative methods learn grasp distributions conditioned on the features of the object via diffusion-based modeling [ 41 , 21 , 44 ]. Although effective in generating diverse and plausible grasps, these models often learn hand-specific priors tied to training embodiments and object distributions, which can limit transferability to novel 3hands or objects. Analytical methods instead recover hand configurations from geometric or kinematic constraints without learning a grasp distribution [ 34 , 35 , 19 , 58 , 27 , 32 , 2]. Within analytical ap-proaches, contact-based optimization methods use predicted contacts to recover hand configurations, demonstrating contact as an effective intermediate representation for grasp synthesis [ 18 , 54 , 53 ]. Our work builds on these perspectives, but rather than treating the recovered configuration as the final grasp, we use it as a pseudo-pose prior to guide policy learning toward executable grasping behavior. 
+
+## 3 Preliminaries 
+
+Dexterous grasping requires training a policy for a multi-fingered robot to interact with diverse objects. We formulate the task as a Partially Observable Markov Decision Process (POMDP) with timesteps t = 0 , . . . , T . For each timestep, the environment evolves according to state: 
+
+st = ( xhand t , x obj t , x geo ), (1) where xhand t denotes robot proprioceptive states (e.g., joint configurations and fingertip states), xobj t
+
+denotes object pose and velocities, and xgeo encodes object geometric information. Due to partial observability, the agent instead receives an observation: 
+
+ot = ( xhand t , v img t , v point t ), (2) which is generated from the underlying state via an observation function P (ot|st). Here, vimg t denotes object-centric images from a third-person view and vpoint t denotes partial point cloud observations. Using full access to the underlying state in simulation, we first train a privileged state-based policy 
+
+πstate (at | st). We then distill the policy into a vision-based policy πvision (at | ot) that could operate under partial observability in real-world settings. For both policies, the action is parameterized by: 
+
+at = (∆ wt, ∆ϕt, ∆θt), (3) where ∆wt ∈ R3 and ∆ϕt ∈ R3 denote the translational and rotational increases in the wrist, respectively, and ∆θt ∈ Rdθ denotes the incremental joint configurations for the actuated hand joints. Here, dθ depends on the robotic hand embodiment (see Appendix D.1). Both policies are trained to maximize the expected discounted return E[PT −1 
+
+> t=0
+
+γtrt], where γ ∈ (0 , 1) is the discount factor. 
+
+## 4 Method 
+
+Our SECOND-Grasp enables robotic hands to grasp objects in a semantically meaningful and physically plausible manner. To achieve this, we first generate a 3D contact map that represents object-specific graspable regions, and then infer a corresponding initial hand pose via inverse kinematics. We subsequently use the contact map and inverse-kinematics-derived pose prior to guide policy learning, enabling semantically aligned and physically stable grasping behaviors. The overview of SECOND-Grasp is illustrated in Figure 2. 
+
+4.1 Semantic Contact Region Proposal 
+
+Identifying semantic contact regions solely from 3D geometry is ambiguous, as graspable parts are defined not just by shape but by functional intent—how an object is meant to be used. This motivates us to leverage 2D vision-language reasoning as a semantic prior to guide contact region proposal. Given multi-view RGB images of an object {I i}Ii=1 from I = 4 fixed viewpoints (front, back, left, right), we use a pretrained large vision-language model (VLM) [ 1 ] to extract an initial set of K graspable regions {gk}Kk=1 (e.g., handle, body, base) and their 2D bounding boxes {bk}Kk=1 .Additionally, each bounding box is associated with a confidence score c(k) 
+
+> i
+
+∈ [0 , 1] , which indicates the VLM’s estimated likelihood that the bounding box contains the k-th graspable region. To achieve a precise pixel-level localization, we apply a segmentation model [ 29 ] Fseg within each bounding box and obtain a binary mask M (k) 
+
+> i
+
+= Fseg (Ii, b (k) 
+
+> i
+
+). The mask is further filtered by valid object regions from the rendered depth map to yield ˜M (k) 
+
+> i
+
+.
+
+4.2 Semantic-Geometric Consistency Refinement 
+
+While the 2D VLM provides high-level semantic contact region proposals, accurate robotic grasping requires finer refinement in the 3D space. Therefore, we introduce a Semantic-Geometric Consistency Refinement (SGCR) module to refine these coarse proposals into precise 3D contact regions that are consistent with both semantic and geometric cues. 44.2.1 Contact Confidence Initialization 
+
+The confidence score c(k) 
+
+> n
+
+assigned by the VLM reflects the model’s semantic confidence in the presence of the k-th graspable region, but do not account for precise localization quality. To address this, we re-weight the raw confidence c(k) 
+
+> i
+
+by the valid object region ratio ρ(k) 
+
+> i
+
+, which is obtained by the area of ˜M (k) 
+
+> i
+
+over the predicted bounding box: 
+
+¯c(k) 
+
+> i
+
+= σ(ρ(k) 
+
+> i
+
+) c(k) 
+
+> i
+
+, (4) where σ(·) is a sigmoid function for down-weighting predictions with low overlap. The initial per-view confidence map is then constructed as S(k, 0)  
+
+> i
+
+(p) = ¯ c(k) 
+
+> i
+
+· ˜M (k) 
+
+> i
+
+(p), where p denotes a pixel location, assigning the calibrated score to each valid mask pixel. 
+
+4.2.2 Cross-View Semantic Refinement 
+
+Regions that are consistently predicted across multiple views better correspond to semantically expressive parts than those predicted from a single view. We therefore assign higher confidence for such cross-view consistent predictions. Let N (i) denote the set of neighboring views of source view i. For each pixel p in ˜M (k) 
+
+> i
+
+, we back-project p into 3D space and re-project it onto each neighboring view j ∈ N (i). We verify whether the re-projected point is geometrically consistent and satisfies a depth consistency, which is measured by the discrepancy between the actual and the re-projected depth: 
+
+δi→j (p) = |Di→j (p) − zi→j (p)| , (5) where Di→j (p) is the actual depth of the reference pixel point p in view j, and zi→j (p) is the re-projected depth of pixel point p in view j. We consider cross-view predictions to be consistent if 
+
+δi→j (p) is less than a predefined threshold τ and the re-projected point lies within ˜M (k) 
+
+> j
+
+. We then accumulate this cross-view support to refine the source-view confidence: 
+
+S(k, ref)  
+
+> i
+
+(p) = S(k, 0)  
+
+> i
+
+(p) + X 
+
+> j∈N (i)
+
+α ¯c(k) 
+
+> j
+
+1 δi→j (p) < τ ∧ pi→j ∈ ˜M (k)
+
+> j
+
+, (6) where α is a scaling factor to moderate the contribution of cross-view agreement, preventing it from overwhelming initial confidence. The refined maps are then normalized globally across all views by their maximum value to yield S(k, norm)  
+
+> i
+
+, which serves as semantic guidance for the subsequent 3D ge-ometric refinement step. We denote the normalized confidence maps as S(k, norm) = {S(k, norm)  
+
+> i
+
+}Ii=1 .
+
+4.2.3 3D Geometric Refinement via Local Convexity 
+
+Refined maps S(k, norm) capture semantic consistency in all views, but do not enforce geometric coherence at the surface level of the object. As a result, predicted regions may be overly dispersed or fragmented into multiple disconnected components, resulting in ambiguous contact targets for the robotic hand. To address this, we propose a novel local convex-pair refinement module that explicitly enforces surface-level geometric coherence, consolidating fragmented predictions into spatially consistent and physically meaningful contact regions. We first lift the multi-view maps S(k, norm) into 3D by back-projecting each view into object space using the corresponding depth maps, resulting in a set of 3D points Q(k) ⊂ O , where O denotes the object surface. Here, each point is associated with a confidence score inherited from S(k, norm) . Then, we define a high-confidence seed region Q(k)seed as the top 10% of points in Q(k) by confidence scores. Starting from the seed region Q(k)seed , we identify points on the same object surface via local-convexity consistency. A pair of surface points (q1, q 2) ∈ O × O is defined as a locally convex pair if the line segment connecting them lies entirely within the volume of the object: 
+
+C(O) = {(q1, q 2) ∈ O × O | (1 − λ)q1 + λq 2 ∈ Vol( O), ∀λ ∈ [0 , 1] } . (7) where Vol( O) denotes the volume enclosed by the object surface O. Then, we retain a point q ∈ Q (k)
+
+in the contact map Q(k)final if it satisfies local-convexity consistency with any seed point qs ∈ Q (k)seed :5Q(k)final = Q(k)seed ∪
+
+n
+
+q ∈ Q (k) ∃ qs ∈ Q (k)seed , (q, q s) ∈ C (O)
+
+o
+
+. (8) Because candidate points are validated directly against the seeds, rather than through iterative propagation or global expansion, this formulation defines local convexity in a seed-centered, pairwise manner. A candidate point is retained only if it forms a locally convex pair with at least one seed, which naturally restricts the accepted region around each seed to a compact local neighborhood, such as a cylinder-like subset of a possibly curved cup handle. By taking the union of these seed-centered neighborhoods, the semantically grounded seed region is expanded into a geometrically coherent contact map without requiring the entire semantic part to be globally convex. 
+
+4.3 Hand Pose Prior via Inverse Kinematics 
+
+To bridge the refined contact map with policy learning, we derive a physically feasible pseudo hand pose through inverse kinematics (IK). Given the refined contact map Q(k)final , we estimate its principal axis using PCA [ 42 ] and partition the contact points into a thumb region Q(k)thumb and a non-thumb region Q(k)non -thumb , encouraging an oppositional grasp structure. Each robot finger f ∈ F is then assigned a target contact region R(k) 
+
+> f
+
+, where F denotes the set of fingers of the target hand and may vary across embodiments. Let h = ( w, ϕ, θ ) denote the hand configuration, where w ∈ R3 and ϕ ∈ R3 are the wrist position and orientation, and θ ∈ Rdθ is the joint configuration. For each finger f , let ξf (h) be the fingertip position induced by h. We obtain the pseudo hand pose by minimizing the fingertip-to-region distance: 
+
+min 
+
+> h
+
+X 
+
+> f∈F
+
+min 
+
+> y∈R (k)
+> f
+
+∥ξf (h) − y∥22 . (9) This objective is solved with a Jacobian-based damped least-squares IK solver [ 2 ]. In practice, we use 12 iterations of IK to obtain an efficient contact-aligned pseudo pose; implementation details are provided in Appendix C.1. 
+
+4.4 Policy Learning 
+
+The joint configuration θ∗ extracted from the inverse kinematics(IK) solution serves as a pose prior for guiding policy learning. Together with the refined contact map, this prior shapes the reward to encourage semantically aligned and physically stable grasping behaviors. The contact map and pseudo pose are used as reward guidance, allowing semantic contact intent to be distilled into the learned policy. We train πstate using reinforcement learning with: 
+
+r = rcontact + rpose + rtask , (10) where rcontact encourages fingertips to approach the refined contact region, rpose penalizes deviation from the IK-derived pseudo pose θ∗, and rtask follows standard lifting and goal-distance objec-tives [ 47 ]. At test time, the trained policy predicts actions directly from its observations without requiring contact maps, pseudo poses, or inverse kinematics. 
+
+## 5 Experiments 
+
+Our experiments aim to evaluate four aspects of the proposed method: (1) grasp success and generalization to unseen object instances and categories, (2) intent-aware grasping, including contact alignment and grasp-style diversity, (3) the effectiveness of the contact-map refinement procedure and other key components, and (4) robustness under cross-dataset object distribution shifts. 
+
+5.1 Experimental Settings Train & Evaluation Settings We train and evaluate all simulation experiments in Isaac Gym [ 23 ]. For the main benchmark, we use DexGraspNet [ 37 ] object assets, training on 3,200 objects and evaluating on 141 unseen objects from seen categories and 100 unseen objects from unseen categories, following prior protocols [ 47 , 36 , 11 ]. Importantly, we use only the object assets and do not rely on ground-truth hand poses. Unless otherwise stated, we use the Shadow Hand in a tabletop lifting task, where success is defined as lifting the object off the table and maintaining a stable hold. 6To obtain a vision-based policy under partial observability, we adopt a teacher–student framework following [ 36 ]. A privileged state-based policy serves as the teacher, and we distill it into a vision-based student policy using DAgger [ 30 ]. Methods marked with † denote results reproduced in our work. Additional simulation and training details are provided in Appendix A.1. 
+
+Evaluation Metrics We evaluate grasping performance using several complementary metrics. Grasp Success Rate (GSR, ↑) measures success rate of grasp-and-lift trials under a predefined stability criterion. Mean Success Affordance Distance (mSAD, ↓) evaluates how closely the realized contact aligns with the intended region. Style Diversity (SD, ↑) measures the diversity of successful grasp configurations, where higher values indicate more diverse strategies, following prior work [ 24 ]. We further introduce Intent Success Rate (ISR, ↑), which counts successful grasps with fingertip contacts within a 4 cm threshold of the intended contact region, providing a stricter measure of intent-consistent lifting. Additional implementation details are provided in the Appendix A.3. Table 1: Grasp Success Rates (GSR, ↑) on DexGraspNet [ 37 ] with the Shadow Hand. Our method achieves the highest performance across all settings.                                             
+
+> Method State-Based Setting Vision-Based Setting Train Test Train Test Seen Cat. Unseen Cat. Seen Cat. Unseen Cat.
+> UniDexGrasp [47] 79.4 74.3 70.8 73.7 68.6 65.1 UniDexGrasp++ [36] 87.9 84.3 83.1 85.4 79.6 76.7 UniGraspTransformer [38] 91.2 89.2 88.3 88.9 87.3 86.8 DemoGrasp [49] 95.2 95.5 94.4 92.2 92.3 90.1 DemoFunGrasp †[24] 90.0 81.7 78.7 91.4 85.8 84.5 Ours 97.9 98.2 97.7 95.7 95.9 94.9
+
+5.2 Results on Grasping Performance 
+
+Table 1 compares GSR against existing dexterous grasping methods on DexGraspNet [ 37 ]. Our method consistently achieves the highest success rates across all splits and settings, reaching 98.2% on seen categories and 97.7% on unseen categories under the state-based setting, and 95.9% on seen categories and 94.9% on unseen categories under the more challenging vision-based setting. Compared to the strongest prior method, DemoGrasp, our approach improves by 3.5% and 4.8% on unseen categories for state-based and vision-based settings, respectively. DemoGrasp [ 49 ] and DemoFunGrasp [ 24 ] adapt a fixed demonstration trajectory via demonstration editing to handle diverse objects, while ResDex [ 11 ] employs geometry-unaware base policies for generalization. While effective, these approaches do not explicitly reason about the local surface geometry of the target contact region when determining hand configurations. In contrast, our method derives a pseudo target pose from the geometrically refined contact map via inverse kinematics, yielding a hand configuration that is physically grounded in the local structure of each object. This geometry-aware supervision signal allows the policy to associate similar contact geometries with consistent hand configurations, which we argue underlies the strong generalization to unseen objects. 
+
+5.3 Results on Intent-Aware Grasping 
+
+Table 2: Comparison of GSR, mSAD, and ISR on [ 24 ]. Our method achieves higher success rates while better aligning with intended contact regions.                            
+
+> Method Seen Cat. Unseen Cat. GSR ↑mSAD ↓ISR ↑GSR ↑mSAD ↓ISR ↑
+> DemoGrasp †[49] 95.50 4.10 52.57 94.40 4.27 33.71 DemoFunGrasp †[24] 91.92 2.92 73.74 89.90 3.23 62.63 Ours 98.24 2.42 86.52 97.65 2.29 88.87
+
+Intent-Aware Grasp Success Rate 
+
+To evaluate whether successful grasps align with the intended contact re-gions, we report GSR, mSAD, and ISR. GSR measures overall grasp suc-cess, mSAD captures the average de-viation from the target region, and ISR measures the fraction of successful grasps with fingertip contacts within 4 cm of the intended region. We reproduce DemoGrasp [ 49 ] and DemoFunGrasp [ 24 ] under the same evaluation setting using 100 environments. As shown in Table 2, our method consistently outperforms prior work across both seen and unseen categories. In particular, our method achieves higher GSR and ISR, while also obtaining the lowest mSAD of 2.42 cm and 2.29 cm on seen and unseen categories, 7Init Reach Grasp Lift Final Contact map Object 
+
+> body
+> handle
+> Bottle
+
+Figure 3: Qualitative results of intent-aware grasping. Given different intents on the same object, SECOND-Grasp adapts its grasp behavior to the specified contact region. Initial Contact Map Semantic Refinement        
+
+> Grasp Intention Geometric Refinement
+> lens of the camera .
+> Initial Contact Map Semantic Refinement
+> Grasp Intention Geometric Refinement
+> barrel of the pistol.
+> High
+> Low Confidence Score
+
+Figure 4: Qualitative visualization of SGCR. Given a grasp intention, SGCR refines coarse contact proposals into localized and geometrically coherent contact maps. Warmer colors indicate higher contact confidence. 
+
+respectively, improving over DemoFunGrasp by 0.6 cm and 0.92 cm. This improved contact accuracy leads to higher ISR, demonstrating more accurate grasping of the intended contact regions. We also observe higher GSR, indicating improved overall grasp success. Unlike prior methods that rely on a single contact point, our semantically and geometrically grounded contact map provides spatial guidance, enabling more precise localization of the intended contact region during execution. Additional qualitative visualizations are provided in Appendix 10. Table 3: Grasp Style Diversity (SD, ↑) on [37 ]. Our method produces more diverse successful grasp strategies. 
+
+Method Seen Cat. Unseen Cat. 
+
+DemoGrasp †[49] 1.66 1.65 DemoFunGrasp[24] 1.48 1.44 Ours 1.71 1.80 
+
+Grasp Style Diversity Since each object has multiple semantic intentions, the policy should generate distinct grasp strategies rather than col-lapsing to a single strategy. A policy that fails to account for such variation would produce sim-ilar grasp configurations across different situ-ations. To evaluate whether the policy avoids such collapse, we measure grasp style diversity (SD) on the DexGraspNet [ 37 ], which quantifies the diversity of successful grasping strategies by computing the average Euclidean distance between all pairs of successful hand joint configurations. As shown in Table 3, our method achieves higher SD than prior works [ 47 , 49 , 24 ]. Importantly, this improvement comes alongside higher grasp success rates, indicating that the gains are not due to trivial diversification but reflect effective grasp strategies. 
+
+5.4 Qualitative Results 
+
+We present qualitative results of the proposed method. Figure 6 visualizes the refinement process of Semantic-Geometric Consistency Refinement (SGCR), where coarse semantic contact proposals are refined into more localized and geometrically consistent contact regions on the object surface. Figure 3 shows grasp executions conditioned on different contact maps. For the same object, specified regions lead to distinct grasp behaviors, such as grasping the bottle body when highlighted and grasping the handle when specified. These results show that our method follows the given contact intent rather than collapsing to a fixed grasp strategy. See Appendix D for more examples. 85.5 Ablation Study 
+
+Table 4: Ablation study on pseudo pose, contact map, and SGCR, evaluated using GSR and SD. Each component consistently improves grasp success and diversity.                                
+
+> Pseudo Pose Contact Map SGCR Seen Cat. Unseen Cat. GSR ↑SD ↑GSR ↑SD ↑
+> ✗✗✗90.82 0.90 88.96 0.89
+> ✓✗✗93.77 1.27 92.77 1.21
+> ✓✓✗97.85 1.54 96.88 1.68
+> ✓✓✓98.24 1.71 97.65 1.80
+
+We conduct an ablation study to an-alyze each component, including the pseudo pose prior, contact map, and Semantic-Geometric Consistency Refine-ment(SGCR). The pseudo pose prior serves as an alternative to dataset-provided joint configurations, maintain-ing performance while alleviating limited diversity of predefined grasp poses. How-ever, without the contact map, the pseudo pose prior alone cannot generate grasps that reflect object-specific semantics or geometry. The contact map provides spatial cues that guide where to make contact, enabling semantically diverse grasp generation. Finally, SGCR refines the contact map through semantically grounded geometric consistency, improving grasp accuracy while preserving diversity. As SGCR refines the contact map, it is evaluated with the contact map. 
+
+5.6 Cross-Dataset Generalization 
+
+Table 1 shows that our method achieves strong performance on DexGraspNet [ 37 ]. To assess robustness under distribution shift, we further evaluate cross-dataset performance on several object datasets, including DexGraspAnything(DGA) [ 56 ], EGAD [ 26 ], Omni6DPose [ 51 ], ModelNet40 [ 45 ], and VisualDexterity [ 4](Table 5). Our method consistently achieves the highest success rates across datasets. Notably, even compared to DemoGrasp [ 49 ], which additionally trains on YCB [ 3 ], our method substantial improvements on DGA (+18.81%) and ModelNet40 (+16.01%), indicating stronger robustness under distribution shift. We attribute this to our geometrically grounded contact maps, derived directly from object geometry and provide stable guidance across different objects. For a fair comparison, we follow prior work [49] and randomly rescale object sizes to 6–15 cm. Table 5: Cross-dataset generalization (GSR , ↑) on five object datasets. Our method demonstrates improved robustness to distribution shifts.                                
+
+> Method Train Test DGA EGAD Omni6DPose ModelNet40 VisualDexterity
+> UniGraspTransformer †[38] DexGraspNet 44.53 69.80 47.95 40.45 68.63 DemoGrasp[49] DexGraspNet + YCB 60.99 94.58 74.84 71.88 93.67 DemoFunGrasp †[24] DexGraspNet + YCB 50.00 83.84 57.58 50.50 81.82 Ours DexGraspNet 79.80 96.68 77.84 87.89 94.14
+
+## 6 Conclusion 
+
+We presented SECOND-Grasp, a framework for dexterous grasping that bridges semantic intent and physical feasibility through contact-level reasoning. By combining vision-language reasoning, multi-view segmentation, and Semantic-Geometric Consistency Refinement, our method produces reliable 3D contact maps. From these contact maps, we derive pseudo target poses via inverse kinematics, providing pose priors for object-specific and physically feasible policy learning. SECOND-Grasp further derives contact maps and pose priors without training, enabling generalization to unseen objects. Extensive experiments demonstrate that our method improves grasping performance while capturing semantic intent and ensuring stable lifting. Results across multiple cross-dataset benchmarks confirm generalization, and comprehensive ablations validate the effectiveness of our approach. 
+
+Limitations and Future work. Our experiments focus on dexterous hand manipulation without explicitly evaluating the proposed method on an arm-hand robotic platform. This choice was motivated by the fact that dexterous hands are high-DoF and inherently complex, making them challenging. We believe that demonstrating reliable performance at the hand level is a necessary first step toward full-body or arm-hand manipulation. Our results show that the proposed method can effectively handle this challenging setting, providing evidence that it can serve as a foundation for more complete robotic systems. In future work, we plan to extend our framework to arm-hand platforms and evaluate coordinated control. 9References 
+
+[1] S. Bai, Y. Cai, R. Chen, K. Chen, X. Chen, Z. Cheng, L. Deng, W. Ding, C. Gao, C. Ge, et al. Qwen3-vl technical report. arXiv preprint arXiv:2511.21631 , 2025. [2] S. Buss. Introduction to inverse kinematics with jacobian transpose, pseudoinverse and damped least squares methods. 2004. [3] B. Calli, A. Singh, A. Walsman, S. Srinivasa, P. Abbeel, and A. M. Dollar. The ycb object and model set: Towards common benchmarks for manipulation research. In 2015 international conference on advanced robotics (ICAR) , pages 510–517. IEEE, 2015. [4] T. Chen, M. Tippur, S. Wu, V. Kumar, E. Adelson, and P. Agrawal. Visual dexterity: In-hand reorientation of novel and complex object shapes. Science Robotics , 8(84):eadc9244, 2023. [5] S. Deng, X. Xu, C. Wu, K. Chen, and K. Jia. 3d affordancenet: A benchmark for visual object affordance understanding. In proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 1778–1787, 2021. [6] T.-T. Do, A. Nguyen, and I. Reid. Affordancenet: An end-to-end deep learning approach for object affordance detection. In 2018 IEEE international conference on robotics and automation (ICRA) , pages 5882–5889. IEEE, 2018. [7] X. Gao, P. Zhang, D. Qu, D. Wang, Z. Wang, Y. Ding, and B. Zhao. Learning 2d invariant affordance knowledge for 3d affordance grounding. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 39, pages 3095–3103, 2025. [8] J. J. Gibson. The theory of affordances. the ecological approach to visual perception. The people, place and, space reader , pages 56–60, 1979. [9] J. He, D. Li, X. Yu, Z. Qi, W. Zhang, J. Chen, Z. Zhang, Z. Zhang, L. Yi, and H. Wang. Dexvlg: Dexterous vision-language-grasp model at scale. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 14248–14258, 2025. [10] Y. Huang, Z. Peng, C. Wen, X. Yang, and W. Shen. Unlocking 3d affordance segmentation with 2d semantic knowledge. arXiv preprint arXiv:2510.08316 , 2025. [11] Z. Huang, H. Yuan, Y. Fu, and Z. Lu. Efficient residual learning with mixture-of-experts for universal dexterous grasping. In The Thirteenth International Conference on Learning Representations , 2025. [12] J. Jian, X. Liu, Z. Chen, M. Li, J. Liu, and R. Hu. G-dexgrasp: Generalizable dexterous grasping synthesis via part-aware prior retrieval and prior-assisted generation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 11447–11457, 2025. [13] J. Lee, E. Park, and M. Cho. Dexter: Language-driven dexterous grasp generation with embodied reasoning. arXiv preprint arXiv:2601.16046 , 2026. [14] G. Li, D. Sun, L. Sevilla-Lara, and V. Jampani. One-shot open affordance learning with foundation models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3086–3096, 2024. [15] H. Li, W. Mao, W. Deng, C. Meng, H. Fan, T. Wang, Y. Osamu, P. Tan, H. Wang, and X. Deng. Multi-graspllm: A multimodal llm for multi-hand semantic guided grasp generation. arXiv preprint arXiv:2412.08468 , 2024. [16] P. Li, T. Liu, Y. Li, Y. Geng, Y. Zhu, Y. Yang, and S. Huang. Gendexgrasp: Generalizable dexterous grasping. In 2023 IEEE international conference on robotics and automation (ICRA) ,pages 8068–8074. IEEE, 2023. [17] S. Li, S. Bhagat, J. Campbell, Y. Xie, W. Kim, K. Sycara, and S. Stepputtis. Shapegrasp: Zero-shot task-oriented grasping with large language models through geometric decomposition. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 10527–10534. IEEE, 2024. 10 [18] S. Liu, Y. Zhou, J. Yang, S. Gupta, and S. Wang. Contactgen: Generative contact modeling for grasp generation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 20609–20620, 2023. [19] T. Liu, Z. Liu, Z. Jiao, Y. Zhu, and S.-C. Zhu. Synthesizing diverse and physically stable grasps with arbitrary hand structures using differentiable force closure estimator. IEEE Robotics and Automation Letters , 7(1):470–477, 2021. [20] Y. Liu, Y. Yang, Y. Wang, X. Wu, J. Wang, Y. Yao, S. Schwertfeger, S. Yang, W. Wang, J. Yu, et al. Realdex: Towards human-like grasping for robotic dexterous hand. arXiv preprint arXiv:2402.13853 , 2024. [21] J. Lu, H. Kang, H. Li, B. Liu, Y. Yang, Q. Huang, and G. Hua. Ugg: Unified generative grasping. In European Conference on Computer Vision , pages 414–433. Springer, 2024. [22] Y. Ma, K. Chen, K. Zheng, and Q. Dou. Contact map transfer with conditional diffusion model for generalizable dexterous grasp generation. arXiv preprint arXiv:2511.01276 , 2025. [23] V. Makoviychuk, L. Wawrzyniak, Y. Guo, M. Lu, K. Storey, M. Macklin, D. Hoeller, N. Rudin, A. Allshire, A. Handa, et al. Isaac gym: High performance gpu-based physics simulation for robot learning. arXiv preprint arXiv:2108.10470 , 2021. [24] C. Mao, H. Yuan, Z. Huang, C. Xu, K. Ma, and Z. Lu. Universal dexterous functional grasping via demonstration-editing reinforcement learning. arXiv preprint arXiv:2512.13380 , 2025. [25] W. Moon, H. S. Seong, and J.-P. Heo. Selective contrastive learning for weakly supervised affordance grounding. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 5210–5220, 2025. [26] D. Morrison, P. Corke, and J. Leitner. Egad! an evolved grasping analysis dataset for diversity and reproducibility in robotic manipulation. IEEE Robotics and Automation Letters , 5(3):4368– 4375, 2020. [27] R. M. Murray, Z. Li, and S. S. Sastry. A mathematical introduction to robotic manipulation .CRC press, 2017. [28] S. Qian, W. Chen, M. Bai, X. Zhou, Z. Tu, and L. E. Li. Affordancellm: Grounding affordance from vision language models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 7587–7597, 2024. [29] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. Rädle, C. Rolland, L. Gustafson, et al. Sam 2: Segment anything in images and videos. arXiv preprint arXiv:2408.00714 , 2024. [30] S. Ross, G. Gordon, and D. Bagnell. A reduction of imitation learning and structured prediction to no-regret online learning. In Proceedings of the fourteenth international conference on artifi-cial intelligence and statistics , pages 627–635. JMLR Workshop and Conference Proceedings, 2011. [31] Shadow Robot Company. Dexterous hand. https://www.shadowrobot.com/ dexterous-hand-series/ , 2024. [32] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo. Robotics: modelling, planning and control .Springer, 2009. [33] O. Taheri, N. Ghorbani, M. J. Black, and D. Tzionas. Grab: A dataset of whole-body human grasping of objects. In European conference on computer vision , pages 581–600. Springer, 2020. [34] D. Turpin, L. Wang, E. Heiden, Y.-C. Chen, M. Macklin, S. Tsogkas, S. Dickinson, and A. Garg. Grasp’d: Differentiable contact-rich grasp synthesis for multi-fingered hands. In European Conference on Computer Vision , pages 201–221. Springer, 2022. 11 [35] D. Turpin, T. Zhong, S. Zhang, G. Zhu, J. Liu, R. Singh, E. Heiden, M. Macklin, S. Tsogkas, S. Dickinson, et al. Fast-grasp’d: Dexterous multi-finger grasp generation through differentiable simulation. arXiv preprint arXiv:2306.08132 , 2023. [36] W. Wan, H. Geng, Y. Liu, Z. Shan, Y. Yang, L. Yi, and H. Wang. Unidexgrasp++: Improving dexterous grasping policy learning via geometry-aware curriculum and iterative generalist-specialist learning. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 3891–3902, 2023. [37] R. Wang, J. Zhang, J. Chen, Y. Xu, P. Li, T. Liu, and H. Wang. Dexgraspnet: A large-scale robotic dexterous grasp dataset for general objects based on simulation. arXiv preprint arXiv:2210.02697 , 2022. [38] W. Wang, F. Wei, L. Zhou, X. Chen, L. Luo, X. Yi, Y. Zhang, Y. Liang, C. Xu, Y. Lu, et al. Unigrasptransformer: Simplified policy distillation for scalable dexterous robotic grasping. In 
+
+Proceedings of the Computer Vision and Pattern Recognition Conference , pages 12199–12208, 2025. [39] Y.-L. Wei, J.-J. Jiang, C. Xing, X.-T. Tan, X.-M. Wu, H. Li, M. Cutkosky, and W.-S. Zheng. Grasp as you say: Language-guided dexterous grasp generation. Advances in Neural Information Processing Systems , 37:46881–46907, 2024. [40] Y.-L. Wei, M. Lin, Y. Lin, J.-J. Jiang, X.-M. Wu, L.-A. Zeng, and W.-S. Zheng. Afforddexgrasp: Open-set language-guided dexterous grasp with generalizable-instructive affordance. In Pro-ceedings of the IEEE/CVF International Conference on Computer Vision , pages 11818–11828, 2025. [41] Z. Weng, H. Lu, D. Kragic, and J. Lundell. Dexdiffuser: Generating dexterous grasps with diffusion models. IEEE Robotics and Automation Letters , 9(12):11834–11840, 2024. [42] S. Wold, K. Esbensen, and P. Geladi. Principal component analysis. Chemometrics and intelligent laboratory systems , 2(1-3):37–52, 1987. [43] Wonik Robotics. Allegro hand. https://www.wonikrobotics.com/ research-robot-hand , 2024. [44] X. Wu, T. Liu, C. Li, Y. Ma, Y. Shi, and X. He. Fastgrasp: Efficient grasp synthesis with diffusion. In 2025 International Conference on 3D Vision (3DV) , pages 735–747. IEEE, 2025. [45] Z. Wu, S. Song, A. Khosla, F. Yu, L. Zhang, X. Tang, and J. Xiao. 3d shapenets: A deep representation for volumetric shapes. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 1912–1920, 2015. [46] G.-H. Xu, Y.-L. Wei, D. Zheng, X.-M. Wu, and W.-S. Zheng. Dexterous grasp transformer. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 17933–17942, 2024. [47] Y. Xu, W. Wan, J. Zhang, H. Liu, Z. Shan, H. Shen, R. Wang, H. Geng, Y. Weng, J. Chen, et al. Unidexgrasp: Universal robotic dexterous grasping via learning diverse proposal generation and goal-conditioned policy. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4737–4746, 2023. [48] Y. Yang, W. Zhai, H. Luo, Y. Cao, J. Luo, and Z.-J. Zha. Grounding 3d object affordance from 2d interactions in images. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 10905–10915, 2023. [49] H. Yuan, Z. Huang, Y. Wang, C. Mao, C. Xu, and Z. Lu. Demograsp: Universal dexterous grasping from a single demonstration. arXiv preprint arXiv:2509.22149 , 2025. [50] H. Yuan, B. Zhou, Y. Fu, and Z. Lu. Cross-embodiment dexterous grasping with reinforcement learning. arXiv preprint arXiv:2410.02479 , 2024. [51] J. Zhang, W. Huang, B. Peng, M. Wu, F. Hu, Z. Chen, B. Zhao, and H. Dong. Omni6dpose: A benchmark and model for universal 6d object pose estimation and tracking. In European Conference on Computer Vision , pages 199–216. Springer, 2024. 12 [52] J. Zhang, H. Liu, D. Li, X. Yu, H. Geng, Y. Ding, J. Chen, and H. Wang. Dexgraspnet 2.0: Learning generative dexterous grasping in large-scale synthetic cluttered scenes. In 8th Annual Conference on Robot Learning , 2024. [53] J. Zhang, Z. Ma, T. Wu, Z. Chen, and H. Dong. Cadgrasp: Learning contact and collision aware general dexterous grasping in cluttered scenes. arXiv preprint arXiv:2601.15039 , 2026. [54] F. Zhao, D. Tsetserukou, and Q. Liu. Graingrasp: Dexterous grasp generation with fine-grained contact guidance. In 2024 IEEE international conference on robotics and automation (ICRA) ,pages 6470–6476. IEEE, 2024. [55] Y. Zhong, X. Huang, R. Li, C. Zhang, Z. Chen, T. Guan, F. Zeng, K. N. Lui, Y. Ye, Y. Liang, et al. Dexgraspvla: A vision-language-action framework towards general dexterous grasping. In 
+
+Proceedings of the AAAI Conference on Artificial Intelligence , volume 40, pages 18836–18844, 2026. [56] Y. Zhong, Q. Jiang, J. Yu, and Y. Ma. Dexgrasp anything: Towards universal robotic dex-terous grasping with physics awareness. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22584–22594, 2025. [57] H. Zhu, Q. Kong, K. Xu, X. Xia, B. Deng, J. Ye, R. Xiong, and Y. Wang. Grounding 3d object affordance with language instructions, visual observations and interactions. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 17337–17346, 2025. [58] R. Zurbrügg, A. Cramariuc, and M. Hutter. Graspqp: Differentiable optimization of force closure for diverse and robust dexterous grasping. In Conference on Robot Learning , pages 2583–2602. PMLR, 2025. 13 A Additional Implementation Details 
+
+A.1 Simulation and Training Setup 
+
+We conduct our experiments in Isaac Gym [ 23 ] using a dexterous hand in a tabletop manipulation environment. The table size is set to 1.0 × 1.0 × 0.6 m, and objects are initialized at a height of 0.7
+
+m, i.e., 0.1 m above the tabletop. For the experiments, we use DexGraspNet [ 37 ] objects with scale factors of {0.06 , 0.08 , 0.10 , 0.12 , 0.15 }. The task goal is to lift an object placed on the table to 0.3 mabove the tabletop. Each training run takes approximately 16 hours on a single NVIDIA GeForce RTX 4090 GPU. The training hyperparameters used in simulation are reported in Table 6. Table 6: Hyperparameters of our experimental setup.             
+
+> Hyperparameter Value Common
+> Episode length 200 Training epochs per iteration 5Action moving average coefficient 1.0 Training iterations 20,000 Random seed 8
+> State-based policy
+> Number of environments 11,000 Parallel rollout steps per iteration 8Number of minibatches per epoch 8
+> Vision-based policy
+> Number of environments 4,096 Parallel rollout steps per iteration 1Number of minibatches per epoch 4
+
+A.2 Reward Terms 
+
+Here, we provide additional implementation details for the reward terms in Eq. 10. In implementation, each reward term is computed at every simulation timestep t. The policy reward consists of three components: a pose-guidance reward, a contact-conditioned pose reward, and the task reward. The first two terms encourage the hand to follow the reference hand state derived from our pseudo pose prior θ∗, and contact map Q(k)final , while the task reward drives the actual grasp-and-lift behavior. We first define a pose-tracking score that measures how closely the current hand state matches the reference hand state: 
+
+rtrack  
+
+> t
+
+= exp( −λw∥∆wt∥2 − λϕ∥∆ϕt∥2 − λθ ∥∆θt∥1) , (11) where ∆wt, ∆ϕt, and ∆θt denote the wrist-position, wrist-orientation, and joint-configuration errors with respect to the reference hand state, respectively. We set λw = 7 .0, λϕ = 2 .0, and λθ = 0 .12 .The pose-guidance reward is then defined as 
+
+rpose  
+
+> t
+
+= β κ t rtrack  
+
+> t
+
+, (12) where β = 0 .55 . The weight κt decays over the first 80 time steps with a minimum value of 0.15 . This emphasizes reference-pose guidance early in the episode and gradually reduces its effect over time. To encourage the fingertips to reach the intended contact region Q(k)final , we add a contact-conditioned pose reward: 
+
+rcontact  
+
+> t
+
+= βc bt rtrack  
+
+> t
+
+, (13) Here, bt ∈ { 0, 1} denotes a binary indicator of fingertip contact with Q(k)final , and we set βc = 0 .25 .In addition to the pose-guidance terms, we use a task reward rtask  
+
+> t
+
+based on the grasp-and-lift reward from the baseline [11]. It consists of approach, lift, goal-reaching, and bonus terms: 
+
+rtask  
+
+> t
+
+= rapproach  
+
+> t
+
++ rlift  
+
+> t
+
++ rgoal  
+
+> t
+
++ rbonus  
+
+> t
+
+. (14) The approach term guides the hand toward the object. The lift term encourages the object to be raised from the table, and the goal-reaching term encourages the lifted object to move toward the target 14 position. The bonus term provides an additional reward when the object is sufficiently close to the target. The total reward at timestep t is given by 
+
+rt = rpose  
+
+> t
+
++ rcontact  
+
+> t
+
++ rtask  
+
+> t
+
+. (15) 
+
+A.3 Evaluation Metrics 
+
+We evaluate each method using the following four metrics. • Grasp Success Rate (GSR) GSR measures the fraction of episodes in which the object is lifted and held near the target position. An episode is considered successful if the object remains within 5 cm of the lifting goal for 20 consecutive time steps. • Mean Success Affordance Distance (mSAD) mSAD measures intent alignment using the Euclidean distance between fingertip contacts and the intended contact region. It is averaged over successful episodes only, with lower values indicating better alignment. • Style Diversity (SD) SD measures the diversity of hand postures among successful episodes. We collect the final hand joint configuration from each successful episode, compute pairwise Euclidean distances among them, and report the average distance. • Intent Success Rate (ISR) ISR measures the fraction of episodes that satisfy both grasp success and intent-consistent contact. For episode n, intent success is defined as GSR n = 1 
+
+and SAD n < 0.04 m . The reported ISR is averaged over all evaluation episodes. 
+
+## B Contact Map Generation Details 
+
+B.1 VLM-based Grasp Intent Proposal 
+
+For each object, we render four side-view RGB images (e.g., front, left, back, and right) and provide them jointly to Qwen3-VL-8B-Instruct [ 1]. The VLM predicts between two and four grasp intents, where each intent corresponds to a distinct object-centric graspable part. For each intent, the VLM outputs a part name, a short description, per-view visibility, a 2D bounding box for each visible view, and a confidence score. The prompt discourages overly complex object-part names, enforces consistent naming across views, and suppresses bounding-box predictions for views where the part is not visible. The VLM output is required to be valid JSON, which is parsed into a structured set of per-view part proposals. The full prompt, including a compact description of the required JSON output format, is shown in Fig. 5. We decode with temperature 0.2, repetition penalty 1.1, and a maximum of 3000 new tokens. During post-processing, invalid bounding boxes are removed and confidence scores are clipped to [0 , 1] . If the visibility flag is missing or unreliable, we determine visibility based on whether a valid bounding box exists. These predictions are used as coarse semantic proposals; the final 3D contact maps are obtained through mask extraction, depth projection, and Semantic-Geometric Consistency Refinement. 
+
+B.2 Semantic-Geometric Contact Map Generation 
+
+This section provides additional implementation details for generating the semantic-geometric contact maps used in our experiments. Starting from the VLM-predicted [ 1] per-view bounding boxes, we first apply SAM2 [ 29 ] within each box to obtain a binary mask for the corresponding graspable part. The extracted mask is intersected with the valid object silhouette obtained from the rendered depth map, which removes mask leakage outside the object region. For each grasp intention, we then construct a per-view confidence map by assigning the VLM confidence score to pixels inside the filtered mask and zero elsewhere. These confidence maps are refined using neighboring-view support: mask pixels are lifted to 3D using the rendered depth and camera parameters, reprojected to adjacent views, and considered supported only when the reprojected location is depth-consistent and lies inside the corresponding part Eq. 5. Supported pixels receive additional confidence from the neighboring view, and the resulting maps are globally normalized across the four views. The normalized 2D confidence maps are finally lifted to the object surface to obtain a scored 3D point cloud for each grasp intention. We aggregate points from all visible views and associate each point with its refined confidence score. To remove fragmented or geometrically inconsistent regions, we select a high-confidence seed component and expand it only to nearby candidate points that satisfy 15 You are given 4 RGB images of the object , captured sequentially while moving counter- clockwise around the object from an arbitrary starting angle. All images are side views of the object.     
+
+> Task:
+> Analyze the four views jointly, predict between min_part and max_part distinct object-centric graspable parts, and localize each predicted part consistently across all visible views using tight 2D bounding boxes.
+> Rules:
+> - Each intention must correspond to one distinct physical 3D part that is plausible for robotic grasping. - Use simple, broad, human-readable part names, and keep the name for the same physical part across views. - Intention names must be simple, human-readable object-part names in plain English. - Output a bbox only when the target part is visible; otherwise set visible to false and bbox to null. - Bounding boxes must tightly cover only the visible region of the target part. - Confidence score must be in [0, 1]. You are an intelligent assistant for multi-view robotic grasp-part prediction. First predict multiple graspable intentions from all four views, then localize each intention consistently across the four views.
+> Output format:
+> - The model outputs a JSON object with the object name and grasp intentions. - Each intention contains a part name and per-view bbox, visibility, and confidence score for image_1–image_4.
+
+Prompt Details for Contact Map Generation Figure 5: Prompt used for VLM-based grasp intent proposal, including the JSON output format. the local convexity criterion in Eq. 7. The remaining points form the final semantic-geometric contact map used for inverse-kinematics-based pose initialization and policy learning. Figure 6 visually illustrates the overall semantic-geometric contact map generation process. 
+
+## C Inverse Kinematics 
+
+C.1 Jacobian-Based Inverse Kinematics 
+
+This appendix details the local damped least-squares solver [ 2 ] used to optimize Eq. 9. Starting from an initial hand configuration h0 = ( w0, ϕ 0, θ 0), we perform 12 iterative updates. At each update, given the current configuration h, we first instantiate the closest target point for each fingertip within its assigned contact region: 
+
+y⋆f = arg min 
+
+> y∈R (k)
+> f
+
+∥ξf (h) − y∥2 . (16) The fingertip-position residuals are then concatenated as 
+
+e = ξf (h) − y⋆f
+
+  
+
+> f∈F
+
+. (17) Let J = ∂e/∂h denote the stacked fingertip Jacobian evaluated at the current configuration. We compute the damped least-squares update as 
+
+∆h = −J⊤  JJ ⊤ + λ2dls I−1 e, h ← h + η∆h, (18) where λdls is the damping coefficient and η is the step size. After each update, the nearest target points are recomputed from the assigned contact regions, yielding a local alternating procedure between target-point selection and IK update. Let the final IK state be h⋆ = ( w⋆, ϕ ⋆, θ ⋆). During training, we use only the joint component θ⋆ as pseudo-pose supervision. The IK result is used only as a pseudo-pose label for training, not as a robot trajectory, and is not used during evaluation. 
+
+C.2 Analysis of IK-based Pseudo Pose Guidance 
+
+The role of the pseudo pose in SECOND-Grasp is not to produce a final executable grasp, but to provide an intermediate hand-level prior for policy learning. Given a refined semantic-geometric contact map, we only need a hand configuration that roughly aligns the fingertips with the intended contact region while respecting the kinematic structure of the target hand. Thus, we prioritize efficient contact-aligned guidance over exhaustive pose optimization. 16 Valid             
+
+> Camera i
+> front
+> door
+> wheel
+> left right back
+> hood VLM + SAM
+> mask extraction
+> Source view (i)Neighboring view (j)
+> 1) back-project to 3D 2) reproject to view j
+> depth
+> pixel
+> depth
+> pixel
+> mask overlap depth consistency
+> Invalid
+> : seed point
+> : inside candidate
+> : outside candidate
+> invalid / reject
+> valid / accept
+> (a) Semantic Contact Region Proposal
+> (b) Cross-View Semantic Refinement (Eq. 5)
+> (c) 3D Geometric Refinement (Eq. 7) Overall Results
+> (a) (b) (c)
+
+Semantic-Geometric Contact Map Generation  
+
+> Camera j
+
+Figure 6: Overview of Semantic Contact Map Generation. Visual illustration of the geometric refinement steps in Semantic-Geometric Consistency Refinement. To determine the number of IK iterations used in our pseudo-pose generation pipeline, we evaluate the efficiency–alignment trade-off by running IK with 1, 3, 12, and 50 iterations and comparing it with baseline pose-generation methods on the same refined contact maps Q(k)final . We sample 100 objects from DexGraspNet [ 37 ] and report inference time and Contact Coverage (Cov.). Inference time is measured in seconds as the average wall-clock time required to generate one pseudo pose from the same object and refined contact map input. Following prior works [ 39 , 22 ], Cov.@ τ measures the percentage of hand surface points whose signed distance to the object surface lies within [−τ, τ ],where τ ∈ { 2 mm , 5 mm }.As shown in Table 7, increasing the number of IK iterations improves contact alignment. The 12-iteration setting achieves the best Cov.@2mm and matches the best Cov.@5mm among IK settings, while increasing to 50 iterations does not improve coverage and increases inference time by more than 4×. Based on this trade-off, we adopt 12 IK iterations throughout our method. Compared with optimization- and generative-based pose-generation methods, this setting provides competitive contact alignment with substantially lower computational cost. These results support our choice of IK-based pseudo poses as efficient intermediate guidance for policy learning rather than final grasp synthesis. Table 7: Efficiency and contact-alignment comparison for pseudo-pose generation. IK with 12 iterations provides a practical trade-off between contact coverage and inference time, making it suitable as intermediate guidance for policy learning. Metrics Inverse Kinematics Optimization-based Method Generative-based Method Iter. = 1 Iter. = 3 Iter. = 12 Iter. = 50 GenDexGrasp [16] UGG [21] DGA [56] Inf. Time (s) ↓ 0.004 0.037 0.187 0.836 11.329 9.222 0.622 Cov.@2mm (%) ↑ 2.220 3.330 3.780 3.110 2.622 0.001 1.206 Cov.@5mm (%) ↑ 12.000 15.110 15.110 14.440 16.585 2.547 8.839 
+
+C.3 Effect of IK-derived Pseudo Pose on Policy Learning 
+
+We further analyze how the IK-derived pseudo pose affects policy learning. Learning dexterous grasping from task reward alone often requires extensive exploration, as the policy must discover 17 effective contact locations and finger coordination by itself. The IK-derived pseudo pose converts the refined contact map into a joint-level target θ⋆. This provides the policy with a feasible hand configuration whose fingertips are already close to the intended contact regions. To isolate this effect, we train two policy variants under the same task reward, object split, simulation setting, and hyperparameters: one with auxiliary supervision toward the pseudo pose θ⋆, and one without it. For each variant, we plot the training time episode success rate and normalized reward in Figure 7. Without pseudo-pose supervision, the policy improves only after a long delay, indicating that contact discovery from task feedback alone is inefficient. In contrast, the policy trained with θ⋆
+
+achieves high reward and success much earlier, showing that the pseudo pose serves as an intermediate hand-pose prior that accelerates early contact formation and grasp stabilization. The final performance gap is smaller than the early training gap, suggesting that the main benefit of pseudo-pose supervision is not to prescribe the final grasp, but to guide the policy toward contact-rich states during learning. 0                
+
+> 1.0
+> 0.8
+> 0.6
+> 0.4
+> 0.2
+> 020k 2.5k 5k 7.5k 10k 12.5k 15k 17.5k
+> Normalized Reward Comparison
+> 0
+> Episode Success Comparison
+> 1.0
+> 0.8
+> 0.6
+> 0.4
+> 0.2
+> 020k 2.5k 5k 7.5k 10k 12.5k 15k 17.5k
+> : w/o pseudo pose
+> : w/ pseudo pose
+> : w/o pseudo pose
+> : w/ pseudo pose
+
+Figure 7: Effect of IK-derived Pseudo-Pose Supervision on Policy Learning. 
+
+## D Additional Results 
+
+D.1 Transfer to Allegro Hand 
+
+We further test whether the same contact-map representation can support grasping with a different robot hand, the Allegro Hand. This transfer is not a direct pose copy because the two hands have different finger layouts and joint spaces. Shadow Hand commonly has five digits and 20 actuated DoFs, whereas Allegro Hand has four fingers and 16 actuated DoFs. Therefore, a joint pose defined for Shadow Hand cannot be directly applied to Allegro Hand. Prior methods [ 50 ] often transfer grasps through hand-specific pose retargeting, which may require additional optimization or training. Our method instead keeps the contact map on the object and recomputes the joint target using IK with the Allegro Hand. Thus, the intended object region stays the same, while the hand pose is adapted to the new hand embodiment. Figure 8 shows that the Allegro Hand grasps and lifts the object from the intended region, such as the watch band or clasp. Table 8 shows that 12 iterations of IK provide a good balance between runtime and contact coverage. Compared with the pose-generation baseline, our result is much faster 
+
+(0 .302 s vs. 5.086 s) and achieves higher Cov.@5mm (0 .158 vs. 0.033) . These results show that our method provides reliable contact map and effective initial poses even for a different hand embodiment, demonstrating that the intent-aware representation can transfer beyond the original hand embodiment. Table 8: Comparison of pseudo-pose efficiency across different IK iterations and baseline pose-generation methods. All methods are evaluated on the same sampled DexGraspNet training objects. Hand / Dataset Metrics Inverse Kinematics Generative-based Method Iter. = 1 Iter. = 3 Iter. = 12 Iter. = 50 Dexdiffuser [41] Allegrohand (DexGraspNet) Inf. Time (s) ↓ 0.028 0.078 0.302 0.468 5.086 Cov.@2mm ↑ 0.005 0.026 0.038 0.040 0.003 Cov.@5mm ↑ 0.056 0.087 0.158 0.173 0.033 
+
+D.2 Qualitative Results of Contact-Map Refinement 
+
+Figure 9 shows additional qualitative examples of Semantic-Geometric Consistency Refinement (SGCR) on objects from datasets beyond DexGraspNet [ 37 ]. Starting from coarse contact proposals, SGCR removes noisy regions and refines the contact map around the intent-specified object part. Across diverse datasets, including DexGraspAnything (DGA) [ 56 ], EGAD [ 26 ], Omni6DPose [ 51 ], ModelNet40 [ 45 ], and VisualDexterity [ 4], the refined maps become more compact and geometrically 18 Init Reach Grasp Lift Final Contact map Object 
+
+Watch 
+
+band 
+
+clasp Figure 8: Additional qualitative results of intent-aware grasping on the Allegro Hand. Initial Contact Map Semantic Refinement                       
+
+> Grasp Intention Geometric Refinement Initial Contact Map Semantic Refinement
+> Grasp Intention Geometric Refinement
+> middle of
+> the sculpture. crossbar of the letter H.
+> wheel of the car .tail of the airplane.
+> head of the dinosaur .nozzle of the hair dryer.
+> heel of the shoe.
+> leg of the doll .
+> EGAD  ModelNet40 Omni6DPose VisualDexterity
+
+Figure 9: Cross-dataset qualitative results of SGCR contact-map refinement. Coarse contact proposals are refined into geometrically coherent contact maps on objects from diverse datasets. consistent while preserving the intended contact semantics. These results provide additional evidence that SGCR remains effective under cross-dataset object distribution shifts. 
+
+D.3 Qualitative Results of Intent-aware Grasping 
+
+Figure 10 presents additional qualitative examples of intent-aware grasping across diverse object categories and semantic part intents. Rather than producing a single stereotyped grasp, our method adapts the refined contact map and the resulting grasp behavior to the requested intent. For instance, on the same microscope object, different intents such as head, arm, and base lead to distinct contact maps concentrated on the corresponding semantic regions. The learned policy then follows these intent-specific contact cues to approach, grasp, and lift the object from the desired part, resulting in clearly different hand placements. Across objects and semantic parts, these examples highlight that our method performs intent-conditioned grasping instead of relying on a fixed grasping pattern. 19 Donkey     
+
+> body
+> head
+> leg
+> Init Reach Grasp Lift Final Contact map Object
+> Microscope
+> Cow
+> hip
+> head
+> arm
+> base
+> head
+> Mug
+> body
+> handle
+
+Figure 10: Additional qualitative results of intent-aware grasping. SECOND-Grasp adapts the refined contact map and resulting grasp behavior according to the specified semantic part intent. 20
