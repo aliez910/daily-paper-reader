@@ -1,0 +1,1913 @@
+Title: Zero-Shot Sim-to-Real Robot Learning: A Dexterous Manipulation Study on Reactive Catching
+
+URL Source: https://arxiv.org/pdf/2605.09789v1
+
+Published Time: Tue, 12 May 2026 02:23:58 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Zero-Shot Sim-to-Real Robot Learning: A Dexterous Manipulation Study on Reactive Catching 
+
+Kejia Ren 1, Gaotian Wang 1, Andrew S. Morgan 2 and Kaiyu Hang 1
+
+> 1
+
+Department of Computer Science, Rice University 
+
+> 2
+
+Robotics and AI Institute 
+
+Abstract —Dexterous manipulation is physics-intensive and highly sensitive to modeling errors and perception noise, making sim-to-real transfer prohibitively challenging. Domain random-ization (DR) is commonly used to improve the robustness of learned policies for such tasks, but conventional DR randomizes one instance per episode, offering very limited exposure to the variability of real-world dynamics. To this end, we propose Domain-Randomized Instance Set (DRIS), which represents and propagates a set of randomized instances simultaneously, pro-viding richer approximation of uncertain dynamics and enabling policies to learn actions that account for multiple possible outcomes. Supported by theoretical analysis, we show that DRIS yields more robust policies and alleviates the need for real-world fine-tuning, even with a modest number of instances (e.g., 10). We demonstrate this on a challenging reactive catching task. Unlike traditional catching setups that use end-effectors designed to mechanically stabilize the object (e.g., curved or enclosing surfaces), our system uses a flat plate that offers no passive stabilization, making the task highly sensitive to noise and requiring rapid reactive motions. The learned policies exhibit strong robustness to uncertainties and achieve reliable zero-shot sim-to-real transfer. 
+
+I. I NTRODUCTION 
+
+Dexterous manipulation refers to the robot’s ability to skill-fully manipulate objects through coordinated and intentional contact interactions, e.g., in-hand manipulation [5, 11], tool use [26], pushing [14], catching [25], etc. Such tasks often require well-planned contact, timing, and motion to achieve stable and adaptive control over object behavior. Moreover, they often introduce a substantial sim-to-real gap, as the success of such tasks can be highly sensitive to inaccuracies in estimating the underlying dynamics and physical proper-ties such as contact geometry, frictions, object inertia, and compliance. Even small discrepancies between simulation and the real world can lead to large deviations in manipulation behavior and ultimately cause task failure. Traditional model-based frameworks depend on known sys-tem parameters to achieve accurate prediction and control [9]. However, in practical manipulation scenarios, properties such as contact stiffness, friction coefficients, and object geometries can greatly vary between environments and are difficult to pre-cisely identify. Learning-based methods address these limita-tions by training policies with extensive domain randomization or data augmentation over uncertain physical parameters in simulation [33], improving the robustness to these uncertain-ties when deployed in the real world. Yet, tasks involving very dynamic, contact-rich interactions remain difficult to learn, as 
+
+Fig. 1: Robot reactive catching of a rubber ball using a flat plate. The second row shows sequential impacts during the catching motion, where the final frame depicts the ball successfully stabilized on the plate; the yellow arrows indicate the ball’s trajectory at the moments of impact. their success hinges on precise coordination of contact timing and force modulation under uncertainty. Domain randomization is traditionally performed by per-turbing relevant physical parameters during data collection, e.g., sampling one object instance with randomized properties in each rollout and training policy on the collected rollouts. While this exposes the policy to diverse experiences, it lacks a structured mechanism for the policy to reason about how uncertainties affect possible manipulation outcomes. In con-trast, if such uncertainties are explicitly incorporated into the task representation itself, the policy can learn to generate actions that compensate for them and plan with respect to a distribution of possible outcomes, thereby mitigating the sim-to-real gap introduced by these uncertainties. To this end, rather than training a policy on individual 
+
+> arXiv:2605.09789v1 [cs.RO] 10 May 2026
+
+manipulation instances with randomly sampled physical pa-rameters (as is done in conventional domain randomization), we propose Domain-Randomized Instance Set (DRIS) that explicitly models a distribution of possible physical variations encountered during manipulation. Our proposed DRIS con-tains multiple parallel instances (e.g., objects with different physical properties), all of which are propagated simultane-ously. Their state evolutions under a shared action jointly inform the policy update. As a result, the learned policy becomes inherently tolerant to the uncertainties encoded in DRIS, leading to improved robustness against the sim-to-real gap (e.g., enabling reliable zero-shot transfer). To demonstrate the effectiveness of the proposed learning strategy, we consider a highly challenging reactive catching task illustrated in Fig. 1. Unlike traditional catching setups that employ curved or concave end-effectors such as cups [15], nets [17], or articulated hands [7], to mechanically stabilize the object after impact, our setup uses a flat and low-friction plate rigidly attached to the robot’s end-effector. As a result, the system becomes highly sensitive to physical uncertainties or perception errors, where even small errors in contact timing, plate orientation, or unwanted lateral forces can cause the ball to bounce off or roll away from the plate. In this work, we propose a robust learning strategy for dy-namic manipulation, demonstrated through a challenging robot reactive catching case study. Our key technical contributions are summarized as follows: 1) We propose Domain-Randomized Instance Set (DRIS) as a representation to capture the uncertainty in system dynamics induced by physical parameter variations; 2) We propose a DRIS-based data collection and policy learning paradigm that enables simultaneous handling of multiple task instances, yielding more stable and robust policy learning and improved zero-shot sim-to-real transfer than the traditional paradigm, supported by theoretical analysis; 3) We instantiate the framework on a challenging reactive catching problem with a tailored task representation and policy architecture, and validate our framework through both simulation and real-world experiments. II. R ELATED WORK 
+
+Reinforcement Learning for Dexterous Manipulation. Un-like traditional analysis-based approaches sensitive to mod-eling errors, Reinforcement Learning (RL) learns directly from data, making it advantageous for the complex contact dynamics of dexterous manipulation. RL has successfully solved tasks including in-hand manipulation [5, 11], catch-ing [1], juggling [36], deformable object manipulation [12], and regrasping [35]. However, these data-intensive methods typically require large-scale high-fidelity simulation or expert demonstrations to facilitate real-world transfer. 
+
+Sim-to-Real Transfer in Robotics. Bridging the sim-to-real gap caused by sensing and contact discrepancies is a central challenge. Beyond Domain Randomization (DR), researchers utilize high-fidelity simulators [51, 41, 27] or explicitly bridge the gap via adaptive system identification [54, 23, 45] and hybrid dynamics learning [3, 24]. While these techniques enable zero-shot transfer [49], reliable deployment for dy-namic manipulation remains difficult due to the discontinuous, stochastic nature of high-speed contact dynamics. 
+
+Domain Randomization in Robot Learning. Since real-world data collection is costly, DR is essential for reducing the simulation gap in contact-rich tasks [30, 21]. Randomization strategies have evolved from visual and geometric proper-ties [49, 50] to kinematic [16] and dynamic parameters [33]. While active DR optimizes sampling distributions to im-prove transfer [39, 10, 28, 29, 47], it typically requires real-world rollouts. Although some established works strategically employ DR—either through curriculum-based scaling [4] or entropy maximization [48]—to enable zero-shot ransfer, our approach differs by training over the joint evolution of multi-ple randomized instances simultaneously to achieve zero-shot transfer for challenging tasks such as catching. 
+
+Representing Uncertainty in States and Dynamics. Robotics has extensively studied uncertainty representation. Classical methods employ belief-space planning via POMDPs [37, 8, 22]. Learning-based approaches incorporate uncertainty through probabilistic latent dynamics [18, 19], history-based parameter inference [31, 44], or ensembles for model-based RL [13]. While some history-based approaches require real-world data in the loop [44], our approach is purely zero-shot. Furthermore, while others can perform adaptation on-line [31], they are not suitable enough for highly dynamic tasks such as catching, where the robot must react within milliseconds. Complementary to these, recent work learns belief embeddings to explicitly encode uncertainty for policy conditioning in partially observable settings [52]. While such belief-representation methods learn a latent state space to im-plicitly represent uncertainty, our approach more explicitly and intuitively captures the uncertainty through a multi-instance representation during high-speed contacts. 
+
+Dexterous Robot Catching. Catching typically requires fast prediction and reactive motion. Prior work evolved from optimization-based planning [7] and probabilistic models for uneven objects [25] to deep learning-based policies on mobile manipulators [55]. However, most rely on mechanically assist-ing end-effectors like cups [32, 15, 1], nets [17], or articulated hands [40, 20]. In contrast, we use a flat plate without mechanical stabilization. Unlike similar flat-surface work [6] limited to specific objects and a number of rebounds, our approach handles diverse conditions without such restrictions. III. L EARNING MANIPULATION POLICY WITH 
+
+DOMAIN -R ANDOMIZED INSTANCE SET 
+
+A. Dexterous Manipulation as Policy Learning 
+
+We consider the dexterous manipulation problem in which a robotic manipulator interacts with an object through contact-rich dynamics. We define the domain space C as the set of all relevant physical parameters that influence the system dynamics, such as robot characteristics (e.g., stiffness), object geometry and physical properties (e.g., friction). Each c ∈ C represents a specific domain instance that induces a particular realization of the system dynamics. These parameters are often difficult to measure accurately, but they can substantially affect the object’s motion during manipulation. The problem is formulated as a discrete-time Markov De-cision Process (MDP). At time step t, the system observes a state st ∈ S, executes an action at = π(st) ∈ A
+
+according to a robot policy π(·), and transitions to the next state st+1 = f (st, at, c), where the dynamics f depend on the domain parameter c. Different values of c (e.g., object properties) lead to distinct motion behaviors even under the same robot action. At each step, the system receives a scalar reward rt = r (st, at) ∈ R.The objective is to find an optimal policy πθ : S 7 → A ,that maximizes the expected return (i.e., cumulative reward), where γ ∈ [0 , 1) is a discount factor: 
+
+max 
+
+> πθ
+
+Eπθ
+
+"T −1X
+
+> t=0
+
+γt r (st, at)
+
+#
+
+s.t. at = πθ (st) ∈ A , ∀t = 0 , · · · , T − 1,
+
+st+1 = f (st, at, c) ∈ S , c ∈ C 
+
+(1) In deep reinforcement learning (DRL), the policy πθ is mod-eled by a neural network parameterized by θ, and optimized via gradient-based update using data collected from robot-object interactions. 
+
+B. Domain-Randomized Instance Set (DRIS) 
+
+In practice, physical parameters c are difficult to identify accurately, introducing uncertainty into manipulation dynam-ics. To improve robustness, most approaches model the dy-namics stochastically as a probability P (st+1 |st, at) and apply domain randomization to approximately capture this stochasticity, typically by sampling a single parameter instance per episode in standard model-free RL [33]. More recent methods further adapt the sampling distribution using real-world data [39, 47]. However, these strategies still predict only individual next states, and do not explicitly model how the distribution of possible states evolves over time. Inspired by prior work on set-based representations [53], rather than propagating a single state st, we instead propagate a set of possible states St ⊂ S simultaneously under a shared robot action, reflecting the effects of physical variations across different domain parameters. Specifically, we construct a discrete set ˆC ⊂ C of N manipulation instances (indexed by 
+
+i) by uniformly sampling from the domain space: 
+
+ˆC =
+
+n
+
+c(i)oNi=1 
+
+, c(i) ∼ U (C) (2) We then define the Domain-Randomized Instance Set (DRIS) 
+
+as the collection of state-parameter pairs associated with these sampled instances: 
+
+Dt =
+
+n 
+
+s(i) 
+
+> t
+
+, c(i)
+
+c(i) ∈ ˆC
+
+oNi=1 
+
+⊂ S × C (3) where s(i) 
+
+> t
+
+in each element denotes the state of the i-th manipu-lation instance, as it evolves at time t under its corresponding domain parameter c(i). For clarity, we also extract the state of all instances in the DRIS to form another set (i.e., the projection of Dt onto the state space S): 
+
+St = proj S (Dt) = 
+
+n
+
+s(i)
+
+> t
+
+
+
+s(i) 
+
+> t
+
+, c(i)
+
+∈ D t
+
+o
+
+⊂ S (4) We extend the system dynamics by introducing a new function 
+
+F to evolve the entire instance set: 
+
+Dt+1 =
+
+n 
+
+s(i)
+
+> t+1
+
+, c(i)o Ni=1 
+
+= F (Dt, at)=
+
+n 
+
+f
+
+
+
+s(i) 
+
+> t
+
+, at, c(i)
+
+, c(i) 
+
+s(i) 
+
+> t
+
+, c(i)
+
+∈ D t
+
+o
+
+(5) 
+
+C. Zero-Shot Sim-to-Real Learning 
+
+Since DRIS defined in Sec. III-B inherently embeds un-certainties into its representation, integrating DRIS into policy learning in simulation enables more robust sim-to-real transfer without fine-tuning. Because the DRIS size N may vary and because the robot will manipulate only a single instance (although trained with multiple instances in DRIS) in real de-ployment, the policy must take an input whose dimensionality is independent of N . Thereafter, we require a compact and size-agnostic representation of DRIS. To this end, we employ an encoder ψ(·) that maps the DRIS state (i.e., St) to a fixed-dimensional latent vector zt = ψ (St) ∈ Rdz , where dz is the latent dimension and remains constant regardless of the size 
+
+N of Dt. A policy that directly operates in this latent space is then learned by solving: 
+
+max 
+
+> πθ
+
+Eπθ
+
+ 
+
+> T−1
+
+X
+
+> t=0
+
+γt · 1
+
+N
+
+X 
+
+> s(i)
+> t∈S t
+
+r(s(i) 
+
+> t
+
+, at)
+
+
+
+s.t. at = πθ (zt) ∈ A , ∀t = 0 , · · · , T − 1,
+
+zt = ψ (St) ∈ Rdz , ∀t = 0 , · · · , T − 1,
+
+St = proj S (Dt) , ∀t = 0 , · · · , T − 1,
+
+Dt+1 = F (Dt, at) ⊂ S × C 
+
+(6) Compared to conventional DR, we summarize the benefits of DRIS in Theorem III.1: 
+
+Theorem III.1 (DRIS improves stability and robustness) .
+
+Relative to conventional domain randomization, DRIS is an exact particle approximation for the system belief propagation. Consequently, DRIS yields a more stable optimization, more robust policies, and improved sim-to-real generalization. (See Appendix B for detailed analysis and proofs.) 
+
+As illustrated in Fig. 2 (left) with a catching task, DRIS can typically be implemented by a set of multiple object instances, each initialized with different physical properties (domain parameters) such as shape, weight, and friction. The instances evolve independently, i.e., they do not interact with one another, and their respective state transitions under the same robot action are evaluated in parallel for policy update. We summarize the DRIS-based policy learning pipeline (using an on-policy example) and its zero-shot inference in Alg. 1. At each training iteration in simulation, we randomly Randomized:  
+
+> balls’ radii ,
+> friction coefficients ,
+> restitutions , etc.
+
+(a) (b) (c) 
+
+Fig. 2: The reactive catching problem instantiation. Left: Randomized parameters in DRIS. Right: Components used to represent the problem: (a) The motion frame is defined at the plate’s initial position pe 
+
+> 0
+
+and rotated about the Z-axis by angle ϕ so that its X-Z plane passes through the incoming ball. (b) The robot has moved from the initial ghosted to the current opaque configuration. The system state consists of the ball’s relative displacement dt (green arrow) to the plate and its linear velocity 
+
+vt (blue arrow), both expressed in the motion frame; these two quantities are decomposed with respect to the plate’s normal vector nt (yellow arrow) to define the reward. (c) The action comprises a translation of the plate δt (black arrow) and a tilting configuration: angle αt (green) specifies a horizontal axis wt (red arrow), about which the plate is rotated by angle βt (blue). 
+
+Algorithm 1 DRIS-based Policy Learning and Inference 
+
+Input: Domain parameter space C, initial policy πθ , DRIS encoder ψ, dynamics F modeled by a simulator 
+
+Part (a): Policy Learning in Simulation  
+
+> 1:
+
+while training do  
+
+> 2:
+
+s0 ← INIT STATE () ▷ Random Initialization  
+
+> 3:
+
+D0 ← {} ▷ Initialize DRIS  
+
+> 4:
+
+for i = 1 , · · · , N do  
+
+> 5:
+
+c(i) ∼ U (C), s(i)0 ← s0 
+
+> 6:
+
+D0 ← D 0 ∪
+
+n 
+
+s(i)0 , c(i)
+
+o  
+
+> 7:
+
+end for  
+
+> 8:
+
+T ← {} ▷ Simulation Rollout  
+
+> 9:
+
+for t = 0 , · · · , T − 1 do  
+
+> 10:
+
+St ← proj S (Dt) ▷ DRIS State  
+
+> 11:
+
+zt ← ψ (St), at ← πθ (zt) 
+
+> 12:
+
+rt ← 1
+
+> N
+
+P 
+
+> s∈S t
+
+r (s, at) ▷ Average Reward  
+
+> 13:
+
+Dt+1 ← F (Dt, at) ▷ Propagate by Eq. (5)  
+
+> 14:
+
+T ← T ∪ (zt, at, r t) 
+
+> 15:
+
+end for  
+
+> 16:
+
+πθ ← POLICY UPDATE (πθ , T ) ▷ Policy Update  
+
+> 17:
+
+end while 
+
+Part (b): Zero-Shot Inference in Real World  
+
+> 18:
+
+while not finished do  
+
+> 19:
+
+s ← OBSERVE STATE () ▷ Real-World State  
+
+> 20:
+
+z ← ψ ({s}), a ← πθ (z) ▷ Generate Action  
+
+> 21:
+
+finished ← EXECUTE (a) 
+
+> 22:
+
+end while 
+
+initialize the system state s0 and sample N different domain parameters from C to construct the DRIS, with all instances initialized at s0. We then collect on-policy rollouts to update the policy, where the rollout stores the encoded latent state 
+
+zt rather than the full set of instance states 
+
+n
+
+s(i)
+
+> t
+
+oNi=1 
+
+. After training, the policy can be deployed in the real world without fine-tuning: At each time step, the observed single real-world state s (equivalent to a DRIS of size N = 1 ) is encoded and provided as input to the trained policy to infer the next action, repeatedly until the task is finished. IV. R EACTIVE CATCHING CASE STUDY 
+
+We instantiate the proposed DRIS-based learning strategy on the problem of reactive ball catching with an M -DoF robot manipulator. As illustrated in Fig. 1, the robot is equipped with a flat plate rigidly attached to its end-effector and is required to catch a ball thrown toward it. To successfully perform this task, the robot must approach and make contact with the incoming ball, absorb its kinetic energy through controlled motions, and subsequently stabilize and balance the ball once it comes to rest on the plate. 
+
+A. Problem Representation 
+
+To enable a more compact problem representation and ensure the catching policy is invariant to the ball’s incoming direction, we define a fixed motion frame relative to the ball at 
+
+t = 0 (the beginning of manipulation). All task-related quanti-ties (e.g., state and action) are expressed in this motion frame. As shown in Fig. 2 (right-a), the motion frame is constructed with its origin at the plate’s center, its Z-axis aligned vertically upward, and its X-Z plane passing through the ball’s center. The transformation from the robot’s base frame to the motion frame is denoted by bTm = ( Rz (ϕ), pe
+
+> 0
+
+) ∈ SE (3) , where 
+
+Rz (ϕ) ∈ SO (3) denotes a rotation about the Z-axis by angle 
+
+ϕ and pe 
+
+> 0
+
+∈ R3 represents the plate’s center position at t = 0 ,expressed in the robot’s base frame. 
+
+State. The state of the system consists of the ball’s dis-placement relative to the plate’s center and its linear velocity, both expressed in the motion frame. Specifically, as shown in Fig. 2 (right-b), the state is denoted as st = ( dt, vt) ∈ R6,where dt = Rz (ϕ)⊤ (pot − pet ) ∈ R3 is the displacement of the ball (with position pot ) relative to the plate’s center Task Environment (Simulation )        
+
+> Encoder
+> 𝒮 𝑡
+> DRIS state Plate’s tilting configuration 𝒖 𝑡
+> FiLM MLP
+> 𝝀 (𝒖 𝑡 )
+> Policy 𝜋 𝜽
+> Action 𝒂 𝑡
+> Freeze Encoder Decoder
+> Loss: Chamfer Distance
+> Step 2: Policy Learning Step 1: DRIS Encoder Pre-training
+> Latent 𝒛 𝑡 𝝁 (𝒖 𝑡 )
+> Randomized 𝒄 (𝑖 )
+
+Fig. 3: Schematic overview of the DRIS-based learning pipeline. Step 1 (Left): The DRIS encoder is pre-trained to reconstruct the input DRIS state. Step 2 (Right): The policy network is trained via RL using the pre-trained (and frozen) DRIS encoder. At the beginning of each simulation episode, the physical property c(i) of each ball instance in the DRIS is randomized; at each time step, the DRIS state St is encoded and fed to the policy πθ to generate an action at.(with position pet ) at time t, expressed in the motion frame; 
+
+vt = Rz (ϕ)⊤vot ∈ R3 is the ball’s linear velocity vot
+
+transformed into the motion frame. 
+
+Action. The action is defined as at = ( δt, ut) ∈ R5, where 
+
+δt ∈ R3 denotes the displacement command of the plate’s center expressed in the motion frame, i.e., the corresponding target position of the plate’s center in the robot’s base frame is computed as ˜pet = Rz (ϕ) δt + pet . The remaining action component ut = ( αt, β t) ∈ R2 represents the target tilting configuration of the plate in 3D. Specifically, the plate is rotated about a horizontal axis wt = (cos αt, sin αt, 0) ⊤ by an angle βt, where αt ∈ [0 , 2π) and βt ∈ [0 , π/ 4) . This rotation tilts the plate’s normal vector nt ∈ R3 as illustrated in Fig. 2 (right-c). During execution, the complete action at
+
+is converted into a desired plate pose, which is then used to command the robot via joint torque control, as will be detailed in Sec. IV-D. 
+
+Reward. Given the observed state st = ( dt, vt) and the plate normal nt ∈ R3 with ∥nt∥ = 1 (all in the motion frame), we decompose the ball’s displacement and velocity into components perpendicular and parallel to the plate surface 
+
+d⊥, d∥, v⊥, v∥ ∈ R, as in Fig. 2 (right-b): 
+
+d⊥ = dt · nt, d∥ = ∥dt − d⊥ · nt∥
+
+v⊥ = vt · nt, v∥ = ∥vt − v⊥ · nt∥ (7) The reward is the sum of a velocity term rv ∈ (0 , 1] (which yields a higher value when the ball’s velocity is kept lower) and a constant penalty term rp = −1 applied when the ball moves beneath or outside the plate: 
+
+rt = r(st, at) = rv + rp,rv = 12 exp − v2
+
+> ∥
+
+η2
+
+!
+
++ 12 exp − max {v⊥, −0.1}2
+
+η2
+
+!
+
+,rp = −1 d⊥ < 0 ∨ d∥ > l e
+
+(8) where η ∈ R in the rv term is a decay coefficient controlling the sensitivity to ball velocity, and le ∈ R in rp term denotes the plate’s size (e.g., half length). 
+
+B. Training with DRIS 
+
+For the reactive catching problem, we consider four phys-ical properties as the domain parameters: the ball’s radius, static friction, dynamic friction, and restitution coefficient, i.e., 
+
+C ⊂ R4. As shown in Fig. 3, in each episode, we spawn 
+
+N balls whose physical properties are independently sampled from C to construct the DRIS. In a vectorized representation, the DRIS state is formed by concatenating the states (i.e., relative displacements and velocities) of these ball instances, i.e., St =
+
+
+
+s(1)  
+
+> t
+
+, · · · , s(N )
+
+> t
+
+
+
+∈ RN ×6.As described in Sec. III-C, an encoder ψ(·) is required to transform the DRIS state into a latent vector in a compact feature space. The encoder must be size-agnostic to the DRIS size N , mapping any set to a fixed-dimensional latent feature 
+
+zt ∈ Rdz where dz denotes the dimension of the latent feature space. We adopt a point cloud-based Autoencoder (AE) [2] and extend its input dimensionality from 3D to 6D by incorporating both the positions and velocities of balls. The point cloud AE consists of an encoder built from 1D convolutional layers followed by a feature-wise max-pooling layer to extract features of the input set [38], and an MLP-based decoder that reconstructs the original set from the latent feature. We collect a dataset of DRIS samples by executing random robot actions, and pre-train this AE to reconstruct DRIS state using the Chamfer distance as reconstruction loss: 
+
+Lψ (St, eS) = 1
+
+N
+
+X
+
+> s∈S t
+
+min  
+
+> s′∈eS
+
+∥s − s′∥2 + 1
+
+| eS| 
+
+X 
+
+> s′∈eS
+
+min 
+
+> s∈S t
+
+∥s − s′∥2
+
+(9) where St and eS denote the input and reconstructed DRIS state, respectively. The encoder from the pre-trained AE is then used as ψ(·) for downstream policy learning. With RL, at each training step, the pre-trained encoder ψ
+
+transforms the observed DRIS state St into a latent vector zt;the policy, operating in the latent feature space (as detailed in Sec. IV-C), is trained using a policy gradient algorithm such as Proximal Policy Optimization (PPO) [43]. C. FiLM-Conditioned Policy Network 
+
+The policy πθ consists of two components: a Feature-wise Linear Modulation (FiLM) [34] module and an MLP-based action generation network, as illustrated in Fig. 3. At each step t, given the encoded state feature zt and the observed plate tilting orientation ut (which serves as the conditional signal), the FiLM module applies a feature-wise affine transformation: 
+
+˜zt = FiLM (zt, ut) = λ (ut) ⊙ zt + μ (ut) (10) where λ (ut), μ (ut) ∈ Rdz are outputs of two small neural networks that generate scaling and bias coefficients, and ⊙
+
+denotes element-wise multiplication. The FiLM-modulated feature ˜zt ∈ Rdz is then passed through an MLP-based action-generation network to produce the action at:
+
+at = πθ (zt) = MLP ( ˜ zt) = MLP (FiLM (zt, ut)) (11) The policy parameters θ include the learnable weights of the FiLM modulation networks λ(·) and μ(·) as well as those of the action-generation MLP. During training, all parameters are jointly optimized through gradient-based updates. The use of FiLM conditioning is motivated by the contact physics of the catching task. When the ball rests on the plate, the plate’s orientation (tilting angle) directly alters the tangential component of gravity along the plate surface and the contact direction, thereby affecting the ball’s acceleration. By modulating the latent feature with the plate’s orientation, the policy can dynamically adapt its action generation to account for these gravity-induced variations, enabling more physically consistent control across different tilt configurations. 
+
+D. Control Implementation on High-DoF Manipulator 
+
+As described in Sec. IV-A, the action at consists of a desired plate displacement δt and a tilting configuration ut =(αt, β t) which corresponds to a rotation of the plate about a horizontal axis wt = (cos αt, sin αt, 0) ⊤ by an angle βt
+
+(all quantities expressed in the motion frame). The desired plate pose (expressed in the robot’s base frame) is given by: eTt =
+
+ eRet , ˜pet
+
+
+
+∈ SE (3) , where the orientation and position components are computed using Rodrigues’ formula ( ˆwt ∈ R3×3 is the skew-symmetric matrix of wt): 
+
+eRet = Rz (ϕ)  I + ˆ wt sin βt + ˆ wt2 (1 − cos βt) ∈ SO (3) ˜pet = Rz (ϕ) δt + pet ∈ R3
+
+(12) The desired joint configuration of the robot ˜qt is obtained via inverse kinematics ( M being the robot’s DoF): ˜qt =
+
+IK 
+
+ eTt
+
+
+
+∈ RM . The desired joint configuration is tracked using a joint-space torque controller that generates real-time joint torques (no inertial feedforward term is included, as the desired joint acceleration is zero): 
+
+τ = K ( ˜ qt − q) − D ˙q + C (q, ˙q) + g(q) ∈ RM (13) where q, ˙q ∈ RM are the observed joint angles and velocities from sensor readings; K, D ∈ RM ×M are the stiffness and damping gain matrices; C (q, ˙q), g(q) ∈ RM are the Coriolis and gravity terms, respectively. V. T RAINING AND VALIDATION IN SIMULATION 
+
+In this section, we implement the reactive catching task, train the policies purely in simulation using our proposed strategy, and evaluate its performance under various sources of uncertainty. 
+
+A. Training in Simulation 
+
+The task simulation was implemented in ManiSkill [46]. We instantiated 128 parallel simulation environments for training, each containing a robot manipulating a set of multiple different balls (i.e., DRIS) for up to 20 steps (corresponding to one second of simulated time). When launching each environment instance, the balls are randomly positioned at a horizontal dis-tance between [1 .0, 2.0] m away from the plate and assigned an initial velocity such that they reach a predefined catching region after [1 .0, 1.5] s, approaching from a random incoming direction. The catching region is defined as a zone at the same height as the plate and within a horizontal radius of 
+
+0.2m from its center. Each episode begins when the ball is about to enter this region, specifically within a random lead time of [0 .08 , 0.12] s before arrival, at which point the robot starts executing generated actions. The initial joint angles of the robot are sampled from a Gaussian distribution centered at the home configuration with a standard deviation of 0.02 
+
+radians per joint. We disable collision detection in simulation between balls within the same DRIS and between balls and all robot links except the plate (i.e., only ball-plate collisions are enabled) to eliminate unmodeled contacts for stable training. We first collected training data for the DRIS encoder by allowing the robot to interact with the DRIS containing 200 
+
+balls using random actions for 50 episodes. Across all 128 
+
+parallel environment instances, this resulted in a total of 
+
+128 , 000 recorded DRIS state samples (i.e., the states of all balls at each step). The encoder was then trained on this dataset for 100 epochs, which took approximately 10 minutes. We then froze the pre-trained DRIS encoder and used it to train the FiLM-conditioned policy for 1000 epochs with PPO, which took approximately 2 hours. 
+
+B. Evaluation against Uncertainties 
+
+To evaluate the effect of DRIS size on policy performance, we trained separate policies with different numbers of balls in the DRIS, specifically N = 1 , 10 , 50 , 200 . Moreover, to com-pare training with the proposed DRIS-based strategy against a standard RL setting, we trained an additional baseline policy using the same neural network architecture but learned end-to-end directly from the observed single-ball state to the desired action. We refer to this baseline as E2E . During evaluation, the DRIS-trained policies, although trained with multiple balls in each DRIS, were always tested on catching a single ball to reflect the real task setting. We evaluate robustness against the following three sources of uncertainty: 1M 2M 
+
+> 0
+> 0.4
+> 0.8
+> reward
+
+perfect  
+
+> E2E
+> DRIS (1)
+> DRIS (10)
+> DRIS (50)
+> DRIS (200)
+> 1M 2M
+> 0
+> 0.4
+> 0.8
+
+noisy (1 σ) 
+
+> 1M 2M
+> 0
+> 0.4
+> 0.8
+
+noisy (2 σ) 
+
+> 1M 2M
+> 0
+> 0.4
+> 0.8
+
+noisy (3 σ) 
+
+> 1M 2M
+> 0
+> 0.4
+> 0.8
+
+noisy (4 σ)     
+
+> 1M 2M
+> 0
+> 0.5
+> 1
+> steps
+> success rate
+> 1M 2M
+> 0
+> 0.5
+> 1
+> steps
+> 1M 2M
+> 0
+> 0.5
+> 1
+> steps
+> 1M 2M
+> 0
+> 0.5
+> 1
+> steps
+> 1M 2M
+> 0
+> 0.5
+> 1
+> steps
+
+(a)       
+
+> 1σ2σ3σ4σ
+> 0
+> 0.4
+> 0.8
+> reward  E2E
+> DRIS (1)
+> DRIS (10)
+> DRIS (50)
+> DRIS (200)
+> 1σ2σ3σ4σ
+> 0
+> 0.5
+> 1
+> noise level
+> success rate
+
+(b) 
+
+Fig. 4: Reward (top) and success rate (bottom) under varying observation noise. (a) Training curves across simulation steps, evaluated under progressively larger noise levels (left to right); (b) Evaluation of each policy at each noise level, averaged over the last 100 epochs.       
+
+> E2E
+> 110 50 200
+> DRIS
+> 0.65
+> 0.7
+> 0.75
+> reward
+> E2E
+> 110 50 200
+> DRIS
+> 0.8
+> 0.9
+> 1
+> success rate
+
+Fig. 5: Reward (left) and success rate (right) of each policy under execution errors, averaged over the last 100 epochs.       
+
+> E2E
+> 110 50 200
+> DRIS
+> 0.55
+> 0.6
+> reward
+> E2E
+> 110 50 200
+> DRIS
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> success rate
+
+Fig. 6: Reward (left) and success rate (right) of each policy when manipulating balls with unseen restitution values (higher than those in training), averaged over the last 100 epochs. 
+
+Observation Noise. This setting mimics scenarios where the ball’s state is not accurately estimated (e.g., due to camera calibration errors or tracking inaccuracies). As shown in Fig. 4, we inject Gaussian noise into the observed ball states at different noise levels, obtained by scaling a base standard deviation σ (1 cm for position and 5 cm/s for velocity) by factors ranging from 1 to 4. We report both the final episode reward and success rate, where success is defined as the ball remaining on the plate with a velocity below 0.1 m/s 
+
+at the end of the episode. The E2E baseline and the DRIS policy with N = 1 , both trained using a single ball (where the DRIS policy reduces to a standard RL setting but with a pre-trained encoder), perform comparably under perfect observations. However, as the observation noise increases, their performance degrades significantly. Moreover, they are more prone to overfitting to the perfect observations, as can be seen from their gradual performance degradation when trained for a longer period in Fig. 4. In contrast, DRIS policies trained with even a slightly larger number of balls (e.g., 
+
+10 ) exhibit substantially improved robustness, demonstrating greater tolerance to observation noise. 
+
+Execution Error. Then, we added noise to the desired joint positions by uniformly sampling perturbations from 
+
+[−0.05 , 0.05] rad to simulate robot execution errors (e.g., controller’s tracking inaccuracies). We report the final reward and success rate for each policy in Fig. 5. Similar to the observation noise evaluation, the E2E baseline is notably less robust than policies trained with DRIS. While increasing the DRIS size generally improved robustness in this evaluation, even a modest number of balls (e.g., 10 ) provided an obvious boost in performance under execution noise. 
+
+Out-of-Distribution Physics. To evaluate how the policies perform under unseen physical parameters, we tested them on balls with higher and more challenging restitution coefficients in [0 .7, 0.8] , despite being trained only within [0 .4, 0.7] . The reward and success rate are reported in Fig. 6. Compared with both the E2E baseline and the DRIS policy trained with a single ball, policies trained with larger DRIS generalize better to manipulate balls with unseen physical properties (restitution, in this case). 
+
+C. Scalability and Computational Efficiency 
+
+To evaluate the efficacy of DRIS from a computational fairness perspective, we conducted a scaling study to verify that the observed performance gains are not merely a prod-uct of increased ball interactions. Specifically, we expanded the E2E baseline to 128 × 50 single-ball environments and compared it against our DRIS configuration, which utilizes Tracking Cameras 3D-Printed Plate       
+
+> 3D-Printed Ramp
+> Interchangeable
+> Wiffle Rubber Ping-Pong Foam 73 mm 64 mm 40 mm 64 mm
+
+Fig. 7: The system setup (top) and the four different balls (bottom) used for real-world experiments. 
+
+128 environments with a DRIS size of 50 (i.e., 50 balls per environment), thereby matching the total number of ball interactions across both methods. Evaluated under 2σ observation noise, the results indicate that while massive parallelization improves the E2E baseline success rate from 0.55 to 0.73 , it does so at a substantial computational cost, increasing simulation VRAM usage from 
+
+0.65 GB to 2 GB. In contrast, the DRIS configuration achieves a significantly higher success rate of 0.89 while increasing VRAM only modestly to 0.71 GB. These results demonstrate that DRIS-based propagation provides superior robustness while remaining considerably more resource-efficient than standard environment parallelization. VI. R EAL -R OBOT DEPLOYMENT 
+
+To more realistically challenge our learned policies under real-world uncertainties and evaluate their sim-to-real transfer performance, we directly deployed the policies trained purely in simulation in a zero-shot manner on a real 7-DoF Franka Research 3 (FR3) robot manipulator, without any fine-tuning using real-world data. 
+
+A. System Setup 
+
+Fig. 7 shows the setup we used for real-world evaluation (top), and the four test balls (wiffle, rubber, ping-pong, and foam) which differ in size, weight, and physical behavior (bottom). The plate is 3D-printed and covered with a neo-prene foam padding to protect the robot from damage during repeated trials. Although the padding slightly reduces the impact force, its surface is smoother than the underlying plastic and causes the ball to roll and accelerate more easily, thus preserving the difficulty of the task. To ensure relatively consistent initial ball states for fair comparative evaluation across different policies, we designed and 3D-printed a ramp with interchangeable lower sections and mounted it above the workspace. The ball is released by rolling from the top of the ramp, and the three interchangeable                                                                                                                                                 
+
+> Ball Ramp VelTrack E2E DRIS (Ours) Wiffle
+> R= 0 .13 m0/50/55/5
+> R= 0 .20 m0/52/54/5
+> R= 0 .32 m0/50/53/5
+> Rubber
+> R= 0 .13 m0/50/52/5
+> R= 0 .20 m0/50/55/5
+> R= 0 .32 m0/51/52/5
+> Ping-Pong
+> R= 0 .13 m0/51/54/5
+> R= 0 .20 m2/51/55/5
+> R= 0 .32 m0/50/54/5
+> Foam
+> R= 0 .13 m0/50/52/5
+> R= 0 .20 m1/51/53/5
+> R= 0 .32 m0/52/52/5
+> Total 3/ 60 8/ 60 41 / 60
+> Success Rate 0.05 0.13 0.68
+
+Fig. 8: Top: Snapshots of our policy catching a ping-pong ball released from the ramp. Bottom: Success rates for each policy across all combinations of ball types and ramp settings. sections (with radii R = 0.13 , 0.20 , and 0.32 m) induce different release speeds, allowing evaluation under varying initial ball states. 
+
+B. Quantitative Evaluation 
+
+We deployed a single DRIS-trained policy (with N = 200 )on the real robot across all evaluation trials and compared its performance against two baselines: 1) VelTrack : a hand-crafted policy that moves the plate horizontally to follow the ball based on its estimated velocity after the first impact, with the plate oriented to face the ball’s incoming direction at the moment of first impact; 2) E2E : similar to the simulation evaluation in Sec. V, this is a policy trained end-to-end with a single ball in simulation and directly deployed on the real robot. The controller gains, i.e., K and D in Eq. (13), were identified on the real robot by matching the controller’s behav-ior to that in simulation. Aside from this gain identification, no additional adaptation or fine-tuning was performed. For each policy, and for every combination of ball type and ramp, we conducted 5 trials and evaluated performance based on the number of successful catches, as summarized in Fig. 8. A trial is considered a successful catch if the robot keeps the ball on the plate for at least 10 seconds after it begins moving. The VelTrack baseline rarely succeeded, as its response was not sufficiently reactive, particularly under inaccurate ball velocity estimates. Its only 3 successful tri-als occurred when the ball was accidentally trapped in the gap between the plate and the finger. The E2E baseline, although producing reasonable motions to contact the ball, was highly sensitive to observation noise, leading to jerky robot movements that frequently knocked the ball off the View 1 
+
+> View 2
+
+Fig. 9: Our policy successfully catches a wiffle ball thrown by a human (top); balances a foam ball (bottom left), where a hard-coded motion rotates the plate by 30 ◦ (blue arrow) to initiate the ball’s rolling in the first frame; and catches irregularly shaped objects (bottom right). plate or hit the robot’s power limit. In contrast, our DRIS-trained policy achieved a 68% success rate when deployed zero-shot, and successfully caught all tested balls. While the system maintains high performance across diverse conditions, the few remaining failure cases typically occur when the initial contact cannot sufficiently dissipate the ball’s momentum or redirect the ball unfavorably due to tracking latency or noise. In these instances, the robot may occasionally over-stretch while attempting to recover the high-speed trajectory. 
+
+C. Qualitative Evaluation 
+
+We conducted several qualitative evaluations to further as-sess the learned policy. First, as showcased in Fig. 9 (top), the policy successfully catches all test balls thrown by a human, despite the increased uncertainty and inconsistency of human throws. Second, as illustrated in Fig. 9 (bottom left), although trained for reactive catching, the policy generalizes directly to a pure balancing task. Third, as shown in Fig. 9 (bottom right), the policy was able to catch irregularly shaped objects, including a lightweight toy apple, a heavier toy strawberry, and a wooden cube. The wooden cube is caught only occasionally due to its highly unpredictable impact dynamics, which makes reliable catching difficult even for humans. VII. C ONCLUSION AND LIMITATIONS 
+
+In this work, we propose a DRIS-based learning strategy that enables robust policy learning in simulation and improved zero-shot sim-to-real transfer for dexterous manipulation under severe physical uncertainty. By simultaneously propagating multiple randomized instances instead of one, DRIS better approximates state evolution under diverse physical condi-tions. Combined with a task-specific policy design, this en-ables stable reactive catching without passive mechanical aids. Extensive experiments show substantially improved robustness and sim-to-real performance over conventional baselines. 
+
+Limitations. While the proposed DRIS-based strategy is promising, we acknowledge several limitations to be addressed in future work. First, DRIS requires an encoder to map states of varying instances to a fixed-dimensional latent representa-tion; while this is efficient for low-dimensional states, tasks involving high-dimensional visual or geometric inputs may require larger models and substantial pre-training. Second, effective DRIS training relies on efficient parallel propagation of multiple instances, which may be computationally expen-sive or impractical without suitable simulator support. This is particularly relevant when scaling to complex multi-body con-tact settings involving multiple mutual interactions, where the computational overhead of resolving simultaneous collision manifolds across the entire DRIS can become a significant bottleneck. Finally, since all instances share a single action, excessive divergence among instance states can destabilize learning, placing a practical limit on the amount of variation introduced. As noted in [42], preventing such divergence is easier in dissipative systems. While our method thrives in “energy-dissipating” tasks like catching, it may struggle in “energy-injecting” tasks like throwing. In such expansionary dynamics, physical variations are rapidly amplified, making it difficult for a shared action to reconcile the diverging states. Future work using adaptive or curriculum-based instance ran-domization during training might mitigate this challenge. ACKNOWLEDGMENTS 
+
+This work was supported by the U.S. National Science Foundation (NSF) under grant FRR-2240040. REFERENCES 
+
+[1] Saminda Abeyruwan, Alex Bewley, Nicholas Matthew Boffi, Krzysztof Marcin Choromanski, David BD’Ambrosio, Deepali Jain, Pannag R Sanketi, Anish Shankar, Vikas Sindhwani, Sumeet Singh, et al. Agile catching with whole-body mpc and blackbox policy learning. In Learning for Dynamics and Control Conference , pages 851–863. PMLR, 2023. [2] Panos Achlioptas, Olga Diamanti, Ioannis Mitliagkas, and Leonidas Guibas. Learning representations and generative models for 3d point clouds. In International Conference on Machine Learning (ICML) , pages 40–49. PMLR, 2018. [3] Anurag Ajay, Jiajun Wu, Nima Fazeli, Maria Bauza, Leslie P Kaelbling, Joshua B Tenenbaum, and Al-berto Rodriguez. Augmenting physical simulators with stochastic neural networks: Case study of planar pushing and bouncing. In IEEE International Conference on Intelligent Robots and Systems (IROS) , pages 3066–3073. IEEE, 2018. [4] Ilge Akkaya, Marcin Andrychowicz, Maciek Chociej, Mateusz Litwin, Bob McGrew, Arthur Petron, Alex Paino, Matthias Plappert, Glenn Powell, Raphael Ribas, et al. Solving rubik’s cube with a robot hand. arXiv preprint arXiv:1910.07113 , 2019. [5] OpenAI: Marcin Andrychowicz, Bowen Baker, Maciek Chociej, Rafal Jozefowicz, Bob McGrew, Jakub Pa-chocki, Arthur Petron, Matthias Plappert, Glenn Powell, Alex Ray, et al. Learning dexterous in-hand manipula-tion. The International Journal of Robotics Research , 39 (1):3–20, 2020. [6] Georg B¨ atz, Arhan Yaqub, Haiyan Wu, Kolja K¨ uhnlenz, Dirk Wollherr, and Martin Buss. Dynamic manipulation: Nonprehensile ball catching. In 18th Mediterranean Conference on Control and Automation, MED’10 , pages 365–370. IEEE, 2010. [7] Berthold B¨ auml, Thomas Wimb¨ ock, and Gerd Hirzinger. Kinematically optimal catching a flying ball with ahand-arm-system. In IEEE International Conference on Intelligent Robots and Systems (IROS) , pages 2592–2599. IEEE, 2010. [8] Adam Bry and Nicholas Roy. Rapidly-exploring random belief trees for motion planning under uncertainty. In 
+
+IEEE International Conference on Robotics and Automa-tion (ICRA) , pages 723–730. IEEE, 2011. [9] Nikhil Chavan-Dafle and Alberto Rodriguez. Prehensile pushing: In-hand manipulation with push-primitives. In 
+
+IEEE International Conference on Intelligent Robots and Systems (IROS) , pages 6215–6222. IEEE, 2015. [10] Yevgen Chebotar, Ankur Handa, Viktor Makoviychuk, Miles Macklin, Jan Issac, Nathan Ratliff, and Dieter Fox. Closing the sim-to-real loop: Adapting simulation randomization with real world experience. In IEEE International Conference on Robotics and Automation (ICRA) , pages 8973–8979. IEEE, 2019. [11] Tao Chen, Jie Xu, and Pulkit Agrawal. A system for general in-hand object re-orientation. In Conference on Robot Learning , pages 297–307. PMLR, 2022. [12] Cheng Chi, Benjamin Burchfiel, Eric Cousineau, Siyuan Feng, and Shuran Song. Iterative residual policy: for goal-conditioned dynamic manipulation of deformable objects. The International Journal of Robotics Research ,43(4):389–404, 2024. [13] Kurtland Chua, Roberto Calandra, Rowan McAllister, and Sergey Levine. Deep reinforcement learning in a handful of trials using probabilistic dynamics mod-els. Advances in Neural Information Processing Systems (NeurIPS) , 31, 2018. [14] Nils Dengler, David Großklaus, and Maren Bennewitz. Learning goal-oriented non-prehensile pushing in clut-tered scenes. In IEEE International Conference on Intelligent Robots and Systems (IROS) , pages 1116–1122. IEEE, 2022. [15] Ke Dong, Karime Pereida, Florian Shkurti, and Angela P Schoellig. Catch the ball: Accurate high-speed motions for mobile manipulators via inverse dynamics learning. In IEEE International Conference on Intelligent Robots and Systems (IROS) , pages 6718–6725. IEEE, 2020. [16] Ioannis Exarchos, Yifeng Jiang, Wenhao Yu, and C Karen Liu. Policy transfer via kinematic domain randomization and adaptation. In IEEE International Conference on Robotics and Automation (ICRA) , pages 45–51. IEEE, 2021. [17] Tobias Gold, Ralf R¨ omer, Andreas V¨ olz, and Knut Graichen. Catching objects with a robot arm using model predictive control. In American Control Conference (ACC) , pages 1915–1920. IEEE, 2022. [18] Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mo-hammad Norouzi. Dream to control: Learning behaviors by latent imagination. arXiv preprint arXiv:1912.01603 ,2019. [19] Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Villegas, David Ha, Honglak Lee, and James Davidson. Learning latent dynamics for planning from pixels. In 
+
+International Conference on Machine Learning (ICML) ,pages 2555–2565. PMLR, 2019. [20] Binghao Huang, Yuanpei Chen, Tianyu Wang, Yuzhe Qin, Yaodong Yang, Nikolay Atanasov, and Xiaolong Wang. Dynamic handover: Throw and catch with bi-manual hands. In Conference on Robot Learning , 2023. [21] Johann Huber, Franc ¸ois H´ el´ enon, Hippolyte Watrelot, Fa¨ ız Ben Amar, and St´ ephane Doncieux. Domain ran-domization for sim2real transfer of automatically gener-ated grasping datasets. In IEEE International Conference on Robotics and Automation (ICRA) , pages 4112–4118. IEEE, 2024. [22] Ajinkya Jain and Scott Niekum. Efficient hierarchical robot motion planning under uncertainty and hybrid dynamics. In Conference on Robot Learning , pages 757– 766. PMLR, 2018. [23] Krishna Murthy Jatavallabhula, Miles Macklin, Florian Golemo, Vikram Voleti, Linda Petrini, Martin Weiss, Breandan Considine, J´ erˆ ome Parent-L´ evesque, Kevin Xie, Kenny Erleben, et al. gradsim: Differentiable sim-ulation for system identification and visuomotor control. 
+
+arXiv preprint arXiv:2104.02646 , 2021. [24] Yifeng Jiang, Tingnan Zhang, Daniel Ho, Yunfei Bai, C Karen Liu, Sergey Levine, and Jie Tan. Simgan: Hybrid simulator identification for domain adaptation via adversarial reinforcement learning. In IEEE International Conference on Robotics and Automation (ICRA) , pages 2884–2890. IEEE, 2021. [25] Seungsu Kim, Ashwini Shukla, and Aude Billard. Catch-ing objects in flight. IEEE Transactions on Robotics , 30 (5):1049–1065, 2014. [26] Ziang Liu, Stephen Tian, Michelle Guo, Karen Liu, and Jiajun Wu. Learning to design and use tools for robotic manipulation. In Conference on Robot Learning , pages 887–905. PMLR, 2023. [27] Viktor Makoviychuk, Lukasz Wawrzyniak, Yunrong Guo, Michelle Lu, Kier Storey, Miles Macklin, David Hoeller, Nikita Rudin, Arthur Allshire, Ankur Handa, et al. Isaac gym: High performance gpu-based physics simulation for robot learning. arXiv preprint arXiv:2108.10470 , 2021. [28] Bhairav Mehta, Manfred Diaz, Florian Golemo, Christo-pher J Pal, and Liam Paull. Active domain randomiza-tion. In Conference on Robot Learning , pages 1162– 1176. PMLR, 2020. [29] Fabio Muratore, Theo Gruner, Florian Wiese, Boris Belousov, Michael Gienger, and Jan Peters. Neural posterior domain randomization. In Conference on Robot Learning , pages 1532–1542. PMLR, 2022. [30] Fabio Muratore, Fabio Ramos, Greg Turk, Wenhao Yu, Michael Gienger, and Jan Peters. Robot learning from randomized simulations: A review. Frontiers in Robotics and AI , 9:799893, 2022. [31] Anusha Nagabandi, Ignasi Clavera, Simin Liu, Ronald S Fearing, Pieter Abbeel, Sergey Levine, and Chelsea Finn. Learning to adapt in dynamic, real-world environments through meta-reinforcement learning. arXiv preprint arXiv:1803.11347 , 2018. [32] Akio Namiki and Naoki Itoi. Ball catching in kendama game by estimating grasp conditions based on a high-speed vision system and tactile sensors. In IEEE Inter-national Conference on Humanoid Robots (Humanoids) ,pages 634–639. IEEE, 2014. [33] Xue Bin Peng, Marcin Andrychowicz, Wojciech Zaremba, and Pieter Abbeel. Sim-to-real transfer of robotic control with dynamics randomization. In IEEE International Conference on Robotics and Automation (ICRA) , pages 3803–3810. IEEE, 2018. [34] Ethan Perez, Florian Strub, Harm De Vries, Vincent Dumoulin, and Aaron Courville. Film: Visual reasoning with a general conditioning layer. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 32, 2018. [35] Aleksei Petrenko, Arthur Allshire, Gavriel State, Ankur Handa, and Viktor Makoviychuk. Dexpbt: Scaling up dexterous manipulation for hand-arm systems with pop-ulation based training. In Robotics: Science and Systems ,2023. [36] Kai Ploeger, Michael Lutter, and Jan Peters. High ac-celeration reinforcement learning for real-world juggling with binary rewards. In Conference on Robot Learning ,pages 642–653. PMLR, 2021. [37] Josep M. Porta, Nikos Vlassis, Matthijs T.J. Spaan, and Pascal Poupart. Point-based value iteration for continu-ous pomdps. Journal of Machine Learning Research , 7 (83):2329–2367, 2006. [38] Charles R Qi, Hao Su, Kaichun Mo, and Leonidas J Guibas. Pointnet: Deep learning on point sets for 3d classification and segmentation. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , pages 652–660, 2017. [39] Fabio Ramos, Rafael Possas, and Dieter Fox. Bayessim: Adaptive domain randomization via probabilistic infer-ence for robotics simulators. In Robotics: Science and Systems , 2019. [40] Seyed Sina Mirrazavi Salehian, Mahdi Khoramshahi, and Aude Billard. A dynamical system approach for softly catching a flying object: Theory and experiment. IEEE Transactions on Robotics , 32(2):462–471, 2016. [41] Alvaro Sanchez-Gonzalez, Jonathan Godwin, Tobias Pfaff, Rex Ying, Jure Leskovec, and Peter Battaglia. Learning to simulate complex physics with graph net-works. In International Conference on Machine Learning (ICML) , pages 8459–8468. PMLR, 2020. [42] Stefan Schaal and Christopher G Atkeson. Open loop stable control strategies for robot juggling. In IEEE International Conference on Robotics and Automation (ICRA) , pages 913–918. IEEE, 1993. [43] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. [44] Matthew Sheckells, Gowtham Garimella, Subhransu Mishra, and Marin Kobilarov. Using data-driven do-main randomization to transfer robust control policies to mobile robots. In IEEE International Conference on Robotics and Automation (ICRA) , pages 3224–3230. IEEE, 2019. [45] Nikhil Sobanbabu, Guanqi He, Tairan He, Yuxiang Yang, and Guanya Shi. Sampling-based system identification with active exploration for legged sim2real learning. In 
+
+Conference on Robot Learning , 2025. [46] Stone Tao, Fanbo Xiang, Arth Shukla, Yuzhe Qin, Xander Hinrichsen, Xiaodi Yuan, Chen Bao, Xinsong Lin, Yulin Liu, Tse kai Chan, Yuan Gao, Xuanlin Li, Tongzhou Mu, Nan Xiao, Arnav Gurha, Viswesh Na-gaswamy Rajesh, Yong Woo Choi, Yen-Ru Chen, Zhiao Huang, Roberto Calandra, Rui Chen, Shan Luo, and Hao Su. Maniskill3: Gpu parallelized robotics simulation and rendering for generalizable embodied ai. In Robotics: Science and Systems , 2025. [47] Gabriele Tiboni, Karol Arndt, and Ville Kyrki. Dropo: Sim-to-real transfer with offline domain randomization. 
+
+Robotics and Autonomous Systems , 166:104432, 2023. [48] Gabriele Tiboni, Pascal Klink, Jan Peters, Tatiana Tom-masi, Carlo D’Eramo, and Georgia Chalvatzaki. Domain randomization via entropy maximization. In Interna-tional Conference on Learning Representations (ICLR) ,volume 2024, pages 19841–19863, 2024. [49] Josh Tobin, Rachel Fong, Alex Ray, Jonas Schneider, Wojciech Zaremba, and Pieter Abbeel. Domain ran-domization for transferring deep neural networks from simulation to the real world. In IEEE International Conference on Intelligent Robots and Systems (IROS) ,pages 23–30. IEEE, 2017. [50] Josh Tobin, Lukas Biewald, Rocky Duan, Marcin Andrychowicz, Ankur Handa, Vikash Kumar, Bob Mc-Grew, Alex Ray, Jonas Schneider, Peter Welinder, et al. Domain randomization and generative models for robotic grasping. In IEEE International Conference on Intel-ligent Robots and Systems (IROS) , pages 3482–3489. IEEE, 2018. [51] Emanuel Todorov, Tom Erez, and Yuval Tassa. Mujoco: A physics engine for model-based control. In IEEE In-ternational Conference on Intelligent Robots and Systems (IROS) , pages 5026–5033. IEEE, 2012. [52] Andrew Wang, Andrew C Li, Toryn Q Klassen, Ro-drigo Toro Icarte, and Sheila A McIlraith. Learning belief representations for partially observable deep rl. In 
+
+International Conference on Machine Learning (ICML) ,pages 35970–35988. PMLR, 2023. [53] Gaotian Wang, Kejia Ren, Andrew S Morgan, and Kaiyu Hang. Caging in time: A framework for robust object manipulation under uncertainties and limited robot per-ception. The International Journal of Robotics Research ,page 02783649251343926, 2025. [54] Wenhao Yu, Jie Tan, C Karen Liu, and Greg Turk. Preparing for the unknown: Learning a universal pol-icy with online system identification. arXiv preprint arXiv:1702.02453 , 2017. [55] Yuanhang Zhang, Tianhai Liang, Zhenyang Chen, Yanjie Ze, and Huazhe Xu. Catch it! learning to catch in flight with mobile dexterous hands. In IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2025. APPENDIX A. I MPLEMENTATION DETAILS 
+
+The learning pipeline and task simulation were executed on a single NVIDIA GeForce RTX 3060 GPU with 12 GB of memory. The actions are generated at 20 Hz, corresponding to a simulation step of 1/20 second. The plate size (half-length) is set to le = 12 cm . The domain-randomized parameters were uniformly sampled from the following ranges: ball radius 
+
+[2 , 4] cm ; static and dynamic friction coefficients [0 , 0.1] ; and restitution coefficient [0 .4, 0.7] . The latent feature dimension of encoded DRIS was set to dz = 64 , and the decay coefficient in the reward of Eq. (8) was η = 0 .25 .When deploying the trained policy in the real world, the ball’s 3D trajectory is estimated using two cameras at 80 FPS through image-based ball detection (e.g., color segmentation followed by contour-based circle fitting), triangulation, and parabolic curve fitting. The ball’s velocity is estimated via ordinary least squares (OLS) by fitting a line to position measurements over a 0.1-second sliding window. The trained policies were loaded on a 3.4 GHz AMD Ryzen 9 5950X CPU for real-time inference. APPENDIX B. T HEORETICAL ANALYSIS OF DRIS In this appendix, we provide a theoretical analysis underly-ing Theorem III.1. Specifically, we contrast the conventional Domain Randomization (DR) with our proposed DRIS under a unified problem setup ( Appendix B-A); we interpret DRIS as an exact particle approximation for the system belief propagation ( Appendix B-B); then, we analyze to show that DRIS yields a more stable optimization ( Appendix B-C), more robust policies ( Appendix B-D), and improved sim-to-real generalization ( Appendix B-E), followed by a brief discussion on the connection to our practical implementation (Appendix B-F). 
+
+A. Unified Problem Setup 
+
+To ensure this appendix is self-contained, we briefly re-capitulate the problem setup and notations from Sec. III in the main text. The manipulation problem is defined over an observable state space S and an action space A. We denote a state by s ∈ S and an action by a ∈ A . The system state evolves according to a deterministic transition function 
+
+st+1 = f (st, at, c), conditioned on the physical parameters 
+
+c ∈ C (e.g., friction, mass). The parameters c are unknown during execution but are assumed to be distributed according to a fixed prior p (c) (which is simplified to a uniform distribution in our implementation). 
+
+Ensemble State with Shared Actions. In the proposed 
+
+Domain-Randomized Instance Set (DRIS) framework, dur-ing policy learning, we sample a set of N i.i.d. physical instances drawn from the prior, denoted ˆC = c(1) , . . . , c(N )
+
+where each c(i) ∼ p(c), The ensemble state of these N parallel instances is denoted as St =
+
+n
+
+s(1)  
+
+> t
+
+, . . . , s(N )
+
+> t
+
+o
+
+∈ S N . At each time step t, the policy πθ (parameterized by θ) generates a single consensus action at = πθ (St) that is applied to all N
+
+parallel instances simultaneously. This introduces an explicit coupling: The state transition of instance i depends on the states of all other instances via the shared action: 
+
+s(i) 
+
+> t+1
+
+= f
+
+
+
+s(i) 
+
+> t
+
+, π θ (St) , c(i)
+
+, ∀i ∈ { 1, . . . , N } (14) 
+
+The Global Objective. With all instances starting from the same initial state s0 ∼ p (s0), the controlled trajectory of the 
+
+i-th instance is τc(i) =
+
+
+
+s0, a0, s(i)1 , a1, . . . , s(i)
+
+> T
+
+
+
+. We denote 
+
+τc(i) to emphasize that the trajectory is implicitly conditioned on the specific realization of the physical parameter c(i). The 
+
+Discounted Cumulative Reward (Return) of a single trajectory is then defined as: 
+
+R (τc(i) ) :=  
+
+> T−1
+
+X
+
+> t=0
+
+γt r
+
+
+
+s(i) 
+
+> t
+
+, at
+
+
+
+(15) The global optimization objective with respect to the policy parameter θ is to maximize the expected average return over all instance trajectories: 
+
+JN (θ) := Es0∼p(s0),c(i)∼p(c)
+
+"
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+R (τc(i) )
+
+#
+
+(16) 
+
+Relationship to Conventional Domain Randomization (DR). By setting the DRIS size to N = 1 , the ensemble state collapses to a singleton St = {st} and the unified objective 
+
+JN reduces to: 
+
+J1 (θ) = Es0∼p(s0),c∼p(c) [R (τc)] (17) This recovers the conventional DR objective, where the ex-pectation is estimated via Monte Carlo sampling of a single physics parameter per episode. 
+
+B. Interpretation: Exact Particle Propagation 
+
+We prove that the simulation step in DRIS corresponds to the exact propagation of a particle approximation of the system’s belief state. 
+
+Continuous Belief Dynamics. Let bt (s, c) be the joint probability density (belief) of the state and physics parameters at time t. Given a deterministic action at, the belief evolves according to the Liouville Equation (the continuity equation for probability mass): 
+
+bt+1 (s′, c′) = 
+
+Z
+
+> S
+
+Z
+
+> C
+
+δ
+
+
+
+s′ − f (s, at, c)
+
+
+
+· δ (c′ − c) bt (s, c) dc ds
+
+(18) Here, δ (·) is the Dirac delta function. The term δ (c′ − c)
+
+enforces that physics parameters are static during propagation. 
+
+Proposition Appendix B.1 (Exact Particle Propagation) . Let the initial belief be approximated by an empirical measure 
+
+ˆbt,N (s, c) = 1
+
+> N
+
+PNi=1 δ(s−s(i) 
+
+> t
+
+)δ(c−c(i)). The time evolution of this measure under the Liouville Equation is exactly the empirical measure constructed from the updated particles 
+
+s(i) 
+
+> t+1
+
+= f
+
+
+
+s(i) 
+
+> t
+
+, at, c(i)
+
+
+
+.Proof: Substituting ˆbt,N into Eq. (18) and utilizing the sifting property of the Dirac delta R f (x)δ(x−x0)dx = f (x0):
+
+ˆbt+1 (s′, c′) = 
+
+Z Z 
+
+δ
+
+
+
+s′ − f (s, at, c)
+
+
+
+δ(c′ − c)
+
+"
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+δ(s − s(i) 
+
+> t
+
+)δ(c − c(i))
+
+#
+
+ds dc
+
+= 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Z Z 
+
+δ
+
+
+
+s′ − f (s, at, c)
+
+
+
+δ(c′ − c)
+
+δ(s − s(i) 
+
+> t
+
+) δ(c − c(i)) ds dc
+
+= 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+δ
+
+
+
+s′ − f
+
+
+
+s(i) 
+
+> t
+
+, at, c(i)  
+
+δ
+
+
+
+c′ − c(i)
+
+(19) This resulting distribution corresponds precisely to the discrete set of updated simulation states. Thus, DRIS is mathematically equivalent to propagating the belief state through the exact system dynamics. 
+
+C. Gradient Variance Reduction 
+
+We analyze the variance of the gradient estimator 
+
+∇θ JN (θ). In particular, assuming the policy is permutation invariant (i.e., the ordering of instances in the DRIS does not affect the policy output), we show that DRIS yields a reduced gradient variance compared to conventional DR. 
+
+Definition Appendix B.1 (Permutation Invariant Policy) . Apolicy πθ is permutation invariant if for any permutation ϕ of indices {1, . . . , N } and any ensemble state s(i), . . . , s(N ) ∈SN :
+
+πθ
+
+n 
+
+s(ϕ(1)) , . . . , s(ϕ(N )) o 
+
+= πθ
+
+n 
+
+s(1) , . . . , s(N )o 
+
+(20) 
+
+Lemma Appendix B.1 (Gradient Exchangeability) . Let 
+
+gi ≜ ∇θ R (τc(i) ) denote the gradient obtained from the 
+
+i-th instance. If πθ is permutation invariant, the gradients 
+
+g1, . . . , gN are exchangeable random variables. Consequently, they share a common mean μ, a common covariance matrix 
+
+Σ and a common cross-covariance matrix Σcross :Cov (gi) = Σ, Cov (gi, gj ) = Σcross ∀i̸ = j (21) 
+
+Proof: Let G = (g1, . . . , gN ) be the joint vector of gradients. Due to the i.i.d. sampling of physics parameters and the permutation invariance of πθ , the joint distribution of 
+
+G is invariant under any permutation ϕ: p (g1, . . . , gN ) = 
+
+p  gϕ(1) , . . . , gϕ(N )
+
+. Hence, g1, . . . , gN are exchangeable. Exchangeability implies identical marginals, so E[gi] = μ
+
+and Cov (gi) = E[( gi − μ)( gi − μ)T ] = Σ for all i. Moreover, exchangeability implies that all unordered pairs (g1, gj ), i̸ = j,have identical joint distributions, and thus identical cross-covariance Cov (gi, gj ) = E[( gi − μ)( gj − μ)T ] = Σcross for all i̸ = j.
+
+Proposition Appendix B.2 (Variance Reduction) . Let the scalar total variance be the trace of the covariance matrix: 
+
+σ2 ≜ Tr (Σ), and the scalar correlation coefficient be ρ ≜
+
+Tr (Σcross ) /σ 2. Then the total variance of the DRIS gradient estimator ˆgDRIS = 1
+
+> N
+
+P gi is given by: Tr (Cov (ˆ gDRIS )) = σ2
+
+
+
+ρ + 1 − ρN
+
+
+
+(22) 
+
+Consequently, DRIS ( N > 1) achieves strict variance reduc-tion compared to conventional DR ( N = 1) if and only if 
+
+ρ < 1 (i.e., when the aggregate cross-covariance is strictly smaller than the marginal covariance). Proof: Using the bilinearity of covariance and the ex-changeability of the gradients: Cov (ˆ gDRIS ) = Cov 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+gi
+
+!
+
+= 1
+
+N 2
+
+
+
+> N
+
+X
+
+> i=1
+
+Cov (gi) + X
+
+> i̸=j
+
+Cov (gi, gj )
+
+
+
+(23) Substituting the covariance and cross-covariance matrices de-fined in Lemma. Appendix B.1: Cov (ˆ gDRIS ) = 1
+
+N 2 [N Σ + N (N − 1) Σcross ]= 1
+
+N Σ + N − 1
+
+N Σcross 
+
+(24) Taking the trace (a linear operator) to obtain the scalar total variance: Tr (Cov (ˆ gDRIS )) = 1
+
+N Tr (Σ) + 
+
+
+
+1 − 1
+
+N
+
+
+
+Tr (Σcross )= σ2
+
+N +
+
+
+
+1 − 1
+
+N
+
+
+
+ρσ 2
+
+= σ2
+
+
+
+ρ + 1 − ρN
+
+
+
+(25) In practice, independently sampled physics parameters intro-duce instance-specific perturbations in rollout trajectories, so gradients across instances are typically not perfectly aligned and ρ < 1 is expected, yielding strict variance reduction for DRIS ( N > 1) compared to conventional DR ( N = 1 ). 
+
+Implication: The result above implies that as the DRIS size increases ( N → ∞ ), the estimator’s total variance decreases from the conventional DR baseline σ2 to a non-zero floor ρσ 2.Intuitively, increasing N averages out the instance-specific (uncorrelated) component of gradient variability; this stabilizes the optimization by suppressing the high-variance noise from single-instance rollouts. 
+
+D. Robustness Analysis 
+
+We analyze how the DRIS objective implicitly promotes robustness against physical uncertainty. While conventional DR and DRIS optimize the same theoretical objective in expectation, their empirical optimization landscapes differ fundamentally. In our problem setup, we can define the empirical objective as the average return over the N rollout trajectories of DRIS. Since physics parameters c(i) are sampled i.i.d. from p (c),the rollouts are conditionally i.i.d. across instances given the shared action sequence {at}T −1 
+
+> t=0
+
+:
+
+ˆJN (θ) := 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+R (τc(i) ) = 1
+
+N
+
+> N
+
+X 
+
+> i=1
+> T−1
+
+X
+
+> t=0
+
+γt r
+
+
+
+s(i) 
+
+> t
+
+, at
+
+
+
+(26) We analyze the optimization landscape by decomposing this return into its local contributions at a single time step t,and define empirical local cost (negative reward) as Ct(s) ≜
+
+−r (s, at). The global maximization is equivalent to minimiz-ing the discounted sum of empirical local costs: 
+
+ˆJN (θ) = − 
+
+> T−1
+
+X
+
+> t=0
+
+γt 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Ct(s(i) 
+
+> t
+
+)
+
+!| {z }
+
+> ˆJN,t
+
+(27) This decomposition simplifies the analysis: by examining the local cost ˆJN,t conditioned on the shared action at, we can determine how N affects the signal-to-noise ratio of the gradient at each step. 
+
+Assumption Appendix B.1 (Local Geometry) . We assume 
+
+Ct(s) is twice differentiable and locally convex w.r.t. the state 
+
+s near the mean μt ≜ E[st | at]. We approximate Ct(st)
+
+using a second-order Taylor expansion: 
+
+Ct (s) ≈ Ct(μt) + g⊤ 
+
+> t
+
+(s − μt) + 12 (s − μt)⊤Ht(s − μt)
+
+(28) 
+
+where gt = ∇sCt (μt) and Ht = ∇2
+
+> s
+
+Ct(μt) ⪰ 0 are the Jacobian and Hessian, respectively. 
+
+Substituting this expansion into ˆJN,t and using the cyclic property of the trace operator Tr  x⊤Ax = Tr  Axx ⊤, we derive the decomposition: 
+
+ˆJN,t = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Ct
+
+
+
+s(i)
+
+> t
+
+
+
+≈ 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+h
+
+Ct(μt) + g⊤ 
+
+> t
+
+(s(i) 
+
+> t
+
+− μt)+ 12 Tr 
+
+
+
+Ht(s(i) 
+
+> t
+
+− μt)( s(i) 
+
+> t
+
+− μt)⊤ i 
+
+= Ct(μt) + g⊤
+
+> t
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+(s(i) 
+
+> t
+
+− μt)
+
+!
+
++ 12 Tr Ht
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+(s(i) 
+
+> t
+
+− μt)( s(i) 
+
+> t
+
+− μt)⊤
+
+!! 
+
+= Ct(μt)
+
+| {z } 
+
+> Nominal
+
++ g⊤ 
+
+> t
+
+¯δN,t 
+
+| {z }
+
+> Linear Noise
+
++ 12 Tr 
+
+
+
+Ht ˆΣN,t 
+
+| {z }
+
+> Robustness Signal
+
+(29) where ¯δN,t = 1
+
+> N
+
+PNi=1 
+
+
+
+s(i) 
+
+> t
+
+− μt
+
+
+
+is the sample mean error; 
+
+ˆΣN,t = 1
+
+> N
+
+PNi=1 (s(i) 
+
+> t
+
+−μt)( s(i) 
+
+> t
+
+−μt)⊤ is the empirical second moment about the true mean, satisfying E
+
+h ˆΣN,t 
+
+i
+
+= Σt.
+
+Theorem Appendix B.1 (Asymptotic Unmasking) . As the DRIS size N increases, the linear noise is suppressed while the robustness signal concentrates. The empirical local cost converges in probability to a regularized objective: 
+
+ˆJN,t P
+
+−→ Ct (μt) + 12 Tr ( HtΣt) as N → ∞ . (30) 
+
+Proof: By the Weak Law of Large Numbers, the error 
+
+¯δN,t P
+
+−→ 0, causing the linear noise term g⊤ 
+
+> t
+
+¯δN,t to vanish. Similarly, ˆΣN,t P
+
+−→ Σt. By the Continuous Mapping Theorem,  
+
+> 12
+
+Tr 
+
+
+
+Ht ˆΣN,t 
+
+ P
+
+−→ 12 Tr ( HtΣt). Due to local convexity (Ht ⪰ 0), this limit is strictly non-negative, acting as a penalty on aleatoric (physics-induced) variance. 
+
+Implication. Substituting this local result back into Eq. (27) proves that DRIS improves the Signal-to-Noise Ratio (SNR) of the global optimization.  
+
+> •
+
+At N = 1 (Conventional DR): The objective is dominated by linear noise P γtg⊤ 
+
+> t
+
+¯δ1,t . The optimizer “chases” random first-order fluctuations, which can ob-scure the variance penalty.  
+
+> •
+
+At N ≫ 1 (DRIS): The linear noise is suppressed by 
+
+O
+
+
+
+1/√N
+
+
+
+. The global objective behaves as: 
+
+ˆJN (θ) ≈ −  
+
+> T−1
+
+X
+
+> t=0
+
+γt
+
+
+
+Ct(μt) + 12 Tr ( HtΣt)
+
+
+
+(31) This steers the policy to update in directions that reduce the physics-induced variance Σt.As a result, the learned policy via DRIS favors state-action regions that are invariant (i.e., robust) to physical uncertainty. 
+
+E. Sim-to-Real Generalization 
+
+We provide a theoretical analysis of the sim-to-real transfer capability of DRIS. We explicitly account for the distribution shift between the physics in simulation and the true physics of the real world. Recall that given a fixed initial state s0, for physics param-eter c, we let τc denote the trajectory induced by policy πθ .As defined earlier in Eq. (15), the discounted return of the trajectory is R (τc). We equivalently define the trajectory cost as the negative return: 
+
+L(θ, c) := −R (τc) = − 
+
+> T−1
+
+X
+
+> t=0
+
+γt r (st, at) (32) Maximizing return is therefore equivalent to minimizing tra-jectory cost. If rewards are bounded as |r(s, a)| ≤ rmax , then 
+
+|L (θ, c)| ≤ rmax 
+
+1 − γ =: B (33) 
+
+Source vs. Target Distributions. We distinguish between two distributions over the physics parameters C: 
+
+> •
+
+Source Distribution with density pS (·): The distribution used in the simulator for learning (e.g., uniform).  
+
+> •
+
+Target Distribution with density pT (·): The unknown true distribution of physical parameters in the real world. We seek to minimize the expected cost in the real world: 
+
+JT (θ) := Ec∼pT (c) [L(θ, c)] (34) The DRIS algorithm minimizes the empirical cost drawn from 
+
+pS (·), averaged over the N instances inside DRIS: 
+
+ˆJN (θ) := 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+L(θ, c(i)), where c(i) i.i.d. 
+
+∼ pS (c) (35) Let JS (θ) = Ec∼pS (c) [L (θ, c)] be the expected cost in simulation. 
+
+Definition Appendix B.2 (Rademacher Complexity) . To quantify the capacity of the policy parameter class Θ to fit random fluctuations in the simulation, we introduce the 
+
+empirical Rademacher Complexity of the induced (trajectory) cost function class LΘ = {L (θ, ·) : θ ∈ Θ}. Given a sample 
+
+ˆC = {c(1) , . . . , c(N )}, it is defined as: 
+
+ˆR ˆC (LΘ) := Eσ
+
+"
+
+sup 
+
+> θ∈Θ
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+σi L
+
+
+
+θ, c(i)#
+
+, (36) 
+
+where σ = ( σ1, . . . , σ N ) are independent Rademacher vari-ables with P(σi = 1) = P(σi = −1) = 12 . The expected Rademacher Complexity is then defined by averaging over the sampling of ˆC:
+
+RN (LΘ) := E ˆC∼ pS (c)N
+
+h ˆR ˆC (LΘ)
+
+i
+
+. (37) 
+
+Theorem Appendix B.2 (Sim-to-Real Transfer Bound) . For any δ ∈ (0 , 1) , with probability at least 1 − δ over the draw of DRIS ˆC ∼ pS (c)N , the following bound holds for all policy parameter θ ∈ Θ:
+
+JT (θ) ≤ ˆJN (θ) + 2 RN (LΘ) + 2 B
+
+r ln(1 /δ )2N| {z }  
+
+> Generalization Gap (Reducible via N)
+
++ dLΘ (pS , p T )
+
+| {z }
+
+> Physics Mismatch (Irreducible)
+
+(38) 
+
+where dLΘ (pS , p T ) is the Integral Probability Metric (IPM) measuring the discrepancy between source and target distri-butions over physics parameter (i.e., C) with respect to the cost class induced by the policy family. 
+
+dLΘ (pS , p T ) := sup 
+
+> θ∈Θ
+
+Z
+
+> C
+
+L(θ, c) ( pT (c) − pS (c)) dc (39) 
+
+Proof: Applying the triangle inequality, we decompose the sim-to-real error into two distinct components: an estima-tion error (finite sampling) and a transfer error (distribution shift): 
+
+JT (θ) = ˆJN (θ) + 
+
+
+
+JS (θ) − ˆJN (θ)
+
+
+
++
+
+
+
+JT (θ) − J S (θ)
+
+
+
+≤ ˆJN (θ) + JS (θ) − ˆJN (θ)
+
+| {z }
+
+> Estimation Error (Step 1)
+
++ JT (θ) − J S (θ)
+
+| {z }
+
+> Transfer Error (Step 2)
+
+(40) 
+
+Step 1: Bounding the Estimation Error. We seek to bound 
+
+sup θ∈Θ JS (θ) − ˆJN (θ) . Let us define a deviation 
+
+Φ( ˆC) = sup 
+
+> θ∈Θ
+
+
+
+JS (θ) − ˆJN (θ)
+
+
+
+(41) Consider two sample sets ˆC = {c(1) , . . . , c(i), . . . , c(N )} and 
+
+ˆC′ = {c(1) , . . . , ˜c(i), . . . , c(N )} that differ by exactly one sample at index i. The difference in the empirical cost is at most 2B/N :
+
+ˆJN (θ) − ˆJN ′ (θ)
+
+= 1
+
+N
+
+> N
+
+X
+
+> j=1
+
+L
+
+
+
+θ, c(j)
+
+− 1
+
+N
+
+L
+
+
+
+θ, ˜c(i)
+
++ X 
+
+> j̸=i
+
+L
+
+
+
+θ, c(j)
+
+= 1
+
+N L
+
+
+
+θ, c(i)
+
+− L 
+
+
+
+θ, ˜c(i)
+
+≤ 1
+
+N
+
+
+
+L
+
+
+
+θ, c(i)
+
++ L
+
+
+
+θ, ˜c(i)  
+
+= 2BN (42) Because the supremum is a contraction, the function Φ( ˆC)
+
+satisfies the bounded difference condition (i.e., substituting the value of c(i) changes the value of Φ( ˆC) by at most 2B/N ): 
+
+Φ( ˆC) − Φ( ˆC′) ≤ sup 
+
+> θ
+
+ˆJN (θ) − ˆJN ′ (θ) ≤ 2BN . (43) We now apply McDiarmid’s Inequality: 
+
+P
+
+
+
+Φ( ˆC
+
+
+
+− E[Φ( ˆC)] ≥ ϵ) ≤ exp 
+
+ −2ϵ2
+
+N (2 B/N )2
+
+
+
+= exp 
+
+ −N ϵ 2
+
+2B2
+
+ (44) Setting the right-hand side to δ and solving for ϵ, we obtain the concentration bound with: 
+
+ϵ = 2 B
+
+r ln(1 /δ )2N . (45) Finally, we bound the expectation E[Φ( ˆC)] via standard sym-metrization. Let ˆCg be an independent ghost sample and σi
+
+i.i.d. Rademacher variables. Then: 
+
+E ˆC [Φ( ˆC)] = E ˆC
+
+
+
+sup 
+
+> θ
+
+E ˆCg
+
+h ˆJNg (θ) − ˆJN (θ)
+
+i
+
+≤ E ˆC, ˆCg
+
+"
+
+sup 
+
+> θ
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+
+
+L(θ, c(i) 
+
+> g
+
+) − L (θ, c(i))
+
+#
+
+≤ 2E ˆC,σ 
+
+"
+
+sup 
+
+> θ
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+σi L(θ, c(i))
+
+#
+
+= 2 RN (LΘ)
+
+(46) Combining the concentration and expectation bounds yields the result for Step 1: 
+
+JS (θ) − ˆJN (θ) ≤ sup 
+
+> θ∈Θ
+
+JS (θ) − ˆJN (θ)
+
+≤ 2RN (LΘ) + 2 B
+
+r ln(1 /δ )2N
+
+(47) 
+
+Step 2: Bounding the Transfer Error (Physics Mis-match). We must bound the discrepancy |J T (θ) − J S (θ)|caused by the shift from pS (·) to pT (·) by: 
+
+|J T (θ) − J S (θ)|≤ sup 
+
+> θ∈Θ
+
+|J T (θ) − J S (θ)|
+
+= sup 
+
+> θ∈Θ
+
+Ec∼pT (c)[L(θ, c)] − Ec∼pS (c)[L(θ, c)] 
+
+= sup 
+
+> θ∈Θ
+
+Z
+
+> C
+
+L(θ, c) pT (c) dc −
+
+Z
+
+> C
+
+L(θ, c) pS (c) dc
+
+=dLΘ (pS , p T )
+
+(48) where dLΘ (pS , p T ) is the IPM defined in Eq. (39), measuring the worst-case performance gap over the hypothesis (policy parameter) space Θ. Unlike the estimation error, this does not vanish with N → ∞ .
+
+Conclusion. Substituting the bounds from Step 1 and Step 2 back into the decomposition, we obtain: 
+
+JT (θ) ≤ ˆJN (θ) + 2RN + 2 B
+
+r ln(1 /δ )2N
+
+!
+
++ dLΘ (pS , p T ).
+
+(49) 
+
+Remark: Note that if the simulator cannot model the real world (e.g., pT is disjoint from pS ), the discrepancy term 
+
+dLΘ is large and irreducible with N . However, compared to conventional DR ( N =1), DRIS ( N ≫ 1) minimizes the first term (Generalization Gap), ensuring that the policy is at least robust to the modeled uncertainty. 
+
+F. Discussion on Theory and Practical Implementation 
+
+The theoretical analysis provided in this appendix examines the properties of the DRIS framework within an idealized setting, assuming access to the full ensemble state. In our practical implementation, however, the policy operates on learned, compressed set representations generated by a trained encoder. While a formal equivalence is not proved here, the encoder is explicitly optimized to preserve task-relevant information from the underlying ball states. Consequently, we anticipate that the properties derived in this analysis remain positively correlated with the system’s practical performance. Extending this theoretical framework to encompass a broader range of learned representations is deferred to future work.

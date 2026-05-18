@@ -1,0 +1,733 @@
+Title: Rainbow Deep Q-Learning with Kinematics-Aware Design for Cooperative Delta and 3-RRS Parallel Robot Insertion
+
+URL Source: https://arxiv.org/pdf/2605.11697v1
+
+Published Time: Wed, 13 May 2026 00:51:26 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+IEEE TRANSACTIONS ON ROBOTICS, VOL. XX, NO. X, MONTH 2026 1
+
+# Rainbow Deep Q-Learning with Kinematics-Aware Design for Cooperative Delta and 3-RRS Parallel Robot Insertion 
+
+Hassen Nigatu , Shi Gaokun , Li Jituo , Wang Jin , Lu Guodong , and Howard Li 
+
+Abstract —This paper presents a kinematics-aware deep reinforcement learning framework based on Rain-bow Deep Q-Networks (DQN) for cooperative peg-in-hole manipulation by a Delta parallel robot and a 3-RRS (Revolute–Revolute–Spherical) parallel ma-nipulator. A key contribution is the integration of a geometric design-optimization stage that precedes learning: the 3-RRS geometry is tuned to maximize the singularity-free workspace and improve conditioning, which in turn enlarges the safe region in which the reinforcement learning policy can explore. Together the two manipulators expose a 6 degree-of-freedom (DoF) controllable subspace (three Delta translations, two 3-RRS rotations, and one 3-RRS vertical translation); the peg-in-hole task is invariant to rotation about the peg axis, so the task-relevant manifold is five dimen-sional. The cooperative insertion problem is cast as a Markov Decision Process with a 12-dimensional state vector and a discrete action set containing 6 × 2 = 12 
+
+incremental commands (one positive and one nega-tive per controlled DoF). A shaped reward combines dense proximity guidance, penalties for kinematic and workspace violations, and sparse bonuses for successful insertions. The Rainbow DQN—integrating double Q-learning, dueling architecture, prioritized replay, multi-step returns, noisy linear layers for exploration, and a distributional value head—is trained with a two-stage curriculum. The co-designed framework is validated in a high-fidelity kinematic simulator, where it achieves stable policy convergence, reliable insertions, and re-duced constraint violations compared against a vanilla DQN agent and a classical sampling-based planner. 
+
+Index Terms —Deep Q-learning, parallel robots, multi-robot coordination, peg-in-hole insertion, motion planning, shared workspace, reinforcement learning. 
+
+Manuscript received Month DD, 2026; revised Month DD, 2026. This work was supported in part by the Robotics Research Center of Yuyao under Grant KZ22308, in part by the Ningbo Yongjiang Talent Program under Grant Z22501, in part by the Zhejiang Talents Program, and in part by the National Natural Science Foundation of China under Grant 52275276. (Corresponding authors: Li Jituo; Howard Li.) 
+
+H. Nigatu, S. Gaokun, J. Li, J. Wang, and G. Lu are with the Robotics Institute of Zhejiang University (Yuyao Robotics Research Centre), Yuyao Technology Innovation Center, No. 479, Yuyao, Ningbo 315400, Zhejiang, China (e-mail: hassen@zju.edu.cn; gaokun@zju.edu.cn; jituo_li@zju.edu.cn; wangjin@zju.edu.cn; luguodong@zju.edu.cn). H. Li is with the Department of Electrical and Computer Engi-neering, University of New Brunswick, Fredericton, NB E3B 5A3, Canada (e-mail: howard@unb.ca). Digital Object Identifier 10.1109/TRO.2026.XXXXXXX 
+
+Figure 1: Schematic of the Delta and 3-RRS parallel manipulators in a cooperative configuration, with a dome-shaped shared workspace for synchronized peg-in-hole task execution. 
+
+I. Introduction 
+
+Cooperative manipulation by multiple robots is a cen-tral research direction in modern robotics, driven by demand for high-precision operations in dynamic, un-structured environments. Applications range from indus-trial assembly and surgical automation to search-and-rescue and collaborative handling, all of which rely on tight spatial and temporal coordination among agents [1], [2]. Unlike single-robot systems, cooperative teams must continuously resolve inter-agent dependencies, negotiate shared workspaces, and adapt to evolving task require-ments under timing constraints [3]. Classical motion planning and control are effective in isolated, structured settings but face scalability and ro-bustness challenges in cooperative scenarios. Deep rein-forcement learning (DRL) has emerged as a complemen- 
+
+> arXiv:2605.11697v1 [cs.RO] 12 May 2026 2IEEE TRANSACTIONS ON ROBOTICS, VOL. XX, NO. X, MONTH 2026
+
+tary paradigm that enables adaptive, data-driven policy synthesis [4], [5]. Multi-agent DRL formulations such as centralized training with decentralized execution [6] and decentralized policy learning [7] have shown promise for dynamic coordination problems where explicit planning pipelines fall short [8]. In this work we focus on a simpler but still-effective cooperative design: a centralized single-agent controller that commands both manipulators over a joint action space. This framing avoids the communication and non-stationarity issues of fully decentralized multi-agent DRL while still exercising cooperative behaviour, and is appropriate because the two manipulators share a common workspace and a single task objective. We study the cooperative system depicted in Fig. 1: a Delta parallel manipulator [9], [10] executes transla-tional positioning of the peg, while a 3-RRS manipu-lator [11], [12] orients a dome-shaped platform carrying the target holes [13], [14]. The problem combines three coupled challenges. First, synchronization demands pre-cise temporal alignment of translation and rotation un-der dynamic conditions. Although centralized cooperative schemes such as MADDPG [6] have shown coordination capability, they incur scalability limits with increasing system complexity [15], and communication-based meth-ods [16] introduce latency that is at odds with millimetre-level insertion tolerance [17]. Second, adaptation to chang-ing relative pose between peg tip and target hole is required without explicit reprogramming [18]–[21]. Third, 
+
+safe motion in a confined workspace must respect kine-matic constraints; parallel mechanism singularities [22] and workspace boundary effects [23] complicate matters. Existing safety frameworks [24]–[26] provide foundations but require task-specific realizations. Within this context, we first enlarge the safe explo-ration region by geometric optimization of the 3-RRS, then train a Rainbow DQN [27] that integrates double Q-learning [28], dueling architectures [29], prioritized experi-ence replay [30], [31], multi-step returns, noisy linear layers for exploration [32], and a distributional value head [33]. The reward function uses kinematic knowledge of both manipulators—Delta workspace constraints [9] and the optimized 3-RRS workspace [13]—for dense shaping, com-bined with sparse insertion bonuses [34] and safety penal-ties [35]–[37]. Because reward shaping and action masking both rely on analytic kinematic models, we describe the method as kinematics-informed DRL rather than strictly model-free. 
+
+Contributions: 
+
+1) A sequential co-design workflow in which the 3-RRS geometric parameters are optimized first, in order to enlarge the singularity-free workspace and improve conditioning, and Rainbow DQN is then trained in this enlarged safe region for cooperative peg-in-hole insertion with a heterogeneous Delta + 3-RRS pair. 2) A task-specific Rainbow DQN formulation with a unified 12-dimensional state, a well-defined discrete action set of 12 incremental commands over 6controlled DoF, and a shaped reward that com-bines dense proximity guidance, workspace-violation penalties, and sparse insertion bonuses. 3) A simulation study with ablations over Rainbow components and over the geometric-optimization stage, comparing against a vanilla DQN and a clas-sical sampling-based planner baseline. The remainder of the paper is organized as follows. Section II reviews learning-based control background. Sec-tion III presents our integrated approach. Section IV reports simulation results and analysis. Section V discusses limitations, and Section VI concludes. 
+
+II. Learning-Based Control 
+
+Reinforcement Learning (RL) is a framework for sequen-tial decision-making in which an agent interacts with an environment to learn a policy that maximizes cumulative reward [1]. At each discrete time step t, the agent observes a state st ∈ S , selects an action at ∈ A according to a pol-icy π(a|s), and receives a reward rt ∈ R. The environment transitions to st+1 according to the kernel P (st+1 | st, a t).The interaction is modeled as a Markov Decision Process 
+
+(S, A, P, R, γ ) with discount factor γ ∈ [0 , 1] . The optimal policy maximizes the expected discounted return 
+
+Gt = Eπ
+
+[ ∞∑
+
+> k=0
+
+γkrt+k
+
+]
+
+. (1) 
+
+A. Value-Based, Policy-Based, and Actor–Critic Methods 
+
+Value-based algorithms estimate V (s) or Q(s, a ) and act greedily with respect to the estimate. Policy-based methods parameterize πθ (a|s) and optimize the expected return by gradient ascent, which suits continuous and stochastic policies. Actor–critic methods combine both. In our setting—discrete incremental actions and a shared workspace with hard kinematic constraints—value-based methods are convenient because the finite action set en-ables straightforward action masking via inverse kinemat-ics, a property we rely on throughout Section III. 
+
+B. Q-Learning and the Bellman Optimality Equation 
+
+Q-learning [38], [39] estimates Q∗(s, a ) via the Bellman optimality equation 
+
+Q∗(s, a ) = E
+
+[
+
+rt + γ max  
+
+> a′
+
+Q∗(st+1 , a ′) | st = s, a t = a
+
+]
+
+.
+
+(2) The tabular update is 
+
+Q(st, a t) ← Q(st, a t)+ α
+
+[
+
+rt + γ max  
+
+> a′
+
+Q(st+1 , a ′) − Q(st, a t)
+
+]
+
+.
+
+(3) Tabular Q-learning does not scale to the high-dimensional joint workspace of coordinated Delta + 3-RRS control, motivating function approximation. NIGATU et al. : RAINBOW DEEP Q-LEARNING WITH KINEMATICS-AWARE DESIGN FOR COOPERATIVE DELTA AND 3-RRS INSERTION3 
+
+C. Deep Q-Network (DQN) 
+
+DQN [4] approximates Qθ (s, a ) with a neural network trained to minimize the temporal-difference loss 
+
+Lt(θ) = E(s,a,r,s ′)∼D 
+
+[
+
+(yt − Q(s, a ; θ)) 2]
+
+, (4) with target 
+
+yt = r + γ max  
+
+> a′
+
+Q(s′, a ′; θ−), (5) replay buffer D, and periodically updated target param-eters θ−. Vanilla DQN suffers from overestimation bias, slow reward propagation, and poor exploration under sparse rewards. 
+
+D. Rainbow DQN 
+
+Rainbow DQN [27] integrates six extensions of the original DQN: double Q-learning [28] to reduce overes-timation bias; the dueling architecture [29] for separate state-value and advantage estimation; prioritized expe-rience replay [30], [31] for sample efficiency; multi-step returns for faster reward propagation; NoisyNets [32] for state-dependent exploration; and distributional RL [33] for richer value representation. These extensions directly address the limitations that are most problematic in long-horizon, sparse-reward coordinated manipulation: sample inefficiency, overestimation bias, and exploration. This motivates our choice of Rainbow DQN for the discrete-action formulation in Section III.= 
+
+III. Proposed Method 
+
+We combine geometric optimization of the 3-RRS with Rainbow DQN-based control. Section III-A formulates the cooperative insertion task as an MDP. Section III-B presents the geometric optimization stage. Section III-C details the Rainbow DQN implementation. 
+
+A. Problem Formulation 
+
+We formalize the cooperative peg-in-hole task as a finite-horizon Markov Decision Process 
+
+M = (S, A, T , R, γ, T max 
+
+), (6) with γ ∈ (0 , 1) and episode horizon Tmax . The observa-tions are treated as full state (perfect kinematic sensing in simulation). A single centralized policy controls both manipulators via a discrete action set (Algorithm 1). 
+
+1) Continuous Configuration Spaces: a) Delta subsystem: Let p∆(t) =[x∆(t), y ∆(t), z ∆(t)] ⊤ ∈ R3 denote the Cartesian pose of the moving platform centre in the global frame. With active-rod length la and passive-rod length lp, the admissible workspace is 
+
+W∆ = {(x, y, z ) ∈ R3 | z ∈ [−(la + lp), −(la − lp)] ,
+
+√x2 + y2 ≤ rmax 
+
+}, (7) with a conservative planar bound rmax = 0 .8 min {la, l p}.The inverse kinematic mapping I∆ : W∆ → R3 returns active-joint angles ϕ = [ ϕ1, ϕ 2, ϕ 3]⊤ satisfying 
+
+∥∥Ai(ϕ) − Pi(p∆)∥∥2 = lp, i = 1 , 2, 3. (8) A configuration is valid iff (8) admits a real solution. 
+
+b) 3-RRS subsystem: Let the 3-RRS platform ori-entation be parameterized by roll–pitch angles η(t) =[θroll (t), θ pitch (t)] ⊤ and vertical displacement zR(t). The reachable set is 
+
+WRRS = {(η, z R) | zR ∈ [hmin , h max ], ∥η∥∞ ≤ π/ 4}, (9) with hmin , h max set at initialization. Platform attachment points follow from R(η) = Rx(θroll )Ry (θpitch ) and d =[0 , 0, z R]⊤. A 3-RRS configuration is valid if each limb length satisfies | ∥ JiBi∥2 − L1| ≤ L2.
+
+2) State Space: At each time step t the agent receives 
+
+st = [p∆(t)
+
+︸ ︷︷ ︸ 
+
+> 3
+
+, η(t), z R(t)
+
+︸ ︷︷ ︸
+
+> 3
+
+, erel (t)
+
+︸ ︷︷ ︸ 
+
+> 3
+
+, ntarget (t)
+
+︸ ︷︷ ︸
+
+> 3
+
+] ∈ R12 , (10) where erel (t) = htarget − ppin is the peg-tip to target-hole displacement and ntarget is the outward hole normal. The state thus encodes the five task-relevant DoF directly: three Delta translations, two rotations of the 3-RRS plat-form, and the vertical height of the 3-RRS. The peg-in-hole task is invariant to rotation about the peg axis, so we deliberately do not parameterize that additional DoF. 
+
+3) Action Space: Six DoF are controlled: three Delta translations (x∆, y ∆, z ∆), two 3-RRS rotations 
+
+(θroll , θ pitch ), and the 3-RRS vertical displacement zR. The discrete action set contains one positive and one negative increment per DoF, giving |A| = 6 × 2 = 12 . Translational increments use δpos = ±0.02 m ; rotational increments use 
+
+δrot = ±0.03 rad . The two magnitudes arise from the unit difference between translations and rotations and were chosen empirically: larger values overshoot during fine approach, while smaller values lengthen episodes beyond practical training budgets. After each action, validity is checked against W∆ × W RRS via the analytic inverse kine-matics; invalid actions are masked during action selection. 
+
+4) Reward Design: Let 
+
+d(t) = ∥erel (t)∥2, (11) 
+
+∆d(t) = d(t − 1) − d(t), (12) 
+
+[x]+ = max( x, 0) . (13) Let vt ∈ {0, 1} indicate a workspace or IK violation induced by the chosen action; zt ∈ { 0, 1} indicate a new 
+
+successful insertion at time t (a hole not previously filled); 
+
+ut ∈ { 0, 1} indicate an attempted duplicate insertion into a hole already filled. Let Nt denote the total number of holes filled at time t (after updating), and let Ttask = 60 s be the 4 IEEE TRANSACTIONS ON ROBOTICS, VOL. XX, NO. X, MONTH 2026 
+
+reference task duration used to reward fast completion. The shaped reward is 
+
+rt = − 3 vt
+
++ [150 + 25 Nt + 80 (1 − t/T task )] zt
+
+− 1 · ut
+
++ (1 − vt − zt − ut
+
+)( −0.01 − d(t)+ 50 [∆ d(t)] + + 200 [0 .03 − d(t)] +
+
+).
+
+(14) The first row penalizes constraint violations; the second rewards a new insertion with a base bonus plus a term proportional to the number of completed insertions and a time bonus; the third discourages repeated attempts at already-filled holes; the last row, active only in nominal transitions, provides dense guidance through a small step cost, a distance shaping term, an incremental progress bonus 50 [∆ d]+, and a near-target bonus 200 [0 .03 − d]+
+
+that dominates once the peg is within 3 cm of the hole. Sparse insertion bonuses dominate to encourage task com-pletion, while the dense terms provide local gradient for exploration. 
+
+5) Curriculum Learning: Training uses a two-stage cur-riculum: stage C0 includes the four peripheral holes, and stage C1 includes all six holes. We switch from C0 to C1 once the moving-average success rate over the last 20 episodes exceeds 75% . This threshold was chosen empirically to ensure competence on the simpler task before progression. Preliminary experiments with a three-stage curriculum yielded only marginal further gains. 
+
+6) Learning Algorithm Overview: The policy πθ : S → A is learned with Rainbow DQN (Algorithm 1), combining double Q-learning, a dueling head, prioritized replay, 3-step returns, noisy linear layers, and a distributional value output. Training uses a replay buffer of capacity 10 6 and soft target updates with τ = 10 −3 (i.e. Polyak averaging); no periodic hard copy is used. Exploration is driven exclu-sively by the NoisyNet layers, which remove the need for a separate ε-greedy schedule. 
+
+B. Geometric Optimization for Learning-Compatible 3-RRS Design 
+
+To provide a well-conditioned environment for the DRL policy, we first optimize the 3-RRS geometric parame-ters. A larger singularity-free workspace and more uni-form manipulability enlarge the safe region in which the policy can explore, which in preliminary tests produced visibly smoother training curves; quantitative evidence is reported in Section IV. 
+
+1) Motivation: A well-conditioned mechanism matters for DRL for three reasons: (i) it enlarges the valid region of the action masking used in Algorithm 1, so fewer candi-date actions are rejected; (ii) more uniform manipulability reduces abrupt changes in transmission that complicate value learning; (iii) a larger singularity-free workspace re-duces the fraction of episodes that terminate on violations. 
+
+2) Computational Framework: 
+
+Algorithm 1 Rainbow DQN for Cooperative Insertion  
+
+> 1:
+
+Init: Dueling noisy Qθ ; target Qθ− ← Qθ ; PER buffer 
+
+D (capacity 10 6); LR scheduler; curriculum stage C0 
+
+> 2:
+
+for episode = 1 , 2, . . . do  
+
+> 3:
+
+Reset env; observe s0; resample NoisyNet noise; 
+
+Qn ← ∅ 
+
+> 4:
+
+while not terminal do  
+
+> 5:
+
+Compute masked Qθ (s, ·) (invalid actions →−∞ ); a ← arg max a Qθ (s, a ) 
+
+> 6:
+
+Step env → (r, s ′, d ); push (s, a, r, s ′, d ) into Qn 
+
+> 7:
+
+if |Q n| ≥ n or d then  
+
+> 8:
+
+Form n-step transition (˜ s, ˜a, ˜r, ˜s′, ˜d) with 
+
+˜r = ∑n−1 
+
+> i=0
+
+γirt−i; insert into D with priority p = pmax  
+
+> 9:
+
+if ready to train then  
+
+> 10:
+
+Sample batch by P (i) ∝ pαi ; wi ←
+
+(1 /(N P (i))) β / max j wj 
+
+> 11:
+
+a′ ← arg max a Qθ (˜ s′, a ) (masked) ▷ Double DQN  
+
+> 12:
+
+y ← ˜r + (1 − ˜d)γnQθ− (˜ s′, a ′) 
+
+> 13:
+
+L ← 1
+
+> B
+
+∑ 
+
+> i
+
+wi Huber( Qθ (˜ s, ˜a) − y) 
+
+> 14:
+
+Adam step on θ (lr 10 −4, wd 10 −5, grad clip 
+
+5) 
+
+> 15:
+
+pi ← | Qθ (˜ s, ˜a) − y| + ϵper  
+
+> 16:
+
+θ− ← (1 − τ )θ− + τ θ , τ = 10 −3 
+
+> 17:
+
+Resample NoisyNet noise; s ← s′ 
+
+> 18:
+
+if d then  
+
+> 19:
+
+break  
+
+> 20:
+
+Update success metrics; advance curriculum if threshold met; step LR scheduler 
+
+3) Algorithmic Pipeline Overview: The pipeline com-prises four components: 1) Kinematic Modeling. Analytic forward and in-verse kinematics for the 3-RRS architecture are used for feasibility checks during optimization. 2) Workspace Delineation. A grid-based sampling of 
+
+WRRS quantifies reachable volumes and singularity loci. Orientations are sampled on a 1◦ grid over 
+
+θx, θ y ∈ [−π/ 3, π/ 3] , chosen as a balance between resolution and compute time. At each grid point the Jacobian J is evaluated; singularities are detected by the minimum singular value σmin (J) < 10 −6, and manipulability is assessed via the condition number 
+
+κ = σmax /σ min .3) Geometric Optimization. Dimensionless param-eters are optimized with a gradient-free simplex (Nelder–Mead) method subject to the physical con-straints below. 4) Performance Validation. Test trajectories are generated on the optimized design to verify joint excursions and smoothness. All analysis uses dimensionless parameters for scale invari-ance. 
+
+4) Optimization Formulation: With base radius Rb,platform radius Rp, and proximal-link length L1, define NIGATU et al. : RAINBOW DEEP Q-LEARNING WITH KINEMATICS-AWARE DESIGN FOR COOPERATIVE DELTA AND 3-RRS INSERTION5 
+
+the scale and dimensionless parameters 
+
+η = Rb + 2 L1 + Rp
+
+4 , λ 1 = Rb
+
+η , λ 2 = 2L1
+
+η , λ 3 = Rp
+
+η ,
+
+(15) subject to 
+
+{
+
+λ1 + λ2 + λ3 = 4 ,λ3 > 0, λ3 < λ 1, λ1 < 2, λ2 > 0. (16) The objective is to maximize the area of the singularity-free orientation workspace, 
+
+max 
+
+> λ1,λ 2
+
+Aw =
+
+∫ ∫ 
+
+> Ω
+
+dθ x dθ y ,
+
+Ω = {(θx, θ y ) | σmin (J) ≥ 0.15 }.
+
+(17) The threshold σmin ≥ 0.15 was chosen by sensitivity analy-sis: lower values admit near-singular configurations during exploration, while higher values unnecessarily shrink the workspace. Because Aw is approximated by a grid-based Monte Carlo integration with jittered sample positions, small run-to-run variation arises; reported statistics in Table I are averaged over 10 independent runs. 
+
+5) Computational Outcomes: The optimization pipeline yields a 42% expansion in singularity-free workspace, from 
+
+0.82 rad 2 to 1.16 rad 2, with σmin improving from 0.08 to 
+
+0.22 (Table I). Maximum roll/pitch excursions improve to 
+
+±40 ◦, condition-number variation across the workspace is reduced by 68% , and the admissible joint angle range nar-rows to [18 .7◦, 68 .3◦], away from singularity boundaries. Figure 2 visualizes the outcomes: the singularity loci at fixed height, a three-dimensional manipulability map, the feasible atlas in (λ1, λ 2) space, and joint angle trajectories along a representative path. 
+
+6) Synergy with the Learning Framework: To quantify the benefit of the optimization stage on DRL training, Section IV reports an explicit ablation that re-trains the full Rainbow DQN on the non-optimized (initial) 3-RRS geometry. The improvements reported there are directly attributable to the enlarged singularity-free workspace, rather than asserted. 
+
+C. Rainbow DQN Implementation 
+
+Figure 3 shows the architecture of our Rainbow DQN-based framework. The agent block combines analytic kine-matic models of the Delta [10] and 3-RRS [11] mech-anisms with a Rainbow DQN network (dueling head, prioritized replay, noisy linear layers, n-step returns, and a distributional value head). The environment block sim-ulates robot kinematics and provides state transitions and shaped rewards; the system block executes the training loop, handles visualization, and logs metrics. 
+
+1) State and Action Spaces: Consistent with Sec-tion III-A, the state at time t is the 12-dimensional vector of (10), combining p∆, η, zR, erel , and ntarget . The action set contains 12 incremental commands ( ±0.02 m 
+
+for translations, ±0.03 rad for rotations) over the six con-trolled DoF. Discrete actions simplify masking via inverse kinematics; they may limit trajectory smoothness, which we revisit in Section V.         
+
+> (a) Singularity loci at z=0.21 m(b) 3D manipulability map
+> (c) Feasible parameter atlas (d) Joint angle trajectories
+
+Figure 2: Analysis outcomes: (a) singularity loci, (b) manipulability map, (c) parameter atlas, (d) joint-angle trajectories along a representative path. 
+
+2) Network and Loss: The action-value function is a distributional, dueling Q-network Q(s, a ; θ) [29], [33] with noisy linear layers in the final two layers. The network is trained to minimize the Huber loss between the predicted atom distribution and the distributional target built from multi-step returns and the target network Q(·; θ−):
+
+Lt(θ) = 1
+
+B
+
+∑
+
+> i
+
+wi Huber (Proj( Q(˜ s, ˜a; θ)) − yi
+
+),yi = DistributionalTarget(˜ r, ˜s′, ˜d; θ−),
+
+˜r =
+
+> n−1
+
+∑
+
+> i=0
+
+γirt−i,wi = (1/(N P (i)) )β ,
+
+(18) with batch size B, importance weights wi from prioritized replay, discount γ, and soft target parameters θ− updated by Polyak averaging. 
+
+3) Exploration Strategy: We rely exclusively on the NoisyNet layers [32] for exploration. State-dependent noise is injected into the final dense layers of the Q-network; as the policy improves, the network learns to suppress this noise, producing a smooth transition from exploration to exploitation without a hand-tuned ε-greedy schedule. We do not additionally use ε-greedy. 
+
+IV. Simulation Results and Analysis 
+
+A. Simulation Environment 
+
+We implemented the approach in a custom Python sim-ulator with deterministic forward and inverse kinematics for both manipulators, geometric collision detection, and alignment-based insertion success criteria (position and 6 IEEE TRANSACTIONS ON ROBOTICS, VOL. XX, NO. X, MONTH 2026 
+
+Table I: Geometric Optimization Performance Metrics (mean ± std over 10 runs).                                 
+
+> Metric Initial Optimized
+> Orientation workspace (rad 2)0.82 ±0.03 1.16 ±0.05 (+42% )Min σmin 0.08 ±0.01 0.22 ±0.02
+> Max roll/pitch ( ◦)±32 ±1±40 ±1
+> Condition number variation (%) 38 ±212 ±1
+> Joint angle range ( ◦)[12 ,78] [18 .7,68 .3]
+
+Figure 3: Overall architecture of the Rainbow DQN-based framework. The agent integrates kinematic models of the Delta and 3-RRS robots with a Rainbow DQN policy. The environment simulates robot kinematics and returns states and shaped rewards. Arrows denote state, action, and reward signals during end-to-end training for cooperative peg-in-hole insertion. orientation thresholds). The environment exposes a unified interface for state observation, action execution, reward calculation, and episode termination. The manipulators used are:  
+
+> •
+
+Delta. A 3-DoF translational parallel manipulator that manipulates the peg and performs the axial insertion motion.  
+
+> •
+
+3-RRS. A 3-DoF parallel manipulator providing two rotations (roll, pitch) and one vertical translation, carrying a dome-shaped platform with six target holes. 
+
+B. Implementation and Training Protocol 
+
+The Q-network uses three dense hidden blocks (256, 128, 64 units) with ReLU activation, followed by a dueling distributional head with 51 atoms. The final two dense layers are noisy linear layers. Inputs are normalized to 
+
+[0 , 1] for training stability. We report a single authorita-tive hyperparameter set (Table II) used for Algorithm 1 throughout all experiments. Table II: Training hyperparameters (authoritative).                                  
+
+> Parameter Value
+> Optimizer Adam Learning rate 10 −4
+> Weight decay 10 −5
+> Gradient clipping 5.0
+> Discount factor γ0.99
+> n-step return 3
+> Replay buffer capacity 10 6
+> PER α, β 0.6,0.4→1.0(annealed) Batch size 64
+> Target update soft, τ= 10 −3
+> Exploration NoisyNets (no ε-greedy) Distributional atoms 51 in [Vmin , V max ] = [ −10 ,200]
+> Total environment steps ∼1.5×10 6
+> Curriculum switch threshold 75% success over 20 episodes Hardware NVIDIA RTX 3090, ∼4 h training
+
+Hyperparameters were selected by coarse grid search over learning rate {5×10 −5, 10 −4, 3×10 −4}, n-step {1, 3, 5},and batch size {32 , 64 , 128 }, evaluated on a validation protocol of 5 independent seeds and 100 post-training NIGATU et al. : RAINBOW DEEP Q-LEARNING WITH KINEMATICS-AWARE DESIGN FOR COOPERATIVE DELTA AND 3-RRS INSERTION7 
+
+episodes each. Ablations used the same hyperparameters as the full Rainbow. 
+
+C. Evaluation Metrics 
+
+1) Task completion time : time to successfully insert the peg into a target hole. 2) Alignment accuracy : angular deviation between peg axis and hole normal at insertion. 3) Success rate : fraction of episodes with at least one successful insertion (per-episode success). 4) Collision rate : average collisions per episode. 5) Energy proxy : integrated joint torque over the episode, estimated from joint-space velocity magni-tudes. 6) Trajectory error : RMS deviation from a geometric reference path to the target. 
+
+D. Baselines 
+
+We compare against two baselines trained or tuned on the same task. 
+
+a) Classical planner (RRT-Connect): The baseline is RRT-Connect in OpenRAVE, given the full geometric model. A centralized coordinator sequences the two ma-nipulators: the 3-RRS is planned to a nominal alignment pose, then the Delta is planned to execute the insertion, each planning call capped at 5 s . This baseline has no closed-loop corrective control, so failure cases are primarily insertion-precision failures rather than failures to find a feasible path. We report it as a representative open-loop planning baseline, not as an upper bound. 
+
+b) Vanilla DQN: The same network architecture and hyperparameters as our approach, but with none of the six Rainbow extensions (single Q-learning, plain feed-forward head, uniform replay, 1-step returns, ε-greedy exploration linearly decayed from 1.0 to 0.05 over 10 4 steps, and scalar value output). 
+
+E. Main Results 
+
+Results in Table III are averaged over 100 test episodes with 5 seeds. Our Rainbow DQN approach outperforms both baselines across all metrics (paired t-test, p < 0.01 
+
+vs. each baseline). Figure 4a shows the learning curves. The two-stage curriculum produces a brief dip at the stage switch that the policy quickly recovers from. Figure 4b reports the annealing of the learning rate and the NoisyNet noise magnitude, the latter serving as an effective exploration schedule learned by the network. Figure 5a shows the number of holes inserted per episode across curriculum stages, and Figure 5b the overall success-rate trajectory. Figure 6a shows the average maximum Q-value, while Figure 6b shows the training loss (log scale). Figure 7 confirms that episode duration decreases over training as the policy becomes more efficient. 0 200 400 Episode       
+
+> 1000
+> 2000
+> 3000 Total Reward
+> Cumulative Reward per Episode
+> Episode Reward Moving Avg (10 eps)
+> 0200 400 Episode
+> 2
+> 4
+> 6Holes Inserted
+> Holes Inserted per Episode
+> Stage 0: 4 holes Stage 1: 6 holes
+> 05000 10000 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> Exploration & Learning Rate
+> Epsilon Learning Rate
+> 0200 400 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00 Success Rate
+> Success Rate
+> Cumulative Moving (10 eps) Stage 0 Target Stage 1 Target
+
+(a) 0 200 400 Episode    
+
+> 1000
+> Total R
+> Episode Reward Moving Avg (10 eps)
+> 0
+> 2
+> 4
+> Holes In
+> 05000 10000 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> Exploration & Learning Rate
+> Epsilon Learning Rate
+> 0
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00 Success Rate
+
+(b) 
+
+Figure 4: (a) Cumulative reward per episode (raw and 10-episode moving average). The step at ∼150 episodes marks the curriculum switch. (b) Learning-rate annealing and the self-regulating NoisyNet noise magnitude over episodes. 0 200 400 Episode       
+
+> 1000
+> 2000
+> 3000 Total Reward
+> Cumulative Reward per Episode
+> Episode Reward Moving Avg (10 eps)
+> 0200 400 Episode
+> 2
+> 4
+> 6Holes Inserted
+> Holes Inserted per Episode
+> Stage 0: 4 holes Stage 1: 6 holes
+> 05000 10000 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> Exploration & Learning Rate
+> Epsilon Learning Rate
+> 0200 400 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00 Success Rate
+> Success Rate
+> Cumulative Moving (10 eps) Stage 0 Target Stage 1 Target
+
+(a) 0 200 400 Episode        
+
+> 1000
+> 2000
+> 3000 Total Reward
+> Cumulative Reward per Episode
+> Episode Reward Moving Avg (10 eps)
+> 0200 400 Episode
+> 2
+> 4
+> 6Holes Inserted
+> Holes Inserted per Episode
+> Stage 0: 4 holes Stage 1: 6 holes
+> 05000 10000 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> Exploration & Learning Rate
+> Epsilon Learning Rate
+> 0200 400 Episode
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00 Success Rate
+> Success Rate
+> Cumulative Moving (10 eps) Stage 0 Target Stage 1 Target
+
+(b) 
+
+Figure 5: (a) Holes inserted per episode across curriculum stages (Stage 0: four holes; Stage 1: six holes). Performance drops briefly after the stage switch and recovers. (b) Per-episode success-rate trajectory over training. 
+
+F. Ablation: Rainbow Components 
+
+Table IV reports success rate when each Rainbow exten-sion is removed, holding all other hyperparameters fixed and re-training from scratch. Prioritized replay and the dueling head contribute most strongly to performance, consistent with findings in [27]. 
+
+G. Ablation: Geometric Optimization 
+
+To substantiate the benefit of the geometric optimiza-tion stage, we retrain the full Rainbow DQN on the 
+
+non-optimized initial 3-RRS geometry and compare to the optimized geometry. All other hyperparameters and training budgets are identical (Table V). The optimized geometry trains faster (fewer environment steps to 75% 
+
+success), reaches a higher final success rate, and encounters far fewer singularity-related terminations. These results quantify the synergy informally described in Section III-B: the optimization stage reduces sample complexity by roughly a third and eliminates singularity terminations during the budget studied. 
+
+H. Robustness 
+
+To assess robustness, we inject zero-mean Gaussian noise into normalized state inputs with standard deviation 
+
+0.01 (i.e. 1% of the normalized state range) during test rollouts. The success rate drops modestly to 88 ± 3% ,8 IEEE TRANSACTIONS ON ROBOTICS, VOL. XX, NO. X, MONTH 2026 
+
+Table III: Performance comparison between Rainbow DQN, Vanilla DQN, and the classical planner baseline.                                                               
+
+> Metric Classical planner Vanilla DQN Rainbow DQN (Ours)
+> Success rate (%) 55 ±468 ±595 ±2
+> Avg. completion time (s) 12 .4±1.29.8±0.97.1±0.5
+> Avg. alignment error (deg) 1.8±0.31.2±0.20.6±0.1
+> Avg. collisions per episode 0.5±0.10.3±0.10.1±0.05
+> Avg. energy proxy (J) 15 .4±1.113 .2±0.812 .3±0.6
+> RMS trajectory error (mm) 4.2±0.42.8±0.31.5±0.20200 400 Episode
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Average Max Q-value
+> 05000 10000 Training Step
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2Training Loss (Log Scale)
+> Raw Smoothed (50)
+
+(a) 0 200 400 Episode     
+
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Average Max Q-value
+> 05000 10000 Training Step
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2Training Loss (Log Scale)
+> Raw Smoothed (50)
+
+(b) 
+
+Figure 6: (a) Average maximum Q-value during training, indicating growing agent confidence. (b) Training loss (log scale), showing convergence. 0 100 200 300 400 500 Episode 
+
+0
+
+200 
+
+400 
+
+600 Time (seconds) 
+
+Episode Duration 
+
+> Episode Time Moving Avg (10 eps)
+
+Figure 7: Per-episode duration in seconds with a 10-episode moving average. The decreasing trend indicates increasing policy efficiency. indicating reasonable but imperfect resilience. Extending this with domain randomization is flagged for future work. 
+
+V. Discussion and Future Work 
+
+=== The proposed kinematics-informed DRL approach delivers substantial gains in success rate, completion time, and alignment accuracy compared to both a vanilla DQN and a classical sampling-based planner. The largest con-tributors are, in order, prioritized replay, the dueling head, and the preceding geometric optimization (Tables IV–V). Several limitations remain and frame the future work. 
+
+Simulation-only validation: The simulator uses an-alytic kinematics and geometric collision detection, and Table IV: Ablation: success rate with individual Rainbow components removed.                             
+
+> Configuration Success rate (%)
+> Full Rainbow (ours) 95 ±2
+> −Prioritized replay 82 ±3
+> −Dueling head 85 ±3
+> −Multi-step returns 88 ±2
+> −NoisyNets 90 ±2
+> −Distributional head 87 ±3
+> −Double Q-learning 89 ±2
+
+Table V: Effect of the geometric-optimization stage on Rainbow DQN training (5 seeds, mean ± std).                       
+
+> Metric Initial geom. Optimized geom.
+> Env. steps to 75% succ. ( ×10 5)11 .2±1.17.6±0.8
+> Final success rate (%) 82 ±495 ±2
+> Singular. terminations / 10 3ep. 41 ±70
+
+does not model joint backlash, motor dynamics, or sensor noise. Hardware validation with sim-to-real transfer is the most important next step. 
+
+Discrete action space: Twelve fixed-magnitude incre-ments simplify masking against the analytic workspace constraints, but they also limit trajectory smoothness near the goal. A continuous-action successor based on actor– critic methods (SAC, PPO, TD3) with projection-based or barrier-based constraints is a natural extension. 
+
+Classical planner as baseline: RRT-Connect is a plan-ner, not a controller, and lacks closed-loop correction; its 55% success rate reflects the difficulty of open-loop insertion at sub-mm tolerance rather than a general weakness of sampling-based methods. A stronger baseline that combines RRT for coarse motion with a dedicated impedance-controlled insertion primitive is a priority for future comparison. 
+
+Centralized single-policy controller: The current pol-icy commands both manipulators centrally. Scaling to larger teams will likely require decentralized or CTDE formulations; we plan to investigate them, along with communication-efficient variants, on this same hardware setup. 
+
+Sequential versus joint co-design: The present work performs geometric optimization first and RL training second. A tighter co-optimization loop, in which learning signals feed back into geometric parameter adjustments, is a promising direction that would make the co-design claim stronger. NIGATU et al. : RAINBOW DEEP Q-LEARNING WITH KINEMATICS-AWARE DESIGN FOR COOPERATIVE DELTA AND 3-RRS INSERTION9 
+
+Ethics and safety: The reward function includes ex-plicit penalties for workspace and kinematic violations, keeping the policy inside the validated safe region dur-ing training and deployment in simulation. Before any deployment near humans, additional runtime shielding, external safety limits, and certified collision avoidance are required.= 
+
+VI. Conclusion 
+
+We presented a kinematics-informed Rainbow DQN framework for cooperative peg-in-hole insertion by a Delta and a 3-RRS parallel manipulator. The problem is formu-lated as an MDP with a 12-dimensional state, a discrete action set of 12 increments over 6 controlled DoF, and a shaped reward combining proximity guidance, workspace-violation penalties, and sparse insertion bonuses. A pre-ceding geometric optimization of the 3-RRS enlarges the singularity-free workspace and improves conditioning, which in turn reduces training sample complexity and eliminates singularity-related terminations in our exper-iments. In simulation, the proposed approach achieves a 95% per-episode success rate, outperforming a vanilla DQN and a classical planner baseline across six metrics. Future work includes hardware validation, continuous-action successors, decentralized multi-agent extensions, and a tighter co-optimization of mechanism and policy.= 
+
+Acknowledgment 
+
+This research was supported in part by the Robotics Research Center of Yuyao (Grant No. KZ22308), in part by the “Design and Fabrication of an Immersive Inter-active VR Robot Controller” project under the Ningbo Yongjiang Talent Program (Grant No. Z22501), in part by the Zhejiang Talents Program, and in part by the Na-tional Natural Science Foundation of China under Grant 52275276. 
+
+References 
+
+[1] R. S. Sutton and A. G. Barto, Reinforcement Learning: An Introduction . MIT Press, 2018. [2] X. Chen et al. , “Multi-robot systems and soft robotics,” Sensors ,vol. 25, p. 1353, 2025. [3] S. Sun et al. , “Peg-in-hole robotic assembly: A survey,” IEEE Trans. Automation Science & Eng. , 2023. [4] V. Mnih et al. , “Human-level control through deep reinforce-ment learning,” Nature , vol. 518, pp. 529–533, 2015. [5] C. Tang et al. , “Drl for robotics: Real-world successes,” 
+
+arXiv:2408.03539 , 2024. [6] R. Lowe et al. , “Multi-agent actor-critic for mixed cooperative-competitive environments,” Proc. NeurIPS , 2017. [7] K. Keval and V. Borkar, “Decentralised q-learning for multi-agent markov decision processes,” arXiv:2311.12613 , 2023. [8] D. Mtowe et al. , “Edge-enabled digital twin for multi-robot collision avoidance,” Sensors , vol. 25, p. 4666, 2025. [9] R. L. Williams II, “The delta parallel robot: Kinematics so-lutions,” 2016, available at: https://people.ohio.edu/williams/ html/PDF/DeltaKin.pdf. [10] R. Clavel, “Device for the movement and positioning of an element in space,” U.S. Patent , no. 4,976,582, 1990. [11] R. Di Gregorio, “The 3-rrs wrist: A new spherical parallel manipulator,” Journal of Mechanical Design , vol. 126, pp. 850– 855, 2004. [12] D. Guo et al. , “Kinematic performance of a 3-rrs parallel mech-anism,” Robotica , vol. 38, pp. 1252–1271, 2020. [13] J. Li et al. , “Inverse kinematics of the 3-rrs parallel platform,” in Proc. ICRA , 2001, pp. 2506–2511. [14] H. Tetik et al. , “Position kinematics of a 3-rrs parallel manipu-lator,” 2015. [15] A. Team, “Asynchronous multi-agent rl for real-time coopera-tive exploration,” arXiv , 2025. [16] J. Foerster et al. , “Learning to communicate with deep multi-agent reinforcement learning,” in Proc. NeurIPS , 2016. [17] P. Chen et al. , “Delta-like parallel robot for peg-in-hole assem-bly,” Journal of Mechanisms and Robotics , vol. 17, p. 021014, 2024. [18] J. Tobin et al. , “Domain randomization for sim-to-real transfer,” in Proc. IROS , 2017, pp. 23–30. [19] Y. Bengio et al. , “Curriculum learning,” in Proc. ICML , 2009, pp. 41–48. [20] G. Germano et al. , “Curriculum design for dual-arm peg-in-hole assembly,” Machines , vol. 12, p. 1385, 2024. [21] C. Florensa et al. , “Reverse curriculum generation for rl,” in 
+
+Proc. CoRL , 2017. [22] H. Tetik and G. Kiper, “Singularity analysis of 3-rrs parallel manipulator,” in Advances in Mechanism and Machine Science ,2018, pp. 349–356. [23] P. Zhao et al. , “Design of 3-rrs parallel ankle rehabilitation robot,” Applied Sciences , vol. 12, p. 6125, 2022. [24] J. García and F. Fernández, “A comprehensive survey on safe reinforcement learning,” JMLR , vol. 16, pp. 1437–1480, 2015. [25] L. Brunke et al. , “Safe learning in robotics,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 5, pp. 411– 444, 2022. [26] H. Ye et al. , “Collision avoidance algorithms for multi-robot systems,” Autonomous Robots , 2025. [27] M. Hessel et al. , “Rainbow: Combining improvements in deep reinforcement learning,” Proc. AAAI , 2018. [28] H. van Hasselt, A. Guez, and D. Silver, “Deep reinforcement learning with double Q-learning,” in Proceedings of the Thirti-eth AAAI Conference on Artificial Intelligence , ser. AAAI’16. AAAI Press, Feb 2016, pp. 2094–2100. [29] Z. Wang, T. Schaul, M. Hessel, H. van Hasselt, M. Lanctot, and N. de Freitas, “Dueling network architectures for deep reinforcement learning,” in Proceedings of the 33rd International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, M. F. Balcan and K. Q. Weinberger, Eds., vol. 48. New York, New York, USA: PMLR, 20–22 Jun 2016, pp. 1995–2003. [30] T. Schaul, J. Quan, I. Antonoglou, and D. Silver, “Prioritized experience replay,” CoRR , vol. abs/1511.05952, 2015. [Online]. Available: http://arxiv.org/abs/1511.05952 [31] T. Schaul et al. , “Prioritized experience replay,” Proc. ICLR ,2016. [32] M. Fortunato, M. G. Azar, B. Piot, J. Menick, I. Osband, A. Graves, V. Mnih, R. Munos, D. Hassabis, O. Pietquin, C. Blundell, and S. Legg, “Noisy networks for exploration,” 
+
+CoRR , vol. abs/1706.10295, 2017. [Online]. Available: http: //arxiv.org/abs/1706.10295 [33] M. G. Bellemare, W. Dabney, and R. Munos, “A distributional perspective on reinforcement learning,” in Proceedings of the 34th International Conference on Machine Learning (ICML 2017) , ser. Proceedings of Machine Learning Research, D. Pre-cup and Y. W. Teh, Eds., vol. 70. Sydney, Australia: PMLR, 6–11 Aug 2017, pp. 449–458. [34] S. A. Lab, “Viki-r: Multi-agent cooperation via rl,” 
+
+arXiv:2506.09049 , 2025. [35] K. Garg et al. , “Learning safe control for multi-robot systems,” 
+
+Robotics and Autonomous Systems , 2024. [36] X. Li et al. , “Safe multi-agent rl for multi-robot control,” Arti-ficial Intelligence , vol. 322, p. 103905, 2023. [37] Y. Naito et al. , “Hierarchical distributed policies for multi-robot transport,” arXiv:2404.02362 , 2024. [38] C. J. C. H. Watkins, “Learning from delayed rewards,” Ph.D. dissertation, King’s College, University of Cambridge, Cam-bridge, United Kingdom, 1989. [39] C. J. C. H. Watkins and P. Dayan, “Q-learning,” Machine Learning , vol. 8, no. 3-4, pp. 279–292, 1992.
