@@ -1,0 +1,575 @@
+Title: Hand-in-the-Loop: Improving Dexterous VLA via Seamless Interventional Correction
+
+URL Source: https://arxiv.org/pdf/2605.15157v1
+
+Published Time: Fri, 15 May 2026 01:39:04 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Hand-in-the-Loop: Improving Dexterous VLA via Seamless Interventional Correction 
+
+## Zhuohang Li 1,2,3,∗, Liqun Huang 3, Wei Xu 3, Zhengming Zhu 3, Nie Lin 3,4,∗, Xiao Ma 3,
+
+## Xinjun Sheng 1,2,†, Ruoshi Wen 3,†
+
+> 1
+
+State Key Laboratory of Mechanical System and Vibration, School of Mechanical Engineering, Shanghai Jiao Tong University , 2Shanghai Key Laboratory of Intelligent Robotics, Meta Robotics Institute, Shanghai Jiao Tong University, Shanghai 200240, China , 3ByteDance Seed ,
+
+> 4
+
+The University of Tokyo 
+
+> ∗
+
+Work done at ByteDance Seed , †Corresponding authors 
+
+## Abstract 
+
+Vision-Language-Action (VLA) models are prone to compounding errors in dexterous manipulation, where high-dimensional action spaces and contact-rich dynamics amplify small policy deviations over long horizons. While Interactive Imitation Learning (IIL) can refine policies through human takeover data, applying it to high-degree-of-freedom (DoF) robotic hands remains challenging due to a command mismatch between human teleoperation and policy execution at the takeover moment, which causes abrupt robot-hand configuration changes, or “gesture jumps”. We present Hand-in-the-Loop (HandITL), a seamless human-in-the-loop intervention method that blends human corrective intent with autonomous policy execution to avoid gesture jumps during bimanual dexterous manipulation. Compared with direct teleoperation takeover, HandITL reduces takeover jitter by 99.8% and preserves robust post-takeover manipulation, reducing grasp failures by 87.5% and mean completion time by 19.1%. We validate HandITL on tasks requiring bimanual coordination, tool use, and fine-grained long-horizon manipulation. When used to collect intervention data for policy refinement, HandITL yields policies that outperform those trained with standard teleoperation data by 19% on average across three long-horizon dexterous tasks.  
+
+> Date:
+
+May 15, 2026  
+
+> Correspondence:
+
+Xinjun Sheng at xjsheng@sjtu.edu.cn , Ruoshi Wen at wenruoshi@bytedance.com  
+
+> Project Page:
+
+https://simpson-li.github.io/Hand-in-the-Loop/ 
+
+## 1 Introduction 
+
+Vision-Language-Action (VLA) models have demonstrated strong potential in robotic manipulation [12, 34]. However, transferring these policies from parallel-jaw grippers to high-degree-of-freedom (DoF) anthropomor-phic hands remains challenging due to the higher-dimensional action space and complex finger-object contacts, which make the system highly sensitive to small hand-pose errors. These factors amplify deployment-time distribution shift on real dexterous systems, where small deviations in fingertip motion, contact state, or object pose can quickly compound during contact-rich, long-horizon tasks, driving the system into out-of-distribution (OOD) states from which the base policy often fails to recover. [ 21 , 25 ]. Interactive Imitation Learning (IIL), such as Dataset Aggregation (DAgger) [ 11 , 21 ], mitigates this issue by enabling human intervention during 1
+
+> arXiv:2605.15157v1 [cs.RO] 14 May 2026
+
+𝜋 𝑝𝑟𝑒 
+
+𝜋 𝑏𝑎𝑠𝑒 
+
+𝜋 𝑛𝑒𝑤   
+
+> Mid
+> Training
+> Post
+> Training
+> Teleoperation
+> Data
+> Takeover
+> Data
+> Rollout
+> Intervention
+> Human
+> Correction
+> (b) Arm -Hand Seamless Correction for Policy Training (c) Deploy for Bimanual Dexterous Tasks
+> Policy Rollout
+> Takeover
+> Data
+> Task A : Unscrew Assembly with Electric Drill
+> Task B : Unscrew Assembly by Hand
+> Task C : Pick Up and Place the Parts
+> Intervention
+> Human Gesture
+> Policy Rollout
+> Human hand
+> Dexterous
+> Hand
+> Time
+> Gesture Mismatch
+> When Taking over
+> Gesture
+> Jump
+> ≠
+> (a) Gesture Jump Problem
+
+Figure 1 Overview of HandITL. (a) The gesture mismatch between human hand and robot hand at intervention moment will cause gesture jump. (b) At the intervention moment, HandITL ensures consistent command and provides smooth correction. The collected takeover data is further used to improve the policy. (c) The fine-tuned policy is deployed to execute complex, long-horizon bimanual dexterous tasks, such as unscrewing assemblies and precision part sorting. 
+
+policy rollouts, thereby collecting targeted recovery data from deployment-induced states and improving policy robustness beyond the original training distribution. Despite its promise, applying IIL to dexterous manipulation remains challenging due to three key bottlenecks: takeover-time command discontinuities between human teleoperation and policy execution, limited hand-arm coordination under shared autonomy, and a limited understanding of how high-dimensional takeover data improves policy learning. Low-DoF interfaces, such as joysticks or SpaceMouse devices, lack the input dimensionality required for coordinated multi-finger corrections, while high-fidelity hand teleoperation systems [ 23 , 26 ] are primarily designed for collecting full demonstrations rather than enabling seamless corrective interventions during policy rollouts. This gap becomes critical at the takeover boundary. With conventional pose-based retargeting, switching control authority abruptly pulls the robot hand command toward the operator’s current hand pose. If the robot is maintaining a stable grasp while the operator’s hand is neutral or unmatched, this mismatch produces a large command discontinuity, which we refer to as a 
+
+gesture jump , as illustrated in Fig. 1(a). Such jumps can destabilize contact-rich grasps, trigger object drops, and make recovery difficult or impossible within the same rollout. To overcome these limitations, we propose Hand-in-the-Loop (HandITL), a seamless interventional method tailored for bimanual dexterous VLA policies, as illustrated in Fig. 1. Our core idea is to fuse human corrective intent with the policy’s ongoing action stream, reducing takeover-induced command discontinuities while preserving contact-rich manipulation after intervention. For dexterous hands, we introduce an optimization-based relative retargeting method anchored at the intervention timestamp. Instead of matching the absolute human hand pose, it maps the operator’s incremental fingertip motion to the robot hand, subject to pinch reinforcement, kinematic safety, and velocity constraints. For the arms, we design a velocity-based shared-control interface that injects the operator’s transient wrist motion as residual twists into the policy-predicted 2arm commands, enabling localized corrections while mitigating long-term drift. HandITL supports two intervention modes for long-horizon bimanual manipulation: full takeover for critical recovery and copilot shared control for small residual corrections. We evaluate these modes on real-world tasks involving bimanual coordination, tool use, and fine-grained manipulation. Extensive experiments show that HandITL reduces takeover-induced command discontinuity by up to two orders of magnitude. Moreover, fine-tuning the base VLA policy with the collected on-policy correction data substantially improves long-horizon task performance, outperforming teleoperation-data fine-tuning under the same training budget. The main contributions of this work are summarized as follows: 
+
+• A Seamless Intervention Method for Dexterous VLA. We propose HandITL, a high-DoF intervention method that enables online corrective data collection during long-horizon, contact-rich bimanual dexterous manipulation. 
+
+• Optimization-Based Relative Hand Retargeting. We develop a retargeting algorithm that maps the operator’s relative fingertip motion, rather than absolute hand pose, to the robot hand. This design substantially reduces command discontinuities during authority handovers and helps preserve ongoing contacts after takeover. 
+
+• Velocity-Based Arm Shared Control. We design a bimanual arm shared-control interface that injects human corrective intent as transient residual twists on top of policy-predicted arm commands, enabling localized corrections while preserving the policy’s active rollout. 
+
+• Efficacy of On-Policy Intervention Data. We empirically show that fine-tuning with high-dimensional, on-policy correction data collected through HandITL improves long-horizon dexterous manipulation performance and reduces failures caused by compounding errors. 
+
+## 2 Related Work 
+
+2.1 VLA Models for Dexterous Manipulation 
+
+Recent VLA models have shown promising instruction-conditioned manipulation capabilities through large-scale pre-training [ 3, 4, 9, 10 , 12 , 15 , 34 ]. Yet, most successful deployments still focus on relatively low-DoF end effectors, and extending these models to multi-fingered anthropomorphic hands remains challenging. Existing dexterous VLA systems broadly follow two paradigms. Hierarchical approaches decouple semantic planning from low-level dexterous control [ 20 , 30 , 33 ], improving modularity but potentially limiting closed-loop adaptation when contact states, object poses, or grasp configurations deviate from the planned trajectory. End-to-end approaches instead learn direct mappings from multimodal observations and instructions to high-DoF actions [ 2, 17 , 26 ], but require substantial real-world dexterous data and remain vulnerable to compounding errors during long-horizon execution. In contrast to these efforts, our work focuses on how deployed dexterous VLA policies can be corrected online and further improved using on-policy intervention data collected from real bimanual rollouts. 
+
+2.2 Interactive Imitation Learning for Policy Fine-Tuning 
+
+IIL mitigates deployment-time distribution shift by collecting expert supervision on states induced by the learner’s own policy. Classical DAgger and human-gated variants reduce covariate shift through expert queries or interventions during rollouts [ 11 , 21 ], and recent extensions improve sample efficiency, compliance, or intervention-aware policy refinement [ 1, 13 , 16 , 29 ]. This paradigm has been effective in relatively low-dimensional manipulation settings, where corrective labels can be provided through simple interfaces and incorporated as on-policy recovery demonstrations. Its extension to bimanual dexterous VLA policies, however, remains underexplored. From a data perspective, high-dimensional takeover data may provide valuable recovery supervision, but it may also introduce noisy, sparse, or distributionally distinct labels that interfere with previously learned manipulation skills. From a systems perspective, studying this question requires a real-time interface capable of collecting physically consistent hand-arm corrections without causing command discontinuities or contact disruption. Existing IIL 3a
+
+𝜋 𝑏𝑎𝑠𝑒 
+
+> Rollout
+> hand
+> command
+> Rollout
+> Arm EEF
+> Velocity
+> Residual
+> Hand
+> Command
+> Residual
+> Arm EEF
+> velocity
+> Hand
+> Command
+
+⊕                 
+
+> Arm EEF
+> Velocity
+> a
+> Human
+> Operator
+> Robot Hand
+> 𝑃 𝑟 ,3
+> 𝑡
+> 𝑃 𝑟 ,2
+> 𝑡
+> 𝑃 𝑟 ,1
+> 𝑡
+> 𝑃 𝑟 ,1
+> 0𝑃 𝑟 ,2
+> 0
+> 𝑃 𝑟 ,3
+> 0
+> 𝑤 𝑟
+> 0
+> 𝑤 𝑟
+> 𝑡
+> No initial pose alignment required
+> Match relative
+> fingertip motion
+> ∆𝑣 ℎ,𝑖 =𝑝 ℎ,𝑖
+> 𝑡 −𝑤 ℎ
+> 𝑡 −(𝑝 ℎ,𝑖
+> 0−𝑤 ℎ
+> 0)
+> ∆𝑣 𝑟 ,𝑖 =𝑝 𝑟 ,𝑖
+> 𝑡 −𝑤 𝑟
+> 𝑡 −(𝑝 𝑟 ,𝑖
+> 0−𝑤 𝑟
+> 0)
+
+∆𝒗 𝒉 ,𝒊 ≈ ∆𝒗 𝒓 ,𝒊           
+
+> Human Hand Robot Hand
+> 𝑤 ℎ
+> 𝑃 ℎ,𝑖
+> 0
+> 𝑃 ℎ,𝑖
+> 𝑡 𝑤 𝑟
+> 𝑃 𝑟 ,𝑖
+> 0
+> 𝑃 𝑟 ,𝑖
+> 𝑡
+> Same
+> Vector
+> displacement
+> (Finger 𝑖 )
+> Human hand
+> 𝑃 ℎ,1
+> 0𝑃 ℎ,2
+> 0
+> 𝑃 ℎ,3
+> 0
+> 𝑃 ℎ,3
+> 𝑡
+> 𝑃 ℎ,2
+> 𝑡
+> 𝑃 ℎ,1
+> 𝑡
+> 𝑤 ℎ
+> 0
+> Wrist -to -fingertip key vector
+> Vector displacement
+> from 𝑡 0to 𝑡
+> (a) Shared -Control Pipeline (b) Optimization -based Relative Retargeting
+> 𝒕 𝟎 𝒕 𝟎
+> 𝒕 𝒕
+> Takeover
+> Data
+
+Figure 2 Architecture of the seamless interventional method. (a) The base VLA policy ( πbase ) generates autonomous rollout commands. During an intervention, the human operator injects transient residual hand commands and velocity-based arm twists. These corrective signals are seamlessly blended with the rollout commands to form the final executed actions. (b) Our method anchors at intervention moment t0 and maps the human’s relative motion to the robot. It preserves existing contacts at the intervention moment because no robot hand motion will be caused with no human hand motion. 
+
+pipelines do not directly address this interface requirement for high-DoF dexterous hands. HandITL fills this gap by enabling seamless online intervention and on-policy corrective data collection during real bimanual dexterous rollouts. 
+
+2.3 Interfaces for Real-Time Human Correction 
+
+The effectiveness of IIL depends on interfaces that allow operators to provide timely and physically consistent corrections during policy rollouts. Low-dimensional devices, such as joysticks [ 8, 22 ], SpaceMouse controllers [ 5,18 ], or smartphones [ 19 ], are effective for correcting simple robot trajectories but cannot naturally express coordinated finger-level corrections. High-fidelity teleoperation systems, including hand/arm exoskeletons [ 6,24 , 31 , 32 ], provide richer control but require specialized hardware and calibration. Glove-based retargeting pipelines [ 7, 14 , 23 , 26 ] offer a more accessible alternative, yet they are typically designed for collecting full demonstrations rather than seamless online interventions. This distinction becomes critical in dexterous IIL. Directly switching from policy-generated commands to absolute pose retargeting can produce a gesture jump when the operator’s hand pose is not aligned with the current robot hand pose, destabilizing contact-rich grasps. Recent systems such as CR-DAgger [ 29 ]and RoboCopilot [ 28 ] explore shared-control interfaces that blend human corrections with policy rollouts. However, their extension to high-DoF bimanual dexterous manipulation remains nontrivial, as hand-arm corrections must be injected without disrupting ongoing contacts or introducing takeover discontinuities. HandITL addresses this gap through relative hand retargeting and velocity-based arm shared control, enabling physically consistent online correction and on-policy data collection during real dexterous rollouts. 
+
+## 3 Methodology 
+
+We propose HandITL, a real-time interventional method that enables high-dimensional human corrections during ongoing dexterous VLA rollouts, as illustrated in Fig. 2. HandITL separates arm-level residual control from hand-level relative retargeting, allowing interventions to modify the policy action stream while preserving ongoing contacts. 43.1 System Overview and Interventional Interface 
+
+Our platform consists of two 7-DoF Franka FR3 arms equipped with two 21-DoF Bytedexter V2 hands [ 27 ], forming a 56-DoF bimanual hand-arm system. The human-in-the-loop interface captures the operator’s 6-DoF wrist poses using Meta Quest 3 controllers and finger motions using Manus Quantum Metagloves. Each controller is rigidly mounted on the back of a glove to maintain a consistent wrist-hand tracking frame. A dual-pedal interface allows the operator to trigger intervention modes without releasing the tracking devices. The VLA policy receives observations from three external RGB-D cameras covering top-down, bottom-up, and third-person viewpoints. During autonomous rollout, the policy directly controls the robot; during intervention, HandITL combines the policy output with human wrist and finger corrections before executing the resulting hand-arm command. 
+
+3.2 Problem Formulation and Intervention Modes 
+
+We formulate bimanual dexterous manipulation as a sequential decision-making process governed by a VLA policy πθ . At each time step t, the policy receives an observation ot, including multi-view RGB-D images and proprioception, and predicts an action sequence Aπt = {aπt:t+H−1} over a horizon H. During autonomous rollout, the robot executes the first action aπt in a receding-horizon manner. During intervention, the operator provides human corrective input uht , which is fused with the policy command to generate the executed command: aexec t =
+
+
+
+Fa(aπt,a , uht,a ; βa), Fh(aπt,h , uht,h ; βh)
+
+
+
+, where Fa denotes arm-level residual shared control, Fh denotes hand-level relative retargeting, and βa, β h are the corresponding human authority weights. HandITL supports two intervention modes: full takeover , where human authority dominates for substantial recovery, and copilot shared control , where the policy remains primary while human inputs provide local residual corrections. The entire rollout is recorded and aggregated into an on-policy correction dataset Dcorr = {(ot, aexec t )}Tt=1 ,covering both autonomous policy execution and human intervention periods. Here, aexec t denotes the physically executed command, which equals the policy output during autonomous rollout and the fused human-policy command during intervention. The dataset is used to fine-tune the base policy πbase .
+
+3.3 Optimization-Based Relative Hand Retargeting 
+
+Conventional pose-based retargeting directly maps the operator’s absolute hand pose to the robot hand. During intervention, this can induce gesture jumps when the operator’s hand configuration is not aligned with the current robot hand configuration. To reduce this discontinuity, we propose an optimization-based relative retargeting method anchored at the intervention timestamp t0. We define two types of hand key vectors: wrist-to-fingertip vectors vi, which describe global finger motion, and thumb-to-fingertip opposition vectors 
+
+uj , which describe pinch-related motion. Instead of matching absolute human key vectors, our method tracks their changes after intervention: 
+
+∆vrob i (qt) = vrob i (qt) − vrob i (qt0 ), ∆ˆ vhum i = ˆ vhum i (t) − ˆvhum i (t0) (1) where ˆ(·) denotes human key vectors transformed into the robot hand frame with scale normalization. At each control step, we solve for the robot hand configuration qt by minimizing 
+
+J (qt) = 
+
+> 5
+
+X
+
+> i=1
+
+βi(di)Hδ
+
+  ∆vrob i (qt) − ∆ˆ vhum i 2
+
+| {z } 
+
+> Lshape (Global Shaping)
+
++ X
+
+> j∈F opp
+
+ωj (dj )Hδ
+
+
+
+urob j (qt) − αj (dj )utgt j (dj ) 2
+
+| {z } 
+
+> Lgrasp (Precision Grasping)
+
++ γ X
+
+> (m,n )∈C
+
+[max(0 , d safe − Dmn (qt))] 2
+
+| {z } 
+
+> Lsafe (Structural Safety)
+
++ λreg Hδ (∥qt − qt−1∥2)
+
+| {z } 
+
+> Lreg (Temporal Regularization)
+
+.
+
+(2) The loss components are defined as follows: 5• Global Shaping ( Lshape ): βi(di) is a distance-dependent gate based on the human thumb-to-finger distance 
+
+di. This term dominates when the hand is open and gradually decreases as the human hand enters a pinch configuration. 
+
+• Precision Grasping ( Lgrasp ): Fopp denotes the set of fingertips paired with the thumb for opposition-based grasping. For pinch grasping, we define a nominal target opposition vector utgt  
+
+> j
+
+= urob  
+
+> j
+
+(qt0 ) + ∆ ˆuhum 
+
+> j
+
+and a pinch activation factor αj (dj ) ∈ [0 , 1] . When dj falls below a threshold, αj (dj ) → 0, biasing the opposition vector toward a compact pinch configuration. As dj decreases, ωj (dj ) increases, causing the optimization to prioritize pinch consistency. 
+
+• Structural Safety ( Lsafe ): Dmn (qt) is the physical distance between potentially colliding hand links or joints. The hinge penalty activates only when Dmn falls below the safety margin dsafe , with γ controlling its strength. 
+
+• Temporal Regularization ( Lreg ): Penalizes the joint displacement, scaled by λreg , to prevent high-frequency jitter. 
+
+3.4 Velocity-Based Shared Arm Control 
+
+Since VR controllers are rigidly mounted on the gloves, operators lack access to physical joysticks. To enable intuitive corrections, we design a velocity-based shared-control interface. Human wrist motions are translated into residual twists, smoothed via Exponential Moving Average (EMA), and injected into the policy trunk without persistent drift. At step t, the VLA outputs the target pose and feedforward twist (pπt , Rπt , ˙pπt , ωπt ). Simultaneously, the residual human twist ( ˙pht , ωht ) is estimated over a window of k = 2 VR ticks ( ∆T = 0 .04 s) to balance stability and latency: 
+
+˙pht = EMA 
+
+ pvr t − pvr t−k
+
+∆T
+
+
+
+, (3) 
+
+ωht = EMA log  (Rvr t−k)−1Rvr t
+
+
+
+∆T
+
+!
+
+. (4) These twists are integrated into incremental pose offsets (∆ pht , ∆Rht ) to compute the final corrective target pose: 
+
+ptgt  
+
+> t
+
+= pπt + ∆ pht , Rtgt  
+
+> t
+
+= Rπt ∆Rht . (5) A task-space PD tracker, augmented with policy feedforward terms, then computes the commanded spatial velocity. Crucially, deriving residuals from relative motion ensures that when the operator is still, ( ˙pht , ωht ) → 0. The EMA filter smoothly decays these residuals, eliminating persistent offsets without requiring the operator to manually return to a neutral “center” position. 
+
+## 4 Experiments 
+
+We aim to answer the following research questions through experiments: 
+
+• Q1: Does our optimization-based relative retargeting method effectively reduce command discontinuity 
+
+(i.e., gesture jumps) at the moment of takeover? 
+
+• Q2: After takeover, does our human-in-the-loop interface preserve dexterous manipulation capability, such as maintaining grasps and completing fine-grained corrective motions? 
+
+• Q3: Can the on-policy correction data collected via our method, especially under copilot shared control ,improve VLA policy more effectively than additional teleoperation data when real-world data is limited? 
+
+• Q4: Can the complete method support challenging, contact-rich, long-horizon bimanual dexterous tasks? 6Jacobian DeltaCmd Teleop Relative             
+
+> 0.0
+> 0.5
+> 1.0
+> Outcome proportion
+> Drill Task: Post-takeover outcome (Attempts 1–3)
+> Jacobian DeltaCmd Teleop Relative
+> 0.000
+> 0.025
+> 0.050
+> 0.075
+> 0.100
+> Joint command jitter (rad)
+> Drill Task: Enable-command discontinuity
+> Jacobian DeltaCmd Teleop Relative
+> 0.0
+> 0.5
+> 1.0
+> Outcome proportion
+> Bread Clip Task: Post-takeover outcome (Attempts 1–3)
+> Jacobian DeltaCmd Teleop Relative
+> 0.00
+> 0.02
+> 0.04
+> 0.06
+> 0.08
+> Joint command jitter (rad)
+> Bread Clip Task: Enable-command discontinuity
+> Outcome
+> Stable (1) Partial (0.5) Drop (0)
+> Operator
+> Operator 1 Operator 2
+
+Figure 3 Takeover command discontinuity on the Drill (top) and Bread Clip (bottom) tasks. Left (Grasp Stability): Outcomes across three consecutive takeover attempts (10 trials each). Green, orange, and red denote stable grasps, partial failures (trigger loosening), and tool drops, respectively. Right (Command Change): Attempt-level distribution of the mean command change at intervention. Scatter points show individual takeovers from two operators, with 95% CI error bars. 
+
+4.1 Experiments Overview 
+
+Our experiments consist of three parts: (1) takeover command discontinuity analysis, which addresses Q1 by measuring the abrupt change in dexterous hand commands at the handover moment; (2) post-takeover manipulation evaluation, which addresses Q2 by testing whether each method preserves dexterous manipulation capability after takeover; and (3) long-horizon policy evaluation, which addresses Q3 and Q4 by examining whether the collected human-correction data improves the performance of a VLA policy on challenging bimanual dexterous manipulation tasks. For the first two parts, we compare our optimization-based relative retargeting method with three alternative takeover strategies, covering local differential control, relative command retargeting, and direct absolute teleoperation switching. 
+
+Jacobian-based mapping: This method computes robot joint increments from desired fingertip displacements using the hand Jacobian at each discrete time step [23]. 
+
+Delta-command retargeting: This method uses the teleoperation retargeting pipeline as its backend [ 7, 27 ], but applies only the command difference after takeover. Suppose takeover happens at t0, and the current robot hand state is qrob t0 . Let the absolute teleoperation commands at t0 and t be qtel t0 and qtel t , respectively. The executed command is computed as qexec t = qrob t0 + ( qtel t − qtel t0 ). This baseline preserves relative command changes but does not explicitly enforce grasp-aware geometric constraints. 
+
+Direct teleoperation switching: This method directly switches control authority to the absolute teleoperation retargeting pipeline at takeover [ 27 ]. It represents a standard absolute-retargeting baseline and is sensitive to hand-pose mismatch at the takeover moment. In the third part, we deploy the base policy on real robots and record full rollouts containing both autonomous execution and human interventions. We use these on-policy correction rollouts for post-training and compare 7Table 1 Post-takeover manipulation capability on the Pick Up and Place the Parts and Pick Up the Drill tasks. 
+
+Interv. (Interventions) and Retries are reported as the total count across all 10 trials (5 per operator). Time (Op1/Op2) 
+
+denotes the separate mean completion times for Operator 1 and Operator 2 to demonstrate cross-operator robustness. 
+
+Success rate indicates whether the drill trigger was successfully actuated.                                                                                    
+
+> Method Task 1: Pick Up and Place the Parts Task 2: Pick Up the Drill Time (s) ↓Time (Op1/Op2) ↓Interv. ↓Retries ↓Time (s) ↓Time (Op1/Op2) ↓Interv. ↓Success ↑
+> Jacobian 68 .0±10 .866 .5/69 .531 /10 14 /10 19 .4±5.620 .3/18 .514 /10 7/10
+> Delta Cmd 56 .7±14 .558 .0/55 .523 /10 9/10 17 .3±5.413 .1/21 .511 /10 8/10
+> Teleop 52 .9±14 .243 .9/61 .921 /10 8/10 15 .5±5.712 .2/18 .912 /10 10/10 Relative (Ours) 42.8 ±5.0 40.0 /45.6 17/10 1/10 14.4 ±4.7 11.0 /17.9 11/10 8/10 Teleop Relative
+> (ours)
+> Jacobian Delta Cmd Glove
+> Pinch Tripod
+
+Figure 4 Grasping Postures and Failure Modes. Optimization-based methods (Teleop and our Relative approach) maintain precise thumb-to-finger opposition and avoid collisions. In contrast, differential methods (Jacobian and Delta Cmd) struggle with pinch grasping and suffer from accumulated drift during fast motions, leading to awkward postures and frequent grasp failures. 
+
+them with equal-duration teleoperation-data fine-tuning under the same training budget. The resulting policies are evaluated on three long-horizon bimanual dexterous manipulation tasks. 
+
+4.2 Takeover Command Discontinuity Analysis 
+
+We evaluate takeover command discontinuity on the Drill and Bread Clip tasks. Discontinuity is measured as the hand-command change at the takeover boundary, ∥qexec t+0
+
+− qexec t−
+
+> 0
+
+∥2, where t− 
+
+> 0
+
+and t+0 denote the control steps immediately before and after takeover. In each trial, the operator first establishes a stable grasp via teleoperation, switches to autonomous rollout, and toggles takeover three times during execution. Across 30 trials per task-method pair, direct teleoperation switching frequently caused failures such as tool drops or drill-trigger release due to abrupt gesture jumps. In contrast, our relative retargeting method maintained grasp stability in nearly all trials; the only Bread Clip failure occurred after a successful handover due to subsequent operator manipulation rather than a takeover command jump. As shown in Fig. 3, our method substantially reduces command discontinuity. On Bread Clip, where the open-hand posture amplifies human-robot mismatch, direct switching produces a large command jump (mean 
+
+≈ 4.38 × 10 −2). Our method reduces it to ≈ 6.8 × 10 −5, corresponding to a 99.8% reduction and nearly two orders of magnitude lower than DeltaCmd ( ≈ 6.23 × 10 −3). On Drill, the closed power grasp yields smaller direct-switching jumps (mean ≈ 2.75 × 10 −2), but these still disrupt trigger actuation. Our method reduces the mean command change to ≈ 2.65 × 10 −4, comparable to the Jacobian baseline while avoiding explicit Jacobian inversion, thereby maintaining stable functional tool use. 8With  Electric Drill By Hand        
+
+> Pick  Up and Place the Parts  Unscrew Assembly
+> Pick Up the Drill Pick Up the Assembly Drill Unscrew Place the Drill
+> Pick Up the Assembly Unscrew with Two Fingers Flick with Index Finger
+> Pick Up and Place the Screw Pick Up and Place the Wheel
+> Pick Up and Place the Bar Pick Up and Place the Cube
+
+Figure 5 Execution sequences of the three long-horizon bimanual dexterous manipulation tasks. Top: Unscrew Assembly With Electric Drill , requiring tool use and bimanual coordination. Middle: Unscrew Assembly By Hand ,demanding fine-grained in-hand manipulation. Bottom: Pick Up and Place the Parts , involving sequential precision grasping of diverse small objects. 
+
+4.3 Post-Takeover Manipulation Capability 
+
+We evaluate whether each takeover interface preserves dexterous manipulation capability after control is transferred to the operator on the Pick Up and Place the Parts and Pick Up the Drill tasks in Fig. 5. Operators start directly in the active takeover state, isolating post-takeover manipulation from the handover discontinuity analyzed above. When reaching their physical workspace limit, operators can disengage, reset their hand posture, and re-engage, which we record as workspace resets .As shown in Table. 1, on the Pick Up and Place the Parts task, our method achieves the fastest mean completion time ( 42 .8 s), reducing time by 19 .1% and grasp failures by 87 .5% compared to Teleop. It also shows a smaller cross-operator completion-time gap ( 5.6 s vs. 18 .0 s for Teleop), suggesting more consistent usability. As illustrated in Fig. 4, this advantage is closely related to pinch-geometry preservation. Our Relative method and Teleop both use optimization-based retargeting, while Jacobian and DeltaCmd rely on differential updates that can accumulate errors during fast motions, leading to awkward grasps, part drops, and longer completion times ( 68 .0 s and 56 .7 s, respectively). On the Pick Up the Drill task, our method again achieves the lowest mean completion time ( 14 .4 s), the fewest workspace resets, and more consistent per-operator completion times than the differential baselines. Its fine-finger mapping differs slightly from absolute teleoperation, so operators sometimes require brief adaptation to precisely actuate the trigger without tactile feedback, slightly reducing button-triggering success. Overall, these results indicate that our method preserves efficient post-takeover dexterous manipulation while reducing grasp failures and workspace resets. 
+
+4.4 Long-Horizon Policy Evaluation 
+
+We collect a 20-hour real-world teleoperation dataset, evenly distributed across three long-horizon tasks. Starting from a pre-trained GR-Dexter policy [ 26 ], we fine-tune the model on this dataset to obtain the 9Base Teleop  
+
+> old
+> Teleop
+> new
+> Copilot Full
+> Takeover
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0    
+
+> Normalized score
+> 0.71 0.77 0.74
+> 0.90 0.89
+
+Unscrew Assembly With Electric Drill     
+
+> Stage 1 Stage 2 Stage 3
+> Base Teleop
+> old
+> Teleop
+> new
+> Copilot Full
+> Takeover
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0  
+
+> 0.62
+> 0.82 0.77
+> 0.99
+> 0.87
+
+Unscrew Assembly By Hand     
+
+> Stage 1 Stage 2 Stage 3
+> Base Teleop
+> old
+> Teleop
+> new
+> Copilot Full
+> Takeover
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> 0.78
+> 0.68
+> 0.77
+> 0.96
+> 0.88
+
+Pick Up and Place the Parts    
+
+> Stage 1 Stage 2 Stage 3 Stage 4
+
+Figure 6 Average normalized sub-goal completion scores across three long-horizon tasks. Intervention-trained policies ( Copilot , Full Takeover ) outperform pure teleoperation baselines, indicating improved robustness against compounding errors. 
+
+base policy . We then deploy the base policy on real robots and collect takeover data whenever the operator judges intervention to be necessary. Correction data are collected under both full-takeover and copilot shared-control modes in an HG-DAgger-style process, where the operator intervenes during policy rollouts to correct failure-prone states. For both modes, we record the entire rollout, including autonomous and intervention segments. For post-training, we compare the following policies: 
+
+• Base : the policy obtained by fine-tuning the pre-trained GR-Dexter model on the 20-hour teleoperation dataset; 
+
+• Teleop_old : continuing to fine-tune the base policy on the original base dataset for the same number of post-training steps; 
+
+• Teleop_new : fine-tuning the base policy using 1-hour new teleoperation data mixed with the base dataset; 
+
+• Copilot : fine-tuning the base policy using 1-hour copilot takeover data mixed with the base dataset; 
+
+• Full Takeover : fine-tuning the base policy using 1-hour full-takeover data mixed with the base dataset. For a fair comparison, all additional post-training datasets are 1 hour in duration, mixed with the base dataset using the same sampling ratio, and trained with identical schedules and hyperparameters. We evaluate all policies on three long-horizon tasks requiring high-precision bimanual coordination (Fig. 5). We report the average Sub-goal Completion Score over 10 evaluation rollouts for each model. As shown in Fig. 5, each long-horizon task is decomposed into several sub-tasks, each worth one point. Each sub-task is further divided into two or three ordered sub-stages, and the one-point score is evenly assigned to its sub-stages. The final score is computed as the sum of successfully completed sub-stage scores. As shown in Fig. 6, comparing the five policies leads to three main observations: 
+
+1) Limited Improvements from Pure Teleoperation: Simply increasing pure teleoperation data brings limited and inconsistent gains. Both Teleop_old and Teleop_new show only marginal improvements, with effects varying across tasks. This suggests that additional off-policy demonstrations may not adequately cover policy-induced states where compounding errors occur, especially in late phases requiring precise contact-rich manipulation. 
+
+2) Effectiveness of Intervention Data: Policies fine-tuned with intervention data achieve higher average 10 normalized completion scores. Because these datasets are recorded from deployed policy rollouts and include human corrections at failure-prone moments, they provide supervision on policy-induced states and targeted recovery behaviors. This makes intervention data more effective than standard teleoperation demonstrations for improving long-horizon robustness.  
+
+> 3) Copilot vs. Full Takeover:
+
+Among the two intervention strategies, Copilot generally yields the strongest overall performance. Unlike Full Takeover , where human commands dominate the executed trajectory, 
+
+Copilot keeps the policy as the primary controller while injecting local residual corrections. The resulting data stays closer to the policy’s rollout distribution, leading to more stable downstream improvements. 
+
+## 5 Conclusion and Limitations  
+
+> Conclusion.
+
+We presented HandITL, a seamless intervention method for bimanual high-DoF dexterous VLA policies. By addressing gesture jumps and the lack of coordinated hand-arm shared control in dexterous IIL, HandITL combines optimization-based relative hand retargeting with velocity-based shared arm control. Real-world experiments show that our method reduces takeover-induced command discontinuity by up to two orders of magnitude while preserving post-takeover manipulation capability. We further demonstrate that high-dimensional on-policy correction data, especially from Copilot shared control, provides targeted supervision for policy-induced OOD states and improves long-horizon sub-goal completion over teleoperation-based post-training and full-takeover variants.  
+
+> Limitations and Future Work.
+
+Two limitations remain. First, our post-training strategy uses simple supervised fine-tuning, while human intervention data may contain suboptimal recovery actions or operator-induced noise. Future work could explore automated segment selection, data filtering, or preference learning for more effective use of intervention data. Second, extremely high-precision manipulation, such as millimeter-level drill-bit alignment, remains challenging due to visual occlusions and the limited spatial resolution of vision-dominant VLA policies. Incorporating tactile sensing, force feedback, and other multimodal signals is a promising direction. 11 References 
+
+[1] Yunus Bicer, Ali Alizadeh, Nazim Kemal Ure, Ahmetcan Erdogan, and Orkun Kizilirmak. Sample efficient interactive end-to-end deep learning for self-driving cars with selective multi-class safe dataset aggregation. In 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 2629–2634. IEEE, 2019. [2] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev, Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox, Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open foundation model for generalist humanoid robots. arXiv preprint arXiv:2503.14734, 2025. [3] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164, 2024. [4] Chilam Cheang, Sijin Chen, Zhongren Cui, Yingdong Hu, Liqun Huang, Tao Kong, Hang Li, Yifeng Li, Yuxiao Liu, Xiao Ma, et al. Gr-3 technical report. arXiv preprint arXiv:2507.15493, 2025. [5] Yuhui Chen, Shuai Tian, Shugao Liu, Yingting Zhou, Haoran Li, and Dongbin Zhao. Conrft: A reinforced fine-tuning method for vla models via consistency policy. arXiv preprint arXiv:2502.05450, 2025. [6] Moein Forouhar, Hamid Sadeghian, Daniel Perez Suay, Abdeldjallil Naceri, and Sami Haddadin. A tactile lightweight exoskeleton for teleoperation: Design and control performance. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pages 178–183. IEEE, 2024. [7] Ankur Handa, Karl Van Wyk, Wei Yang, Jacky Liang, Yu-Wei Chao, Qian Wan, Stan Birchfield, Nathan Ratliff, and Dieter Fox. Dexpilot: Vision-based teleoperation of dexterous robotic hand-arm system. In 2020 IEEE International Conference on Robotics and Automation (ICRA), pages 9164–9170. IEEE, 2020. [8] Zheyuan Hu, Robyn Wu, Naveen Enock, Jasmine Li, Riya Kadakia, Zackory Erickson, and Aviral Kumar. Rac: Robot learning for long-horizon tasks by scaling recovery and correction. arXiv preprint arXiv:2509.07953, 2025. [9] Physical Intelligence, Ali Amin, Raichelle Aniceto, Ashwin Balakrishna, Kevin Black, Ken Conley, Grace Connors, James Darpinian, Karan Dhabalia, Jared DiCarlo, et al. π∗
+
+> 0.6
+
+: a vla that learns from experience. arXiv preprint arXiv:2511.14759, 2025. [10] Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π0.5: a vision-language-action model with open-world generalization. arXiv preprint arXiv:2504.16054, 2025. [11] Michael Kelly, Chelsea Sidrane, Katherine Driggs-Campbell, and Mykel J Kochenderfer. Hg-dagger: Interactive imitation learning with human experts. In 2019 International Conference on Robotics and Automation (ICRA), pages 8077–8083. IEEE, 2019. [12] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246, 2024. [13] Sung-Wook Lee, Xuhui Kang, and Yen-Ling Kuo. Diff-dagger: Uncertainty estimation with diffusion policy for robotic manipulation. In 2025 IEEE International Conference on Robotics and Automation (ICRA), pages 4845–4852. IEEE, 2025. [14] Shuang Li, Norman Hendrich, Hongzhuo Liang, Philipp Ruppel, Changshui Zhang, and Jianwei Zhang. Adexterous hand-arm teleoperation system based on hand pose estimation and active vision. IEEE Transactions on Cybernetics, 54(3):1417–1428, 2022. [15] Yunfei Li, Xiao Ma, Jiafeng Xu, Yu Cui, Zhongren Cui, Zhigang Han, Liqun Huang, Tao Kong, Yuxiao Liu, Hao Niu, et al. Gr-rl: Going dexterous and precise for long-horizon robotic manipulation. arXiv preprint arXiv:2512.01801, 2025. [16] Deqing Liu, Yinfeng Gao, Deheng Qian, Qichao Zhang, Xiaoqing Ye, Junyu Han, Yupeng Zheng, Xueyi Liu, Zhongpu Xia, Dawei Ding, et al. Takead: Preference-based post-optimization for end-to-end autonomous driving with expert takeover data. IEEE Robotics and Automation Letters, 11(2):1738–1745, 2025. 
+
+12 [17] Hao Luo, Yicheng Feng, Wanpeng Zhang, Sipeng Zheng, Ye Wang, Haoqi Yuan, Jiazheng Liu, Chaoyi Xu, Qin Jin, and Zongqing Lu. Being-h0: vision-language-action pretraining from large-scale human videos. arXiv preprint arXiv:2507.15597, 2025. [18] Jianlan Luo, Charles Xu, Jeffrey Wu, and Sergey Levine. Precise and dexterous robotic manipulation via human-in-the-loop reinforcement learning. Science Robotics, 10(105):eads5033, 2025. [19] Ajay Mandlekar, Danfei Xu, Roberto Martín-Martín, Yuke Zhu, Li Fei-Fei, and Silvio Savarese. Human-in-the-loop imitation learning using remote teleoperation. arXiv preprint arXiv:2012.06733, 2020. [20] Xiaofeng Mao, Gabriele Giudici, Claudio Coppola, Kaspar Althoefer, Ildar Farkhatdinov, Zhibin Li, and Lorenzo Jamone. Dexskills: Skill segmentation using haptic data for learning autonomous long-horizon robotic manipulation tasks. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pages 5104–5111. IEEE, 2024. [21] Stéphane Ross, Geoffrey Gordon, and Drew Bagnell. A reduction of imitation learning and structured prediction to no-regret online learning. In Proceedings of the fourteenth international conference on artificial intelligence and statistics, pages 627–635. JMLR Workshop and Conference Proceedings, 2011. [22] Jonathan Spencer, Sanjiban Choudhury, Matthew Barnes, Matthew Schmittle, Mung Chiang, Peter Ramadge, and Siddhartha Srinivasa. Learning from interventions. In Robotics: Science and Systems (RSS), volume 1, page 2, 2020. [23] Chen Wang, Haochen Shi, Weizhuo Wang, Ruohan Zhang, Li Fei-Fei, and C Karen Liu. Dexcap: Scalable and portable mocap data collection system for dexterous manipulation. arXiv preprint arXiv:2403.07788, 2024. [24] Dehao Wei and Huazhe Xu. A wearable robotic hand for hand-over-hand imitation learning. In 2024 IEEE International Conference on Robotics and Automation (ICRA), pages 18113–18119. IEEE, 2024. [25] Edgar Welte and Rania Rayyes. Interactive imitation learning for dexterous robotic manipulation: challenges and perspectives—a survey. Frontiers in Robotics and AI, 12:1682437, 2025. [26] Ruoshi Wen, Guangzeng Chen, Zhongren Cui, Min Du, Yang Gou, Zhigang Han, Liqun Huang, Mingyu Lei, Yunfei Li, Zhuohang Li, et al. Gr-dexter technical report. arXiv preprint arXiv:2512.24210, 2025. [27] Ruoshi Wen, Jiajun Zhang, Guangzeng Chen, Zhongren Cui, Min Du, Yang Gou, Zhigang Han, Junkai Hu, Liqun Huang, Hao Niu, et al. Dexterous teleoperation of 20-dof bytedexter hand via human motion retargeting. arXiv preprint arXiv:2507.03227, 2025. [28] Philipp Wu, Yide Shentu, Qiayuan Liao, Ding Jin, Menglong Guo, Koushil Sreenath, Xingyu Lin, and Pieter Abbeel. Robocopilot: Human-in-the-loop interactive imitation learning for robot manipulation. arXiv preprint arXiv:2503.07771, 2025. [29] Xiaomeng Xu, Yifan Hou, Zeyi Liu, and Shuran Song. Compliant residual dagger: Improving real-world contact-rich manipulation with human corrections. arXiv preprint arXiv:2506.16685, 2025. [30] Haoqi Yuan, Yu Bai, Yuhui Fu, Bohan Zhou, Yicheng Feng, Xinrun Xu, Yi Zhan, Börje F Karlsson, and Zongqing Lu. Being-0: A humanoid robotic agent with vision-language models and modular skills. arXiv preprint arXiv:2503.12533, 2025. [31] Han Zhang, Songbo Hu, Zhecheng Yuan, and Huazhe Xu. Doglove: Dexterous manipulation with a low-cost open-source haptic force feedback glove. arXiv preprint arXiv:2502.07730, 2025. [32] Rui Zhong, Chuang Cheng, Junpeng Xu, Yantong Wei, Ce Guo, Daoxun Zhang, Wei Dai, and Huimin Lu. Nuexo: A wearable exoskeleton covering all upper limb rom for outdoor data collection and teleoperation of humanoid robots. In 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pages 12026–12033. IEEE, 2025. [33] Yifan Zhong, Xuchuan Huang, Ruochong Li, Ceyao Zhang, Zhang Chen, Tianrui Guan, Fanlian Zeng, Ka Nam Lui, Yuyao Ye, Yitao Liang, et al. Dexgraspvla: A vision-language-action framework towards general dexterous grasping. In Proceedings of the AAAI Conference on Artificial Intelligence, volume 40, pages 18836–18844, 2026. [34] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker, Ayzaan Wahid, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. In Conference on Robot Learning, pages 2165–2183. PMLR, 2023. 
+
+13
