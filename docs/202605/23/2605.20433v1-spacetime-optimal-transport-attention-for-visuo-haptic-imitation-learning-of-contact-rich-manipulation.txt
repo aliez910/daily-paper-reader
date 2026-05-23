@@ -1,0 +1,620 @@
+Title: Spacetime Optimal-Transport Attention for Visuo-Haptic Imitation Learning of Contact-Rich Manipulation
+
+URL Source: https://arxiv.org/pdf/2605.20433v1
+
+Published Time: Thu, 21 May 2026 00:17:23 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+> 1
+
+# Spacetime Optimal-Transport Attention for Visuo-Haptic Imitation Learning of Contact-Rich Manipulation 
+
+Yue Feng, Member, IEEE, Weicheng Huang, and I-Ming Chen, Fellow, IEEE 
+
+Abstract —Contact-rich manipulation tasks such as tight-clearance insertion, connector mating, polishing, and surface-conforming wiping remain difficult for data-driven controllers because they couple discontinuous contact dynamics, partial observability, and strict safety constraints. No single sensing modality suffices: vision supplies global context before contact, force/torque (F/T) feedback governs interaction after contact, and proprioceptive pose provides a consistent kinematic backbone. Most prior imitation-learning policies for contact-rich tasks operate on uni- or bi-modal signals, and the few that fuse three modalities typically adopt off-the-shelf attention modules with no explicit prior on how attention mass should be distributed across task-relevant regions. We present Spacetime Optimal-Transport Attention (SO-TA), a tri-modal fusion backbone that replaces softmax-normalized patch attention by an entropy-regularized Optimal Transport (OT) alignment between force–pose-derived sub-queries and visual patches. Explicit marginal constraints act as a structured inductive bias for contact-rich tasks, encouraging conditioning-aware spatial selection that is stable across illumination, distractors, and partial occlusion. SO-TA is paired with a diffusion-based sequence policy mapping observation windows to pose-action chunks. We evaluate SO-TA on three real-robot tasks: tight peg-in-hole assembly, BCM wiring-connector insertion, and curved-surface mark erasing. With ∼ 200 rollouts per condition, SO-TA reaches 100% success on tight peg-in-hole versus 93% 
+
+for cross-attention at matched capacity, and retains 82 .5% 
+
+success under illumination, distractor, and partial-occlusion perturbations where a concatenation baseline drops to 43 .5% .OT-derived patch heatmaps and leave-one-out modality-influence ratios provide interpretable, phase-dependent diagnostics. 
+
+Index Terms —Imitation learning, learning from demonstra-tion, optimal transport, diffusion policy, visuo-haptic fusion, contact-rich manipulation. 
+
+I. I NTRODUCTION 
+
+# CONTACT-RICH manipulation tasks pervade industrial and service-robot deployments. Representative examples include tight-clearance insertion, connector mating, deburring, polishing, surface-conforming wiping, and sealing [1], [2]. These tasks share three properties that make data-driven control hard. First, the dynamics transition abruptly between free-space motion and constrained contact, so a controller must regulate interaction force the moment contact begins; deficiencies in sensing or control can result in force spikes, 
+
+Yue Feng and I-Ming Chen are with the Robotics Research Centre, School of Mechanical and Aerospace Engineering, Nanyang Technological University, Singapore 639798. Weicheng Huang is with Wings Robotics. E-mail: yue011@e.ntu.edu.sg, info@wingsrobotics.com, michen@ntu.edu.sg. This manuscript is a preprint deposited on arXiv. © 2026 The Authors. 
+
+surface damage, and loss of repeatability [1]. Second, task-relevant visual evidence is often a small region of the camera frame whose location shifts rapidly across task phases. Third, the operating envelope is safety-constrained, so a deployed policy must behave predictably under modest distribution shift. These properties motivate tri-modal sensing that fuses vi-sion, F/T, and proprioceptive pose. Vision provides global scene context and coarse geometric cues before contact. F/T feedback becomes essential after contact to regulate interaction and prevent force spikes [3], [4]. Pose signals provide a consistent kinematic backbone for both execution and phase progression. Recent imitation-learning (IL) systems based on diffusion- or transformer-based sequence policies [5]–[7] have demonstrated that complex behaviors can be learned from a modest number of demonstrations. Empirical progress on tri-modal IL, however, is held back on two fronts. Open multimodal datasets remain dominated by vision and pro-prioception, and synchronized corpora with calibrated F/T are scarce [8]–[10]. More fundamentally, the fusion module that builds the conditioning signal for these policies has received comparatively little attention in the contact-rich set-ting. Most existing systems either concatenate per-modality features or adopt standard cross-attention off-the-shelf from other domains [2], [11]–[13]. Concatenation discards spatial structure, while softmax-normalized cross-attention places no explicit constraint on the mass distributed across patches and is therefore sensitive to spurious saliency from clutter, occlusion, and illumination changes. Recent surveys on IL for contact-rich tasks and on forceful foundation models converge on the same diagnosis: progress requires moving beyond plug-and-play attention toward principled fusion that is phase-aware, modality-selective, and aligned with the physics of contact [2], [4]. This paper introduces Spacetime Optimal-Transport Attention (SO-TA) , a tri-modal fusion backbone designed around the regularities of contact-rich manipulation. Concretely:  
+
+> •
+
+We formulate force–pose-conditioned spatial aggregation as an entropy-regularized Optimal Transport alignment be-tween force–pose-derived sub-queries and visual patches. Explicit marginal constraints replace the softmax normal-ization of standard cross-attention and act as a structured inductive bias for selecting task-relevant evidence.  
+
+> •
+
+We combine SO-TA with a per-frame modal Transformer and a temporal Transformer to produce a fused encoding compatible with diffusion-policy backbones, and we expose 
+
+> arXiv:2605.20433v1 [cs.RO] 19 May 2026 2
+
+two interpretability signals: OT-derived patch heatmaps and leave-one-out modal influence ratios.  
+
+> •
+
+We evaluate SO-TA against concatenation and cross-attention baselines on three real-robot tasks. SO-TA reaches 
+
+100% success on tight peg-in-hole, retains 82 .5% success under visual perturbation when concatenation drops to 
+
+43 .5% , and produces phase-consistent interpretability maps on both insertion and erasing. The rest of the paper reviews related work (Sec. II), states preliminaries (Sec. III), formulates the tri-modal IL setup (Sec. IV), details SO-TA (Sec. V), describes the baselines (Sec. VI), and reports experiments (Sec. VII). II. R ELATED WORK 
+
+Imitation learning and diffusion policies: Imitation learn-ing (IL) avoids reward design by fitting a policy to expert demonstrations [14]–[16]. Recent sequence policies [5]–[7] predict future action chunks from short observation windows, improving temporal consistency over single-step behavior cloning. Diffusion Policy [5] in particular has emerged as a competitive backbone because conditional denoising naturally handles multimodal action distributions. Surveys of IL for contact-rich manipulation and of deep generative models for multimodal demonstrations [2], [13] converge on a common observation: the action-producing backbone is now relatively mature, while the upstream fusion network that builds its conditioning signal remains the bottleneck under contact. We adopt Diffusion Policy as the action-producing module and focus on this upstream fusion step. 
+
+Attention-based visuo-haptic fusion: Multimodal Trans-formers and attention layers [11], [12], [17], [18] are the default tool for fusing heterogeneous modalities, and sev-eral systems have adopted them off-the-shelf for contact-rich IL. SoftGrasp uses cross-modal self-attention for dexterous grasping [19]; diffusion-policy approaches for compliant ma-nipulation insert self- or cross-attention between vision and F/T tokens [20], [21]; broader sensory-fusion architectures combine vision, audio, and touch through attention [22]; and Visuo-Tactile Transformers extend the formulation to tactile streams [23]. Earlier work also demonstrated the value of vision–touch self-supervised representations for contact-rich tasks [24], [25]. These designs improve over concatenation but inherit the softmax normalization of generic attention, which leaves the spatial selection step inside the visual stream unconstrained and therefore vulnerable to spurious saliency from clutter, occlusion, and illumination changes [2], [4]. 
+
+Bimodal and force-centric methods: A second line of work emphasizes force supervision and compliant control rather than fusion design. Hybrid trajectory–force IL stabilizes assembly with force supervision but omits vision [26]; learned force control for paper wrapping concatenates transformed streams without cross-modal alignment [27]; MOMA-Force adds force to a visual policy for mobile manipulation but uses it primarily for downstream compliant execution rather than as a token in a tri-modal stack [28]; ForceMimic introduces a force–motion capture pipeline and reports strong insertion performance, while its fusion step largely concatenates the streams [29]. These results confirm that force supervision is valuable, but they leave the question of how to fuse three modalities at the representation level largely open. 
+
+Architecture- and stage-guided priors: A third line of work encodes task structure directly into the fusion model. Hierarchical and curriculum methods tailored to peg-in-hole inject staged contact difficulty and perception–control decou-pling [30], [31], and stage-guided dynamic multi-sensory fu-sion reweights vision, audio, and touch according to predicted interaction stages [32]. These designs show that phase-aware priors help, but they rely on task-specific assumptions or explicit stage labels and therefore do not constitute a general, label-free mechanism for contact-rich fusion. SO-TA instead derives its phase-awareness implicitly, through marginal con-straints on a force–pose-conditioned transport plan. 
+
+Optimal transport in attention: Entropy-regularized OT [33], [34] admits efficient Sinkhorn solvers and has been used to replace softmax normalization in attention layers [35], to sharpen slot-attention assignments [36], and for multi-prompt zero-shot segmentation [37]. We bring this OT view of attention to the visuo-haptic fusion problem and tie its row marginal to a learned supply distribution that is itself conditioned on force and pose tokens, yielding a label-free structured prior on the spatial selection step. III. P RELIMINARIES 
+
+We collect the notation, the diffusion-policy backbone, and the entropic OT formulation used in the rest of the paper. 
+
+A. Tri-modal imitation learning 
+
+At each time index t the robot collects synchronized obser-vations (oimg  
+
+> t
+
+, oforce  
+
+> t
+
+, opose  
+
+> t
+
+). A fixed-length window of length 
+
+Tw is mapped to a future pose-action chunk of horizon Th,yielding training tuples 
+
+ oimg  
+
+> t−Tw:t−1
+
+, oforce  
+
+> t−Tw:t−1
+
+, opose  
+
+> t−Tw:t−1
+
+, apose 
+
+> t:t+Th−1
+
+ ∈ D . (1) A behavior-cloning objective 
+
+min ED
+
+h
+
+∥ˆapose  
+
+> t:t+Th−1
+
+− apose 
+
+> t:t+Th−1
+
+∥22
+
+i
+
+(2) is a standard baseline but is susceptible to covariate shift; we use it as a starting point and replace the regressor by a diffusion denoiser. 
+
+B. Diffusion-based sequence policy 
+
+Diffusion models [38], [39] learn to invert a gradual Gaus-sian noising process 
+
+ys =
+
+q
+
+1 − G diff  
+
+> s
+
+ys−1 +
+
+q
+
+Gdiff  
+
+> s
+
+ϵs, ϵs ∼ N (0, I), (3) 
+
+s = 1, . . . , N diff , with a fixed schedule Gdiff  
+
+> s
+
+∈ (0 , 1) . A conditional denoiser is trained with the ϵ-prediction objective 
+
+min Es, y0,ϵs
+
+h
+
+∥ϵs − bϵ(ys, s, zcond )∥22
+
+i
+
+. (4) Following Diffusion Policy [5] we set 
+
+y0 ≜ apose 
+
+> t:t+Th−1
+
+, zcond ≜ Zfused  
+
+> t−Tw:t−1
+
+. (5) Online, an N infer diff ≪ Ndiff -step reverse process yields a low-latency receding-horizon controller. 3
+
+Fig. 1. Overall forward pass of the tri-modal imitation-learning pipeline: an observation window is preprocessed, fused into a single encoding, and consumed by a diffusion policy that emits a pose-action chunk; the chunk is integrated and clamped before being sent to an impedance loop. 
+
+C. Entropy-regularized Optimal Transport 
+
+Given a cost matrix C ∈ RNsub ×Npatch , a supply γ ∈ RNsub ,and a capacity β ∈ RNpatch , the entropy-regularized OT problem solves 
+
+min  
+
+> Π≥0
+
+⟨Π, C⟩ − εot H(Π) (6) s.t. Π1 = γ, ΠT1 = β, (7) with entropy H(Π) = − P 
+
+> ℓ,p
+
+Πℓ,p log Π ℓ,p and temperature 
+
+εot > 0. The Sinkhorn algorithm [33] solves (6)–(7) via alter-nating log-domain updates; we use this formulation throughout Sec. V. IV. P ROBLEM FORMULATION 
+
+Pipeline: Figure 1 summarizes the data flow. At in-ference cadence finfer , the follower-side sensors expose an RGB sequence V, the TCP wrench T WF together with a gripper force scalar ς, and the TCP incremental motion ∆XF
+
+together with the gripper position δ. Preprocessing time-aligns the streams, segments them into windows of length Tw,converts the pose channel into frame-to-frame increments, and normalizes low-dimensional channels with dataset statistics. Each RGB frame is center-cropped, resized, and normalized in pixel space. 
+
+Why a structured fusion module matters: Contact-rich tasks display a phase-dependent dominance of modalities: vision concentrates relevant cues in a small spatial region before contact, while force/torque becomes the primary signal during contact regulation. A fusion module that reflects this regularity acts as an inductive bias and improves data effi-ciency. SO-TA encodes this prior by replacing softmax with an OT alignment whose row marginal is conditioned on the force–pose token, biasing spatial selection toward patches that are jointly consistent with the current haptic state. V. S PACETIME OPTIMAL -T RANSPORT ATTENTION 
+
+Figure 2 summarizes the SO-TA backbone over a window of length Tw. The goal is a time-aligned fused encoding Zfused ∈
+
+RB×Tw ×dmodel .         
+
+> Force / Pose Obs.
+> oforce ,opose
+> Token Encoder (MLP)
+> Zforce ,Zpose
+> F/P Conditioning Proj.
+> zfp ∈RB×Tw ×datt
+> SO-TA: OT-Based Attention
+> zsota ∈RB×Tw ×datt
+> Frame-wise Modal Fusion
+> Zframe
+> Temporal Transformer
+> Zfused
+> Image Sequence
+> oimg
+> ResNet + 2D PE
+> Zimg
+> (B, T w, N patch , d model )
+> Legend
+> Learnable module Tensor variable
+
+Fig. 2. End-to-end SO-TA fusion pipeline. Red-bordered blocks are learnable, gray blocks are tensor variables. The OT-based attention is detailed in Fig. 3. 
+
+Fig. 3. Compact view of the OT-based attention node inside SO-TA. The sub-queries and the row-marginal supply γ are both generated from the force–pose conditioning vector; the column marginal is uniform; transport is solved by log-domain Sinkhorn. 
+
+A. Token encoding and force–pose conditioning 
+
+Force and pose observations are mapped by learnable MLP encoders into token sequences Zforce , Zpose ∈ RB×Tw ×dmodel 
+
+and concatenated and projected to form the conditioning embedding zfp ∈ RB×Tw ×datt . Each RGB frame is encoded by a ResNet-18 [40] with GroupNorm into patch tokens 
+
+Zimg ∈ RB×Tw ×Npatch ×dmodel augmented with a deterministic 2D positional encoding. 
+
+B. OT-based attention 
+
+For notational convenience we merge (B, T w) into BT and index a frame sample by n, sub-queries by ℓ, and patches by 
+
+p.4
+
+1) Sub-query and supply. A FC head produces Nsub sub-queries 
+
+zqry  
+
+> n
+
+= proj qry (zfp  
+
+> n
+
+) ∈ RNsub ×datt , (8) and a second head predicts a row-marginal supply 
+
+γn = softmax  proj γ (zfp  
+
+> n
+
+) ∈ RNsub , X
+
+> ℓ
+
+γn,ℓ = 1 . (9) Intuitively, γn,ℓ is the OT mass carried by sub-query ℓ under the current haptic state. 
+
+2) Key/value projection. Each patch is projected to the OT space 
+
+zkey  
+
+> n,p
+
+= proj key (Zimg  
+
+> n,p
+
+), zval  
+
+> n,p
+
+= proj val (Zimg  
+
+> n,p
+
+). (10) 
+
+3) Cost. Sub-queries and Keys are ℓ2-normalized; the cost is the negative cosine similarity 
+
+Cn,ℓ,p = − norm( zqry  
+
+> n,ℓ
+
+), norm( zkey  
+
+> n,p
+
+) . (11) 
+
+4) Entropic OT. With uniform patch capacity β = 1 
+
+> Npatch
+
+1,the transport plan is the solution of 
+
+min  
+
+> Πn≥0
+
+⟨Πn, Cn⟩ − εot H(Πn)
+
+s.t. Πn1 = γn, ΠT
+
+> n
+
+1 = β. (12) The Sinkhorn solver uses log-domain dual variables κn, νn
+
+updated by 
+
+κn,ℓ ← log γn,ℓ − log X
+
+> p
+
+exp 
+
+
+
+− Cn,ℓ,p  
+
+> εot
+
++ νn,p 
+
+
+
+, (13) 
+
+νn,p ← log βp − log X
+
+> ℓ
+
+exp 
+
+
+
+− Cn,ℓ,p  
+
+> εot
+
++ κn,ℓ 
+
+
+
+, (14) and the plan is recovered as Πn,ℓ,p = exp( κn,ℓ − C n,ℓ,p /ε ot +
+
+νn,p ).
+
+5) Aggregation and tied merge. Each sub-query collects a message zsub  
+
+> n,ℓ
+
+= P 
+
+> p
+
+Πn,ℓ,p zval 
+
+> n,p
+
+. To avoid a degenerate uniform fallback under uniform β, we tie the merge weights to the OT row marginals, 
+
+zsota  
+
+> n
+
+= X
+
+> ℓ
+
+γn,ℓ zsub  
+
+> n,ℓ
+
+= X
+
+> p
+
+ζsota  
+
+> n,p
+
+zval 
+
+> n,p
+
+, (15) with ζsota  
+
+> n,p
+
+= P 
+
+> ℓ
+
+γn,ℓ Πn,ℓ,p .
+
+Remark (why tie γ).: Because β is uniform, any conditioning-independent merge over sub-queries collapses to scaled mean pooling over patches and loses the dependence on zfp  
+
+> n
+
+. Tying the merge weights to γn preserves conditioning while introducing no additional parameters. 
+
+C. Frame-wise and temporal fusion 
+
+At each frame t a length-3 token sequence 
+
+[Zforce , Zpose , Zsota ] is processed by a lightweight Transformer shared across frames. A pooled head produces a softmax gate wgate ∈ R3 used to combine the contextualized tokens into a frame-wise fused feature Zframe . Sinusoidal time encoding is added and a temporal Transformer produces the final Zfused .
+
+D. Interpretability signals Modal influence ratio: The gate wgate reflects gating over contextualized tokens and therefore does not isolate raw-modality contributions. We instead define a leave-one-out ratio: for each modality m ∈ { force , pose , sota } we zero the corresponding token before the frame-wise Transformer and rerun fusion to obtain Zframe ,m t . The ratio 
+
+wmt = ∥Zframe  
+
+> t
+
+− Zframe ,m t ∥2
+
+P 
+
+> m′
+
+∥Zframe  
+
+> t
+
+− Zframe ,m ′ 
+
+> t
+
+∥2
+
+(16) is non-negative and sums to one across modalities. 
+
+OT-derived heatmap: We scale the normalized effective patch weights by the visual influence ratio, 
+
+ζheatmap  
+
+> n,p
+
+= wsota  
+
+> n
+
+· ζsota 
+
+> n,p
+
+P 
+
+> p′
+
+ζsota 
+
+> n,p ′
+
+, (17) and reshape into the patch grid for overlay. VI. B ASELINES 
+
+A. Concatenation 
+
+A learnable MLP encodes the force observation into zforce ∈
+
+RB×Tw ×dforcefeat and a ResNet encodes each RGB frame into 
+
+zvis ∈ RB×Tw ×dvis . The pose observation is appended directly. The fused tensor is 
+
+Zfused = [ zvis ; zforce ; opose ] ∈ RB×Tw ×dcat , (18) with dcat = dvis + dforcefeat + dpose . Cross-modal interaction must be learned downstream. 
+
+B. Force–pose-conditioned cross-attention 
+
+The module shares the interfaces of Fig. 2 but replaces the OT step with standard scaled dot-product attention [17]. A sin-gle query zqry  
+
+> n
+
+= proj qry (zfp  
+
+> n
+
+) is matched against patch Keys; weights ζca n,p = softmax p(⟨norm( zqry  
+
+> n
+
+), norm( zkey  
+
+> n,p
+
+)⟩/√datt )
+
+aggregate Values into zca  
+
+> n
+
+= P 
+
+> p
+
+ζca n,p zval 
+
+> n,p
+
+. Mixed-precision-stable normalization follows [41]. VII. E XPERIMENTS 
+
+A. Implementation and protocol 
+
+Demonstrations are collected with a leader–follower bilat-eral teleoperation setup [42]–[44]: the teleoperator perceives the scene only through the wrist-mounted RGB stream and the leader-side haptic feedback, matching the sensing avail-able to the policy at deployment. Only follower-side sig-nals are logged. Force and pose channels are scale-stabilized (magnitude/direction split for F/T; 6D rotation representa-tion [45]) and normalized with dataset min–max statistics. Each RGB frame is center-cropped, resized to 224 × 224 
+
+and normalized. The diffusion denoiser is a 1D conditional UNet over the temporal axis of the action chunk; we use a squared-cosine schedule, AdamW with cosine warm-up, mixed-precision training, and EMA weights for evaluation. Hyperparameters are summarized in Table I. Training runs on a single NVIDIA RTX 6000 Pro for 4,000 epochs with 8,192 
+
+samples per epoch ( ∼22 h). Inference is benchmarked on an RTX 4070 Ti SUPER. 5
+
+TABLE I KEY HYPERPARAMETERS USED IN ALL EXPERIMENTS 
+
+Symbol Value Meaning 
+
+Tw 8 Observation window length 
+
+Th 16 Action horizon (chunk length) 
+
+finfer 10 Hz Online inference frequency 
+
+B 256 Training batch size 
+
+Himg ×Wimg 224 ×224 Image resolution 
+
+dforce , d pose 9, 10 Force / pose obs. dim. 
+
+Ndiff 100 Training diffusion steps 
+
+N infer diff 10 Inference denoising steps 
+
+dmodel 512 Backbone feature dim. 
+
+datt 256 OT / attention dim. 
+
+h×w = Npatch 7×7 = 49 Patch grid 
+
+Nsub 2 OT sub-queries 
+
+εot 0.20 Entropic OT temperature 
+
+Not 5 Sinkhorn iterations 
+
+β 149 1 Patch capacity 
+
+nh 4 Attention heads (CA) 
+
+TABLE II PARAMETER COUNTS OF THE THREE FUSION BACKBONES 
+
+Fusion type DP params Fusion params Total SO-TA 40 M 21 M 61 M Cross-attention 40 M 21 M 61 M Concatenation 69 M 0 M 81 M 
+
+Fig. 4. Tight peg-in-hole task. (a) Third-person view of the setup. (b) Robot-mounted camera view, i.e. the visual observation seen by the policy. TABLE III INFERENCE LATENCY AND FIRST -S TEP z MAE VS . N infer diff FOR THE 
+
+SO-TA P OLICY                                               
+
+> Ninfer diff 12345678910 Avg inference time (ms) 9.6 8.5 9.5 10.5 11.3 12.3 13.3 14.2 15.2 16.2 Equiv. max finfer (Hz) 105 118 105 96 89 82 75 70 66 62
+> zMAE ×10 −3(m) 5.37 0.14 0.09 0.09 0.08 0.08 0.08 0.09 0.08 0.08
+
+B. Tight peg-in-hole assembly 
+
+The peg-in-hole testbed (Fig. 4) has clearance below 
+
+0.2 mm , which makes contact dynamics critical. We collect 
+
+198 teleoperated episodes (32 ,974 synchronized tri-modal steps; 3,297 .4 s ). With Tw = 8 , Th = 16 and episode-boundary padding, this yields 29 ,608 window–chunk pairs. The initial pose is randomized within bounded translation/rotation perturbations. 
+
+Fig. 5. Predicted first-step ∆zL vs. ground truth for N infer diff ∈ { 1, 2, 5, 10 }
+
+(SO-TA). 
+
+Fig. 6. Peg-in-hole: success rate (left) and success-only completion time density (KDE, right) under modality zero-masking with the concatenation backbone. 
+
+Fig. 7. Peg-in-hole: success rate (left) and success-only completion time density (right) across SO-TA, cross-attention, and concatenation. 
+
+1) Inference latency vs. denoising iterations: A control deadline of 1/f infer = 100 ms at 10 Hz is the binding constraint. With N infer diff = 1 the reverse process starts from high noise and the prediction is dominated by noise; after the second iteration the MAE drops sharply and the predicted trajectory closely tracks ground truth (Fig. 5 and Table III). Beyond N infer diff = 3 gains are marginal, and even N infer diff = 10 
+
+fits comfortably inside the deadline. 
+
+2) Modality ablation: Holding the concatenation backbone fixed, we ablate F/T and pose by zero-masking the corre-sponding input tensors during both training and rollouts. Each variant runs ∼ 200 rollouts under a 5 N safety threshold and a 100 s timeout. The full tri-modal input achieves the highest success ( ∼ 99 .5% ) and the most concentrated duration density (Fig. 6). Removing pose has a mild effect ( 97 .5% success); removing F/T drops success to 85 .6% and spreads completion time. Vision-only attains the lowest success ( 81 .9% ). Failures with zero-masked F/T are dominated by exceeding the safety threshold; with F/T available, failures more often follow a covariate-shift drift pattern. All three modalities contribute; F/T has the strongest marginal influence after vision. 
+
+3) Fusion-method comparison: Holding the input modal-ities fixed to the full tri-modal set, only the fusion module varies. SO-TA reaches 100% success across ∼ 200 rollouts; concatenation reaches 99 .5% with one failure; cross-attention 6     
+
+> Fig. 8. Peg-in-hole under illumination changes, distractor pegs, and partial occlusion. SO-TA retains 82 .5% success; concatenation drops to 43 .5% .
+> Fig. 9. Peg-in-hole: SO-TA interpretability across three phases. Top: OT-based patch heatmap from (17). Bottom: modality ratios (16). Vision share peaks before contact; F/T and pose grow during search and insertion.
+
+drops to 93% (Fig. 7). Cross-attention also exhibits the heaviest completion-time tail. At matched parameter budget (Table II), SO-TA’s explicit marginal constraints yield more stable spatial selection than softmax-normalized attention. 
+
+4) Generalization under visual perturbation: Without any retraining, we vary the illumination, add distractor pegs, and partially occlude the socket. Over 200 rollouts per method, SO-TA retains 82 .5% success ( 165 /200 ); concatenation drops to 43 .5% (87 /200 ) (Fig. 8). Both methods slow down, but SO-TA retains a clear advantage in success-only completion time. Structured tri-modal fusion meaningfully buys robustness to visual distribution shift. 
+
+5) Interpretability: Replaying the trained SO-TA policy on a demonstration, we report the RGB observation, the OT heatmap, and the modality ratios at three representative frames (Fig. 9). During the pre-contact approach the visual share reaches its maximum across the trajectory ( 38 .8% ), with pose at 33 .0% and force at 28 .2% . After contact the visual share drops to 24 .5% during hole searching and to 18 .7% during insertion, while pose grows to 45 .2% and force settles at 
+
+36 .1% . This matches the expected post-contact regime, where F/T and pose carry more information than vision for fine alignment. The heatmaps favor visually distinctive regions; the diffuse-but-plausible focus is consistent with the absence of an explicit spatial prior in the OT cost. 
+
+C. BCM wiring-connector insertion 
+
+The Audi BCM connector task (Fig. 10) is visually more challenging than peg-in-hole: the task-relevant region occupies a smaller fraction of the camera frame, the background is more cluttered, and color contrast is weaker; the clearance is more             
+
+> Fig. 10. BCM wiring-connector insertion. (a) Setup. (b) Robot-camera view.
+> Fig. 11. BCM connector insertion: success rate (left) and success-only completion-time density (right) of the SO-TA policy compared with human demonstrations.
+> Fig. 12. Selecting the cutoff time by minimizing the 99 th percentile of success-only total time under a ≥99 .5% success constraint. The selected cutoff is 12 s .
+> Fig. 13. With the 12 s cutoff wrapper, the long-duration tail is removed and the short-time mode is preserved.
+
+forgiving. The dataset contains 396 teleoperated demonstra-tions ( 29 ,126 steps, 2,916 .2 s ), yielding 22 ,430 training pairs at the same Tw, T h. Success requires the connector to be fully seated under 5 N downward force. Across 200 online rollouts the SO-TA policy attains a mean success-only time close to human teleoperation ( ∼ 10 s ), but exhibits a long completion-time tail ( 20 –100 s ) and 7 timeouts (Fig. 11). This is the canonical compounding-error pattern of imitation learning under contact: once the policy drifts off the demonstration manifold, recovery is prolonged. 7 
+
+> Fig. 14. Curved-surface mark erasing. (a) Setup with a handwritten “Robot” mark at a random location within a green region on the vase. (b) Robot-camera view.
+> Fig. 15. Erasing: success rate (left) and success-only completion-time density (right) of the SO-TA policy compared with human demonstrations.
+
+Cutoff-and-reset wrapper: We introduce a lightweight runtime wrapper that aborts and restarts a rollout once it has not succeeded by time t, with a 1 s reset overhead. Bootstrapping single-attempt outcomes under the 100 s budget, we select t to minimize the 99 th percentile of total time-to-success while maintaining ≥ 99 .5% success (Fig. 12). The selected cutoff t = 12 s yields a 99 th -percentile total time-to-success of 47 .7 s versus 70 .85 s without cutoff, while reaching 
+
+100% success in 1,000 simulated episodes (Fig. 13). The wrapper improves tail latency without modifying the trained policy. 
+
+D. Curved-surface mark erasing 
+
+Unlike insertion, mark erasing requires localizing the target on a curved surface, establishing contact, regulating normal force, and producing sustained sliding friction. The eraser frequently occludes the remaining ink near the end of an episode, so short-horizon temporal context matters. We collect 
+
+199 demonstrations ( 35 ,374 steps, 3,437 .4 s , 31 ,991 training pairs). Across 200 online rollouts (Fig. 15), SO-TA reaches a mean success-only time of 19 .3 s versus 17 .6 s for human teleoperation, with 166 /200 successes under the strict “all marks removed” criterion. The KDE displays a multi-modal structure consistent with 1-, 2- and 3-attempt successes. Fail-ures correlate with mark location: under-represented boundary placements are substantially more likely to require multiple attempts. The interpretability protocol of Sec. VII-B extends natu-rally (Fig. 16). Pose remains consistently large throughout the episode—likely a signature of the stereotyped operator routine in the dataset. Before contact, vision attains its highest share and force is near zero. During erasing the visual share  
+
+> Fig. 16. Erasing: SO-TA interpretability across three phases. Vision peaks before contact; visual and force shares are jointly emphasized during wiping; pose dominates during retreat.
+
+decreases but remains comparable to force, consistent with regulating contact while choosing wiping direction. During retreat the visual share drops sharply ( ∼ 17% ) and pose dominates (∼ 46% ), matching a near-deterministic return motion. OT heatmaps concentrate on the vase surface during approach, persist during erasing, and become more diffuse near episode termination. VIII. C ONCLUSION 
+
+We presented SO-TA , a tri-modal fusion module that casts force–pose-conditioned spatial aggregation as an entropy-regularized Optimal Transport problem with explicit marginal constraints. Paired with a diffusion-policy backbone, SO-TA matches or exceeds concatenation and cross-attention baselines on three real-robot contact-rich tasks under matched capacity, and retains 82 .5% success under visual perturbation where concatenation drops to 43 .5% . Two limitations remain: OT heatmaps stay somewhat diffuse because the cost in (11) carries no spatial prior, and structured fusion shrinks but does not eliminate the compounding-error long tail under contact, which the cutoff-and-reset wrapper closes only at runtime. The broader takeaway is that structured inductive biases on the fusion step remain a high-leverage axis for visuo-haptic policy learning, even as action-producing backbones scale. REFERENCES [1] M. Suomalainen, Y. Karayiannidis, and V. Kyrki, “A survey of robot manipulation in contact,” Robotics and Autonomous Systems , vol. 156, p. 104224, 2022. [2] T. Tsuji, Y. Kato, G. Solak, H. Zhang, T. Petriˇ c, F. Nori, and A. Ajoudani, “A survey on imitation learning for contact-rich tasks in robotics,” arXiv preprint arXiv:2506.13498 , 2025. [3] A. I. Weinberg, A. Shirizly, O. Azulay, and A. Sintov, “Survey of learning-based approaches for robotic in-hand manipulation,” Frontiers in Robotics and AI , vol. 11, p. 1455431, 2024. [4] W. Xie and N. Correll, “Towards forceful robotic foundation models: A literature survey,” arXiv preprint arXiv:2504.11827 , 2025. [5] C. Chi, S. Feng, Y. Du, Z. Xu, E. Cousineau, B. C. M. Burchfiel, and S. Song, “Diffusion Policy: Visuomotor Policy Learning via Action Diffusion,” in Proceedings of Robotics: Science and Systems (RSS) ,2023. [6] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware,” in Proceedings of Robotics: Science and Systems (RSS) , 2023. 8
+
+[7] N. M. M. Shafiullah, Z. J. Cui, A. Altanzaya, and L. Pinto, “Behavior transformers: Cloning k modes with one stone,” in Advances in Neural Information Processing Systems (NeurIPS) , 2022. [8] Q. Vuong, S. Levine, H. R. Walke, K. Pertsch, A. Singh, R. Doshi, C. Xu, J. Luo, L. Tan, D. Shah et al. , “Open X-embodiment: Robotic learning datasets and RT-X models,” in Towards Generalist Robots: Learning Paradigms for Scalable Skill Acquisition @ CoRL , 2023. [9] R. McCarthy, D. C. H. Tan, D. Schmidt, F. Acero, N. Herr, Y. Du, T. G. Thuruthel, and Z. Li, “Towards generalist robot learning from internet video: A survey,” Journal of Artificial Intelligence Research , vol. 83, 2025. [10] H.-S. Fang, H. Fang, Z. Tang, J. Liu, C. Wang, J. Wang, H. Zhu, and C. Lu, “RH20T: A comprehensive robotic dataset for learning diverse skills in one-shot,” arXiv preprint arXiv:2307.00595 , 2023. [11] T. Baltruˇ saitis, C. Ahuja, and L.-P. Morency, “Multimodal machine learning: A survey and taxonomy,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 41, no. 2, pp. 423–443, 2019. [12] Y. Du, J. Hu, J. Chen, and Y. Wang, “Multimodal learning with transformers: A survey,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2022. [13] J. Urain, A. Mandlekar, Y. Du, M. Shafiullah, D. Xu, K. Fragkiadaki, G. Chalvatzaki, and J. Peters, “Deep generative models in robotics: A survey on learning from multimodal demonstrations,” arXiv preprint arXiv:2408.04380 , 2024. [14] B. D. Argall, S. Chernova, M. Veloso, and B. Browning, “A survey of robot learning from demonstration,” Robotics and Autonomous Systems ,vol. 57, no. 5, pp. 469–483, 2009. [15] T. Osa, J. Pajarinen, G. Neumann, J. A. Bagnell, P. Abbeel, and J. Peters, “An algorithmic perspective on imitation learning,” Foundations and Trends in Robotics , vol. 7, no. 1–2, pp. 1–179, 2018. [16] H. Ravichandar, A. S. Polydoros, S. Chernova, and A. Billard, “Recent advances in robot learning from demonstration,” Annual Review of Control, Robotics, and Autonomous Systems , vol. 3, pp. 297–330, 2020. [17] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, L. Kaiser, and I. Polosukhin, “Attention is all you need,” in Advances in Neural Information Processing Systems (NeurIPS) , 2017, pp. 5998– 6008. [18] Y.-H. H. Tsai, S. Bai, P. P. Liang, J. Z. Kolter, L.-P. Morency, and R. Salakhutdinov, “Multimodal transformer for unaligned multimodal language sequences,” in Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (ACL) , 2019, pp. 6558–6569. [19] Y. Li, C. Guo, J. Ren, B. Chen, C. Cheng, H. Zhang, and H. Lu, “SoftGrasp: Adaptive grasping for dexterous hand based on multimodal imitation learning,” Biomimetic Intelligence and Robotics , vol. 5, no. 2, p. 100217, 2025. [20] M. Aburub, C. C. Beltran-Hernandez, T. Kamijo, and M. Hamaya, “Learning diffusion policies from demonstrations for compliant contact-rich manipulation,” arXiv preprint , 2024. [21] J. H. Kang, S. Joshi, R. Huang, and S. K. Gupta, “Robotic compliant object prying using diffusion policy guided by vision and force obser-vations,” arXiv preprint , 2024. [22] H. Li, Y. Zhang, J. Zhu, S. Wang, M. A. Lee, H. Xu, E. Adelson, L. Fei-Fei, R. Gao, and J. Wu, “See, hear, and feel: Smart sensory fusion for robotic manipulation,” in Proceedings of the 6th Conference on Robot Learning (CoRL) , ser. Proceedings of Machine Learning Research, vol. 205, 2023. [23] Y. Chen, M. van der Merwe, A. Sipos, and N. Fazeli, “Visuo-tactile transformers for manipulation,” in Proceedings of the 6th Conference on Robot Learning (CoRL) , ser. Proceedings of Machine Learning Research, vol. 205, 2023, pp. 2026–2040. [24] M. A. Lee, Y. Zhu, K. Srinivasan, P. Shah, S. Savarese, L. Fei-Fei, A. Garg, and J. Bohg, “Making sense of vision and touch: Self-supervised learning of multimodal representations for contact-rich tasks,” in IEEE International Conference on Robotics and Automation (ICRA) , 2019, pp. 8943–8950. [25] D. Kalashnikov, A. Irpan, P. Pastor, J. Ibarz, A. Herzog, E. Jang, D. Quillen, E. Holly, M. Kalakrishnan, V. Vanhoucke, and S. Levine, “QT-Opt: Scalable deep reinforcement learning for vision-based robotic manipulation,” in Conference on Robot Learning (CoRL) , 2018, pp. 651– 673. [26] Y. Wang, C. C. Beltran-Hernandez, W. Wan, and K. Harada, “Robotic imitation of human assembly skills using hybrid trajectory and force learning,” arXiv preprint , 2021. [27] H. Hanai, T. Kiyokawa, W. Wan, and K. Harada, “Robotic paper wrapping by learning force control,” arXiv preprint , 2023. [28] T. Yang, Y. Jing, H. Wu, J. Xu, K. Sima, G. Chen, Q. Sima, and T. Kong, “MOMA-Force: Visual-force imitation for real-world mobile manipulation,” arXiv preprint arXiv:2308.03624 , 2024. [29] W. Liu, J. Wang, Y. Wang, W. Wang, and C. Lu, “ForceMimic: Force-centric imitation learning with force-motion capture system for contact-rich manipulation,” arXiv preprint , 2024. [30] P. Jin, Y. Lin, Y. Tan, T. Li, and W. Yang, “Multi-modal fusion in contact-rich precise tasks via hierarchical policy learning,” arXiv preprint , 2022. [31] P. Jin, Y. Lin, Y. Song, T. Li, and W. Yang, “Vision-force-fused curriculum learning for robotic contact-rich assembly tasks,” Frontiers in Neurorobotics , vol. 17, p. 1280773, 2023. [32] R. Feng, D. Hu, W. Ma, and X. Li, “Play to the score: Stage-guided dynamic multi-sensory fusion for robotic manipulation,” in Proceedings of the Conference on Robot Learning (CoRL) , 2024. [33] M. Cuturi, “Sinkhorn distances: Lightspeed computation of optimal transport,” in Advances in Neural Information Processing Systems (NeurIPS) , 2013. [34] G. Peyr´ e and M. Cuturi, Computational Optimal Transport , ser. Founda-tions and Trends in Machine Learning. Now Publishers, 2019, vol. 11, no. 5–6. [35] M. E. Sander, P. Ablin, M. Blondel, and G. Peyr´ e, “Sinkformers: Transformers with doubly stochastic attention,” in Proceedings of the 25th International Conference on Artificial Intelligence and Statistics (AISTATS) , 2022, pp. 3515–3530. [36] Y. Zhang, D. W. Zhang, S. Lacoste-Julien, G. J. Burghouts, and C. G. M. Snoek, “Unlocking slot attention by changing optimal transport costs,” in 
+
+Proceedings of the 40th International Conference on Machine Learning (ICML) , 2023, pp. 41 931–41 951. [37] K. Kim, Y. Oh, and J. C. Ye, “OTSeg: Multi-prompt sinkhorn atten-tion for zero-shot semantic segmentation,” in European Conference on Computer Vision (ECCV) , 2024, pp. 200–217. [38] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” in Advances in Neural Information Processing Systems (NeurIPS) ,vol. 33, 2020, pp. 6840–6851. [39] Y. Song, J. Sohl-Dickstein, D. P. Kingma, A. Kumar, S. Ermon, and B. Poole, “Score-based generative modeling through stochastic differ-ential equations,” International Conference on Learning Representations (ICLR) , 2021. [40] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , 2016, pp. 770–778. [41] P. Micikevicius, S. Narang, J. Alben, G. F. Diamos, E. Elsen, D. Garc´ ıa, B. Ginsburg, M. Houston, O. Kuchaiev, G. Venkatesh, and H. Wu, “Mixed precision training,” in International Conference on Learning Representations (ICLR) , 2018. [42] Y. Feng, W. Huang, C. Qiu, H. Dong, and I.-M. Chen, “Delta6: A low-cost, 6-dof force-sensing flexible end-effector,” arXiv preprint arXiv:2604.06150 , 2026. [43] Y. Feng, W. Huang, and I.-M. Chen, “One interface, many robots: Unified real-time low-level motion planning for collaborative arms,” 
+
+arXiv preprint arXiv:2604.08787 , 2026. [44] Y. Feng, W. Huang, and I.-M. Chen, “Optimizing small-scale commer-cial automation: Introducing WOS, a low-code solution for robotic arms integration,” in IEEE International Conference on Advanced Intelligent Mechatronics (AIM) , 2024, pp. 272–277. [45] Y. Zhou, C. Barnes, J. Lu, J. Yang, and H. Li, “On the continuity of rotation representations in neural networks,” in IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2019, pp. 5745– 5753.
