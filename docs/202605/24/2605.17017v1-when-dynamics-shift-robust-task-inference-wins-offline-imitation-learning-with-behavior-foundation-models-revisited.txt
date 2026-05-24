@@ -1,0 +1,1668 @@
+Title: When Dynamics Shift, Robust Task Inference Wins: Offline Imitation Learning with Behavior Foundation Models Revisited
+
+URL Source: https://arxiv.org/pdf/2605.17017v1
+
+Published Time: Tue, 19 May 2026 00:59:28 GMT
+
+Number of Pages: 32
+
+Markdown Content:
+# When Dynamics Shift, Robust Task Inference Wins: Offline Imitation Learning with Behavior Foundation Models Revisited 
+
+Rishabh Agrawal Rahul Jain Ashutosh Nayyar 
+
+University of Southern California 
+
+rishabha@usc.edu, rahul.jain@usc.edu, ashutosn@usc.edu 
+
+## Abstract 
+
+Behavior Foundation Models (BFMs) enable scalable imitation learning (IL) by pretraining task-agnostic representations that can be rapidly adapted to new tasks. However, existing BFMs assume fixed environment dynamics, limiting their ro-bustness under real-world shifts such as changes in friction, actuation, or sensor noise. We address this by formulating BFM task-inference as a robust minimax optimization problem, enabling adaptation to worst-case dynamics perturbations without modifying pretraining. To the best of our knowledge, this is the first BFM-based framework that achieves robustness to dynamics shifts while relying solely on offline data from a single nominal environment. Our approach signifi-cantly outperforms standard BFM and robust offline IL baselines under dynamics shifts. These results demonstrate that robust policy can be achieved entirely at task-inference time, improving the practicality of BFMs in dynamic settings. 
+
+## 1 Introduction 
+
+Deploying autonomous agents in complex, unstructured environments demands learning behavioral policies that generalize broadly without hand-crafted reward functions or controllers [ 24 , 4 ]. Imitation Learning (IL), wherein an agent acquires behavior directly from expert demonstrations, offers a compelling alternative, enabling remarkable successes in robotic manipulation [ 8], language generation [ 1 , 46 ], and autonomous control [ 18 ]. Yet conventional IL methods learn each task in isolation, requiring retraining or large demonstration sets for every new behavior [ 21 , 17 ], limiting their scalability. Behavior Foundation Models (BFMs) [ 55 , 57 ] address this scalability bottleneck by pretraining a single model on diverse exploratory offline data in an unsupervised manner, capturing task-agnostic environment representations via occupancy measures or successor measures. Forward-backward (FB) decompositions [ 43 ] factorize these successor measures into policy-dependent and global components, yielding linear representations that generalize across tasks. At inference time, BFMs adapt rapidly to new tasks from limited demonstrations by optimizing a low-dimensional task embedding z,producing competitive imitation policies within seconds to minutes without full retraining [ 43 ]. This 
+
+pretrain once, adapt anywhere paradigm is a compelling solution for scalable multi-task IL in fixed environments. However, BFMs fundamentally assume that the dynamics at pretraining and deployment coincide, an assumption routinely violated in practice due to sim-to-real discrepancies, mechanical wear, sensor noise, and environmental variation [ 54 , 25 ]. Recent work demonstrates that standard BFMs fail to adapt when environment dynamics shift [ 12 , 30 ]. Proposed remedies: dynamics-conditioned belief encoders [ 12 ] and memory-augmented architectures [ 30 ], both require pretraining data spanning diverse dynamics variations to learn meaningful representations, a requirement that is expensive, time-consuming, and often infeasible in real-world settings [ 42 , 6]. This raises the following question: 
+
+> Preprint.
+> arXiv:2605.17017v1 [cs.LG] 16 May 2026
+
+Figure 1: Overview of the proposed RBFM framework. FB-IL, RBFM-Light, and RBFM-Heavy share an identical pretraining procedure; robustness is introduced only at the task inference stage. RBFM variants produce policies significantly more robust to dynamic perturbations than FB-IL. 
+
+Can BFMs be made robust to environment dynamics shift when offline data from only a single nominal environment is available? 
+
+We answer affirmatively by formulating BFM task inference as a robust minimax optimization problem. Keeping the pretrained model fixed, we let an adversary perturb the environment within a specified uncertainty set while the learner minimizes the induced adversarial imitation loss, yielding a task embedding that hedges against plausible dynamics shifts. To preserve the fast task-inference characteristic of BFMs, we propose two variants (Figure 1): RBFM-Light augments the inference objective with a single robustness parameter optimized jointly with z, achieving robustness with minimal computational overhead. RBFM-Heavy further constrains the policy-induced occupancy measure to lie within the feasible distribution set, enforcing realizability and improving robustness at the cost of a larger optimization problem. Both variants require only lightweight modifications to the task-inference stage, with no changes to pretraining. Empirically, RBFM-Light and RBFM-Heavy consistently and substantially outperform standard BFMs (FB-IL) under diverse dynamics perturbations across multiple environments, while remaining competitive in the nominal setting (data-collecting environment) and orders of magnitude faster than single-task robust IL baselines such as DRBC [39] and BE-DROIL [3]. To summarize, our contributions are as follows: 1. We propose a robust formulation of BFM task inference via minimax optimization over an uncertainty set of environment dynamics, enabling robustness to dynamics shift without any modification to BFM pretraining. 2. We introduce RBFM-Light and RBFM-Heavy , two algorithms that trade computational efficiency against robustness while preserving the fast task-inference property of BFMs. 3. We demonstrate consistent and substantial robustness gains across three morphologically diverse environments under a wide range of perturbations. Our approach requires only a single exploratory dataset collected in the nominal setting for pretraining, unlike [ 12 , 30 ], which rely on data from multiple diverse environments, and only a small set of expert demonstrations for task inference to produce a robust policy. Importantly, no expert data from perturbed environments is required at any stage. 4. To the best of our knowledge, this is the first work to achieve robustness to environment dynamics variation within the BFM framework without requiring pretraining or expert data from multiple dynamics regimes. This increases the range of real-world deployments for BFM-based methodology. 22 Preliminaries 
+
+Markov decision processes. We consider a discounted, reward-free Markov decision process (MDP) 
+
+M = ( S, A, P, γ, μ ). Here, S and A denote the state and action spaces, P (d s′ | s, a ) is the transition kernel, γ ∈ (0 , 1) is the discount factor, and the initial state is drawn as s0 ∼ μ. A policy π defines a distribution over actions conditioned on the state, denoted by π(a|s). Starting from s0 ∼ μ,trajectories (st, a t)t≥0 evolve according to st ∼ P (d st | st−1, a t−1) and at ∼ π(· | st).
+
+Successor measure. To characterize the evolution of future states under a policy π, we consider the successor measure M π (· | s, a ) when taking action a in state s, which aggregates discounted future state visitation. For any measurable set X ⊂ S ,
+
+M π (X | s, a ) = 
+
+> ∞
+
+X
+
+> t=0
+
+γtPπ (st+1 ∈ X | s, a ). (1) This construction naturally separates the effect of the dynamics from the specification of a task. In particular, for any reward function r : S → R, the associated Q-function can be written as 
+
+Qπr (s, a ) = Eπ
+
+" ∞X
+
+> t=0
+
+γtr(st+1 ) s, a 
+
+#
+
+=
+
+Z
+
+> S
+
+M π (d s′ | s, a ) r(s′). (2) Thus, once the successor measure is known, value functions for different rewards can be obtained without modifying the policy-dependent component. 
+
+Forward–backward (FB) parameterization. In practice, directly representing M π is intractable in large or continuous state spaces. A common approach is therefore to approximate it using a low-rank decomposition. Concretely, Behavior Foundation Models (BFMs) represents M π as 
+
+M π (X | s, a ) ≈
+
+Z
+
+> s′∈X
+
+F π (s, a )⊤B(s′) ϕ(d s′), (3) where F π : S × A → Rd and B : S → Rd denote forward and backward embeddings, respectively, and ϕ is a reference distribution over states. Under this factorization, the dependence on the reward reduces to a linear projection: 
+
+Qπr (s, a ) = F π (s, a )⊤z, z = Es∼ϕ[B(s) r(s)] . (4) To enable generalization across tasks, both the policy and the forward embedding are conditioned on a latent vector z ∈ Z ⊆ Rd [57]. This yields the parameterization 
+
+M πz (X | s, a ) ≈ R 
+
+> s′∈X
+
+F (s, a, z )⊤B(s′) ϕ(d s′),πz (s) = arg max a F (s, a, z )⊤z. (5) In practice, the latent space Z is typically constrained (e.g., to a bounded subset of Rd). In the pre-training stage, the embeddings are learned from an offline dataset with distribution ϕ by minimizing a temporal-difference objective derived from the Bellman equation [57]: 
+
+LFB (F, B ) = E z∼ν, (s,a,s ′)∼ϕs+∼ϕ, a ′∼πz (·| s′)
+
+h F (s, a, z )⊤B(s+) − γ ¯F (s′, a ′, z )⊤ ¯B(s+)2i
+
+− 2 Ez∼ν, (s,a,s ′)∼ϕ
+
+F (s, a, z )⊤B(s′), (6) where ¯F and ¯B denote stop-gradient operators and ν is a distribution over latent variables. For continuous action spaces, the maximization in πz is replaced by an actor network trained to maximize: 
+
+Lactor (π) = −Ez∼ν,s ∼ϕ, a ∼πz (·| s)
+
+F (s, a, z )⊤z. (7) The overall procedure consists of two phases. In the first phase (pretraining), we learn the forward and backward embeddings, along with the actor (when applicable), offline from a fixed exploratory dataset by minimizing LFB and Lactor , without access to task-specific rewards. In the second phase, we perform task-inference by selecting a latent variable z that induces a policy πz . The latent z can be inferred from rewards, goals, or expert demonstrations; since our focus is imitation learning, in this work, we will consider the reward-free setting with expert demonstration data. 3Learning from demonstrations. Since no reward function is available for task-inference, learn-ing must rely solely on expert demonstrations, without any additional interaction with the en-vironment in the offline setting. To formalize this, we describe policies through their dis-counted occupancy measures under a nominal transition function T o as ρπT o (s, a, s ′) = (1 −
+
+γ) Eπ
+
+P ∞ 
+
+> t=0
+
+γt 1st=s,a t=a,s t+1 =s′
+
+. The marginal state–action and state-only occupancy measures are then given by ρπT o (s, a ) = P 
+
+> s′
+
+ρπT o (s, a, s ′) and ρπT o (s) = P 
+
+> a,s ′
+
+ρπT o (s, a, s ′) respectively. Given a dataset of trajectories generated by an expert policy πD , the goal is to identify a latent task-vector z such that the induced policy πz matches the expert behavior. A natural objective is 
+
+arg min  
+
+> z∈Z
+
+Es∼ρπDT o
+
+L(πz (·| s), π D (·| s)) , (8) where L is the imitation loss (e.g., mean squared error or KL divergence) measuring the gap between learner and expert policies. We refer to this objective as FB-IL, which serves as our primary baseline. 
+
+Robust formulation. Finally, we account for uncertainty in the transition dynamics by introducing an ambiguity or uncertainty set over Transition kernels. Specifically, we consider 
+
+T (ε′) = 
+
+n
+
+(Ts,a )(s,a )∈S×A Ts,a ∈ ∆( S), D TV 
+
+ Ts,a , T os,a 
+
+ ≤ ε′, ∀(s, a ) ∈ S × A 
+
+o
+
+. (9) This induces a distributionally robust objective in which performance is evaluated under the worst-case transition model within the ambiguity set. Formally, we consider [3] 
+
+arg min  
+
+> z∈Z
+
+max   
+
+> T∈T
+
+Es∼ρπDT
+
+L(πz (·| s), π D (·| s)) , (10) where ρπD 
+
+> T
+
+denotes the discounted state distribution induced by the expert policy πD under transition kernel T ∈ T . The objective admits a natural minimax interpretation: an adversary selects a transition model T ∈ T (ε′) that maximizes the imitation loss, while the learner chooses a latent variable z (and corresponding induced-policy πz ) to minimize this worst-case loss. Crucially, this game is played in the offline regime, where only trajectories generated by πD under T o are available. 
+
+## 3 Fast Robust Offline Imitation Learning 
+
+We propose two complementary formulations for robust and computationally efficient task-inference of pre-trained Behavioral Foundation Models (BFMs) under transition uncertainty. The first variant, 
+
+RBFM-Light (§3.1), relaxes dynamics perturbations into a state-occupancy uncertainty set, yielding a tractable offline objective. The second variant, RBFM-Heavy (§3.2), enforces robustness through explicit Bellman flow constraints, leading to less conservative policies at the expense of increased computational complexity. 
+
+3.1 RBFM-Light 
+
+We begin by characterizing the sensitivity of the discounted state-occupancy measure ρπT (s) to perturbations in the transition kernel T .
+
+Lemma 1. For any policy π and transition kernel T ∈ T (ε′), the following holds: 
+
+DTV (ρπT (s), ρ πT o (s)) ≤ γε ′
+
+1 − γ .
+
+Lemma 1 provides a uniform bound on the deviation between occupancy measures induced by perturbed and nominal dynamics. This enables replacing uncertainty over transition kernels with an uncertainty set defined directly in occupancy space, yielding a tractable relaxation of the robust ob-jective in (10) . Concretely, we define DπD
+
+> light
+
+(εl) = 
+
+n
+
+ρπD 
+
+> T
+
+(s) : DTV (ρπD 
+
+> T
+
+(s), ρ πD  
+
+> To
+
+(s)) ≤ γε ′ 
+
+> 1−γ
+
+= εl
+
+o
+
+,which contains all occupancy measures induced by admissible kernels T ∈ T (ε′). By construc-tion, optimizing over DπD
+
+> light
+
+(ε) upper bounds the original worst-case objective over T (ε′). This reformulation removes explicit dependence on the unknown dynamics and provides a purely offline optimization problem. The resulting objective is given by RBFM-Light := min  
+
+> z
+
+max  
+
+> ρπDT≥0
+
+Es∼ρπDT
+
+[L(πz (·| s), π D (·| s))] s.t. DT V (ρπD 
+
+> T
+
+(s) ∥ ρπD  
+
+> To
+
+(s)) ≤ εl
+
+(11) 4The inner maximization admits a tractable dual reformulation, yielding the equivalent optimization problem provided in Proposition 1. 
+
+Proposition 1. The solution to the constrained optimization problem in (11) is given by solving: 
+
+min  
+
+> z
+
+min 
+
+> λ∈R
+
+(
+
+Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max  
+
+> ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
++ λ
+
+)
+
+The proof of Proposition 1 is provided in the Appendix A. Objective defined in Proposition 1 can be optimized to solve the robust imitation learning problem in (10) , using the offline data only available from the nominal environment T o. We further specialize the objective under standard assumptions commonly used in offline imitation learning. 
+
+Proposition 2. Suppose that the expert and learner policies πD and πz are deterministic and that the action space A is bounded. Let L(πz (·| s), π D (·| s)) = ∥πz (s)−a∥22 and L := sup (s,a )∼ρπDT o ∥πz (s)−
+
+πD (s)∥22. Then the optimization problem in Proposition 1 can be simplified to 
+
+min  
+
+> z
+
+min 
+
+> λ∈[0 ,(1+ ε)L]
+
+(
+
+Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max  
+
+> ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
++ λ
+
+)
+
+Proposition 2 reduces the search space of the dual variable λ from R to a bounded interval, enabling faster optimization. The proof is provided in the Appendix A. 
+
+3.2 RBFM-Heavy 
+
+While RBFM-Light provides a tractable offline solution by operating directly in occupancy space, it allows arbitrary perturbations within a TV ball around the nominal occupancy measure. In particular, the uncertainty set DπD
+
+> light
+
+(ε) may include occupancy measures that assign probability mass to transitions that are not realizable under the expert policy in the underlying MDP. This can lead to overly conservative solutions. To address this limitation, we refine the uncertainty set by incorporating structural constraints that ensure realizability. We begin by considering the extension of Lemma 1 to joint state-action-next-state occupancy measures. 
+
+Lemma 2. For any policy π and transition kernel T ∈ T (ε′), the following holds: 
+
+DTV (ρπT (s, a, s ′), ρ πT o (s, a, s ′)) ≤ ε′
+
+1 − γ .
+
+Building on Lemma 2, we enforce a Bellman flow conservation condition [ 45 , 7 ], ensuring that 
+
+ρπD 
+
+> T
+
+(s, a, s ′) corresponds to a valid stationary occupancy measure induced by the expert policy πD
+
+under transition kernel T . This preserves the temporal structure of the MDP and rules out infeasible perturbations. In addition, we generalize the divergence constraint by replacing the TV distance with an f -divergence (see Appendix D.3 for details). Upon incorporating these changes, we obtain the following constrained minimax formulation: RBFM-Heavy := min  
+
+> z
+
+max  
+
+> ρπDT≥0
+
+Es∼ρπDT
+
+[L(πz (·| s), π D (·| s))] 
+
+s.t. (1) Df (ρπD 
+
+> T
+
+(s, a, s ′) ∥ ρπD  
+
+> To
+
+(s, a, s ′)) ≤ ε, 
+
+(2) X
+
+> s′
+
+ρπD 
+
+> T
+
+(s, a, s ′) = (1 − γ)μ(s)πD (a|s) + γπ D (a|s)X
+
+> ˜s, ˜a
+
+ρπD 
+
+> T
+
+(˜ s, ˜a, s ) ∀(s, a ).
+
+(12) To solve (12) , we fix the task vector z (hence the corresponding induced policy πz ) and consider the corresponding dual formulation: 
+
+min   
+
+> Q,τ ≥0
+
+max  
+
+> ρπDT≥0
+
+Es∼ρπDT
+
+Lπz (s) − τ  Df
+
+ ρπD 
+
+> T
+
+(s, a, s ′) ρπD  
+
+> To
+
+(s, a, s ′) − ε
+
+− X
+
+> s,a
+
+Q(s, a )
+
+X
+
+> s′
+
+ρπD 
+
+> T
+
+(s, a, s ′) − (1 − γ)μ(s)πD (a|s) − γπ D (a|s)X
+
+> ˜s, ˜a
+
+ρπD 
+
+> T
+
+(˜ s, ˜a, s )
+
+ .
+
+(13) 5where Lπz (s) = L(πz (·| s), π D (·| s)) , Q(s, a ) ∈ R is the Lagrange multiplier for the Bellman flow constraint, and τ ≥ 0 is the multiplier for the f -divergence constraint. Since the inner maximization in (12) is convex and admits a strictly feasible point (e.g., ρπD  
+
+> To
+
+), Slater’s condition [ 14 ] implies strong duality. Thus, (13) attains the same optimal value as the original problem. After algebraic simplification, we obtain: 
+
+min   
+
+> Q,τ ≥0
+
+max  
+
+> ρπDT≥0
+
+(1 − γ) Es∼μ, a ∼πD (·| s)[Q(s, a )] − τ D f (ρπD 
+
+> T
+
+(s, a, s ′) ∥ ρπD  
+
+> To
+
+(s, a, s ′)) + ϵτ 
+
++ Es,a,s ′∼ρπDT
+
+h
+
+Lπz (s) + γ Ea′∼πD (·| s′)[Q(s′, a ′)] − Q(s, a )
+
+i
+
+.
+
+(14) This formulation still depends on the unknown occupancy ρπD 
+
+> T
+
+(s, a, s ′) for arbitrary T ∈ T (ϵ′),and is therefore not directly amenable to offline optimization. To address this, we introduce the importance ratio w(s, a, s ′) = ρπDT (s,a,s ′)  
+
+> ρπDT o(s,a,s ′)
+
+. Using the definition of f -divergence, we rewrite (14) as 
+
+min   
+
+> Q,τ ≥0
+
+max  
+
+> w≥0
+
+(1 − γ) Es∼μ, a ∼πD (·| s)[Q(s, a )] + ϵτ 
+
++ Es,a,s ′∼ρπDT o [−τ f (w(s, a, s ′)) + w(s, a, s ′) cQ,π z (s, a, s ′)] , (15) where cQ,π z (s, a, s ′) = Lπz (s) + γ Ea′∼πD (·| s′)[Q(s′, a ′)] − Q(s, a ).
+
+This reformulation transforms the original maximization over unknown occupancy measures ρπD 
+
+> T
+
+for any T ∈ T (ϵ′) into an objective that depends only on samples from the nominal distribution ρπD  
+
+> To
+
+.As a result, the problem becomes tractable in a purely offline setting using expert demonstrations alone. We now turn to solving the inner maximization over the importance weights w, which admits a closed-form solution. 
+
+Proposition 3. For τ > 0, the inner maximization in (15) admits the solution 
+
+w⋆Q,τ,π z (s, a, s ′) = max 
+
+
+
+0, (f ′)−1
+
+ cQ,π z (s, a, s ′)
+
+τ
+
+ 
+
+.
+
+For τ = 0 , w⋆Q,τ,π z (s, a, s ′) = + ∞ if cQ,π z (s, a, s ′) > 0 and 0 otherwise. 
+
+The proof of Proposition 3 is provided in Appendix A. Substituting w⋆Q,τ,π z into (15) reduces the problem to a minimization over Q and τ . This results in a bilevel-like optimization with two coupled subproblems: estimating (Q, τ ) and updating the task parameters. 
+
+min   
+
+> Q,τ ≥0
+
+(1 − γ) Es∼μ, a ∼πD (·| s)[Q(s, a )] + ϵτ 
+
++ E(s,a,s ′)∼ρπDT o
+
+−τ f  w⋆Q,τ,π z (s, a, s ′) + w⋆Q,τ,π z (s, a, s ′) cQ,π z (s, a, s ′)
+
+min  
+
+> z
+
+E(s,a,s ′)∼ρπDT o
+
+w⋆Q,τ,π z (s, a, s ′) Lπz (s) .
+
+(16) Optimization alternates between updates of (Q, τ ) and the task-vector z until convergence, yielding a policy πz that is robust to worst-case transition perturbations in the uncertainty set. 
+
+## 4 Experiments 
+
+We evaluate RBFM-Light (§3.1) and RBFM-Heavy (§3.2) on robustness to dynamics perturbations, seeking answers to five questions: (Q1) How do RBFM-Light and RBFM-Heavy compare with FB-IL under dynamics perturbations? (Q2) How do they compare with single-task robust offline IL algorithms? (Q3) Are RBFM-Light and RBFM-Heavy computationally efficient? (Q4) How does the quality and quantity of pretraining data affect robustness? (Q5) How does the robustness parameter ε
+
+affect performance? 
+
+Setup. We evaluate on the ExORL benchmark [ 61 ], which provides datasets collected via unsuper-vised exploration on the DeepMind Control Suite [ 53 ]. Following prior BFM works [ 43 , 29 ], we use pretraining datasets from RND [ 15 ], APS [ 35 ], and PROTO [ 60 ]. Following [ 49 ], experiments span three domains with twelve tasks: Walker (Stand, Walk, Run, Flip), Quadruped (Stand, Walk, Run, Jump), and Cheetah (Walk, Run, Walk_Backward, Run_Backward). For each domain, we 6Tilted Gravity Ground Contact Stiffness Actuator Ctrlrange   
+
+> Run Walk Jump Stand
+> RBFM-Heavy FB-IL RBFM-Light
+
+Figure 2: Quadruped performance under dynamics perturbations (95% Confidence Interval), pre-trained on Quadruped RND dataset. Rows: tasks; columns: perturbation types with absolute values of the perturbed parameter. Nominal conditions correspond to the leftmost point for the first two perturbations and the rightmost for actuator control range. Average return on y-axis. introduce physics perturbations: gravity, body mass, and joint friction loss for Walker; tilted gravity, ground contact stiffness, and actuator control range for Quadruped; and actuator strength, joint friction loss, and range of motion for Cheetah. For Walker, we evaluate all combinations of three pretraining datasets, yielding 36 tasks. For Quadruped and Cheetah, we use RND-pretrained data only, for a total of 60 tasks across all domains. A pretrained BFM generates 200 expert trajectories per task; imitation learning uses 4 randomly sampled trajectories per task. Performance is measured as average return over 100 evaluation episodes, averaged across 5 random seeds per environment–task– perturbation combination. We compare against FB-IL for (Q1), and additionally against DRBC [ 39 ]and BE-DROIL [3] for (Q2). Full experimental setup details are provided in Appendix C. 
+
+Implementation Details. For all BFM-based methods, we follow Pirotta et al. [43] and warm-start 
+
+z via zw = Eτ
+
+h P  
+
+> t≥0B(st+1 )
+> l(τ)
+
+i
+
+. The term (1 − γ)Es∼μ, a ∼πD (·| s)[Q(s, a )] in (16) requires sampling from the initial-state distribution μ. Since each expert dataset contains only 4 initial states, we follow Agrawal et al. [3] and treat all trajectory states as effective initial states to improve coverage and stabilize estimation. Complete implementation details are provided in Appendix D. 
+
+Results. (Q1) Across all three morphologies and perturbation types, both RBFM variants con-sistently outperform FB-IL as perturbation severity increases, with RBFM-Heavy achieving the 7(a) Run (b) Walk (c) Flip (d) Stand     
+
+> RBFM-Heavy FB-IL RBFM-Light DRBC BE-DROIL
+
+Figure 3: Average return (y-axis) vs. body mass perturbation (x-axis, % increase from nominal) on the Walker environment across four tasks, pretrained on RND dataset.     
+
+> (a) 100k (b) 500k (c) 1M
+> RBFM-Heavy FB-IL RBFM-Light
+
+Figure 4: Average return (y-axis) vs. joint friction loss perturbation (x-axis, absolute Nm per joint) on Walker flip task across three RND pretraining dataset sizes ( 100 k, 500 k, 1M transitions). highest returns, RBFM-Light intermediate, and FB-IL exhibiting the steepest degradation across the majority of settings (Figure 2 for Quadruped; Walker and Cheetah in Figures 6 and 7, Appendix F.1). 
+
+Algorithm Time 
+
+DRBC 5h 23 mBE-DROIL 6h 10 mFB-IL 1mRBFM-Light 5mRBFM-Heavy 10 mTable 1: Per-task infer-ence time averaged across environments and tasks. The robustness gap widens monotonically with perturbation magnitude, consistent with our robust objectives: by optimizing z against a worst-case distribution within an uncertainty set around the empirical expert distribution, RBFM explicitly accounts for transition distribution shift at evaluation time. RBFM-Heavy outperforms RBFM-Light because its re-alizability constraint yields a less conservative solution, whereas RBFM-Light’s unconstrained objective over-penalizes transitions unlikely under the true perturbation distribution; FB-IL, optimizing solely under the empirical expert distribution, carries no margin for model mismatch and degrades most severely. These findings hold across perturbation types spanning distinct physical failure modes, motor degradation, joint resistance, kinematic restriction, gravitational disturbance, and terrain compliance, demonstrating that RBFM’s robustness benefits generalize across morphologies and perturbation types (see Appendix F.1 for per-environment details). 
+
+(Q2) Figure 3 compares RBFM variants and FB-IL against single-task distributionally robust offline IL baselines DRBC and BE-DROIL on the Walker environment under body mass perturbation. At nominal and moderate perturbation levels, all BFM-based methods substantially outperform the single-task baselines, an advantage attributable to the multi-task pretraining of the FB models, which induces a task-agnostic representation that generalizes across reward structures, consistent with the nominal-setting findings of [ 43 ]. At higher perturbation levels, BE-DROIL matches or marginally outperform FB-IL, demonstrating that per-task distributional robustness does confer an advantage over non-robust BFM inference when dynamics shifts are non-trivial. Crucially, the proposed RBFM framework that combines multi-task BFM pretraining with robust task inference, maintains consistent superiority over both FB-IL and the single-task baselines throughout the full perturbation sweep. 
+
+(Q3) Table 1 reports wall-clock time to compute an imitation policy for a single task, averaged across environments and tasks. Single-task robust baselines (DRBC: 5h 23 m; BE-DROIL: 6h 10 m) incur substantial per-task optimization cost, whereas BFM-based methods amortize representation learning 8over a one-time pretraining phase, reducing task-specific inference to minutes: FB-IL ( 1m), RBFM-Light ( 5m), RBFM-Heavy ( 10 m). Since pretraining is a fixed cost shared across all downstream tasks, per-task inference time is the operationally relevant deployment metric and RBFM variants are orders of magnitude faster than single-task robust baselines while achieving superior robustness (Q1 & Q2), demonstrating that RBFM attains distributional robustness without compromising the computational efficiency inherent to the BFM framework. 
+
+Figure 5: Average return (y-axis) vs. ground contact stiffness (x-axis, abso-lute perturbation) on Quadruped jump under varying ε for RBFM-Heavy. 
+
+(Q4) We investigate two axes of pretraining data quality: source and quantity. For data source, we evaluate on Walker using APS- and PROTO-generated datasets (Appendix F.2, Figures 8 and 9); trends are consistent with (Q1), confirm-ing robustness rankings across pretraining sources. For data quantity, we vary pretraining dataset size across 100k, 500k, and 1M transitions on the Walker flip task under joint friction loss (Figure 4). At 100k, performance is inconsistent with no clear method separation; at 500k trends begin to stabilize; by 1M a consistent separation emerges. This progression underscores that robust task inference critically depends on the quality of the learned FB representations, which require sufficient pretraining data to become expressive. 
+
+(Q5) We vary ε ∈ {0.2, 0.4, 0.6, 0.8, 1.0} and evaluate RBFM-Heavy on the Quadruped jump task under ground contact stiffness perturbations (Figure 5). Smaller ε yields higher nominal returns but sharp degradation under perturbation, as the uncertainty set fails to cover the perturbed transition distribution; larger ε induces more gradual decay at the cost of modest nominal performance loss. The value ε = 0 .8 achieves the best trade-off and is used in all experiments. 
+
+## 5 Related Work 
+
+Offline imitation learning is commonly approached via Behavioral Cloning (BC) [ 44 ], which treats imitation as supervised learning but suffers from covariate shift and compounding errors due to ignoring environment dynamics [ 47 ]. The DICE family [ 33 , 31 , 36 ] incorporates transition structure by estimating occupancy ratios from offline data. In parallel, robust reinforcement learning addresses transition uncertainty via worst-case optimization over ambiguity sets [ 37 , 27 , 20 , 62 , 40 ], but typically requires rewards and online interaction. Offline robust RL [ 38 ] removes interaction but still relies on known rewards, limiting applicability to imitation learning. Robust imitation learning has largely focused on imperfect demonstrations or training stability [ 59 , 52 , 34 , 48 ], while domain randomization and meta-IL methods assume access to simulators or fixed dynamics [ 42 , 26 , 22 ]. Recent approaches improve BC robustness under distributional shift [ 58 , 51 ], but do not address transition uncertainty. Among methods that do, DRBC [ 39 ] and BE-DROIL [ 3 ] formulate robust offline imitation learning under transition ambiguity. However, these approaches operate in a per-task manner, requiring separate optimization for each task. This limits their applicability in multi-task settings, where rapid adaptation to new tasks is essential, thereby motivating the need for a unified and robust framework capable of generalizing across tasks. We refer to Appendix B for an extended discussion on related works. 
+
+## 6 Conclusion 
+
+We revisited Behavior Foundation Models (BFMs) under dynamics shift and showed that standard task inference is inherently brittle to transition mismatch. To address this, we proposed a robust minimax formulation over an uncertainty set of dynamics, and introduced two practical algorithms, 
+
+RBFM-Light and RBFM-Heavy , trading off efficiency and robustness without modifying pretraining or requiring multi-environment data. Empirically, both variants significantly improve robustness over standard BFMs and outperform single-task robust offline IL baselines, while preserving fast task inference. Our results highlight a promising direction for scalable imitation learning, where a single pretrained model can be robustly adapted to new tasks using only offline data. 9References 
+
+[1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4 technical report. arXiv preprint arXiv:2303.08774 , 2023. [2] Rishabh Agrawal, Nathan Dahlin, Rahul Jain, and Ashutosh Nayyar. Policy optimization for strictly batch imitation learning. In OPT 2024: Optimization for Machine Learning , 2024. URL 
+
+https://openreview.net/forum?id=5L3qmI0XPz .[3] Rishabh Agrawal, Yusuf Alvi, Rahul Jain, and Ashutosh Nayyar. Balance equation-based distributionally robust offline imitation learning. arXiv preprint arXiv:2511.07942 , 2025. [4] Rishabh Agrawal, Nathan Dahlin, Rahul Jain, and Ashutosh Nayyar. Markov balance satisfac-tion improves performance in strictly batch offline imitation learning. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 39, pages 15311–15319, 2025. [5] Rishabh Agrawal, Nathan Dahlin, Rahul Jain, and Ashutosh Nayyar. Conditional kernel imi-tation learning for continuous state environments. In Necmiye Ozay, Laura Balzano, Dimitra Panagou, and Alessandro Abate, editors, Proceedings of the 7th Annual Learning for Dynam-ics &amp; Control Conference , volume 283 of Proceedings of Machine Learning Research ,pages 469–483. PMLR, 04–06 Jun 2025. URL https://proceedings.mlr.press/v283/ agrawal25a.html .[6] Elie Aljalbout, Jiaxu Xing, Angel Romero, Iretiayo Akinola, Caelan Reed Garrett, Eric Heiden, Abhishek Gupta, Tucker Hermans, Yashraj Narang, Dieter Fox, et al. The reality gap in robotics: Challenges, solutions, and best practices. Annual Review of Control, Robotics, and Autonomous Systems , 9, 2025. [7] Eitan Altman. Constrained Markov decision processes . Routledge, 2021. [8] Shan An, Ziyu Meng, Chao Tang, Yuning Zhou, Tengyu Liu, Fangqiang Ding, Shufang Zhang, Yao Mu, Ran Song, Wei Zhang, et al. Dexterous manipulation through imitation learning: A survey. arXiv preprint arXiv:2504.03515 , 2025. [9] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. Layer normalization. arXiv preprint arXiv:1607.06450 , 2016. [10] André Barreto, Will Dabney, Rémi Munos, Jonathan J Hunt, Tom Schaul, Hado P Van Hasselt, and David Silver. Successor features for transfer in reinforcement learning. Advances in neural information processing systems , 30, 2017. [11] Léonard Blier, Corentin Tallec, and Yann Ollivier. Learning successor states and goal-dependent values: A mathematical viewpoint. arXiv preprint arXiv:2101.07123 , 2021. [12] Maksim Bobrin, Ilya Zisman, Alexander Nikulin, Vladislav Kurenkov, and Dmitry V. Dylov. Zero-shot adaptation of behavioral foundation models to unseen dynamics. In The Fourteenth International Conference on Learning Representations , 2026. URL https://openreview. net/forum?id=dBDBg4WF4F .[13] Diana Borsa, André Barreto, John Quan, Daniel Mankowitz, Rémi Munos, Hado Van Hasselt, David Silver, and Tom Schaul. Universal successor features approximators. arXiv preprint arXiv:1812.07626 , 2018. [14] Stephen P Boyd and Lieven Vandenberghe. Convex optimization . Cambridge university press, 2004. [15] Yuri Burda, Harrison Edwards, Amos Storkey, and Oleg Klimov. Exploration by random network distillation. arXiv preprint arXiv:1810.12894 , 2018. [16] Jongseong Chae, Seungyul Han, Whiyoung Jung, Myungsik Cho, Sungho Choi, and Youngchul Sung. Robust imitation learning against variations in environment dynamics. In International Conference on Machine Learning , pages 2828–2852. PMLR, 2022. 10 [17] Seongwoong Cho, Donggyun Kim, Jinwoo Lee, and Seunghoon Hong. Meta-controller: Few-shot imitation of unseen embodiments and tasks in continuous control. Advances in Neural Information Processing Systems , 37:134250–134286, 2024. [18] Felipe Codevilla, Eder Santana, Antonio M López, and Adrien Gaidon. Exploring the limitations of behavior cloning for autonomous driving. In Proceedings of the IEEE/CVF international conference on computer vision , pages 9329–9338, 2019. [19] Peter Dayan. Improving generalization for temporal difference learning: The successor repre-sentation. Neural computation , 5(4):613–624, 1993. [20] Esther Derman and Shie Mannor. Distributional robustness and regularization in reinforcement learning. arXiv preprint arXiv:2003.02894 , 2020. [21] Yan Duan, Marcin Andrychowicz, Bradly Stadie, OpenAI Jonathan Ho, Jonas Schneider, Ilya Sutskever, Pieter Abbeel, and Wojciech Zaremba. One-shot imitation learning. Advances in neural information processing systems , 30, 2017. [22] Chelsea Finn, Tianhe Yu, Tianhao Zhang, Pieter Abbeel, and Sergey Levine. One-shot visual imitation learning via meta-learning. In Conference on robot learning , pages 357–368. PMLR, 2017. [23] Scott Fujimoto, David Meger, and Doina Precup. Off-policy deep reinforcement learning without exploration. In International conference on machine learning , pages 2052–2062. PMLR, 2019. [24] Jonathan Ho and Stefano Ermon. Generative adversarial imitation learning. Advances in neural information processing systems , 29, 2016. [25] Xiaoyi Hu, Qiao Sun, Bailin He, Haojie Liu, Xueyi Zhang, Chunpeng Lu, and Jiangwei Zhong. Impact of static friction on sim2real in robotic reinforcement learning. In 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 17107–17114. IEEE, 2025. [26] Wenlong Huang, Igor Mordatch, Pieter Abbeel, and Deepak Pathak. Generalization in dexterous manipulation via geometry-aware multi-task learning. arXiv preprint arXiv:2111.03062 , 2021. [27] Garud N Iyengar. Robust dynamic programming. Mathematics of Operations Research , 30(2): 257–280, 2005. [28] Stephen James, Michael Bloesch, and Andrew J Davison. Task-embedded control networks for few-shot imitation learning. In Conference on robot learning , pages 783–795. PMLR, 2018. [29] Scott Jeen, Tom Bewley, and Jonathan M Cullen. Zero-shot reinforcement learning from low quality data. Advances in Neural Information Processing Systems , 37:16894–16942, 2024. [30] Scott Jeen, Tom Bewley, and Jonathan M Cullen. Zero-shot reinforcement learning under partial observability. arXiv preprint arXiv:2506.15446 , 2025. [31] Geon-Hyeong Kim, Seokin Seo, Jongmin Lee, Wonseok Jeon, HyeongJoo Hwang, Hongseok Yang, and Kee-Eung Kim. DemoDICE: Offline imitation learning with supplementary imperfect demonstrations. In International Conference on Learning Representations , 2022. URL https: //openreview.net/forum?id=BrPdX1bDZkQ .[32] Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980 , 2014. [33] Ilya Kostrikov, Ofir Nachum, and Jonathan Tompson. Imitation learning via off-policy dis-tribution matching. In International Conference on Learning Representations , 2020. URL 
+
+https://openreview.net/forum?id=Hyg-JC4FDr .[34] Michael Laskey, Jonathan Lee, Roy Fox, Anca Dragan, and Ken Goldberg. Dart: Noise injection for robust imitation learning. In Sergey Levine, Vincent Vanhoucke, and Ken Goldberg, editors, 
+
+Proceedings of the 1st Annual Conference on Robot Learning , volume 78 of Proceedings of Machine Learning Research , pages 143–156. PMLR, 13–15 Nov 2017. URL https: //proceedings.mlr.press/v78/laskey17a.html .11 [35] Hao Liu and Pieter Abbeel. Aps: Active pretraining with successor features. In International Conference on Machine Learning , pages 6736–6747. PMLR, 2021. [36] Liyuan Mao, Haoran Xu, Weinan Zhang, and Xianyuan Zhan. ODICE: Revealing the mystery of distribution correction estimation via orthogonal-gradient update. In The Twelfth International Conference on Learning Representations , 2024. URL https://openreview.net/forum? id=L8UNn7Llt4 .[37] Arnab Nilim and Laurent El Ghaoui. Robust control of markov decision processes with uncertain transition matrices. Operations Research , 53(5):780–798, 2005. [38] Kishan Panaganti, Zaiyan Xu, Dileep Kalathil, and Mohammad Ghavamzadeh. Robust rein-forcement learning using offline data. Advances in neural information processing systems , 35: 32211–32224, 2022. [39] Kishan Panaganti, Zaiyan Xu, Dileep Kalathil, and Mohammad Ghavamzadeh. Distributionally robust behavioral cloning for robust imitation learning. In 2023 62nd IEEE Conference on Decision and Control (CDC) , pages 1342–1347. IEEE, 2023. [40] Kishan Panaganti, Zaiyan Xu, Dileep Kalathil, and Mohammad Ghavamzadeh. Bridging distributionally robust learning and offline rl: An approach to mitigate distribution shift and partial data coverage. In Necmiye Ozay, Laura Balzano, Dimitra Panagou, and Alessandro Abate, editors, Proceedings of the 7th Annual Learning for Dynamics &amp; Control Conference ,volume 283 of Proceedings of Machine Learning Research , pages 619–634. PMLR, 04–06 Jun 2025. URL https://proceedings.mlr.press/v283/panaganti25a.html .[41] Seohong Park, Tobias Kreiman, and Sergey Levine. Foundation policies with hilbert representa-tions. arXiv preprint arXiv:2402.15567 , 2024. [42] Xue Bin Peng, Marcin Andrychowicz, Wojciech Zaremba, and Pieter Abbeel. Sim-to-real transfer of robotic control with dynamics randomization. In 2018 IEEE international conference on robotics and automation (ICRA) , pages 3803–3810. IEEE, 2018. [43] Matteo Pirotta, Andrea Tirinzoni, Ahmed Touati, Alessandro Lazaric, and Yann Ollivier. Fast imitation via behavior foundation models. In The Twelfth International Conference on Learning Representations , 2024. URL https://openreview.net/forum?id=qnWtw3l0jb .[44] Dean A Pomerleau. Alvinn: An autonomous land vehicle in a neural network. Advances in neural information processing systems , 1:305–313, 1988. [45] Martin L Puterman. Markov decision processes: discrete stochastic dynamic programming .John Wiley & Sons, 2014. [46] Rafael Rafailov, Archit Sharma, Eric Mitchell, Christopher D Manning, Stefano Ermon, and Chelsea Finn. Direct preference optimization: Your language model is secretly a reward model. 
+
+Advances in neural information processing systems , 36:53728–53741, 2023. [47] Stéphane Ross and Drew Bagnell. Efficient reductions for imitation learning. In Proceedings of the thirteenth international conference on artificial intelligence and statistics , pages 661–668. JMLR Workshop and Conference Proceedings, 2010. [48] Stephane Ross, Geoffrey Gordon, and Drew Bagnell. A reduction of imitation learning and structured prediction to no-regret online learning. In Geoffrey Gordon, David Dunson, and Miroslav Dudík, editors, Proceedings of the Fourteenth International Conference on Artificial Intelligence and Statistics , volume 15 of Proceedings of Machine Learning Research , pages 627–635, Fort Lauderdale, FL, USA, 11–13 Apr 2011. PMLR. URL https://proceedings. mlr.press/v15/ross11a.html .[49] Thomas Rupf, Marco Bagatella, Marin Vlastelica, and Andreas Krause. Optimistic task inference for behavior foundation models. arXiv preprint arXiv:2510.20264 , 2025. [50] Tom Schaul, Daniel Horgan, Karol Gregor, and David Silver. Universal value function ap-proximators. In International conference on machine learning , pages 1312–1320. PMLR, 2015. 12 [51] Seokin Seo, Byung-Jun Lee, Jongmin Lee, HyeongJoo Hwang, Hongseok Yang, and Kee-Eung Kim. Mitigating covariate shift in behavioral cloning via robust stationary distribution correction. 
+
+Advances in Neural Information Processing Systems , 37:109177–109201, 2024. [52] Voot Tangkaratt, Nontawat Charoenphakdee, and Masashi Sugiyama. Robust imitation learning from noisy demonstrations. In Arindam Banerjee and Kenji Fukumizu, editors, Proceedings of The 24th International Conference on Artificial Intelligence and Statistics , volume 130 of 
+
+Proceedings of Machine Learning Research , pages 298–306. PMLR, 13–15 Apr 2021. URL 
+
+https://proceedings.mlr.press/v130/tangkaratt21a.html .[53] Yuval Tassa, Yotam Doron, Alistair Muldal, Tom Erez, Yazhe Li, Diego de Las Casas, David Budden, Abbas Abdolmaleki, Josh Merel, Andrew Lefrancq, et al. Deepmind control suite. 
+
+arXiv preprint arXiv:1801.00690 , 2018. [54] Rajesh Tiwari, Shailesh Khapre, and Avantika Singh. Reinforcement learning in robotic systems: A review on sim-to-real transfer. Robotics and Autonomous Systems , page 105327, 2026. [55] Ahmed Touati and Yann Ollivier. Learning one representation to optimize all rewards. Advances in Neural Information Processing Systems , 34:13–23, 2021. [56] Ahmed Touati, Jérémy Rapin, and Yann Ollivier. Does zero-shot reinforcement learning exist? 
+
+arXiv preprint arXiv:2209.14935 , 2022. [57] Ahmed Touati, Jérémy Rapin, and Yann Ollivier. Does zero-shot reinforcement learning exist? In The Eleventh International Conference on Learning Representations , 2023. URL 
+
+https://openreview.net/forum?id=MYEap_OcQI .[58] Shili Wu, Yizhao Jin, Puhua Niu, Aniruddha Datta, and Sean B Andersson. Robust behavior cloning via global lipschitz regularization. arXiv preprint arXiv:2506.19250 , 2025. [59] Yueh-Hua Wu, Nontawat Charoenphakdee, Han Bao, Voot Tangkaratt, and Masashi Sugiyama. Imitation learning from imperfect demonstration. In Kamalika Chaudhuri and Ruslan Salakhutdi-nov, editors, Proceedings of the 36th International Conference on Machine Learning , volume 97 of Proceedings of Machine Learning Research , pages 6818–6827. PMLR, 09–15 Jun 2019. URL https://proceedings.mlr.press/v97/wu19a.html .[60] Denis Yarats, Rob Fergus, Alessandro Lazaric, and Lerrel Pinto. Reinforcement learning with prototypical representations. In International Conference on Machine Learning , pages 11920–11931. PMLR, 2021. [61] Denis Yarats, David Brandfonbrener, Hao Liu, Michael Laskin, Pieter Abbeel, Alessandro Lazaric, and Lerrel Pinto. Don’t change the algorithm, change the data: Exploratory data for offline reinforcement learning. arXiv preprint arXiv:2201.13425 , 2022. [62] Zhuodong Yu, Ling Dai, Shaohang Xu, Siyang Gao, and Chin Pang Ho. Fast bellman updates for wasserstein distributionally robust mdps. Advances in Neural Information Processing Systems ,36:30554–30578, 2023. [63] Kexin Zheng, Lauriane Teyssier, Yinan Zheng, Yu Luo, and Xianyuan Zhan. Breeze: Towards robust zero-shot reinforcement learning. https://github.com/Whiterrrrr/BREEZE , 2026. GitHub repository, accessed May 7, 2026. [64] Allan Zhou, Eric Jang, Daniel Kappler, Alex Herzog, Mohi Khansari, Paul Wohlhart, Yunfei Bai, Mrinal Kalakrishnan, Sergey Levine, and Chelsea Finn. Watch, try, learn: Meta-learning from demonstrations and rewards. In International Conference on Learning Representations ,2020. URL https://openreview.net/forum?id=SJg5J6NtDr .13 Appendices 
+
+A Missing Proofs 16 B Extended Related Work 19 C Experimental Setup 20 
+
+C.1 ExORL Domains . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.1.1 Walker . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.1.2 Quadruped . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.1.3 Cheetah . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.2 ExORL Datasets . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.3 Environment Perturbations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.3.1 Walker . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.3.2 Quadruped . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21 C.3.3 Cheetah . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21 C.4 Evaluation Protocol . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22 C.4.1 Pre-training Evaluation . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 C.4.2 Downstream Task Inference . . . . . . . . . . . . . . . . . . . . . . . . . 23 C.5 Computational Resources . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 
+
+D Implementation Details 23 
+
+D.1 Forward-Backward Representations . . . . . . . . . . . . . . . . . . . . . . . . . 23 D.1.1 Architecture . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 D.1.2 Forward Representation F (s, a, z ) . . . . . . . . . . . . . . . . . . . . . . 23 D.1.3 Backward Representation B(s) . . . . . . . . . . . . . . . . . . . . . . . 23 D.1.4 Actor πz (s) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 D.1.5 Additional Details. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.2 Task Sampling Distribution Z . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.3 Discussion on usage of f -divergence in RBFM-Heavy . . . . . . . . . . . . . . . 24 D.4 BFM-based Hyperparameters . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.4.1 Pretraining . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.4.2 Task-Inference . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 D.5 Single Task Robust Offline IL baselines . . . . . . . . . . . . . . . . . . . . . . . 25 D.5.1 DRBC . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25 D.5.2 BE-DROIL . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25 
+
+E Algorithm 26 F Extended Results 26 
+
+F.1 Further discussion of (Q1) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26 F.2 Q4: Different Sources of Pretraining Data . . . . . . . . . . . . . . . . . . . . . . 29 14 G Discussion and Limitation 30 
+
+15 A Missing Proofs 
+
+Lemma 1. For any policy π and transition kernel T ∈ T (ε′), the following holds: 
+
+DTV (ρπT (s), ρ πT o (s)) ≤ γε ′
+
+1 − γ .
+
+Proof. See Lemma 7 in [39] for details. 
+
+Lemma 3. For any policy π and transition kernel T ∈ T (ρ′), the following holds: 
+
+DTV (ρπT (s, a ), ρ πT o (s, a )) ≤ γε ′
+
+1 − γ .
+
+Proof. We build upon the Lemma 1 that quantifies how uncertainty in the transition model influences the induced occupancy measure on the state-space for a fixed policy. Since ρπT (s, a ) = π(a|s)ρπT (s), it follows that 
+
+DTV (ρπT (s, a ), ρ πT o (s, a )) = 12
+
+X
+
+> s,a
+
+|ρπT (s, a ) − ρπT o (s, a )|
+
+= 12
+
+X
+
+> s,a
+
+π(a|s)|ρπT (s) − ρπT o (s)|
+
+= DTV (ρπT (s), ρ πT o (s)) 
+
+≤ γρ ′
+
+1 − γ .
+
+Lemma 2. For any policy π and transition kernel T ∈ T (ε′), the following holds: 
+
+DTV (ρπT (s, a, s ′), ρ πT o (s, a, s ′)) ≤ ε′
+
+1 − γ .
+
+Proof. We have 
+
+ρπT (s, a, s ′) = ρπT (s, a )Ts,a (s′), ρπT o (s, a, s ′) = ρπT o (s, a )T os,a (s′).
+
+Then, 
+
+∥ρπT (s, a, s ′) − ρπT o (s, a, s ′)∥1
+
+= X
+
+> s,a,s ′
+
+ρπT (s, a )Ts,a (s′) − ρπT o (s, a )T os,a (s′)
+
+≤ X
+
+> s,a,s ′
+
+ρπT (s, a ) Ts,a (s′) − T os,a (s′) + X
+
+> s,a,s ′
+
+|ρπT (s, a ) − ρπT o (s, a )| T os,a (s′).
+
+For the first term, using ∥Ts,a − T os,a ∥1 = 2 DTV (Ts,a , T os,a ) ≤ 2ε′,
+
+X
+
+> s,a,s ′
+
+ρπT (s, a ) Ts,a (s′) − T os,a (s′) = X
+
+> s,a
+
+ρπT (s, a )∥Ts,a − T os,a ∥1 ≤ 2ε′.
+
+For the second term, since P 
+
+> s′
+
+T os,a (s′) = 1 , we have 
+
+X
+
+> s,a,s ′
+
+|ρπT (s, a ) − ρπT o (s, a )| T os,a (s′) = X
+
+> s,a
+
+|ρπT (s, a ) − ρπT o (s, a )|
+
+= ∥ρπT (s, a ) − ρπT o (s, a )∥1.
+
+16 By lemma 3, 
+
+DTV (ρπT (s, a ), ρ πT o (s, a )) ≤ γε ′
+
+1 − γ ,
+
+which implies 
+
+∥ρπT (s, a ) − ρπT o (s, a )∥1 ≤ 2γε ′
+
+1 − γ .
+
+Combining both terms, 
+
+∥ρπT (s, a, s ′) − ρπT o (s, a, s ′)∥1 ≤ 2ε′ + 2γε ′
+
+1 − γ = 2ε′
+
+1 − γ .
+
+Hence, 
+
+DTV 
+
+ ρπT (s, a, s ′), ρ πT o (s, a, s ′) = 12 ∥ρπT (s, a, s ′) − ρπT o (s, a, s ′)∥1 ≤ ε′
+
+1 − γ .
+
+Lemma 4. Let Df be the f-divergence with f (t) = |t − 1|/2 corresponding to the total variation (TV) uncertainty set. Then, 
+
+min     
+
+> Df(P∥Po)≤ρ
+
+EP [l(X)] = − min  
+
+> η∈R
+
+EPo
+
+(η − l(X)) +
+
+ + ρ (η − min  
+
+> x∈X
+
+l(x)) + − η. (17) 
+
+Proof. See Lemma 5 in [38] for details. 
+
+Proposition 1. The solution to the constrained optimization problem in (11) is obtained by solving the following: 
+
+min  
+
+> z
+
+min 
+
+> λ∈R
+
+(
+
+Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max  
+
+> ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
++ λ
+
+)
+
+.
+
+Proof. Let us fix the learner’s task vector z and therefore its policy πz and define the point-wise loss 
+
+ℓz (s) := L(πz (·| s), π D (·| s)) 
+
+Now, let Mz := max s∈S : ρπDT o (s)>0 ℓz (s). Applying the total-variation duality lemma 4 to ℓz with nominal distribution ρπD  
+
+> To
+
+and radius ε gives 
+
+min    
+
+> Q:DTV (Q,ρ πDT o)≤ε
+
+EQ[ℓz (S)] = min 
+
+> λ∈R
+
+n
+
+Es∼ρπDT o
+
+(ℓz (s) − λ)+
+
+ + εl(Mz − λ)+ + λ
+
+o
+
+.
+
+Substituting back the definition of ℓz and the minimization over task vector z gives 
+
+min  
+
+> z
+
+min 
+
+> λ∈R
+
+(
+
+Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max   
+
+> s:ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
++ λ
+
+)
+
+.
+
+Proposition 2. Suppose that the expert and learner policies πD and πz are deterministic and that the action space A is bounded. Let L(πz (·| s), π D (·| s)) = ∥πz (s) − πD (s)∥22 and L := sup (s,a )∼ρπDT o ∥πz (s) − πD (s)∥22. Then the optimization problem in Proposition 1 can be simplified to 
+
+min  
+
+> z
+
+min 
+
+> λ∈[0 ,(1+ εl)L]
+
+(
+
+Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max  
+
+> ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
++ λ
+
+)
+
+.
+
+17 Proof. Let us fix the learner’s task vector z and the corresponding policy πz and define the point-wise loss 
+
+ℓz (s) := L(πz (·| s), π D (·| s)) = ∥πz (s) − πD (s)∥22.
+
+Since the expert and learner policies are deterministic and the action space A is bounded, the loss is bounded on the support of ρπD  
+
+> To
+
+. In particular, 
+
+0 ≤ ℓz (s) ≤ L for all s with ρπD  
+
+> To
+
+(s) > 0.
+
+Now, Proposition 1 provides the following optimization problem: 
+
+min  
+
+> z
+
+min 
+
+> λ∈R
+
+(
+
+Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max   
+
+> s:ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
++ λ
+
+)
+
+.
+
+Next, we define Mz := max s∈S : ρπDT o (s)>0 ℓz (s) and g(λ) as 
+
+g(λ) := Es∼ρπDT o
+
+(ℓz (s) − λ)+
+
+ + εl(Mz − λ)+ + λ. 
+
+If λ < 0, then ℓz (s) − λ > 0 and Mz − λ > 0, so 
+
+g(λ) = Es∼ρπDT o [ℓz (s) − λ] + εl(Mz − λ) + λ, 
+
+which is strictly decreasing in λ because εl > 0. Hence no minimizer lies below 0. If λ ≥ Mz , then 
+
+ℓz (s) − λ ≤ 0 for all s in the support of ρπD  
+
+> To
+
+, and also Mz − λ ≤ 0, so 
+
+g(λ) = λ, 
+
+which is strictly increasing in λ. Hence no minimizer lies above Mz . Therefore every minimizer belongs to [0 , M z ]. Since Mz ≤ L, we may restrict the minimization further to the larger interval 
+
+[0 , (1 + εl)L] without changing the value. Thus, we have 
+
+min  
+
+> z
+
+min 
+
+> λ∈[0 ,(1+ εl)L]
+
+(
+
+λ + Es∼ρπDT o
+
+(L(πz (·| s), π D (·| s)) − λ)+
+
+ + εl max  
+
+> s∈S :ρπDT o(s)>0
+
+L(πz (·| s), π D (·| s)) − λ
+
+!
+
+> +
+
+)
+
+Proposition 3. For τ > 0, the inner maximization in (15) admits the solution 
+
+w⋆Q,τ,π z (s, a, s ′) = max 
+
+
+
+0, (f ′)−1
+
+ cQ,π z (s, a, s ′)
+
+τ
+
+ 
+
+.
+
+For τ = 0 , w⋆Q,τ,π z (s, a, s ′) = + ∞ if cQ,π z (s, a, s ′) > 0 and 0 otherwise. Proof. We first consider the case τ > 0. For fixed (Q, τ ), the optimization over w ≥ 0 in (15) reduces to 
+
+max  
+
+> w≥0
+
+Es,a,s ′∼ρπDT o
+
+ − τ f (w(s, a, s ′)) + w(s, a, s ′) cQ,π (s, a, s ′).
+
+Since the expectation is separable across (s, a, s ′), the maximization decomposes pointwise. For each (s, a, s ′), we solve 
+
+max  
+
+> w≥0
+
+−τ f (w) + cQ,π (s, a, s ′) w. 
+
+Because f is strictly convex, the objective is strictly concave in w, and the problem admits a unique maximizer. Ignoring the constraint w ≥ 0, the first-order optimality condition gives 
+
+−τ f ′(w) + cQ,π (s, a, s ′) = 0 ⇒ w = ( f ′)−1
+
+ cQ,π (s, a, s ′)
+
+τ
+
+
+
+.
+
+Enforcing the constraint w ≥ 0 amounts to projecting this unconstrained solution onto R+, yielding 
+
+w⋆Q,τ,π (s, a, s ′) = max 
+
+
+
+0, (f ′)−1
+
+ cQ,π (s, a, s ′)
+
+τ
+
+ 
+
+.
+
+18 For tuples (s, a, s ′) with ρπD  
+
+> To
+
+(s, a, s ′) = 0 , the corresponding terms do not affect the objective, and 
+
+w can be defined arbitrarily. We now consider the case τ = 0 . The objective reduces to 
+
+Es,a,s ′∼ρπDT o
+
+w(s, a, s ′) cQ,π (s, a, s ′),
+
+which is linear in w. Maximizing over w ≥ 0 yields 
+
+w⋆Q,τ,π (s, a, s ′) = 
+
++∞, if cQ,π (s, a, s ′) > 0,
+
+0, otherwise .
+
+## B Extended Related Work 
+
+Offline Imitation Learning. Behavioral Cloning (BC) [ 44 ] reduces imitation to supervised regression from expert state-action pairs, but its independence from environment dynamics makes it susceptible to compounding errors under covariate shift [ 47 ]. The DICE family of methods [ 33 , 31 , 36 ] addresses this by estimating stationary occupancy ratios between expert and learner distributions, enabling off-policy imitation without explicit policy access. Recent work [ 2 , 4 , 5 ] establishes that offline IL must respect a Markov balance condition coupling the expert policy to the underlying transition dynamics. Our formulation shares this occupancy-based perspective but departs fundamentally: rather than correcting for policy mismatch under fixed dynamics, we introduce importance weights through a robust inner maximization over a transition uncertainty set, explicitly accounting for dynamics shift at test time: a regime where BC, DICE, and Markov-balance methods uniformly fail. 
+
+Robust Reinforcement Learning. Robust RL optimizes worst-case returns over an ambiguity set of transition kernels, typically using rectangular uncertainty sets and minimax dynamic program-ming [ 37 , 27 ]. Subsequent work extends this to distributionally robust formulations under total variation, f -divergence, and Wasserstein metrics [ 20 , 62 , 40 ]. Offline variants estimate worst-case value functions from fixed datasets via nominal-measure reformulations [ 38 ], but continue to require known reward signals, rendering them inapplicable to the imitation setting where only expert demon-strations are available. Our work transplants these robust foundations into the IL regime, constructing a fully offline, reward-free formulation that hedges against transition uncertainty using only nominal expert data. 
+
+Robust Imitation Learning. A substantial body of IL work addresses robustness to demonstra-tion imperfections, suboptimal labels, noisy annotations, or covariate shift: through label denois-ing [ 59 , 52 ], corrective querying [ 48 ], and noise injection [ 34 ], but these assume fixed transition dynamics throughout. Meta-IL and multi-task IL frameworks improve cross-task generalization via shared experience [ 22 , 28 , 64 ] but similarly do not account for dynamics mismatch. Domain randomization [42, 26] perturbs physical parameters during training to improve sim-to-real transfer, but requires a high-fidelity simulator and access to perturbed environments, assumptions that are incompatible with the strictly offline setting we consider. Among methods that explicitly target transi-tion uncertainty, Wu et al. [58] enforce Lipschitz regularization against input perturbations under fixed dynamics, while DRIL-DICE [ 51 ] mitigates covariate shift via f -divergence regularization, also under nominal dynamics. RIME [ 16 ] learns policies robust across families of MDPs but requires online rollouts for robustness estimation. The most closely related single-task methods are DRBC [ 39 ] and BE-DROIL [ 3], which robustify offline IL against transition uncertainty; however, both are single-task methods that require independent per-task optimization, incurring prohibitive computational cost in the multi-task regime where policies for many tasks must be recovered efficiently. 
+
+Behavior Foundation Models. BFMs currently achieve state-of-the-art zero-shot performance in RL by pretraining task-agnostic representations that generalize across both goal-conditioned and dense-reward tasks [ 55 , 57 ]. Conceptually rooted in successor representations [ 19 ], universal value function approximators [ 50 ], successor features [ 10 ], and successor measures [ 11 ], modern BFMs are instantiated as either universal successor features [ 13 , 41 ] or forward-backward (FB) representations [ 55 , 29 , 43 ]. Recent work identifies key failure modes of standard BFMs under distributional shift: Bobrin et al. [12] show that BFMs conflate policies across dynamics regimes and cannot adapt to unobserved dynamics changes, while Jeen et al. [30] demonstrate degradation under partial observability. Both propose architectural remedies: belief encoders and memory-augmented 19 models, respectively, but require pretraining data from multiple dynamics regimes. To the best of our knowledge, this is the first BFM approach that achieves robustness to dynamics variation using only a single nominal offline dataset per environment, with no changes to pretraining and no expert data required under perturbed dynamics. 
+
+## C Experimental Setup 
+
+C.1 ExORL Domains 
+
+We evaluate our methods on three environments from the ExORL benchmark [ 61 ], which is built on top of the DeepMind Control Suite [53]. 
+
+C.1.1 Walker 
+
+This domain features a two-legged agent that must achieve stable locomotion starting from a crouched configuration. The state space is 24 -dimensional and the action space is 6-dimensional, comprising joint positions, velocities, and torques. The benchmark defines four tasks: stand , walk , run , and 
+
+flip . The stand task rewards maintaining an upright torso with extended legs. The walk and run 
+
+tasks extend this objective by encouraging forward motion at different speeds, while flip promotes rotational motion of the torso after achieving a standing posture. All reward signals are dense. 
+
+C.1.2 Quadruped 
+
+This domain involves a four-legged robot navigating within a three-dimensional space. The state and action spaces are 78 - and 12 -dimensional, respectively. We consider four tasks. The quadruped_stand 
+
+task rewards maintaining an upright posture. The quadruped_walk and quadruped_run tasks ad-ditionally encourage forward motion through velocity-based rewards, with quadruped_walk also including a term promoting a minimum center-of-mass height. Finally, quadruped_jump rewards achieving sufficient vertical displacement. Rewards are dense across all tasks. 
+
+C.1.3 Cheetah 
+
+This domain features a planar biped designed for high-speed locomotion. The state is represented by a 17 −dimensional vector capturing joint positions and velocities, while actions are 6−dimensional. We evaluate four tasks. In cheetah_walk and cheetah_run , rewards scale with forward velocity up to target speeds of approximately 2 m/s and 10 m/s, respectively. The tasks walker_walk_backward and 
+
+walker_run_backward instead incentivize achieving specified backward velocities. 
+
+C.2 ExORL Datasets 
+
+Training is performed using 1M transitions (unless otherwise mentioned) sampled uniformly from datasets generated by different unsupervised exploration strategies within ExORL. Specifically, we use data collected by RND [15], APS [35], and PROTO [60]. 
+
+C.3 Environment Perturbations 
+
+We evaluate robustness across three environments: Walker, Quadruped, and Cheetah, each subject to three perturbation types chosen to span distinct physical failure modes. All perturbations are applied at evaluation time only; the BFM pretraining is performed exclusively under nominal dynamics. For each environment, we describe the perturbation mechanism, the parameter modified in the MuJoCo physics model, and the rationale for the chosen sweep range. 
+
+C.3.1 Walker 
+
+The Walker is a planar bipedal robot with six actuated joints (hip, knee, ankle × 2 legs) and four tasks: stand, walk, run, and flip. 
+
+Gravity (+0% to +35% of nominal -9.81 m/s²). We scale the vertical component of gravitational acceleration from its nominal value up to a 35 increase in effective gravitational load. This directly increases the ground reaction forces the robot must overcome to maintain posture and generate 20 forward momentum, stressing both the stance and swing phases of the gait cycle. The range is selected to produce monotonic degradation across all four tasks without inducing physics instability; the flip task is most sensitive due to its requirement for sustained aerial rotation against gravity. 
+
+Body Mass (+0% to +100% of nominal). We uniformly scale all non-world body masses: torso, thighs, shins, and feet, by up to 100% of their nominal values. Increased inertia raises the torque demand at every joint during acceleration and deceleration phases, directly stressing the actuator budget. At +100%, the total robot mass doubles, placing the system well outside the inertial regime experienced during expert demonstration. 
+
+Joint Friction Loss (0 to 30 Nm per joint). We add a constant passive resistive torque opposing motion at all six limb joints, drawn from the MuJoCo dof_frictionloss parameter (nominal: 0 Nm). Unlike viscous damping, which scales with joint velocity, frictionloss imposes a fixed load regardless of motion speed, effectively raising the torque threshold that must be exceeded before any useful joint motion occurs. At 30 Nm per joint, the six limb joints collectively impose 180 Nm of passive resistance, making fast locomotion tasks (run, flip) substantially more costly while moderately degrading slower tasks (walk, stand). 
+
+C.3.2 Quadruped 
+
+The Quadruped is a three-dimensional four-legged robot with twelve actuated joints (yaw, lift, extend 
+
+× 4 legs) and four tasks: stand, walk, run, and jump. 
+
+Tilted Gravity (0 to 7.5 m/s² lateral component). We introduce a lateral gravitational component along the x-axis of the global frame while keeping the vertical component fixed at -9.81 m/s², producing an effective gravity vector tilted up to 37.4° from vertical. This creates a persistent lateral torque on the torso that the policy must continuously counteract to maintain uprightness, directly penalizing the upright reward component (r=r_ upright × r_ move ) that governs all four tasks. The range [0 , 7.5] m/s² is chosen as the stable regime; values above ≈ 8 m/s² induce numerical instability ( mjWARN_BADQACC ) in a subset of episodes due to the robot falling and entering degenerate contact configurations. Stand and walk are affected through postural destabilization; run and jump additionally suffer degraded forward propulsion as lateral compensation diverts actuator effort. 
+
+Ground Contact Stiffness (solref timeconst: 0.01 to 0.25 s). We increase the MuJoCo geom_solref 
+
+timeconst of the floor geometry from its nominal value of 0.01 s to 0.25 s. The timeconst parame-ter controls the rise time of contact constraint forces: larger values produce slower, softer contact responses, effectively making the ground more compliant and energy-absorbing, analogous to transi-tioning from rigid pavement to soft terrain such as mud or foam. The quadruped’s gait relies on brief, stiff ground contacts to deliver sharp propulsive impulses; increased compliance reduces the effective push-off force per step, degrading locomotion efficiency across all tasks with a stronger effect on dynamic tasks (run, jump) than static ones (stand). 
+
+Actuator Control Range (command bound: ±1.0 to ±0.3). We clip the control signal sent to all twelve actuators symmetrically to [−v, v ] where v decreases from the nominal 1.0 to 0.4. This is mechanistically distinct from gear ratio scaling: the actuator hardware remains at full torque capacity, but the command channel is truncated so that the policy cannot request torques in the upper 
+
+[v, 1] portion of its action space regardless of what the network outputs. At v = 0 .3v, the effective command range is reduced to 30% of nominal, which for the quadruped’s gear-1 actuators directly caps the maximum controllable torque at 30% of the physical limit. This models command saturation or control signal degradation in the communication channel between the policy and the actuators. 
+
+C.3.3 Cheetah 
+
+The Cheetah is a planar six-joint runner (bthigh, bshin, bfoot, fthigh, fshin, ffoot) with nominal gear ra-tios of 120 /90 /60 /90 /60 /30 Nm/unit and four tasks: run, run_backward, walk, and walk_backward. 
+
+Actuator Strength (0% to −30% gear ratio reduction). We scale all six actuator gear ratios down from their nominal values by up to 30% , reducing the maximum joint torque to 70% of nominal. The gear ratios are large ( 120 Nm/unit for bthigh), so even a 30% reduction represents a substantial absolute torque loss of up to 36 Nm on the primary propulsive joint. The range is deliberately conservative: exploratory testing revealed a sharp performance cliff at −40% reduction where the actuators become insufficient to sustain any meaningful locomotion, making deeper perturbations uninformative for 21 Hyperparameter Value                          
+
+> Latent dimension d50
+> F/ψdimensions (1024, 1024)
+> B/φdimensions (256, 256, 256) Preprocessor dimensions (1024, 1024) Std. deviation for policy smoothing σ0.2 Truncation level for policy smoothing 0.3 Learning steps 1,000,000 Batch size 512 Optimizer Adam [32] Learning rate 0.0001 Discount γ0.98 (0.99 for maze) Activations (unless otherwise stated) ReLU Target network Polyak smoothing coefficient 0.01
+> z-inference labels 10,000
+> zmixing ratio 0.5
+
+Table 2: Hyperparameters for BFM methods.         
+
+> Hyperparameter Value
+> Optimization steps 3,000
+> Batch size 512
+> Learning rate 0.001
+> Optimizer Adam [32] Loss MSE Policy smoothing std. deviation σ0.1
+
+Table 3: Hyperparameters for FB-IL. robustness comparison. The [0% , 30%] range corresponds to the gradual degradation regime where policy quality rather than physical feasibility determines performance. 
+
+Joint Friction Loss (0 to 25 Nm per joint). We add a constant passive resistive torque opposing motion at all six actuated joints via the dof_frictionloss parameter (nominal: 0 Nm). Unlike viscous damping, which scales with joint velocity, frictionloss imposes a fixed load regardless of motion speed, effectively raising the torque threshold that must be exceeded before any useful joint motion occurs. At 25 Nm per joint, the six joints collectively impose 150 Nm of passive resistance per control cycle, substantial relative to the lighter actuators (ffoot: 30 Nm/unit nominal gear). The effect is particularly pronounced on the Cheetah due to the high-frequency nature of its gait: fast locomotion tasks (run, run_backward) require rapid joint reversals on every stride, paying the frictionloss penalty twice per cycle (opposing both flexion and extension). The range [0 , 25] Nm is chosen to span the regime from negligible degradation to near-collapse of high-speed locomotion while preserving meaningful signal across all four tasks. 
+
+Range of Motion (100% to 60% of nominal joint range retained). We shrink the mechanical range of motion of all six limb joints symmetrically around their center positions, reducing the allowed angular excursion to a specified fraction of the nominal range. For example, the bfoot joint with nominal range [−4.01 , 0.87] rad is restricted to [−2.52 , 0.37] rad at 60% retention. This models physical range restriction arising from joint damage, swelling, or mechanical interference. The Cheetah’s fast gait requires large angular excursions, particularly at bfoot and fshin, to generate the leg sweeping motion that drives forward velocity; restricting these excursions forces the policy into a kinematically constrained regime that was not present during expert demonstration. The range 
+
+[100% , 60%] is chosen to avoid the sharp feasibility cliff below 60% where joint constraints render normal locomotion physically impossible for all methods. 
+
+C.4 Evaluation Protocol 
+
+Our pipeline consists of two stages: (i) pre-training of the BFM and (ii) downstream task inference. 22 Hyperparameter Value            
+
+> Robustness parameter εl0.8
+> Optimization steps 5,000
+> Batch size 512
+> Learning rate 0.0005
+> Optimizer Adam [32] Policy smoothing std. deviation σ0.1
+> (Task Vector :Dual Update) Frequencies 1 : 1
+
+Table 4: Hyperparameters for RBFM-Light. 
+
+C.4.1 Pre-training Evaluation 
+
+Following [ 29 ], during BFM pre-training, we assess performance by measuring the cumulative reward (score) achieved on each task. Training is run for 10 6 steps, and evaluation is performed every 20 , 000 steps. At each evaluation point, we execute 10 rollouts per task and compute the interquartile mean (IQM) of the resulting scores to obtain a robust estimate of performance. We select the checkpoint corresponding to the highest IQM aggregated across all tasks. This checkpoint is used for all subsequent downstream experiments. 
+
+C.4.2 Downstream Task Inference 
+
+Using the selected pre-trained checkpoint, we train policies for downstream imitation learning tasks across 5 random seeds. Performance is reported in terms of cumulative return, averaged across 100 
+
+episodes for a given seed. Final results are presented with 95% confidence intervals computed across seeds. 
+
+C.5 Computational Resources 
+
+All experiments were conducted on a single NVIDIA Quadro P 5000 GPU with 16 GB memory. Pretraining of BFM took approximately 14 hours for 1M steps. 
+
+## D Implementation Details 
+
+D.1 Forward-Backward Representations D.1.1 Architecture 
+
+Our implementation of the forward-backward framework is based on the design introduced by [ 29 ], with specific hyperparameter choices summarized in Table 2. 
+
+D.1.2 Forward Representation F (s, a, z )
+
+The forward network operates on preprocessed inputs. In particular, the state-action pair (s, a ) and the state-task pair (s, z ) are each passed through separate MLPs, which project them into a shared embedding space of dimension 512 . These two embeddings are then concatenated and fed into an additional MLP, which outputs a embedding vector of dimension d.
+
+D.1.3 Backward Representation B(s)
+
+The backward network is implemented as an MLP that takes the state s as input and produces a 
+
+d-dimensional embedding vector. 
+
+D.1.4 Actor πz (s)
+
+The policy network adopts a similar design to the forward model. The inputs (s, a ) and (s, z ) are first encoded independently using separate MLPs into 512 -dimensional embeddings. These embeddings are concatenated and passed through a final MLP that generates an action vector of dimension a,corresponding to the action space. A Tanh activation is applied at the output layer to ensure bounded 23 actions. During training, Gaussian noise with standard deviation σ is injected into the actions for smoothing, following [23]. 
+
+D.1.5 Additional Details. 
+
+To improve training stability, layer normalization [ 9 ] is applied, and Tanh activations are used in the first layer of each MLP. 
+
+D.2 Task Sampling Distribution Z
+
+FB representations require a strategy for generating the task vector z during training. Following [ 56 ], we adopt a combination of two sampling procedures. First, z is drawn uniformly from the surface of a hypersphere with radius √d in Rd. Second, z is obtained by encoding states s ∼ D through the backward model, i.e., z = B(s). Due to the ℓ2 normalization applied in the backward network, these vectors also lie on the hypersphere, although their distribution is not uniform. At each training step, we sample z using these two approaches with equal probability. 
+
+D.3 Discussion on usage of f -divergence in RBFM-Heavy 
+
+Lemma 2 provides a total variation (TV) bound on the mismatch between occupancy measures under nominal and perturbed dynamics. We extend this to general f -divergences by restricting to generators bounded by the TV generator. 
+
+Lemma 5. Let f : [0 , ∞) → R satisfy f (1) = 0 and f (t) ≤ αf TV (t) for all t ≥ 0, where 
+
+fTV (t) = 12 |t − 1|. Then, for any policy π and T ∈ T (ε′),
+
+Df
+
+ ρπT ∥ ρπTo
+
+ ≤ αD TV 
+
+ ρπT , ρ πTo
+
+ ≤ α ε′
+
+1 − γ . (18) 
+
+Proof. See Lemma 2 in [3] for details. Our formulation further requires f to be differentiable with invertible f ′. Since fTV is non-differentiable at t = 1 , we use the smooth SoftTV generator: 
+
+fSoftTV (x) = 12 log  cosh( x − 1) , (f ′
+
+> SoftTV
+
+)−1(y) = tanh −1(2 y) + 1 . (19) As fSoftTV (x) ≤ fTV (x) for all x, setting α = 1 yields 
+
+DfSoftTV 
+
+ ρπT ∥ ρπTo
+
+ ≤ ε′
+
+1 − γ . (20) We use SoftTV in practice, though any generator satisfying the conditions in Lemma 5 is admissible. 
+
+D.4 BFM-based Hyperparameters D.4.1 Pretraining 
+
+We use the publicly available code at [ 63 ] for BFM and RBFM-based approaches. The hyperpa-rameters used for pretraining BFM model are provided in Table 2. Since, FB-IL, RBFM-Light, and RBFM-Heavy share the same pretrained BFM, these hyperparameters are common to all these approaches. 
+
+D.4.2 Task-Inference FB-IL. The hyperparameters used for inferring task vector in FB-IL are provided in Table 3. 
+
+RBFM-Light. The hyperparameters used for inferring task vector in RBFM-Light are provided in Table 4. 24 Hyperparameter Value 
+
+Robustness parameter ε 0.8 Optimization steps 5,000 
+
+Batch size 512 
+
+γ 0.99 
+
+Learning rate 0.0003 
+
+Optimizer Adam [32] Policy smoothing std. deviation σ 0.1
+
+Q-network architecture MLP 
+
+Q-network hidden dimension 64 
+
+Q-network hidden layers 2
+
+Q-network activation ReLU (Task Vector : Dual Update) Frequencies 1 : 1 
+
+Dual variables learning rate 0.0003 
+
+Table 5: Hyperparameters for RBFM-Heavy.                                        
+
+> Environment Robustness param εlPolicy layers Activation Max steps Learning rate LR decay Decay rate Decay freq.
+> Cheetah 0.3 (256, 256) Tanh 2M 1×10 −5True 0.9 10k Walker 0.5 (256, 256) Tanh 2M 1×10 −4True 0.95 10k Quadruped 0.6 (256, 256) Tanh 2M 1×10 −4True 0.9 10k
+
+Table 6: Hyperparameter configuration for DRBC 
+
+RBFM-Heavy. Q-network architecture. The Q-function in RBFM-Heavy is parameterized as a two-layer MLP with hidden dimension 64 and ReLU activations, operating on the frozen forward model features ¯F (s, a, z w) evaluated at a fixed warm-start task embedding zw. Specifically, given the pretrained forward model F , we compute ¯F (s, a, z w) ∈ Rd and pass it through the MLP to produce a scalar Q-value estimate. Critically, a key motivation for building on BFMs is their ability to infer task-specific policies within minutes; using a large Q−network over raw observations and actions would render inference computationally prohibitive, defeating this purpose entirely. By operating on the pretrained FB model instead, the Q-network remains lightweight while still leveraging the rich representational structure already encoded during pretraining. The hyperparameters used for task vector inference in RBFM-Heavy are provided in Table 5. 
+
+D.5 Single Task Robust Offline IL baselines 
+
+We compare against the following Robust Offline IL baselines in our experiments. 
+
+D.5.1 DRBC 
+
+We implement DRBC [ 39 ] in PyTorch using a policy network with two hidden layers of 256 units each and Tanh activations. Models are trained for 2 × 10 6 gradient steps with a batch size of 256, optimized using Adam. The learning rate follows the schedule in [ 39 ], with an initial value of 
+
+1 × 10 −4 for all environments except HalfCheetah, where 1 × 10 −5 is used. The learning rate is decayed exponentially every 10000 steps with a factor between 0.9 and 0.95. The robustness parameter εl is set to {0.2, 0.3, 0.5, 0.6} for Cheetah, Walker, and Quadruped, respectively (see Table 6). 
+
+D.5.2 BE-DROIL 
+
+BE-DROIL [ 3] method is also implemented in PyTorch. The policy is modeled as a TanhGaussian network with two fully connected layers of 256 units, producing a Gaussian distribution whose outputs are squashed via a Tanh transformation to respect action bounds. Both the policy and Q-function are trained using Adam with a learning rate of 5 × 10 −5 and a batch size of 512. The Q-function is parameterized as a two-layer MLP with 256 hidden units and ReLU activations, and we use a discount factor of γ = 0 .99 . The policy objective minimizes the mean squared error between actions sampled from the learned policy and those from the expert i.e. Lπ (s) = MSE( a, a D ), a ∼
+
+π(· | s), a D ∼ πD (· | s), where π and πD denote the learned and expert policies, respectively. 25 Component Architecture Hidden units Activation Batch size Learning rate Steps γ Update ratio (policy : Q, τ )                      
+
+> Policy πTanhGaussian MLP (256, 256) ReLU 512 5×10 −51M 0.99 1:1 Q-function QMLP (256, 256) ReLU 512 5×10 −51M 0.99 1:1
+
+Table 7: Hyperparameter configuration for BE-DROIL. Training is performed for 10 6 gradient steps, alternating between a policy update and a joint update of the Q-function and τ network. See Table 7 for additional details. 
+
+## E Algorithm 
+
+Pseudo-code for pre-training of BFM is provided in Algorithm 1. This mimics the Algorithm 1 of [ 29 ], with conservative part removed. Pseudo-code to extract the task vector for our RBFM-Light method is provided in Algorithm 2. Finally, Algorithm 3 provides the pseudo-code for our RBFM-Heavy algorithm. 
+
+Algorithm 1 Unsupervised Pre-training of Forward-Backward Representations 
+
+Require: Exploratory Dataset D of trajectories  
+
+> 1:
+
+Initialize FθF , BθB , and policy πz 
+
+> 2:
+
+Set number of steps N , z-distribution Z, Polyak factor ν, batch size b 
+
+> 3:
+
+for n = 1 to N do  
+
+> 4:
+
+Sample mini-batch {(si, a i, s i+1 )}bi=1 ∼ D  
+
+> 5:
+
+Sample {zi}bi=1 ∼ Z  
+
+> 6:
+
+// FB Update  
+
+> 7:
+
+Sample ai+1 ∼ π(si+1 , z i) 
+
+> 8:
+
+Update F, B using {(si, a i, s i+1 , a i+1 , z i)} using Eq. 6)  
+
+> 9:
+
+// Actor Update  
+
+> 10:
+
+Sample ai ∼ π(si, z i) 
+
+> 11:
+
+Update actor to maximize Eq. (7), i.e., 
+
+EF (si, a i, z i)⊤zi
+
+ 
+
+> 12:
+
+// Target network updates (Polyak averaging)  
+
+> 13:
+
+θ− 
+
+> F
+
+← (1 − ν)θ− 
+
+> F
+
++ νθ F 
+
+> 14:
+
+θ− 
+
+> B
+
+← (1 − ν)θ− 
+
+> B
+
++ νθ B 
+
+> 15:
+
+end for 
+
+## F Extended Results 
+
+F.1 Further discussion of (Q1) Walker. On the walker, Figure 6 shows that the robustness advantage of RBFM variants over FB-IL is most pronounced under gravity and body mass perturbations, with the performance gap reaching its maximum on the flip task, a dynamically demanding task requiring full-body coordinated rotation where perturbation-induced transition distribution shifts are largest in magnitude. Under joint friction loss, all three methods degrade monotonically with increasing resistive torque, but RBFM-Heavy maintains the highest return throughout the sweep, with RBFM-Light consistently intermediate. Notably, FB-IL exhibits the highest variance at severe perturbation levels, indicating that its inferred z becomes behaviorally unstable when the transition dynamics deviate significantly from the nominal expert distribution. The walker results most cleanly validate the core hypothesis: DRO-based task inference produces embeddings that remain behaviorally viable under transition distributions overlapping with the worst-case support identified during inference, whereas the FB-IL embedding is brittle outside the nominal support. 
+
+Quadruped. The quadruped presents a more challenging robustness benchmark due to its redundant four-leg morphology, which enables passive mechanical compensation for many single-parameter perturbations. Despite this, Figure 2 shows that under tilted gravity, which introduces a persistent 26 Algorithm 2 RBFM-Light 
+
+Require: Expert dataset De = {(sj , a j )}Nj=1 , uncertainty radius ϵl 
+
+> 1:
+
+Warm-start z ← zw as defined in Implementation details in Section 4  
+
+> 2:
+
+for iteration k = 1 , . . . , K do  
+
+> 3:
+
+Sample mini-batch {(si, a i)}bi=1 ∼ D e 
+
+> 4:
+
+//RBFM-Light objective 
+
+L := max  
+
+> i∈[b]
+
+L(πz (· | si), a i),
+
+LRBFM-Light (z) = min 
+
+> λ∈[0 ,(1+ ϵl)L]
+
+"
+
+1
+
+b
+
+> b
+
+X
+
+> i=1
+
+ L(πz (· | si), a i) − λ
+
+> +
+
++ ϵl
+
+  max  
+
+> i∈[b]
+
+L(πz (· | si), a i) − λ 
+
+> +
+
++ λ
+
+#
+
+. 
+
+> 5:
+
+// Dual update  
+
+> 6:
+
+λ ← arg min λ∈[0 ,(1+ ϵl)L] LRBFM-Light (z, λ ) 
+
+> 7:
+
+// Policy update  
+
+> 8:
+
+z ← arg min z LRBFM-Light (z, λ ) 
+
+> 9:
+
+end for  
+
+> 10:
+
+return z
+
+Algorithm 3 RBFM-Heavy 
+
+Require: Expert Dataset De = {(sj , a j , s ′ 
+
+> j
+
+, a ′ 
+
+> j
+
+)}Nj=1 , initial state distribution μ, discount γ, robust-ness parameters ε 
+
+> 1:
+
+Initialize Qθ , scalar τ ≥ 0, and warm-start z ← zw as defined in Implementation details in Section 4  
+
+> 2:
+
+for iteration k = 1 , . . . , K do  
+
+> 3:
+
+Sample mini-batch {(si, a i, s ′
+
+> i
+
+, a ′
+
+> i
+
+)}bi=1 ∼ D e 
+
+> 4:
+
+Sample {(s(i)0 , a (i)0 )}bi=1 ∼ D e (See Implementation details in Experiments section 4)  
+
+> 5:
+
+// Step 1: Compute optimal density ratio w⋆ 
+
+> 6:
+
+Compute {cQ,π z (si, a i, s ′
+
+> i
+
+)}bi=1 as defined in Eq. 15  
+
+> 7:
+
+Compute {w⋆Q,τ,π z (s, a, s ′)}bi=1 via closed-form in Proposition 3  
+
+> 8:
+
+// Step 2: Update critic (Q, τ ) 
+
+> 9:
+
+Estimate gradient of: 
+
+Lθ,τ = (1 − γ)
+
+b
+
+> b
+
+X
+
+> i=1
+
+Qθ (si
+
+> 0
+
+, a i
+
+> 0
+
+) + ϵτ 
+
+− εb
+
+" bX
+
+> i=1
+
+ f (w⋆Qθ ,τ,π z (si, a i, s ′
+
+> i
+
+) + w⋆Qθ ,τ,π z (si, a i, s ′
+
+> i
+
+)cQθ ,π z (si, a i, s ′
+
+> i
+
+)# 
+
+> 10:
+
+Update θ ← θ − ηQ∇θ LQθ ,τ  
+
+> 11:
+
+Update τ ← max(0 , τ − ητ ∇τ LQθ ,τ ) 
+
+> 12:
+
+// Step 3: Policy update (actor)  
+
+> 13:
+
+Estimate: 
+
+Lπz =
+
+> b
+
+X
+
+> i=1
+
+w⋆Qθ ,τ,π z (si, a i, s ′
+
+> i
+
+)Lπz (si)
+
+b 
+
+> 14:
+
+Update z ← z − ηπ ∇z Lπz 
+
+> 15:
+
+end for  
+
+> 16:
+
+return (Qθ , τ, z )
+
+27 Gravity Mass Joint Friction Loss   
+
+> Run Walk Flip Stand
+> RBFM-Heavy FB-IL RBFM-Light
+
+Figure 6: Walker performance with 95% confidence interval across four tasks (rows) and three perturbation types (columns): gravity and body mass increase the physical load on the robot (% change from nominal); joint friction loss adds passive resistive torque at each joint, simulating mechanical wear (absolute Nm per joint). Pretrained on RND data. lateral torque component that directly penalizes the upright reward term and ground contact stiffness, which degrades push-off efficiency by softening contact impulse delivery; RBFM-Heavy maintains the highest return across all four tasks, followed by RBFM-Light, with FB-IL degrading most steeply. The advantage is most pronounced on dynamic tasks (run, jump) where perturbation-induced distributional shifts are larger, and relatively attenuated on static tasks (stand, walk) where the quadruped’s passive stability partially compensates for dynamics mismatch. Under actuator ctrlrange clipping, the performance advantage of RBFM-Heavy is most visible at intermediate perturbation levels; beyond a critical clipping threshold all methods collapse, suggesting that DRO-based robustness operates within the recoverable dynamics regime but cannot compensate for command truncation that renders the task fundamentally infeasible under any task embedding. 
+
+Cheetah. On the cheetah, Figure 7 shows that the three-way performance separation is most sharply differentiated across all four tasks and all three perturbation types. Under joint friction loss — which imposes a fixed passive resistive torque at every joint on every control cycle, compounding across the six actuated degrees of freedom, FB-IL collapses to near-zero return at moderate perturbation levels while RBFM-Heavy maintains substantial locomotion performance, with RBFM-Light intermediate. Under actuator strength reduction, the performance separation is consistent from the first perturbation level, indicating that even marginal reductions in gear ratio expose the brittleness of the FB-IL task 28 Range of Motion Actuator Strength Joint Friction Loss   
+
+> Run Run Backward Walk Walk Backward
+> RBFM-Heavy FB-IL RBFM-Light
+
+Figure 7: Cheetah performance with 95% confidence interval across four tasks (rows) and three perturbation types (columns): range of motion restricts how far each joint can move, simulating mechanical damage (% of nominal retained); actuator strength reduces peak joint torque, simulating motor degradation (% reduction); joint friction loss adds passive resistive torque at each joint, simulating mechanical wear (absolute Nm per joint). Pretrained on RND data. embedding. Under range of motion restriction, the only kinematic perturbation across all experiments, constraining the feasible configuration space rather than the force generation or dissipation properties, RBFM-Heavy maintains the highest return throughout, while FB-IL exhibits notably higher variance, suggesting greater sensitivity to the hard feasibility constraints imposed by reduced joint limits. The consistently sharp three-way separation on the cheetah, relative to the walker and quadruped, likely reflects the high sensitivity of fast asymmetric locomotion to dynamics mismatch: the cheetah’s gait involves large joint excursions and brief ground contact phases, concentrating the nominal transition distribution in a narrow dynamical regime that is more susceptible to perturbation-induced shifts falling outside the expert support. 
+
+F.2 Q4: Different Sources of Pretraining Data 
+
+Figures 8 and 9 compares the performance of RBFM-Heavy and RBFM-Light against FB-IL when pretrained on Walker-APS and Walker-Proto dataset respectively. We observe similar trend as that when Walker-RND was used for pre-training. We observe RBFM-Heavy to have the strongest robust performance, followed by RBFM-Light, and finally FB-IL. 29 Gravity Mass Joint Friction Loss   
+
+> Run Walk Flip Stand
+> RBFM-Heavy FB-IL RBFM-Light
+
+Figure 8: Walker performance with 95% confidence interval across four tasks (rows) and three perturbation types (columns): gravity and body mass increase the physical load on the robot (% change from nominal); joint friction loss adds passive resistive torque at each joint, simulating mechanical wear (absolute Nm per joint). Pretrained on APS data. 
+
+## G Discussion and Limitation 
+
+While answering (Q4) in Section 4, we observed that when the pretraining dataset is insufficient, performance becomes highly unpredictable as perturbations increase. This suggests that our approach relies on sufficiently rich exploratory data to learn well-structured FB representations, which are then used to derive robust policies for downstream tasks within a given environment. Figure 10 illustrates the IQM metric during pretraining for the Walker domain, comparing models trained on a 100 k RND dataset versus a 500 k dataset. We observe that with only 100 k samples, the FB representations fail to learn effectively. Consequently, the IQM scores on representative tasks such as run, stand, flip, and walk are significantly lower than those achieved with the 500 k dataset. This confirms that the failure of our approach stems from insufficient pretraining, which adversely impacts task inference and, hence, the policy. 30 Gravity Mass Joint Friction Loss   
+
+> Run Walk Flip Stand
+> RBFM-Heavy FB-IL RBFM-Light
+
+Figure 9: Walker performance with 95% confidence interval across four tasks (rows) and three perturbation types (columns): gravity and body mass increase the physical load on the robot (% change from nominal); joint friction loss adds passive resistive torque at each joint, simulating mechanical wear (absolute Nm per joint). Pretrained on PROTO data. 31 (a) Run (b) Flip  
+
+> (c) Walk (d) Stand
+
+Figure 10: Comparison of pretraining of Walker on 100 k RND dataset vs 500 k RND dataset, where the models are evaluated every 20 , 000 timesteps where we perform 10 rollouts and record the IQM. 32

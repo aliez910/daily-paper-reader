@@ -1,0 +1,409 @@
+Title: RoHIL: Robust Human-in-the-Loop Robotic Reinforcement Learning Against Illumination Variations
+
+URL Source: https://arxiv.org/pdf/2605.19924v1
+
+Published Time: Wed, 20 May 2026 01:40:52 GMT
+
+Number of Pages: 21
+
+Markdown Content:
+# RoHIL: Robust Human-in-the-Loop Robotic Reinforcement Learning Against Illumination Variations 
+
+Shuoqin Zhang 1,2 Yixin Xiong 1 Xiru Gao 1 Kai Liu 1
+
+Ke Wang 1 Xichuan Zhou 1,† Zhe Hu 1,2,†
+
+> 1
+
+Chongqing University 2Chengdu Anu Intelligence 
+
+> †
+
+Corresponding Author 
+
+Abstract 
+
+Human-in-the-loop reinforcement learning systems achieve near-perfect success on the work-station where they are trained, but collapse when the same robot is moved to a workstation a few meters away due to shifts in the visual input distribution caused by new lamp positions and win-dow light. Re-collecting demonstrations and re-running HIL on every workstation is incompatible with deployment, and naively fine-tuning on shifted-light data triggers catastrophic forgetting of the source workstation. To close this cross-domain gap, we present RoHIL, an offline fine-tuning framework that uses no extra real-robot interaction. RoHIL combines (i) a world-model-based image relighter that re-synthesises the visual stream of source-workstation trajectories under multiple virtual HDRI environments, leaving actions and rewards real; (ii) Illumination-Retention Replay (IRR ), a data-level anti-forgetting mechanism that interleaves relit adaptation transitions with original-light retention transitions to preserve source-workstation Bellman coverage; and (iii) an anchored Bellman–actor regulariser that constrains representation and policy drift from the original source-workstation policy. Across four real-robot manipulation tasks under significant cross-workstation illumination variations, RoHIL substantially improves shifted-light performance where standard HIL-RL collapses, while preserving source-workstation performance, eliminating the need to re-collect data and retrain for every new workstation and environment. Project page: 
+
+https://anonymous4365.github.io/RoHIL/ .
+
+# 1 Introduction 
+
+Human-in-the-loop reinforcement learning (HIL-RL), exemplified by HIL-SERL (Luo et al., 2025), has rapidly become the de facto recipe for sample-efficient real-world robotic manipulation: afew hundred human demonstrations seed a SAC (Haarnoja et al., 2018; Ball et al., 2023) learner, an operator intervenes to correct failure modes, and within a few hours of online interaction the policy reaches near-perfect success on contact-rich tasks. However, existing HIL-RL methods still degrade severely under illumination variation between training and deployment, and the most common remedies (pixel jitter, demo re-collection, naive fine-tuning) either fail to reproduce real light transport or destroy the source-workstation policy. 
+
+The hidden ceiling of HIL-RL: lack of robustness under domain shift. HIL-RL trains a policy within a closed source visual domain, but deployment exposes the same policy to many target domains induced by changes in lamp placement, daylight direction, shadows, and specular highlights. Since these illumination domains are not known in advance, a naive deployment recipe must treat each workstation as a new training problem: collect new demonstrations and run a new  
+
+> Preprint. 1
+> arXiv:2605.19924v1 [cs.RO] 19 May 2026
+
+Figure 1: RoHIL overview. Starting from an online best policy that degrades under lighting shifts, RoHIL uses (a) world-model relighting to synthesise illumination-diverse transitions, (b) offline robust fine-tuning with LActor =LSAC +Lmse and LCritic =LBellman +Lfeat , and (c) IRR replay buffers for retention. The resulting policy preserves original-light performance while improving changed-light robustness across four real-robot tasks. HIL session. The human-interaction cost therefore scales as O(N ) in the number of workstations. Our goal is to make this cost O(1) : train once on a source workstation, then adapt the resulting policy offline to unseen illumination domains without additional robot interaction. RoHIL realizes this goal by relighting the source trajectories and fine-tuning with retention and anchoring, allowing a single HIL run to be amortized across deployment-time lighting environments. 
+
+Why is this hard? Cross-workstation lighting shift is difficult because the natural remedies are either insufficient or incompatible with deployment. Simple pixel-level augmentation can perturb image appearance, but it does not capture the structured illumination changes that arise from different lamps, daylight directions, shadows, and specular highlights. Collecting new demonstrations and re-running HIL on each workstation would capture these effects, but it restores the O(N )
+
+deployment cost that we aim to avoid. Offline fine-tuning offers a scalable alternative, but naively adapting the source-workstation policy to shifted-light data can overwrite the representation and policy that solved the original workstation, causing catastrophic forgetting. These failures leave three problems that must be solved: (i) obtaining realistic illumination variation without new robot interaction; (ii) using this variation to adapt the policy to shifted lighting domains; (iii) preserving the source-workstation policy during adaptation. RoHIL addresses these problems with world-model relighting, Illumination-Retention Replay, and an anchored Bellman–actor regulariser. 
+
+Our approach. We propose RoHIL, an offline fine-tuning framework that adapts a source-workstation HIL-SERL policy to illumination shifts without new robot interaction. RoHIL relights recorded trajectories to expose the policy to new lighting, uses IRR as a data-level retention mechanism during replay, and anchors the Bellman and actor updates to a frozen source policy. 2Together, these components enable robust illumination generalization. 
+
+Contributions. The combination of these components, summarized in Figure 1, defines RoHIL: 
+
+• We formulate cross-workstation HIL-RL deployment under illumination shift as an offline domain-adaptation problem, and propose RoHIL, a framework that amortizes one source-workstation HIL-SERL run into an O(1) deployment procedure with no additional real-robot interaction. 
+
+• We introduce a relight-and-retain data pipeline for robust adaptation. A world-model relighter generates illumination-diverse observations from already-collected trajectories while preserving real actions and rewards, and IRR preserves source-workstation Bellman coverage by balancing relit adaptation data with original-light retention data. 
+
+• We design an anchored Bellman–actor regulariser for safe fine-tuning under lighting shift. The regulariser adds Lfeat to the critic update and Lmse to the actor update, mitigating source-domain forgetting at both the representation and policy levels while retaining plasticity to relit observations. 
+
+# 2 Related Work 
+
+Vision-based robotic RL with humans in the loop. HIL-SERL (Luo et al., 2025) combines SAC (Haarnoja et al., 2018), RLPD-style symmetric replay (Ball et al., 2023), and SpaceMouse interventions to solve contact-rich tasks from modest demonstrations. Related HIL/RL and imitation baselines include IBRL (Hu et al., 2024), ResiP (Ankile et al., 2024), DAgger / HG-DAgger (Ross et al., 2011; Kelly et al., 2019), behaviour cloning, ACT (Zhao et al., 2023), and Diffusion Policy (Chi et al., 2025). Pixel augmentations such as RAD (Laskin et al., 2020) and DrQ (Kostrikov et al., 2021; Yarats et al., 2022) improve sample efficiency, but their low-order image perturbations do not model cross-workstation light transport; RoHIL instead performs offline relighting and retention-aware fine-tuning. 
+
+World models for image relighting. Recent video relighters provide a stronger source of illumination variation than hand-designed image noise. On the Cosmos-Transfer1 video-diffusion backbone (Abu Alhaija and NVIDIA, 2025; Blattmann et al., 2023), DiffusionRenderer (Liang et al., 2025) performs HDRI-conditioned inverse and forward rendering, while UniRelight (He et al., 2025) improves temporal consistency through joint decomposition–synthesis. We adopt DiffusionRenderer for its resource-efficiency trade-off (§4.1, Appendix C); other candidates including IC-Light (Zhang and Agrawala, 2024), Lumos (Liu et al., 2025a), Lumen (Yang et al., 2025), TC-Light (Liu et al., 2025b), and VidToMe (Li et al., 2024) were less reliable on indoor manipulation views. Prior robot-lighting robustness mostly relies on domain randomisation or saliency-guided augmentation (Tobin et al., 2017; Zhuang et al., 2025; Jin et al., 2025). 
+
+Fine-tuning without forgetting. Offline-to-online RL methods such as CQL (Kumar et al., 2020), IQL (Kostrikov et al., 2022), Cal-QL (Nakamoto et al., 2023), RLDG (Xu et al., 2025), ConRFT (Chen et al., 2025), DPPO (Ren et al., 2025), and WSRL (Zhou et al., 2025) study adaptation from static data, while generalist VLA models (Brohan et al., 2023b,a; Kim et al., 2024; Octo Model Team et al., 2024; Black et al., 2024; Open X-Embodiment Collaboration, 2023) address broader skill transfer. Our setting is narrower but sharper: adapting a solved HIL policy to lighting 3shift without regressing on the source workstation. IRR is inspired by continual replay, where retaining the historical transition distribution prevents value regression (Rolnick et al., 2019); our anchored Bellman–actor regularizer follows frozen-reference learning without forgetting and policy distillation (Li and Hoiem, 2018; Rusu et al., 2016), with high-quality expert anchors motivated by exemplar-memory methods (Rebuffi et al., 2017; Lopez-Paz and Ranzato, 2017; Buzzega et al., 2020). 
+
+# 3 Preliminaries and Problem Setup 
+
+HIL-SERL with RLPD-style symmetric replay. We start from the HIL-SERL training stack (Luo et al., 2025): a SAC actor–critic (Haarnoja et al., 2018) with a ResNet-10 visual encoder 
+
+ϕθ(o) ingests wrist-camera RGB and proprioception. The policy πθ(a | s) is a continuous squashed (tanh) diagonal-Gaussian over a 6-dimensional end-effector delta twist (Haarnoja et al., 2018), with mean μθ(s) and diagonal log-variance log σ2 
+
+> θ
+
+(s) produced by the actor head. An RLPD-style buffer (Ball et al., 2023) draws each minibatch with a 50 /50 symmetric split between an online RL replay R and a demonstration buffer D:
+
+B = 12 Sample( R) ∪ 12 Sample( D).
+
+The critic is trained on the joint Bellman loss LBellman = EB[( Qθ(s, a ) − y)2] with y = r + γ(1 −
+
+d) Ea′∼πθ (·| s′)[Q¯θ(s′, a ′) − η log πθ(a′|s′)] ; the actor on LSAC = Es∼B , a ∼πθ (·| s)[η log πθ(a|s) − Qθ(s, a )] ,where η is the SAC entropy temperature (we reserve α for the IRR retention coefficient introduced in §4.2). A SpaceMouse intervention channel injects expert corrections, which are streamed simultaneously into R (as transitions) and D (as the demonstration set). 
+
+Cross-workstation deployment as Domain-Incremental Learning. We define a workstation 
+
+as a fixed combination of robot, parts, and ambient illumination. At training time we observe the source workstation W0; at deployment time we encounter a sibling workstation Wk that shares the same task semantics, kinematics, contact dynamics, and reward function as W0, but exhibits a shifted visual observation distribution pWk (o | s)̸ = pW0 (o | s), induced by changes in window orientation, ceiling and task lighting, and ambient occlusion. The agent has no access to a workstation identifier at inference time, must perform on Wk, and, critically for deployment, must not regress on W0. This is precisely the Domain-Incremental Learning regime (Rolnick et al., 2019; Li and Hoiem, 2018). 
+
+Why naive fine-tuning fails: the stability/plasticity dilemma. A naive remedy, namely fine-tuning the source-workstation policy on data collected (or synthesised) under shifted lighting, creates a textbook stability/plasticity dilemma. Increasing plasticity via vanilla SGD on relit data drives the encoder ϕθ toward the new visual statistics, but the same gradient updates erode source-workstation features, collapsing W0 success well below the pre-fine-tune level. Conversely, overweighting original-light data starves the policy of new-domain signal. RoHIL resolves this dilemma along two complementary anti-forgetting axes: (i) IRR , which balances original-light retention with relit adaptation to maintain Bellman coverage on W0 (§4.2), and (ii) an anchored Bellman–actor regularizer that constrains encoder and policy outputs on source-workstation expert states to match the frozen pre-fine-tune model (§4.3). 44 Method 
+
+RoHIL is an offline fine-tuning framework that turns a single source-workstation HIL-SERL run into a policy robust to cross-workstation illumination shift, with no further real-robot interaction required after Stage 1 (§4.1). The design goal is to suppress source-domain forgetting during offline adaptation while still exposing the policy to visual evidence needed for lighting-invariant generalisation. It comprises three stages (Figure 1): ( Stage 1 , §4.1) world-model relighting supplies new illumination signals for adaptation while preserving real actions and rewards; ( Stage 2 , §4.2) 
+
+IRR provides data-level anti-forgetting by retaining original-light Bellman coverage inside the RLPD replay structure; ( Stage 3 , §4.3) anchored Bellman–actor regularisation provides representation-and policy-level anti-forgetting through LCritic =LBellman +Lfeat and LActor =LSAC +Lmse . The three components are coupled by design: IRR alone leaves the encoder free to drift, anchoring alone lacks Bellman coverage of source-workstation negative states, and only their combination closes the gap (§5). 
+
+4.1 Stage 1: Source-Workstation Collection and World-Model Relighting 
+
+A HIL-SERL session on the source workstation gives us real robot trajectories, but only under one illumination domain. Stage 1 (§4.1) turns these source trajectories into shifted-light adaptation data without collecting new robot interaction. Each transition is stored as (ot, a t, r t, o t+1 , d t), where the visual components of ot and ot+1 are the parts affected by cross-workstation lighting changes. The action, reward, and termination label, however, come from the recorded physical interaction and should remain unchanged. RoHIL therefore preserves at, rt, and dt, and re-synthesises the visual stream of each trajectory under multiple lighting conditions. This produces illumination-diverse observations while keeping the supervision signal grounded in real robot experience. 
+
+World-model relighter. We instantiate the relighting module with Cosmos-Transfer1-Diffusion Renderer (Liang et al., 2025), an HDRI-conditioned video relighter built on the NVIDIA Cosmos-Transfer1 video-diffusion foundation (Abu Alhaija and NVIDIA, 2025). Given a recorded RGB stream and a target HDRI environment map, the model produces a relit RGB stream that changes the illumination state while preserving the scene layout, object geometry, and material appearance. We synthesise four target lighting conditions for each recorded trajectory (Appendix C, Figure 7). Together with the original lighting, this expands each source trajectory into five illumination variants that share the same actions, rewards, and termination labels. 
+
+Relighter implementation. We choose DiffusionRenderer for its quality–cost trade-off in indoor manipulation views. UniRelight (He et al., 2025), another Cosmos-based relighter, gives slightly stronger temporal consistency but is substantially more expensive: relighting one camera stream of 
+
+8 000 transitions takes 6.82 h and 26 .80 GB peak VRAM with DiffusionRenderer, versus 48 .63 hand 39 .88 GB with UniRelight (Appendix C, Table 10). Additional relighter pilots are reported in Appendix C. 
+
+4.2 Stage 2: Illumination-Retention Replay 
+
+Four data pools. Stage 1 (§4.1) expands the source-workstation data into the four transition pools in Table 1. The two policy-driven pools contain transitions whose actions were produced by the trained policy, and therefore include both successful and unsuccessful source-workstation experience. The two demonstration pools contain human actions and provide higher-quality expert 5Table 1: Transition pools used by IRR. Superscript 0 denotes original lighting, and superscript 
+
+rel denotes relit observations.                
+
+> Pool Symbol Light Action
+> Policy-driven RL R0
+> πsource mixed Human demos D0source expert Relit policy-driven RL Rrel
+> πrelit mixed Relit demos Drel relit expert
+
+support. The original-light and relit versions are disjoint visual domains, while sharing the same underlying action and reward labels. 
+
+From RLPD replay to IRR. RLPD’s symmetric replay assumes that the RL pool and demon-stration pool share one observation domain. After relighting, naive RLPD faces a domain-allocation problem: relit-only replay maximises adaptation but deletes source-workstation negative states, while original-only replay preserves the source policy but starves the critic of new illumination evidence. Inspired by continual replay’s retention principle (Rolnick et al., 2019), IRR keeps the RLPD 50 /50 structure but inserts a retention coefficient inside the RL half: 
+
+Rα = α R0 
+
+> π
+
++ (1 − α)(Rrel  
+
+> π
+
+∪ D rel ), Danc = D0 ∪ D rel ,
+
+B = 12 Sample( Rα) ∪ 12 Sample( Danc ). (1) Here R0 
+
+> π
+
+is the original-light policy-driven pool, Rrel  
+
+> π
+
+its relit counterpart, and D0, Drel are original-light and relit demonstrations. Thus IRR is a data-level anti-forgetting mechanism: the relit component supplies illumination-adaptation signal, while the retained original-light component preserves Bellman coverage of W0.
+
+Why a strict majority of original-light data in Rα? The original-light policy-driven pool is the full distribution of source-workstation experience, including successful trajectories, exploratory states, negative states, and occasional emergent behaviours beyond the human demonstrations. Discarding it removes the only source-workstation failures the critic has seen and encourages over-estimation of Q on unseen W0 states. We therefore sweep α ∈ { 0.0, 0.05 , . . . , 0.95 , 1.0} and find 
+
+α = 0 .75 to be the consistent best operating point on both source and shifted lighting (§5.3). 
+
+Why anchor only on expert data. If policy-driven transitions were also used as anchors, the Stage 3 (§4.3) anchor terms would pin the policy to match the frozen model on failure states, literally instructing it to “replicate failures” (the GEM (Lopez-Paz and Ranzato, 2017) / iCaRL (Rebuffi et al., 2017) failure mode for low-quality exemplars). IRR instead uses policy-driven data only for unconstrained Bellman coverage, while Danc supplies high-quality expert support for Stage 3 (§4.3). 
+
+4.3 Stage 3: Anchored Bellman–Actor Regularization 
+
+Source-anchored fine-tuning. IRR (§4.2) preserves source-workstation data in replay, but replay alone does not constrain how the model changes during offline fine-tuning. Bellman updates on relit observations can still shift the visual encoder, alter critic targets, and drive the actor away from the solved source policy. Stage 3 (§4.3) therefore adds frozen-source anchors on expert states. The feature anchor preserves source-domain representations, while the actor anchor preserves 6reference action preferences. Together, they allow relit data to improve illumination robustness while suppressing source-domain forgetting. 
+
+SAC update under IRR. Let θ0 denote the frozen source-workstation parameters, and let B
+
+and Danc be the IRR minibatch and anchor pool from Equation 1. For twin critics Qθi and target critics Q¯θi , the relit/original-light Bellman update is 
+
+y = r + γ(1 − d) Ea′∼πθ (·| s′)
+
+[
+
+min  
+
+> i=1 ,2
+
+Q¯θi (s′, a ′) − η log πθ(a′|s′)
+
+]
+
+, (2) 
+
+LBellman = E(s,a,r,s ′,d )∼B 
+
+[ 2∑
+
+> i=1
+
+(Qθi (s, a ) − sg( y))2
+
+]
+
+, (3) 
+
+LSAC = Es∼B , a ∼πθ (·| s)
+
+[
+
+η log πθ(a|s) − min  
+
+> i=1 ,2
+
+Qθi (s, a )
+
+]
+
+, (4) where η is the SAC entropy temperature. These terms provide the plasticity needed to fit the relit observation distribution, but alone they do not prevent the source-domain representation from moving. 
+
+Anchors for representation and policy retention. We therefore add two frozen-reference anchors on Danc . The feature anchor constrains the visual representation used by both critics and actor: 
+
+Lfeat = λfeat ρ(t) Eo∼D anc 
+
+[∥ϕθ(o) − sg( ϕθ0 (o)) ∥2
+
+> F
+
+]. (5) The actor-side reference-action anchor is applied inside LActor : rather than treating the squared mean penalty as an isolated imitation loss, Lmse regularises the pre-tanh Gaussian action mean while SAC continues to optimise value-seeking behaviour: 
+
+Lmse = βmse ρ(t) Es∼D anc 
+
+[∥μθ(s) − sg( μθ0 (s)) ∥22
+
+], (6) where μθ(s) is the diagonal-Gaussian mean. We set λfeat = 0 .2 and βmse = 0 .1.
+
+Full anchored objective. The final fine-tuning step couples adaptation and retention as 
+
+LCritic = LBellman + Lfeat , LActor = LSAC + Lmse . (7) To avoid over-constraining late adaptation, both anchors decay with ρ(t) = 1 − (1 − ρend )t/T and 
+
+ρend = 0 .33 , shifting the update from early retention to late illumination generalisation. Appendix A further compares the reference-action mean anchor with a full Gaussian KL anchor and shows that KL is not the optimal choice in our setting. 
+
+# 5 Experiments 
+
+Our empirical evaluation is organised around three studies, each isolating one piece of the design, with the last bringing the full system into contact with established baselines. We first establish, on the most lighting-sensitive task (USB insertion), that the anchored Bellman–actor objective is a strictly better fine-tune objective than the standard SAC loss and that its two terms contribute independently (§5.2). We then sweep the original-vs.-relit mixing ratio in IRR to identify the optimal retention balance and verify that the loss advantage holds across the full sweep (§5.3), and put IRR and the anchored objective into a 2×2 ablation to disentangle their individual contributions (§5.4). Finally we benchmark the full RoHIL system against five HIL-compatible baselines on four real-robot tasks under ten illumination conditions (§5.5). 7Figure 2: The four manipulation tasks: (a) ram_insertion , (b) usb_insertion , (c) 
+
+circuit_breaker , and (d) table_wiping . Per-task hardware setup is in Appendix B. 
+
+5.1 Tasks, evaluation protocol, and baselines 
+
+We evaluate on four real-robot manipulation tasks executed on a Franka Emika Panda arm with a wrist-mounted RealSense camera (Figure 2): ram_insertion , usb_insertion , circuit_breaker ,and table_wiping . Each task is collected on a designated source workstation. For deployment-time evaluation, we sweep an illumination-shift intensity gradient at {0% , 10% , . . . , 90% , 100% } deviation from the source-workstation baseline; the 60% -shift point is used as the headline cross-workstation evaluation. Lighting conditions cover five HDRI maps, three task-light spotlight configurations, and two natural-window-light shifts (Appendix C). Source training uses task-dependent HIL-SERL budgets (RAM 60 k, USB 30 k, circuit-breaker 35 k, table wiping 95 k steps); RoHIL fine-tunes offline for 15 000 steps with no further real-robot interaction. Per-task hyperparameters are deferred to Appendix B; results below report 30 trajectories per condition, except for the cross-method headline which uses 60 .We compare RoHIL against five HIL-compatible baselines, all retrained on the same source-workstation data: HIL-SERL (Luo et al., 2025), HG-DAgger (Kelly et al., 2019), behaviour cloning (BC), IBRL (Hu et al., 2024), and ACT (Zhao et al., 2023). The other relighter candidates we surveyed (IC-Light, Lumos, Lumen, TC-Light, VidToMe) are discussed but not benchmarked because they failed pilot reproductions on indoor manipulation views (§2). 
+
+5.2 Loss study: anchored objective outperforms standard SAC 
+
+We first establish the loss-side advantage and dissect the two anchor terms on USB insertion at 
+
+α=0.75 . Figure 3 compares the full anchored Bellman–actor objective against the standard SAC fine-tune objective along the training horizon: with anchoring the policy converges stably to near-perfect success on both source and shifted lighting; without it, the run exhibits the late-training collapse predicted by our drift analysis (Section 4.3). The pattern matches our hypothesis at population scale: the anchored objective is a strictly better fine-tune objective in this regime, and the gap to the standard SAC objective widens monotonically after the joint best step around 15 000 iterations. 8Figure 3: USB insertion ( α=0.75 ): training-iteration sweep over 30 000 offline steps. Standard SAC oscillates and ends well below the online best ( 0.57 /0.73 ), while the anchored Bellman–actor objective rises steadily and peaks at 1.00 /1.00 around 15 000 steps on both source and shifted lighting. Table 2: Component ablation over the two anchor terms on USB insertion at α=0.75 . “og”/“re” denote source/shifted-light evaluation; SR is success rate over 30 trajectories; “time” is mean successful-episode duration in seconds.                           
+
+> Variant og SR og T re SR re T
+> no anchor 0.77 5.30 0.67 3.95
+> Lfeat only 0.57 7.69 0.97 3.45 ref.-action Lmse only 1.00 3.05 0.80 6.16
+> Lfeat +Lmse (RoHIL) 1.00 2.75 1.00 2.48
+
+Table 2 further dissects the two anchor terms. The encoder-level anchor Lfeat alone substantially boosts shifted-light success ( 0.67 →0.97 ) but leaves the source-workstation undertrained on Q-values (0.77 →0.57 ); the reference-action mean anchor Lmse alone restores source-workstation success to saturation ( 1.00 ) but is insufficient on shifted lighting ( 0.80 ). Combined, the two anchors yield 
+
+1.00 /1.00 success and the shortest episode duration, confirming that they target distinct failure paths and are complementary by design. 
+
+5.3 IRR study: optimal original-vs.-relit mixing 
+
+We next determine the optimal original-light fraction α inside IRR , sweeping α ∈ { 0.0, 0.05 , . . . , 
+
+0.95 , 1.0} on USB insertion. The sweep also serves as a fine-grained, in-domain check that the anchored Bellman–actor objective is preferable to the standard SAC loss across the full ratio spectrum. Figure 4 surfaces two findings simultaneously. First, the anchored Bellman–actor objective dominates standard SAC at essentially every value of α on all three metrics. Second, holding the loss fixed, the joint optimum is α=0.75 , where both source and shifted-light success reach 1.00 and the average successful-episode duration drops to 2.48 s on shifted lighting; below this point the critic loses source-workstation Bellman coverage, while at α → 1.0 relit data vanishes from Rα and adaptation degrades. We fix α = 0 .75 in subsequent experiments. 9Figure 4: Sweep of the original-light fraction α in IRR on USB insertion. Rows show source/shifted lighting; columns show success, intervention rate, and episode length. The anchored objective (purple) dominates standard SAC (blue) and peaks at α=0 .75 .
+
+5.4 Component ablation: IRR × anchored objective 
+
+A 2×2 design crossing “ IRR on/off” with “anchored objective on/off” (Table 3) shows that each component moves the needle but neither alone closes the gap: anchoring alone (Final-B) lifts success to 0.50 /0.67 by stabilising the encoder; IRR alone (Final-C) keeps source-workstation success but the unconstrained encoder still drifts on shifted lighting. Only Final-D combining both reaches 
+
+1.00 /1.00 , validating that data-level and representation/policy-level retention are coupled by design. Table 3: 2×2 ablation crossing IRR (α=0.75 ) with the anchored Bellman–actor objective on USB insertion. IRR “off” corresponds to α=0 .                               
+
+> Configuration IRR Anch. obj. og SR og time re SR re time
+> Final-A (RLPD baseline) ××0.33 9.13 0.57 7.58 Final-B (anchored obj. only) ×✓0.50 6.95 0.67 6.18 Final-C ( IRR only) ✓×0.77 5.30 0.67 3.95 Final-D (RoHIL, full system) ✓✓1.00 2.75 1.00 2.48
+
+5.5 Cross-method comparison 
+
+We benchmark RoHIL against the five HIL-compatible baselines under controlled illumination drift on all four tasks. Table 4 reports the headline at 60% illumination shift. RoHIL reaches the highest success rate on every task at 60% shift (RAM 1.00 , USB 1.00 , wiping 
+
+0.87 , breaker 0.83 ), while every baseline degrades materially: HIL-SERL retains barely half its 10 Table 4: Cross-method comparison at 60% illumination shift ( 60 trajectories per cell). SR is success rate; “T” is mean successful-episode duration (s). Best per task in bold.                                                             
+
+> ram usb wipe breaker
+> Method SR TSR TSR TSR TBC 0.07 4.99 0.27 7.11 0.13 11.31 0.33 6.64 ACT (Zhao et al., 2023) 0.30 6.23 0.38 3.52 0.23 14.75 0.40 14.19 HG-DAgger (Kelly et al., 2019) 0.13 8.54 0.37 6.66 0.17 —0.23 8.54 HIL-SERL (Luo et al., 2025) 0.43 5.66 0.50 4.14 0.33 13.74 0.13 6.32 IBRL (Hu et al., 2024) 0.37 6.31 0.87 3.53 0.43 13.66 0.37 6.30
+> RoHIL (ours) 1.00 4.54 1.00 3.59 0.87 14.39 0.83 5.67
+
+source success on USB and collapses to 0.13 on the breaker, HG-DAgger and BC fall below 0.4
+
+on every task, and the strongest baseline IBRL trails RoHIL by 0.4 to 0.6 on three of four tasks. Figure 5 extends this comparison to the full intensity gradient: RoHIL stays near 1.00 on USB throughout and falls only modestly on the other tasks at extreme shifts, while baselines degrade roughly monotonically; even IBRL loses ≥ 0.4 between 0% and 60% on wiping and breaker. The gap between RoHIL and the strongest baseline is consistent across tasks, indicating that the robustness is a property of the framework rather than task-specific tuning. 
+
+Figure 5: Lighting-shift gradient on all four tasks (rows) for RoHIL vs. HIL-SERL, HG-DAgger, IBRL. Three metrics per row: success rate, intervention rate, mean episode length. Horizontal axis: shift intensity {0, 10 , . . . , 100 }%. RoHIL remains essentially flat across the gradient, while baselines degrade roughly monotonically. 
+
+# 6 Conclusion and Limitations 
+
+RoHIL closes the cross-workstation illumination-robustness gap of HIL-RL via three coupled mechanisms (world-model relighting, IRR , anchored Bellman–actor regularisation), without re-collecting demonstrations and without further real-robot interaction. Three limitations point to future work: any future relighter with stronger inter-frame consistency or higher photometric fidelity should immediately translate into better shifted-light performance, since the relighter is a drop-in 11 component in our pipeline; an anchor-free variant is needed when source-workstation demonstrations are not yet available; and extending the anchored-regularisation principle to mixed visual and geometric drift is a natural next step. 
+
+# References 
+
+Hassan Abu Alhaija and NVIDIA. Cosmos-Transfer1: Conditional world generation with adaptive multimodal control. arXiv preprint arXiv:2503.14492 , 2025. Lars Ankile, Anthony Simeonov, Idan Shenfeld, Marcel Torne, and Pulkit Agrawal. From imitation to refinement: Residual RL for precise visual assembly. In arXiv preprint arXiv:2407.16677 , 2024. Philip J. Ball, Laura Smith, Ilya Kostrikov, and Sergey Levine. Efficient online reinforcement learning with offline data. In Proceedings of the 40th International Conference on Machine Learning , volume 202 of Proceedings of Machine Learning Research , pages 1577–1594, 2023. Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi, Zion English, Vikram Voleti, Adam Letts, Varun Jampani, and Robin Rombach. Stable video diffusion: Scaling latent video diffusion models to large datasets. arXiv preprint arXiv:2311.15127 , 2023. Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Xi Chen, Krzysztof Choromanski, Tianli Ding, Danny Driess, Avinava Dubey, Chelsea Finn, et al. RT-2: Vision-language-action models transfer web knowledge to robotic control. arXiv preprint arXiv:2307.15818 , 2023a. Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakrishnan, Karol Hausman, Alex Herzog, Jasmine Hsu, et al. RT-1: Robotics transformer for real-world control at scale. In Robotics: Science and Systems XIX , 2023b. doi: 10.15607/RSS.2023.XIX.025. Pietro Buzzega, Matteo Boschini, Angelo Porrello, Davide Abati, and Simone Calderara. Dark experience for general continual learning: A strong, simple baseline. In Advances in Neural Information Processing Systems 33 , 2020. Yuhui Chen, Shuai Tian, Shugao Liu, Yingting Zhou, Haoran Li, and Dongbin Zhao. ConRFT: A reinforced fine-tuning method for VLA models via consistency policy. In Robotics: Science and Systems XXI , 2025. doi: 10.15607/RSS.2025.XXI.019. Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. The International Journal of Robotics Research , 44(10-11), 2025. doi: 10.1177/02783649241273668. Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine. Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor. In Proceedings of the 35th International Conference on Machine Learning , volume 80 of Proceedings of Machine Learning Research , pages 1861–1870, 2018. 12 Kai He, Ruofan Liang, Jacob Munkberg, Jon Hasselgren, Nandita Vijaykumar, Alexander Keller, Sanja Fidler, Igor Gilitschenski, Zan Gojcic, and Zian Wang. UniRelight: Learning joint decom-position and synthesis for video relighting. arXiv preprint arXiv:2506.15673 , 2025. Hengyuan Hu, Suneel Mirchandani, and Dorsa Sadigh. Imitation bootstrapped reinforcement learning. In Robotics: Science and Systems XX , 2024. doi: 10.15607/RSS.2024.XX.056. Sheng Jin, Lu Wang, Benedikt Temming, and Florian T. Pokorny. Physically-based lighting generation for robotic manipulation. arXiv preprint arXiv:2508.01442 , 2025. Michael Kelly, Chelsea Sidrane, Katherine Driggs-Campbell, and Mykel J. Kochenderfer. HG-DAgger: Interactive imitation learning with human experts. In IEEE International Conference on Robotics and Automation , pages 8077–8083, 2019. doi: 10.1109/ICRA.2019.8793698. Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Foster, Grace Lam, Pannag Sanketi, Quan Vuong, Thomas Kollar, Benjamin Burchfiel, Russ Tedrake, Dorsa Sadigh, Sergey Levine, Percy Liang, and Chelsea Finn. OpenVLA: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. Ilya Kostrikov, Denis Yarats, and Rob Fergus. Image augmentation is all you need: Regularizing deep reinforcement learning from pixels. In International Conference on Learning Representations ,2021. Ilya Kostrikov, Ashvin Nair, and Sergey Levine. Offline reinforcement learning with implicit Q-Learning. In International Conference on Learning Representations , 2022. Aviral Kumar, Aurick Zhou, George Tucker, and Sergey Levine. Conservative Q-learning for offline reinforcement learning. In Advances in Neural Information Processing Systems 33 , 2020. Misha Laskin, Kimin Lee, Adam Stooke, Lerrel Pinto, Pieter Abbeel, and Aravind Srinivas. Reinforcement learning with augmented data. In Advances in Neural Information Processing Systems 33 , 2020. Xirui Li, Chao Chu, Yiwei Lian, Xudong Dai, and Yu-Xiong Wang. VidToMe: Video token merging for zero-shot video editing. In IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024. Zhizhong Li and Derek Hoiem. Learning without forgetting. IEEE Transactions on Pattern Analysis and Machine Intelligence , 40(12):2935–2947, 2018. doi: 10.1109/TPAMI.2017.2773081. Ruofan Liang, Zan Gojcic, Huan Ling, Jacob Munkberg, Jon Hasselgren, Zhi-Hao Lin, Jun Gao, Alexander Keller, Nandita Vijaykumar, Sanja Fidler, and Zian Wang. DiffusionRenderer: Neural inverse and forward rendering with video diffusion models. In IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2025. Xiao Liu, Bo Yang, Hangjie Liu, Yuyang Zhang, Yuwei Wang, Wencheng Pang, Cuilin Lan, Tao Zhang, and Yu-Gang Jiang. Lumos: Learning visual generative priors without text. arXiv preprint arXiv:2503.12246 , 2025a. Yang Liu, Chen Lin, Hanrong Zhao, Wei Yu, Yiqun Du, and Zhitong Tang. TC-Light: Temporally coherent generative relighting. arXiv preprint arXiv:2506.18904 , 2025b. 13 David Lopez-Paz and Marc’Aurelio Ranzato. Gradient episodic memory for continual learning. In 
+
+Advances in Neural Information Processing Systems 30 , 2017. Jianlan Luo, Charles Xu, Jeffrey Wu, and Sergey Levine. Precise and dexterous robotic manipulation via human-in-the-loop reinforcement learning. Science Robotics , 10(105):eads5033, 2025. doi: 10.1126/scirobotics.ads5033. Mitsuhiko Nakamoto, Yuexiang Zhai, Anikait Singh, Max Sobol Mark, Yi Ma, Chelsea Finn, Aviral Kumar, and Sergey Levine. Cal-QL: Calibrated offline RL pre-training for efficient online fine-tuning. In Advances in Neural Information Processing Systems 36 , 2023. Octo Model Team, Dibya Ghosh, Homer Walke, Karl Pertsch, Kevin Black, Oier Mees, Sudeep Dasari, Joey Hejna, Tobias Kreiman, Charles Xu, Jianlan Luo, You Liang Tan, Pannag Sanketi, Quan Vuong, Ted Xiao, Dorsa Sadigh, Chelsea Finn, and Sergey Levine. Octo: An open-source generalist robot policy. arXiv preprint arXiv:2405.12213 , 2024. Open X-Embodiment Collaboration. Open X-Embodiment: Robotic learning datasets and RT-X models. arXiv preprint arXiv:2310.08864 , 2023. Sylvestre-Alvise Rebuffi, Alexander Kolesnikov, Georg Sperl, and Christoph H. Lampert. iCaRL: Incremental classifier and representation learning. In IEEE Conference on Computer Vision and Pattern Recognition , pages 2001–2010, 2017. doi: 10.1109/CVPR.2017.587. Allen Z. Ren, Justin Lidard, Lars Ankile, Anthony Simeonov, Pulkit Agrawal, Anirudha Majumdar, Benjamin Burchfiel, Hongkai Dai, and Max Simchowitz. Diffusion policy policy optimization. In 
+
+International Conference on Learning Representations , 2025. David Rolnick, Arun Ahuja, Jonathan Schwarz, Timothy Lillicrap, and Greg Wayne. Experience replay for continual learning. In Advances in Neural Information Processing Systems 32 , 2019. Stéphane Ross, Geoffrey J. Gordon, and J. Andrew Bagnell. A reduction of imitation learning and structured prediction to no-regret online learning. In Proceedings of the 14th International Conference on Artificial Intelligence and Statistics , volume 15 of Proceedings of Machine Learning Research , pages 627–635, 2011. Andrei A. Rusu, Sergio Gomez Colmenarejo, Caglar Gulcehre, Guillaume Desjardins, James Kirkpatrick, Razvan Pascanu, Volodymyr Mnih, Koray Kavukcuoglu, and Raia Hadsell. Policy distillation. In International Conference on Learning Representations , 2016. Josh Tobin, Rachel Fong, Alex Ray, Jonas Schneider, Wojciech Zaremba, and Pieter Abbeel. Domain randomization for transferring deep neural networks from simulation to the real world. In IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 23–30, 2017. doi: 10.1109/IROS.2017.8202133. Charles Xu, Qiyang Li, Jianlan Luo, and Sergey Levine. RLDG: Robotic generalist policy distillation via reinforcement learning. In Robotics: Science and Systems XXI , 2025. Jianqi Yang, Linsen Wang, Yikai Du, Hao Du, Mingkai Zhao, Sheng Liu, Wei Wang, and Cihang Yang. Lumen: Consistent video relighting and harmonious background replacement. arXiv preprint arXiv:2508.12945 , 2025. 14 Denis Yarats, Rob Fergus, Alessandro Lazaric, and Lerrel Pinto. Mastering visual continuous control: Improved data-augmented reinforcement learning. In International Conference on Learning Representations , 2022. Lvmin Zhang and Maneesh Agrawala. IC-Light: Imposing consistent light. Software project page ,2024. https://github.com/lllyasviel/IC-Light .Tony Z. Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manipulation with low-cost hardware. In Robotics: Science and Systems XIX , 2023. doi: 10.15607/RSS.2023.XIX.016. Zhiyuan Zhou, Andy Peng, Qiyang Li, Sergey Levine, and Aviral Kumar. Efficient online reinforce-ment learning fine-tuning need not retain offline data. In International Conference on Learning Representations , 2025. Zheyu Zhuang, Ruiyu Wang, Nils Ingelhag, Ville Kyrki, and Danica Kragic. Enhancing visual domain robustness in behaviour cloning via saliency-guided augmentation. In Proceedings of the 8th Conference on Robot Learning , volume 270 of Proceedings of Machine Learning Research ,pages 4314–4331, 2025. 15 A Algorithm and Actor-Anchor Variant 
+
+Pseudocode. Algorithm 1 gives one Learner step of the offline fine-tune. 
+
+Algorithm 1 RoHIL offline fine-tune (one Learner step) 
+
+Require: frozen source-workstation parameters θ0; current θ; target ¯θ; IRR replay Rα with α=0.75 ;anchor pool Danc (original-light human demos ∪ relit demos); weights λfeat , β mse ; schedule ρ(t) 
+
+> 1:
+
+Sample BR ∼ R α (|B R|=B/ 2), BD ∼ D anc (|B D|=B/ 2); form B = BR ∪ B D 
+
+> 2:
+
+Compute SAC target y = r + γ(1 − d)
+
+[
+
+min i Q¯θi (s′, a ′) − η log πθ(a′|s′)
+
+]
+
+, a′ ∼ πθ(·| s′) 
+
+> 3:
+
+LBellman ← EB
+
+[∑ 
+
+> i
+
+(Qθi (s, a ) − sg( y)) 2] 
+
+> 4:
+
+Lfeat ← λfeat ρ(t) EBD
+
+[∥ϕθ(o) − sg( ϕθ0 (o)) ∥2
+
+> F
+
+] 
+
+> 5:
+
+Update critic on LCritic = LBellman + Lfeat  
+
+> 6:
+
+LSAC ← Es∼B , a ∼πθ (·| s)
+
+[η log πθ(a|s) − min i Qθi (s, a )] 
+
+> 7:
+
+Lmse ← βmse ρ(t) EBD
+
+[∥μθ(s) − sg( μθ0 (s)) ∥22
+
+] 
+
+> 8:
+
+Update actor on LActor = LSAC + Lmse  
+
+> 9:
+
+Polyak-update target ¯θ ← τ θ + (1 −τ )¯θ
+
+Actor anchor head: reference-action mean vs. KL. The policy anchor admits two natural forms on the SAC diagonal-Gaussian: our reference-action mean anchor Lmse = ∥μθ −sg (μθ0 )∥22, used inside LActor in the main method (Equation 6); and a full distributional KL LKL = DKL (πθ0 ∥πθ),closed-form on diagonal-Gaussians, which constrains both the mean and the variance. KL is the stronger anchor but in our setting we want stability without throttling adaptation. Empirically (Table 5), the two heads tie on the source workstation, but KL slightly under-performs the reference-action mean anchor on shifted lighting ( 0.97 vs. 1.00 success, 3.27 s vs. 2.48 s mean episode duration), consistent with the hypothesis that locking the variance throttles relit-domain adaptation. Table 5: Actor anchor head: reference-action mean anchor (ours) vs. full KL distillation on USB insertion at α=0 .75 . “og”/“re” denote source/shifted-light evaluation; SR over 30 trajectories.                        
+
+> Anchor head og SR og time og interv. re SR re time re interv.
+> Lmse on μ(ours) 1.00 2.75 0.00% 1.00 2.48 0.00%
+> LKL on (μ, σ )1.00 2.46 0.00% 0.97 3.27 1.00%
+
+# B Per-Task Setup and Hyperparameters 
+
+The four tasks share the Franka Emika Panda arm, a wrist-mounted Intel RealSense camera, and the SpaceMouse intervention channel; they differ in initial demonstration count, episode length, and reset procedure. The action space is uniformly 6-dimensional and corresponds to the end-effector delta twist. Across all tasks the shared training hyperparameters are λfeat = 0 .2, βmse = 0 .1,
+
+ρend = 0 .33 , and original-light fraction α = 0 .75 . Figure 6 summarises the corresponding hardware mounts and camera placements. 
+
+a) RAM insertion. The robot grasps a fixed RAM module and inserts it into a vertical motherboard slot, requiring sub-millimetre alignment of the gold contact strip with the slot teeth. We report the policy training details for this task in Table 6. 16 Table 6: Policy training details for the RAM insertion task. 
+
+Parameter Value 
+
+Action space 6-dimensional end-effector delta twist Initial demonstrations 20 Max episode length 150 steps Reset method Script reset Source policy training 60 000 HIL-SERL steps Offline robust fine-tune 15 000 learner-only steps; no additional robot interaction Fine-tune batch size 256 transitions per learner step Policy / critic backbone SAC + RLPD replay, ResNet-10 encoder Relighting expansion DiffusionRenderer; 4 relit + 1 original 
+
+IRR replay B = 12 Sample( Rα) ∪ 12 Sample( Danc ), α = 0 .75 
+
+Anchor pool Original-light demos ∪ relit demos Anchor weights / schedule λfeat = 0 .2, βmse = 0 .1, ρend = 0 .33 
+
+b) USB insertion. The robot inserts a USB connector into a fixed receptacle. The small contact patch and the polarised orientation make this the most lighting-sensitive of the four tasks: the gripper-jaw glare under shifted lighting is what fails the source policy. We report the policy training details for this task in Table 7. Table 7: Policy training details for the USB insertion task. 
+
+Parameter Value 
+
+Action space 6-dimensional end-effector delta twist Initial demonstrations 20 Max episode length 150 steps Reset method Script reset Source policy training 30 000 HIL-SERL steps Offline robust fine-tune 15 000 learner-only steps; no additional robot interaction Fine-tune batch size 256 transitions per learner step Policy / critic backbone SAC + RLPD replay, ResNet-10 encoder Relighting expansion DiffusionRenderer; 4 relit + 1 original 
+
+IRR replay B = 12 Sample( Rα) ∪ 12 Sample( Danc ), α = 0 .75 
+
+Anchor pool Original-light demos ∪ relit demos Anchor weights / schedule λfeat = 0 .2, βmse = 0 .1, ρend = 0 .33 
+
+c) Circuit-breaker actuation. The robot toggles a circuit-breaker switch from off to on by hooking the switch lever and lifting it. The challenge is to control the contact force between the lever and the gripper finger so that the lever rotates without slipping. We report the policy training details for this task in Table 8. 17 Table 8: Policy training details for the circuit-breaker actuation task. 
+
+Parameter Value 
+
+Action space 6-dimensional end-effector delta twist Initial demonstrations 20 Max episode length 150 steps Reset method Human reset Source policy training 35 000 HIL-SERL steps Offline robust fine-tune 15 000 learner-only steps; no additional robot interaction Fine-tune batch size 256 transitions per learner step Policy / critic backbone SAC + RLPD replay, ResNet-10 encoder Relighting expansion DiffusionRenderer; 4 relit + 1 original 
+
+IRR replay B = 12 Sample( Rα) ∪ 12 Sample( Danc ), α = 0 .75 
+
+Anchor pool Original-light demos ∪ relit demos Anchor weights / schedule λfeat = 0 .2, βmse = 0 .1, ρend = 0 .33 
+
+d) Table wiping. The robot wipes a circular region on a flat work surface with a cloth attached to the end-effector, applying a moderate downward force throughout. The longer episode length reflects the multi-pass nature of this task. We report the policy training details for this task in Table 9. Table 9: Policy training details for the table wiping task. 
+
+Parameter Value 
+
+Action space 6-dimensional end-effector delta twist Initial demonstrations 30 Max episode length 250 steps Reset method Human reset Source policy training 95 000 HIL-SERL steps Offline robust fine-tune 15 000 learner-only steps; no additional robot interaction Fine-tune batch size 256 transitions per learner step Policy / critic backbone SAC + RLPD replay, ResNet-10 encoder Relighting expansion DiffusionRenderer; 4 relit + 1 original 
+
+IRR replay B = 12 Sample( Rα) ∪ 12 Sample( Danc ), α = 0 .75 
+
+Anchor pool Original-light demos ∪ relit demos Anchor weights / schedule λfeat = 0 .2, βmse = 0 .1, ρend = 0 .33 
+
+18 Figure 6: Hardware mounts and camera placements for the four tasks. 19 C Lighting Conditions and Relighter Comparison 
+
+We report the ten illumination conditions used in our evaluation in Figure 7, and a visual / cost comparison of the candidate relighters in Figure 8 and Table 10. 
+
+Figure 7: The ten illumination conditions used in our evaluation. Top: five HDRI environment maps. Middle: three task-light spotlight configurations. Bottom: two natural-window-light shifts. 
+
+Figure 8: Visual comparison of Cosmos-Transfer1-DiffusionRenderer (top) and UniRelight (bottom) on a representative manipulation frame across four HDRI conditions. UniRelight exhibits stronger inter-frame temporal consistency; DiffusionRenderer is roughly 7× cheaper to run. 20 Table 10: Resource cost of relighting one camera stream of 8 000 transitions on the same single-GPU hardware. Both methods are run at bf16 for a fair comparison; UniRelight uses a minimal inference-time loader fix that removes a transient load-time VRAM spike, while preserving the released bf16 inference setting.                    
+
+> Method Precision Runtime Peak VRAM Notes
+> DiffusionRenderer bf16 6.82 h26 .80 GB adopted in this work UniRelight bf16 48 .63 h39 .88 GB finer temporal continuity, ∼7×slower
+
+21
