@@ -6,98 +6,122 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-05-24
-- 运行时间：2026-05-24 20:14:50 UTC
+- 最新运行日期：2026-05-25
+- 运行时间：2026-05-25 21:05:46 UTC
 - 运行状态：成功
-- 本次总论文数：26
-- 精读区：15
+- 本次总论文数：34
+- 精读区：23
 - 速读区：11
 
 ### 今日简报（AI）
-今日精读15篇、速读11篇，共26篇论文，聚焦跨实体模仿学习与可解释机器人策略。最值得看的是Demo-JEPA（10分）实现单次跨实体模仿，以及SADP（9分）利用基础模型生成示范打造可解释扩散策略。建议优先精读这两篇，再浏览速读中LACE与DyGRO-VLA的跨任务扩展思路。
-- 详情：[/202605/24/README](/202605/24/README)
+今天共处理34篇论文，精读23篇，重点关注VLA模型的可供性表征注入与实时流世界模型。最值得精读的是《AffordVLA》通过隐式特征对齐提升模型理解能力，以及《RoboFlow4D》以轻量级流模型实现实时机器人操作，两者均获9分高分。建议优先阅读这两篇论文，把握VLA模型在表征增强与控制效率上的前沿突破。
+- 详情：[/202605/25/README](/202605/25/README)
 
 ### 精读区论文标签
-1. [Demo-JEPA: Joint-Embedding Predictive Architecture for One-shot Cross-Embodiment Imitation](/202605/24/2605.20811v1-demo-jepa-joint-embedding-predictive-architecture-for-one-shot-cross-embodiment-imitation)  
-   标签：评分：10.0/10、query:rob-il
-   evidence：通过JEPA世界模型实现跨实体模仿学习
-2. [SADP: Subgoal-Aware Diffusion Policy for Explainable Robots Learned from Foundation Model Generated Demonstrations](/202605/24/2605.16871v1-sadp-subgoal-aware-diffusion-policy-for-explainable-robots-learned-from-foundation-model-generated-demonstrations)  
+1. [AffordVLA: Injecting Affordance Representations into Vision-Language-Action Models via Implicit Feature Alignment](/202605/25/2605.17517v1-affordvla-injecting-affordance-representations-into-vision-language-action-models-via-implicit-feature-alignment)  
    标签：评分：9.0/10、query:rob-il
-   evidence：子目标感知扩散策略用于模仿学习
-3. [When Dynamics Shift, Robust Task Inference Wins: Offline Imitation Learning with Behavior Foundation Models Revisited](/202605/24/2605.17017v1-when-dynamics-shift-robust-task-inference-wins-offline-imitation-learning-with-behavior-foundation-models-revisited)  
+   evidence：通用机器人操作的VLA模型
+2. [RoboFlow4D: A Lightweight Flow World Model Toward Real-Time Flow-Guided Robotic Manipulation](/202605/25/2605.17522v1-roboflow4d-a-lightweight-flow-world-model-toward-real-time-flow-guided-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：使用行为基础模型进行离线模仿学习以实现操纵
-4. [Contrastive Conceptor Activation Steering (COAST): Unlocking Vision-Language-Action Models through Hidden States](/202605/24/2605.17144v1-contrastive-conceptor-activation-steering-coast-unlocking-vision-language-action-models-through-hidden-states)  
+   evidence：端到端视觉运动模型预测3D流
+3. [From a Single Demonstration to a General Policy for Contact-Rich Manipulation](/202605/25/2605.17601v1-from-a-single-demonstration-to-a-general-policy-for-contact-rich-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过概念器引导改进VLA模型用于机器人任务
-5. [AffordVLA: Injecting Affordance Representations into Vision-Language-Action Models via Implicit Feature Alignment](/202605/24/2605.17517v1-affordvla-injecting-affordance-representations-into-vision-language-action-models-via-implicit-feature-alignment)  
+   evidence：单演示模仿学习用于接触丰富操作
+4. [Dexora: Open-source VLA for High-DoF Bimanual Dexterity](/202605/25/2605.18722v1-dexora-open-source-vla-for-high-dof-bimanual-dexterity)  
    标签：评分：9.0/10、query:rob-il
-   evidence：增强可操作性的视觉-语言-动作模型
-6. [RoboFlow4D: A Lightweight Flow World Model Toward Real-Time Flow-Guided Robotic Manipulation](/202605/24/2605.17522v1-roboflow4d-a-lightweight-flow-world-model-toward-real-time-flow-guided-robotic-manipulation)  
+   evidence：用于双臂灵巧操作的开源VLA系统
+5. [COBALT: Crowdsourcing Robot Learning via Cloud-Based Teleoperation with Smartphones](/202605/25/2605.19138v1-cobalt-crowdsourcing-robot-learning-via-cloud-based-teleoperation-with-smartphones)  
    标签：评分：9.0/10、query:rob-il
-   evidence：端到端流世界模型用于视觉运动操纵
-7. [From a Single Demonstration to a General Policy for Contact-Rich Manipulation](/202605/24/2605.17601v1-from-a-single-demonstration-to-a-general-policy-for-contact-rich-manipulation)  
+   evidence：通过众包遥操作扩大机器人操作模仿学习的数据收集
+6. [COBALT: Crowdsourcing Robot Learning via Cloud-Based Teleoperation with Smartphones](/202605/25/2605.19138v2-cobalt-crowdsourcing-robot-learning-via-cloud-based-teleoperation-with-smartphones)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从单一演示进行接触丰富操纵的一次性模仿学习
-8. [Dexora: Open-source VLA for High-DoF Bimanual Dexterity](/202605/24/2605.18722v1-dexora-open-source-vla-for-high-dof-bimanual-dexterity)  
+   evidence：通过众包遥操作扩大机器人操作模仿学习的数据收集
+7. [DEFLECT: Delay-Robust Execution via Flow-matching Likelihood-Estimated Counterfactual Tuning for VLA Policies](/202605/25/2605.19294v1-deflect-delay-robust-execution-via-flow-matching-likelihood-estimated-counterfactual-tuning-for-vla-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：开源VLA用于双臂灵巧操作
-9. [DEFLECT: Delay-Robust Execution via Flow-matching Likelihood-Estimated Counterfactual Tuning for VLA Policies](/202605/24/2605.19294v1-deflect-delay-robust-execution-via-flow-matching-likelihood-estimated-counterfactual-tuning-for-vla-policies)  
+   evidence：增强VLA策略在异步推理中延迟鲁棒性
+8. [PAPO-VLA: Planning-Aware Policy Optimization for Vision-Language-Action Models](/202605/25/2605.19580v1-papo-vla-planning-aware-policy-optimization-for-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：解决VLA策略异步执行延迟问题
-10. [RoVLA: Multi-Consistency Constraints for Robust Vision-Language-Action Models](/202605/24/2605.19678v1-rovla-multi-consistency-constraints-for-robust-vision-language-action-models)  
+   evidence：面向闭环VLA操纵的规划感知优化
+9. [RoVLA: Multi-Consistency Constraints for Robust Vision-Language-Action Models](/202605/25/2605.19678v1-rovla-multi-consistency-constraints-for-robust-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于鲁棒视觉-语言-动作模型的多一致性约束
-11. [SUGAR: A Scalable Human-Video-Driven Generalizable Humanoid Loco-Manipulation Learning Framework](/202605/24/2605.20373v1-sugar-a-scalable-human-video-driven-generalizable-humanoid-loco-manipulation-learning-framework)  
+   evidence：用于视觉到动作映射的多一致性鲁棒VLA
+10. [SUGAR: A Scalable Human-Video-Driven Generalizable Humanoid Loco-Manipulation Learning Framework](/202605/25/2605.20373v1-sugar-a-scalable-human-video-driven-generalizable-humanoid-loco-manipulation-learning-framework)  
    标签：评分：9.0/10、query:rob-il
-   evidence：人类视频驱动的全身操纵技能学习
-12. [Spacetime Optimal-Transport Attention for Visuo-Haptic Imitation Learning of Contact-Rich Manipulation](/202605/24/2605.20433v1-spacetime-optimal-transport-attention-for-visuo-haptic-imitation-learning-of-contact-rich-manipulation)  
+   evidence：人类视频驱动的模仿学习用于移动操作
+11. [Spacetime Optimal-Transport Attention for Visuo-Haptic Imitation Learning of Contact-Rich Manipulation](/202605/25/2605.20433v1-spacetime-optimal-transport-attention-for-visuo-haptic-imitation-learning-of-contact-rich-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：视觉-触觉模仿学习处理接触密集任务
-13. [Action with Visual Primitives](/202605/24/2605.22183v1-action-with-visual-primitives)  
+   evidence：基于视觉的接触式操纵模仿学习最新方法
+12. [Jointly Learning Predicates and Actions Enables Zero-Shot Skill Composition](/202605/25/2605.20648v1-jointly-learning-predicates-and-actions-enables-zero-shot-skill-composition)  
    标签：评分：9.0/10、query:rob-il
-   evidence：基于视觉原语的端到端VLA架构
-14. [Spatial Memory for Out-of-Vision Manipulation in Vision-Language-Action](/202605/24/2605.22283v1-spatial-memory-for-out-of-vision-manipulation-in-vision-language-action)  
+   evidence：从示范中学习，结合闭环视觉运动技能
+13. [GaussianDream: A Feed-Forward 3D Gaussian World Model for Robotic Manipulation](/202605/25/2605.20752v1-gaussiandream-a-feed-forward-3d-gaussian-world-model-for-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：为视觉-语言-动作模型增加空间记忆
-15. [Factored Diffusion Policies:Compositionally Generalized Robot Control with a Single Score Network](/202605/24/2605.22596v1-factored-diffusion-policiescompositionally-generalized-robot-control-with-a-single-score-network)  
+   evidence：用于VLA操纵的前馈3D高斯世界模型
+14. [VLA-REPLICA: A Low-Cost, Reproducible Benchmark for Real-World Evaluation of Vision-Language-Action Models](/202605/25/2605.20774v1-vla-replica-a-low-cost-reproducible-benchmark-for-real-world-evaluation-of-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于机器人组合控制的分式扩散策略
+   evidence：用于真实世界VLA评估的低成本可复现基准
+15. [Mobile UMI: Cross-View Diffusion Policy with Decoupled Kinematics for Mobile Manipulation](/202605/25/2605.20894v1-mobile-umi-cross-view-diffusion-policy-with-decoupled-kinematics-for-mobile-manipulation)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：移动场景中的模仿学习，交叉视角扩散策略与解耦运动学
+16. [PointACT: Vision-Language-Action Models with Multi-Scale Point-Action Interaction](/202605/25/2605.21414v1-pointact-vision-language-action-models-with-multi-scale-point-action-interaction)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：用于机器人操纵的3D感知视觉-语言-动作策略
+17. [Action with Visual Primitives](/202605/25/2605.22183v1-action-with-visual-primitives)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：通用视觉-语言-动作模型使用视觉基元
+18. [From Abstraction to Instantiation: Learning Behavioral Representation for Vision-Language-Action Model](/202605/25/2605.22671v1-from-abstraction-to-instantiation-learning-behavioral-representation-for-vision-language-action-model)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：视觉-语言-动作模型的行为表示学习
+19. [GesVLA: Gesture-Aware Vision-Language-Action Model Embedded Representations](/202605/25/2605.22812v1-gesvla-gesture-aware-vision-language-action-model-embedded-representations)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：将手势作为并行指令模态的通用视觉-语言-动作操控模型
+20. [Agentic-VLA: Efficient Online Adaptation for Vision-Language-Action Models](/202605/25/2605.22896v1-agentic-vla-efficient-online-adaptation-for-vision-language-action-models)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：视觉语言动作模型的在线自适应方法
+21. [$π_0$-EqM: Equilibrium Matching for Closed-Loop Vision-Language-Action Control](/202605/25/2605.23128v1-0-eqm-equilibrium-matching-for-closed-loop-vision-language-action-control)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：闭环视觉-语言-动作模型与均衡匹配
+22. [Direct Dynamic Retargeting for Humanoid Imitation Learning from Videos](/202605/25/2605.23762v1-direct-dynamic-retargeting-for-humanoid-imitation-learning-from-videos)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：直接从单目视频到仿人机器人的动态重定向模仿学习
+23. [Instrumentation for Imitation Learning: Enhancing Training Datasets for Clothes Hanger Insertion](/202605/25/2605.23847v1-instrumentation-for-imitation-learning-enhancing-training-datasets-for-clothes-hanger-insertion)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：用于机器人操作的仪器化模仿学习
 
 ### 速读区论文标签
-1. [LACE: Latent Visual Representation for Cross-Embodiment Learning](/202605/24/2605.16743v1-lace-latent-visual-representation-for-cross-embodiment-learning)  
+1. [Event-Grounded Sparse Autoencoders for Vision-Language-Action Policies](/202605/25/2605.17204v1-event-grounded-sparse-autoencoders-for-vision-language-action-policies)  
    标签：评分：8.0/10、query:rob-il
-   evidence：跨实体视觉表示对齐用于模仿学习
-2. [Event-Grounded Sparse Autoencoders for Vision-Language-Action Policies](/202605/24/2605.17204v1-event-grounded-sparse-autoencoders-for-vision-language-action-policies)  
+   evidence：VLA策略的闭环行为分析
+2. [DyGRO-VLA: Cross-Task Scaling of Vision-Language-Action Models via Dynamic Grouped Residual Optimization](/202605/25/2605.17486v1-dygro-vla-cross-task-scaling-of-vision-language-action-models-via-dynamic-grouped-residual-optimization)  
    标签：评分：8.0/10、query:rob-il
-   evidence：视觉-语言-动作策略的可解释性用于闭环行为
-3. [DyGRO-VLA: Cross-Task Scaling of Vision-Language-Action Models via Dynamic Grouped Residual Optimization](/202605/24/2605.17486v1-dygro-vla-cross-task-scaling-of-vision-language-action-models-via-dynamic-grouped-residual-optimization)  
+   evidence：通过动态分组残差优化实现VLA模型跨任务扩展
+3. [Key-Gram: Extensible World Knowledge for Embodied Manipulation](/202605/25/2605.18556v1-key-gram-extensible-world-knowledge-for-embodied-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：优化VLA模型实现跨任务泛化
-4. [Key-Gram: Extensible World Knowledge for Embodied Manipulation](/202605/24/2605.18556v1-key-gram-extensible-world-knowledge-for-embodied-manipulation)  
+   evidence：分离语言知识与视觉推理的记忆框架，用于VLA策略
+4. [Beyond Action Residuals: Real-World Robot Policy Steering via Bottleneck Latent Reinforcement Learning](/202605/25/2605.19919v1-beyond-action-residuals-real-world-robot-policy-steering-via-bottleneck-latent-reinforcement-learning)  
    标签：评分：8.0/10、query:rob-il
-   evidence：用于具身操纵的视觉-动作条件记忆框架
-5. [How to Instruct Your Robot: Dense Language Annotations Power Robot Policy Learning](/202605/24/2605.17077v1-how-to-instruct-your-robot-dense-language-annotations-power-robot-policy-learning)  
+   evidence：通过潜在空间强化学习改进预训练模仿策略
+5. [ManiSoft: Towards Vision-Language Manipulation for Soft Continuum Robotics](/202605/25/2605.18617v1-manisoft-towards-vision-language-manipulation-for-soft-continuum-robotics)  
    标签：评分：7.0/10、query:rob-il
-   evidence：语言标注提升策略学习
-6. [Mixtac: A Novel Bio-Inspired Hybrid Tactile Sensor with Synergistic Event-Frame Perception](/202605/24/2605.18550v1-mixtac-a-novel-bio-inspired-hybrid-tactile-sensor-with-synergistic-event-frame-perception)  
+   evidence：面向软体机器人的视觉-语言操作基准，支持操作任务评估
+6. [SWEET: Sparse World Modeling with Image Editing for Embodied Task Execution](/202605/25/2605.19319v1-sweet-sparse-world-modeling-with-image-editing-for-embodied-task-execution)  
    标签：评分：7.0/10、query:rob-il
-   evidence：混合触觉传感器用于操纵任务
-7. [StableHand: Quality-Aware Flow Matching for World-Space Dual-Hand Motion Estimation from Egocentric Video](/202605/24/2605.18553v1-stablehand-quality-aware-flow-matching-for-world-space-dual-hand-motion-estimation-from-egocentric-video)  
+   evidence：图像编辑作为稀疏世界模型用于闭环视觉反馈
+7. [Spatially Prompted Visual Trajectory Prediction for Egocentric Manipulation](/202605/25/2605.20085v1-spatially-prompted-visual-trajectory-prediction-for-egocentric-manipulation)  
    标签：评分：7.0/10、query:rob-il
-   evidence：手部运动估计用于策略监督
-8. [ManiSoft: Towards Vision-Language Manipulation for Soft Continuum Robotics](/202605/24/2605.18617v1-manisoft-towards-vision-language-manipulation-for-soft-continuum-robotics)  
+   evidence：空间提示的视觉轨迹预测用于操作
+8. [VBT-MPC: Vision-Based Tactile MPC for Contour Following](/202605/25/2605.20392v1-vbt-mpc-vision-based-tactile-mpc-for-contour-following)  
    标签：评分：7.0/10、query:rob-il
-   evidence：针对软连续体机器人的视觉语言操纵基准
-9. [Visual Sculpting: Visually-Aligned Planning Representations for Long-Horizon Robot Clay Sculpting](/202605/24/2605.17556v1-visual-sculpting-visually-aligned-planning-representations-for-long-horizon-robot-clay-sculpting)  
+   evidence：基于视觉触觉的模型预测控制，闭环视觉反馈
+9. [Visual Sculpting: Visually-Aligned Planning Representations for Long-Horizon Robot Clay Sculpting](/202605/25/2605.17556v1-visual-sculpting-visually-aligned-planning-representations-for-long-horizon-robot-clay-sculpting)  
    标签：评分：6.0/10、query:rob-il
-   evidence：视觉对齐规划用于粘土雕刻
-10. [RoHIL: Robust Human-in-the-Loop Robotic Reinforcement Learning Against Illumination Variations](/202605/24/2605.19924v1-rohil-robust-human-in-the-loop-robotic-reinforcement-learning-against-illumination-variations)  
+   evidence：用于长期变形操纵的视觉对齐规划
+10. [Neural Operators for Design-Space Surrogate Modeling of Tendon-Actuated Continuum Robots](/202605/25/2605.19104v1-neural-operators-for-design-space-surrogate-modeling-of-tendon-actuated-continuum-robots)  
    标签：评分：6.0/10、query:rob-il
-   evidence：通过人机循环强化学习实现光照变化下鲁棒操纵
-11. [VBT-MPC: Vision-Based Tactile MPC for Contour Following](/202605/24/2605.20392v1-vbt-mpc-vision-based-tactile-mpc-for-contour-following)  
+   evidence：连续体机器人控制的代理建模
+11. [Beyond Binary Success: A Diagnostic Meta-Evaluation Framework for Fine-Grained Manipulation](/202605/25/2605.19986v1-beyond-binary-success-a-diagnostic-meta-evaluation-framework-for-fine-grained-manipulation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：基于视觉触觉MPC的轮廓跟踪
+   evidence：精细操作基准的诊断元评估框架
 
 
 <div class="dpr-home-promo-card">

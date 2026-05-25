@@ -1,0 +1,400 @@
+Title: Neural Operators for Design-Space Surrogate Modeling of Tendon-Actuated Continuum Robots
+
+URL Source: https://arxiv.org/pdf/2605.19104v1
+
+Published Time: Wed, 20 May 2026 00:18:51 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# Neural Operators for Design-Space Surrogate Modeling of Tendon-Actuated Continuum Robots 
+
+Branden Frieden 1, James M. Ferguson 1, Alan Kuntz 2, and Varun Shankar 1
+
+Abstract — Continuum robots enable dexterous manipulation in constrained environments, but require accurate and efficient models for real-time manipulation and control. Traditional physics-based models can be computationally expensive and may suffer from inaccuracies due to unmodeled effects, while current learning-based methods often generalize poorly beyond the specific robot on which they are trained. We present a formulation of surrogate modeling for tendon-driven continuum robots as an operator learning problem that maps robot design parameters and tendon actuation inputs to resulting configurations. This formulation enables a single trained model to generalize across a large class of robot designs. We develop four novel neural operator architectures–two based on Deep Operator Networks (DeepONets) and two based on Fourier Neural Operators (FNOs)–and train them on simulation data to predict robot configurations. All architectures achieve good accuracy while allowing for fast and accurate generalization across designs. Our results demonstrate that operator learning provides an effective and generalizable surrogate for continuum robot mechanics in the design space, enabling fast modeling for control, planning, and design optimization in surgical and industrial applications. 
+
+I. I NTRODUCTION 
+
+Continuum robots (CRs) are manipulators with highly de-formable backbones, capable of smooth, continuous motion rather than discrete jointed articulation. Their inherent com-pliance makes them well-suited for applications in minimally invasive surgery, inspection, and confined-space manipula-tion [34], [13], [7], [5]. Surveys highlight the breadth of CR designs and control approaches, emphasizing tendon-driven continuum robots (TDCRs) as a widely used actuation paradigm [38], [29], [7], [5]. Tendon actuation enables com-pact, dexterous designs, but introduces nonlinearities from friction, coupling, and backbone elasticity [26], [27]. Physics-based mechanics models of CRs typically use Cosserat rod theory, which treats the backbone as an geomet-ric three dimensional structure rod [2], [27]. This framework captures bending, torsion, shear, and extension, and forms the foundation of many practical applications. However, numeri-cal integration of these models, especially when coupled with tendon routing and external loads, can be computationally            
+
+> 1The Robotics Center and the Kahlert School of Computing at the University of Utah, Salt Lake City, UT 84112, USA.
+> 2The Departments of Computer Science and Electrical and Computer Engineering at Vanderbilt University, Nashville, TN, 37203, USA. VS was supported by NSF DMS 2505986. Research reported in this publication was also supported by the Advanced Research Projects Agency for Health (ARPA-H) under Award Number D24AC00415-00 for ALISS. The ARPA-H award provided 25% of total costs with an award total of up to $10,741,534.20. The content is solely the responsibility of the authors and does not necessarily represent the official views of ARPA-H.
+> backbone curve
+> {R(s),r(s)}
+> tendon iposition
+> ri(s)
+> routing disc tip: s=Lbase: s= 0
+> Fig. 1. Tendon-driven continuum robot (TDCR) that we model with neural Operators. Tendons are routed through holes in the attached discs at a constant pitch θ, and the flexible backbone bends continuously. Given tendon tensions, and robot design parameters, our model predicts the shape of the robot at any position along the backbone.
+
+demanding [26], [33] and may not be as expressive as learned approaches which can capture unmodeled effects (e.g. friction). A promising recent paradigm for overcoming these chal-lenges is in learned or surrogate models of CRs [18]. Prior work in soft and continuum robotics has emphasized the importance of efficient models for real-time control [8], [32], [30]. These modern methods allow models to learn kinematic or static mappings directly from data, either generated in simulation via physics-based models or via sensing of the physical robot as it is actuated. Examples include surveys of machine learning–based control [35], data-driven methods to compute the inverse kinematics [36], [20] and forward kinematics [3], [11], [15], [9], [14] of continuum robots, deep visual inverse kinematics for static shape control [1], model-less visual control of TDCRs using recurrent neurodynamic optimization [12], tip-force estimation using recurrent neural networks [10], and deep decoder approaches to hysteresis compensation [6]. While these approaches are typically ef-ficient and accurate, they are generally design specific . That is, if a robot’s tendon routing, disk spacing, or material properties change, new training data must be generated, either in simulation or by fabricating and actuating the physical robot. In parallel, the scientific machine learning community has developed neural operators , architectures that learn map-pings between infinite-dimensional function spaces rather than finite-dimensional vectors [17]. Deep Operator Net-works (DeepONets) [22] and Fourier Neural Operators (FNOs) [19] are leading frameworks, with demonstrated success in modeling complex physical systems including fluid dynamics, materials modeling, and climate forecast-
+
+> arXiv:2605.19104v1 [cs.RO] 18 May 2026
+
+ing [19], [37], [25]. Transformer-based neural operators have also begun to appear, for example ViTO, which ap-plies vision transformers to PDE surrogates [24]. Neural operators combine superior generalization capabilities with fast inference, making them natural candidates for surrogate modeling in a wide variety of applications. Operator learning is also beginning to impact robotics. Recent examples include a neural-operator predictor for delay-compensating control with closed-loop stability guarantees and experiments on a 5-link manipulator [4]; an operator formulation of motion planning that learns a cost-to-value map via the Planning Neural Operator (PNO), enabling zero-shot super-resolution and generalization across environments [23]; and neural-operator-based haptic sensing along slender rods, relevant to interventional and continuum-robot settings [31]. Inspired by these developments, we develop design-agnostic surrogate models for TDCRs using two foundational neural operators: DeepONets and FNOs. To facilitate the use of neural operators as surrogates, we develop a mathematical formulation of TDCR surrogate learning as an operator learn-ing task. Using data generated from Cosserat rod simulations of multiple designs with tendon actuation, we design and train custom DeepONets and FNOs to approximate the map-ping from the design space of a tendon-actuated continuum robot to its equilibrium configuration space. This results in neural operator architectures that are able to output both positions in R3 and rotations in SO (3) . Our results show that these architectures achieve high accuracy on inference for unseen designs and fast evaluation times, demonstrating the potential of operator learning for design-agnostic modeling of continuum robots. The remainder of this paper is organized as follows. In Section II, we present a review of the Cosserat rod model and of operator learning. Next, in Section III, we present a mathematical formulation of surrogate modeling of TDCRs as an operator learning problem, and present four new neural operator architectures (two based on DeepONets and two based on FNOs) suited to this task. We also discuss loss functions, important architectural details (for reproduction), and training details (including data generation). Then, in Section IV, we present convergence results for our model on the task of learning equilibrium configurations, explore the parsimony (or lack thereof) of our models, the behavior of these new models on out-of-distribution predictions, and also present both training and evaluation timings. We conclude in Section V with a summary and a description of future work. II. B ACKGROUND 
+
+A. Continuum Robots as Cosserat Rods 
+
+We briefly review the physics-based mechanics model commonly used for tendon-actuated continuum robots, in which the backbone is modeled as a geometrically exact Cosserat rod [2], [28]. The shape of the rod is parameterized by the arc-length coordinate s ∈ [0 , L ]. Specifically, the centerline of the backbone is represented by a space curve 
+
+r(s) ∈ R3 together with an attached orthonormal frame 
+
+R(s) ∈ SO (3) describing the orientation of the cross-section; see Fig. 1 for an illustration. The kinematic variables evolve along the rod according to 
+
+ν(s) = R(s)⊤r′(s), R′(s) = R(s)bκ(s), (1) where ν(s) and κ(s) denote the shear/extension and bend-ing/torsion strain vectors, respectively. Static equilibrium of the rod is governed by the balance of internal force n(s) and moment m(s) [28]: 
+
+n′(s) + f (s) = 0 , (2) 
+
+m′(s) + r′(s) × n(s) + ℓ(s) = 0 , (3) where f and ℓ denote distributed forces and moments acting along the rod. The stresses and strains inside the rod are related by the material constitutive law: 
+
+n = Ks(ν − ν0), m = Kb(κ − κ0), (4) where Ks, K b are stiffness matrices encoding sensitivity to shear/elongation and bending/torsion, which can be com-puted from material properties. Tendons routed at fixed cross-sectional offsets ρi generate distributed loads along the rod, resulting the shape deforma-tion. The path of the ith tendon is given by 
+
+ri(s) = r(s) + R(s)ρi, (5) with unit tangent ti = r′ 
+
+> i
+> ∥r′
+> i∥
+
+. The tendon tension τi, causes distributed loads along the rod according to [28]: 
+
+fi(s) = − dds 
+
+ τiti
+
+, ℓi(s) = R(s) ρi × fi(s), (6) which contribute to the toal loads in(2)–(3) [26], [28]. Together, these equations describes the static equilibrium of the coupled rod–tendon system under prescribed base con-ditions and tendon actuation. Solving the resulting boundary value problem yeilds the robot configuration. The result-ing system of equations serves as the high-fidelity physics model underpinning many continuum-robot simulators and controllers [13], [26], [38], [29]. Consequently, in this work, we use this formulation as our ground truth representation of a tendon-actuated continuum robot. 
+
+B. Operator Learning 
+
+We now provide a brief mathematical background on operator learning. Let U  Ωu; Rdu
+
+ and V  Ωv ; Rdv
+
+ be two separable Banach spaces of Rdu - and Rdv -valued functions, respectively, taking values in Ωu ⊂ Rdx and Ωv ⊂ Rdy ,respectively. Further, let G : U → V be a general (nonlinear) operator. The operator learning problem involves approxi-mating G : U → V with a parametrized operator ˆG : U × Θ →V from a finite number of function pairs {(ui, v i)}, i =1, . . . , N where ui ∈ U are typically called input functions ,and vi ∈ V are called output functions , i.e. , vi = G(ui).The parameters Θ are chosen to minimize ∥G − ˆG∥ in some norm. In practice, the problem must be discretized. This requires samples of the input and output functions at a finite set of function sample locations X ∈ Ωu and Y ∈ Ωv ,respectively. One then requires that ∥vi(y) − ˆG(ui)( y)∥22 is minimized over (ui, v i), i = 1 , . . . , N , where ui are sampled at x ∈ X and vi at y ∈ Y , for some chosen architecture for 
+
+ˆG. In the context of surrogate modeling for partial differential equations (PDEs), the spaces U and V often correspond to spaces initial and final conditions (in the case of time-dependent PDEs), all of which are functions, and the sets X
+
+and Y correspond to spatial sampling locations. DeepONets and FNOs correspond to specific architectural choices for ˆG.III. N EURAL OPERATORS AS SURROGATE MODELS FOR 
+
+TDCR S
+
+A. Operator Learning Formulation 
+
+D
+
+d
+
+E
+
+E(d, s )
+
+G(d, s )        
+
+> Fig. 2. Surrogate modeling of tendon-driven continuum robots as an operator learning problem. A design d∈ D (blue) is mapped by the operator
+> G(d, s )to its equilibrium E(d, s )∈ E (orange).
+
+We now formulate the Cosserat rod model as an operator 
+
+that maps from a design space D to a corresponding space of equilibrium configurations E for a given fixed initial configuration of the rod. This differs from the standard setup of operator learning in Section II-B in one crucial way: while the elements of E are indeed functions like the elements of V,the elements of D are instead finite collections of parameters and hence can be modeled as vectors (unlike the elements of U, which are indeed functions). We now describe our formulation in detail; this formulation is visualized in Figure 2. As mentioned previously, let D denote the design space 
+
+of tendon–driven continuum robots (TDCRs). Each element 
+
+d ∈ D encodes a robot design with Nt tendons consisting of several parameters: 
+
+d = {{ ρi ϕi, τ i}Nt
+
+> i=1
+
+, r, L, E }, (7) where ρi is once again the cross-sectional offset of each tendon, ϕi is the tendon path, τi is the tension on each tendon, L is the backbone length, r its radius, and E its Young’s modulus. As implied above, we consider tendon tensions as the only actuation input for this work. For each 
+
+d the Cosserat model defines an equilibrium configuration 
+
+E(d, s ) := {(rd(s), R d(s)) },
+
+where rd : [0 , L ] → R3 is the centerline and Rd : [0 , L ] →
+
+SO (3) the frame field– both for a specific design d –satisfying the rod balance equations with tendon loads [2], [26]. This leads naturally to the definition of the infinite-dimensional equilibrium operator G, which is a mapping 
+
+G : d 7 −→ (r(·), R (·)) , G : D → X , (8) with X the space of equilibrium configurations. Interestingly, the problem also directly admits a simpler alternative defi-nition of the space E which we label E′. It is possible to simply define the equilibrium configurations purely in terms of the tendon positions so that 
+
+E′(d, s ) = {ri(d, s )}Nt
+
+> i=1
+
+. (9) Let X ′ be the space of all such equilibrium configurations now defined as the set of all E′ for every d. Then, naturally, we have the alternative definition of the equilibrium operator as G′ : D → X ′. We emphasize that E is a function that consumes a design d and an arclength s and outputs a vector in R3 and a 3 × 3 rotation matrix, while E′ is a function that consumes the same inputs but instead outputs Nt vectors in 
+
+R3. From the mathematical perspective, there is a strict one-to-one mapping between E and E′ for each practical design 
+
+d, and consequently G and G′ are isomorphic. We now discuss realizations of these operators through two neural operator architectures: DeepONets and FNOs. It is important to note that these operators could also be learned from actual data rather than Cosserat rod simulations. 
+
+B. Why Operator Learning 
+
+The Cosserat rod equations define a nonlinear boundary-value problem in arclength, and their solution induces a non-linear solution operator. In the classical setting, this operator maps prescribed input functions and boundary conditions to rod configurations and internal force and moment fields. In our setting, we instead parameterize the inputs by the robot design variables together with the distributed loading, and seek the corresponding equilibrium state variables as output functions. This still defines a well-posed operator mapping from a finite-dimensional design/load space into an appropriate function space of rod states. Because repeated evaluation of this operator requires the numerical solution of a nonlinear system, it can become computationally ex-pensive in design, control, and optimization workflows. This motivates the use of operator-learning methods to construct a data-driven surrogate of the solution operator, with the goal of substantially reducing evaluation cost while preserving the underlying input–output structure of the problem. 
+
+C. DeepONet Architectures 
+
+βθ1 (d)
+
+Tθ2 (s)
+
+⟨· , ·⟩ 
+
+rd(s) ∈ R3
+
+Rd(s) ∈ SO (3)                     
+
+> R⊤R=I, det R= 1
+> Fig. 3. DeepONet: branch βθ1(d)and trunk Tθ2(s)fuse via an inner product ⟨., . ⟩to produce GDON (d, s, θ ) =  rd(s), R d(s)from (10).
+> G′
+> DON instead outputs Nttendon position vectors.
+
+We present two DeepONet architectures, GDON and G′
+
+> DON
+
+,that learn G and G′ respectively. These architectures use the same inputs, but differ in their outputs: GDON outputs in X
+
+for each design d (a backbone vector in R3 and a 3 × 3
+
+rotation matrix for each s), while G′ 
+
+> DON
+
+outputs in X ′ (Nt
+
+vectors in R3 for each s). GDON is given explicitly by 
+
+GDON (d, s, θ ) = ⟨βθ1 (d), T θ2 (s)⟩, (10) where βθ1 (d) is a (vector-valued) neural network with trainable parameters θ1 (the “branch net”) that encodes the design space D; Tθ2 (s) is another (vector-valued) neural network with trainable parameters θ2 that spans equilibrium configuration space X ; θ = {θ1, θ 2}; and ⟨., . ⟩ represents the 
+
+ℓ2 inner product. The branch and trunk are trained jointly to minimize some loss function; see Figure 3 for an illustration. 
+
+G′ 
+
+> DON
+
+has the same high level architecture as well, which we write as 
+
+G′
+
+> DON
+
+(d, s, θ ′) = ⟨β′ 
+
+> θ′
+> 1
+
+(d), T ′ 
+
+> θ′
+> 2
+
+(s)⟩. (11) Note the primes over the symbols to distinguish (11) from (10). 
+
+D. FNO Architectures                                
+
+> dLA1· · · ALP
+> σσrd(s)∈R3
+> Rd(s)∈SO (3)
+> Fig. 4. FNO: the input design dis lifted and passed through activated Fourier layers (13) before it is projected using aDNN down to the equilibrium configuration, giving GFNO in (12). G′
+> FNO instead outputs Nt
+> tendon position vectors.
+
+We also developed two FNO architectures, GFNO and 
+
+G′
+
+> FNO
+
+, that learn G and G′ respectively. FNO architectures differ significantly from DeepONets in that they are con-structed by compositions of kernel-based integral operators parametrized by the fast Fourier transform (FFT), rather than from “vanilla” DNNs. More precisely, the FNO GFNO can be written as 
+
+GFNO (d) = P ◦ A L ◦ σ ◦ . . . ◦ σ ◦ A 1 ◦ L ◦ d, (12) where ◦ indicates composition; L is a linear layer that takes an n × | d| matrix containing the tensor product of 
+
+n arclength samples along the backbone with the design vector d and outputs an n×p matrix where p is the “channel dimension”; σ is a nonlinear (elementwise) activation; P is a standard DNN that projects (undoes L); and Ak is a “Fourier layer”, the functional equivalent of a standard DNN’s affine transform but with an additional residual connection. To see the structure of A, we first define the argument q = ( d, s ),then write 
+
+A(u(q)) = 
+
+Z
+
+> Dq
+
+K(q, q′)u(q′)dq′ + W u, (13) where u is the vector obtained by sampling the input function to the layer ( u(q)) on the tensor-product of the design and arclength grids. The integral in (13) is handled via the FFT in that entries of the Gramian of K are learned directly in frequency space; we retain the 5 lowest frequency Fourier modes (we experimented with others, but found this performed the best). As in the DeepONet case, we also created a variant G′ 
+
+> FNO
+
+to directly output tendon equilibrium positions (i.e., to learn G′); again as in the DeepONet case, 
+
+GFNO is trained to output a backbone position and two columns of the rotation matrix for each s.
+
+E. Loss functions 
+
+We now discuss the loss functions used to train our neural operators. For all our models, we generate the same training dataset of N training pairs {dj , E′(dj )}Nj=1 (design– tendon equilibrium position) using a Cosserat rod simulator, where 
+
+E′ is given by (9). However, since the outputs of both types of models ( G and G′) are different, we use different loss functions for each. Both the DeepONet and FNO variants G∗
+
+that approximate G output a backbone position and rotation matrix, so the loss function is defined as 
+
+e(d, s ) = 
+
+> Nt
+
+X
+
+> i=1
+
+∥ri(d, s ) −
+
+
+
+˜rd(s) + ˜Rd(s)ρi
+
+
+
+∥22, (14) where ˜rd(s) is the backbone position estimated by the neural operator G∗ and ˜Rd(s) is the estimated rotation matrix. As mentioned previously, we ensure the columns of this 3 × 3
+
+rotation matrix are orthonormal by using the Gram-Schmidt process to orthonormalize the two columns output by G∗ and to generate a third column as well; we do this during both training and inference. On the other hand, to train neural operators G′∗, we instead define the loss 
+
+e′(d, s ) = 
+
+> Nt
+
+X
+
+> i=1
+
+∥ri(d, s ) − ˜ri(d, s )∥22, (15) where ˜ri(d, s ) are now the tendon equilibrium positons directly predicted by the neural operators G′∗. Both e and 
+
+e′ are averaged over all N training designs d and evaluated on an n point grid for the variable s ∈ [0 , L ] to obtain fully discrete losses. 
+
+F. More Architectural Details 
+
+We next describe the practical implementation of the DeepONet and FNO architectures evaluated in this work. 
+
+a) DeepONet architectures: For all our DeepONets, we use the “stacked” vanilla-DeepONet architecture (sin-gle branch rather than many) with multilayer perceptrons (MLPs) as both the branch β and trunk T . The branch network has five layers with hidden dimension 64 , using 
+
+tanh activations after each layer except the output (which is unactivated, as is customary). The trunk network again has five layers and a hidden dimension of 128, once again with tanh activations. For the DeepONet G′
+
+> DON
+
+, the output dimension is 12 p for vanilla DeepONet (corresponding to three spatial coordinates for each of the four tendons), while the output dimension for the DeepONet GDON is 9p (three coordinates for the centerline offset and six values used to construct the rotation matrix via the Gram–Schmidt method). In our experiments, we found that p = 100 performed the best in both architectures. This results in the vanilla Deep-ONet G′ 
+
+> DON
+
+having 219,904 trainable parameters; GDON has 205,668 parameters. 
+
+b) FNO architectures: For FNOs, evaluation points are taken along the arclength of the centerline as an equispaced grid on [0 , L ], concatenated with the model inputs. This two-dimensional input array is lifted to the channel dimension 
+
+p = 128 and passed through five Fourier layers, each retaining five modes with ReLU activations in between. A final linear layer maps the output to the target dimension of 12 for G′ 
+
+> FNO
+
+(three coordinates for each of four tendons) and 9 for GFNO (three coordinates for the centerline offset and six values for the rotation matrix via Gram–Schmidt). These architectural choices results in G′ 
+
+> FNO
+
+having 168,844 trainable parameters and GFNO having 168,457 parameters. 
+
+G. Training 1) Data generation and preprocessing: We briefly de-scribe our data generation and preprocessing. Input param-eters were uniformly sampled over predefined ranges; these are shown in Table I) to obtain N designs. For each design d,a Runge–Kutta solver was used to solve for Nt = 4 tendon positions in R3. Each of the N equilibrium configurations thus consists of 12 values (three spatial coordinates for four tendons) recorded at n = 42 equispaced points along the robot centerline/backbone. The corresponding arclength values were also stored and used as inputs to the neural operators. This dataset was then partitioned into training and test sets by holding out 20% of the samples for testing, with the remaining 80% used for training. For our largest dataset, we generate 100,000 training examples, using N = 80 , 000 for training and 20,000 for testing. Models are trained using the full 80,000 examples unless stated otherwise, but the data is put into batches of size 5000 to allow the data to fit into GPU memory. As seen in Table I our parameters have several                           
+
+> TABLE I RANGES OF INPUT PARAMETERS USED TO GENERATE TRAINING AND TEST DATA .
+> Parameter Symbol Range
+> Tendon tensions τi[0 .0,5] NLength of robot L[0 .1,0.35] mTendon pitches ϕi[−20 ,20] rads/m Tendon offset ρi[0 .005 ,0.01] mYoung’s modulus E[15 .5,45 .5] ×10 9Pa Backbone radius r[.0005 , . 0015]
+
+magnitudes of difference between them. To mitigate the risk of a single parameter dominating the others, we regularized our inputs by dividing or multiplying certain parameters to ensure that they were within at most one order of magnitude from the others (e.g. dividing the Young’s modulus by 10 9 to reduce its range to [15.5, 46.5]). This allowed us to keep our values from drowning out our smaller values while keeping the feature space of the parameters linear. 
+
+2) Training procedure: Our training procedure uses (14) and (15) sampled at n = 42 arclength locations and N
+
+training examples as our discrete loss. We update all model parameters using the Adam optimizer [16]. The learning rate is scheduled using the cyclical cosine annealing scheme [21]. Our schedule uses an initial learning rate of 10 −4, a warm up fraction of 0.3, a peak value of 3 × 10 −3, and end value of 5 × 10 −6, with 4 cycles and a γ of 0.7. We initialize this schedule assuming we will train for 100,000 epochs. However, because we stop training once the ℓ2 training error converges, only the first part of the schedule is typically seen. These convergences occurred after around 20000 epochs for the DeepONets and around 1500 epochs for the FNOs. IV. R ESULTS 
+
+A. Preliminaries 
+
+For our results section, we represent the effectiveness of our models by measuring their relative l2 error on general-ization, eℓ2 , defined by: 
+
+eℓ2 = ∥y − ˆy∥2
+
+∥y∥2
+
+, (16) where y is the ground truth vector, and ˆy is the model’s prediction of y. The accuracy of the model can be computed straightforwardly as (1 − eℓ2 ) ∗ 100% to give us a percent accuracy of our model. For each result in this section. We train the models over 3 different seeds and report the average of the relative errors for our results. For the remainder of this section, we will refer to each of our models with the following labels:  
+
+> •
+
+GDON as “DeepONetPose”; G′ 
+
+> DON
+
+as “DeepONet”.  
+
+> •
+
+GFNO as “FNOPose”; G′ 
+
+> DON
+
+as “FNO”. The rationale for this naming scheme is that the “Pose” variants explicitly output a “pose”: a backbone and a local orthonormal basis to describe the offset to the tendons. All experiments were run on an Nvidia RTX 4090 GPU with code written using the JAX python library. 
+
+B. Generalization Errors 
+
+First, we explored the generalization error as the number of design-equilibrium pairs {di, E(di}Ni=1 is increased by training each model to (training) convergence. This type of convergence study (error as a function of N ) is common in the neural operator literature. The idea is that the limit 
+
+N → ∞ corresponds to recovering the infinite-dimensional operator; in this setting, an absence of error decay would be concerning. The results are shown in Figure 5. Figure 5 shows that the accuracy of the model improves rapidly as N increases, but the rate of decrease of the error begins to slow down around N = 20 , 000 training pairs with the minimum error achieved for different models at different values of N . This is likely due to the fact that the model capacity has been reached; further decrease in error will likely require wider or deeper networks, or perhaps a higher value of p (for both DeepONets and FNOs), or possibly more advanced architectures (such as those based on transformers and attention, for instance). Another trend that can be clearly Fig. 5. Decay in generalization error as a function of number of training pairs N . We increase the number of training designs and the corresponding equilibrium configurations for all four models and compute errors according to (16). 
+
+seen is that DeepONets consistently achieve lower relative errors than FNOs. In addition, the “Pose” models (which output backbone positions and rotation matrices) outperform the baseline counterparts. The specific number of training functions required for a problem will in general depend on the ranges of the input design. 
+
+C. Model Parsimony     
+
+> Fig. 6. The effect of dropout on generalization errors for N= 80 ,000 .We see that dropout actually worsens the generalization errors across the board linearly, though it appears to aid the FNOPose model to a certain extent.
+
+Neural operators typically have a large number of trainable parameters (as do our models). Naturally, it is reasonable to ask if such high parameter counts are necessary for learning the map from the design space to the equilibrium position space. To explore this question, we added dropout regularization to our training procedure by inserting dropout layers between the layers in our models. Since dropout is the procedure of zeroing out neuron weights randomly, we use this test as a method of discerning if our models are overparametrized or merely sufficiently parameterized. For the DeepONet, we inserted dropout layers between every layer in the branch and trunk MLPs; for the FNOs, we included dropout between the Fourier layers. We then varied the dropout probability q and trained our models. The results are shown in Figure 6, which surprisingly shows that increasing q negatively impacts the relative error (in a linear fashion) even with small probabilities of zeroing out neurons. This overall behavior is indicative that our models appear to be fully utilizing all of their trainable parameters. Interestingly, there is a subtle difference between the DeepONet and FNO models: the DeepONet errors in-creases linearly with q, growing quicker than the FNO errors for small dropouts ( q ≤ 0.15 ); the latter grow sublinearly. For sufficiently large q, however, the FNO errors shoot up to be greater than the DeepONets. The FNO models seem to benefit slightly more from dropout; this is potentially due to dropout helping smooth away Gibbs’ oscillations caused by the FFT (though this is merely speculation on our part). We observe that the “Pose” models and their counterparts seem to behave similarly, though the error in the FNOPose model does shoot up a slightly later q than its counterpart. 
+
+D. Out-of-Distribution Predictions      
+
+> Fig. 7. Generalization errors for designs that are outside of the training distribution for models trained on N= 80 ,000 training pairs. The x-axis shows the percentage by which the design parameters are outside the training range.
+
+We also investigated the ability of our models to extrap-olate to out-of-distribution (OOD) inputs. Neural operators are widely regarded as capable of such extrapolation. To generate data for this OOD extrapolation test, we chose design parameters of varying ranges beyond our training range. We first created a set of bins, each with an upper and lower percent; specifically, we chose our bins to have a width of 5% and created four bins ranging the top end from 5%-20%. For each of these bins, we generated 1000 sets of random percentages, one random value for each input, within that bin’s range. Then, we took the ranges from Table I, added the percentage to the right end of that range, and created parameters with those value. We then fed the designs composed of these new OOD inputs through the same Cosserat rod solver to obtain the corresponding equilibrium configurations. Finally, we fed these OOD pairs through each trained model and computed relative errors between the model outputs and the solver outputs. These errors are shown in Figure 7. Figure 7 shows that our model accuracy falls off once we leave our training range, but with a strange caveat that small deviations actually improve the accuracy over the baseline! For instance, the 0-5% increase actually improved 
+
+the accuracy of our model, in some cases to 97% (over the baseline 90%). A careful inspection of the model parameters reveals the true reason for this improvement: increasing the ranges of our parameters can in some cases make the TDCR backbones stiffer, thereby reducing their range of motion and making the equilibrium configuration easier to predict. Our first data point for each model shows the in-distribution accuracy of our models (the -5% to 0% bin), once again showing that DeepONets are more accurate than FNOs, while the “Pose” models outperform their counterparts. The DeepONets errors appear to grow at a greater rate then the FNOs, with the DeepONetPose model’s error increasing exponentially until it becomes the least accurate model. We similarly see the FNO and FNOPose model errors increasing exponentially, with the FNOPose overtaking the FNO model at around 20%, though not as quickly as the DeepONet-Pose model. Surprisingly, the vanilla-DeepONet begins to show this same behavior, but then flattens out and becomes the most accurate model at high percentages, with very reasonable errors. It seems that the “Pose” models (which output a backbone and a rotation matrix) extrapolate worse than those without. This makes some sense as deviations in the columns of the rotation matrices could be amplified through the Gram-Schmidt method, leading to less reliable predictions. In the future, we will explore forming a basis for SO (3) and encoding that into the architectures directly. In general, the OOD tests show that the actual physics governing the TDCR can dictate the generalization capabili-ties of the neural operator surrogates. The OOD performance can likely be improved by either incorporating Cosserat rod physics into the models as a soft loss term or designing neural operators that architecturally respect the Cosserat model. We will explore these avenues in future work. 
+
+E. Timings 
+
+Finally, we present timings for all four models on an RTX 4090 GPU. The training times are shown for N = 1 , N =1000 , and N = 80 , 000 in Table II. While both DeepONets and FNOs take approximately the same time per training epoch, our DeepONets take O(20k) epochs to converge,                                     
+
+> TABLE II MODEL TRAINING TIMES AS A FUNCTION OF N.
+> Model N= 1 N= 1000 N= 80 ,000
+> DeepONet 149.4 s 150.6 s 108 min DeepONetPose 144.2 s 148.3 s 106 min FNO 13.66 s 14.66 s 15.5 min FNOPose 14.56 s 15.28 s 15.8 min TABLE III MODEL INFERENCE TIMES .
+> Model 1 design 1k designs 80k designs
+> DeepONet .0019 s .0022 s .0878 s DeepONetPose .0017 s .0021 s .0756 s FNO .0015 s .0015 s .1997 s FNOPose .0014 s .0016 s .2009 s
+
+while our FNOs require only O(2k) epochs for convergence. DeepONets were more accurate on generalization, but FNOs seem to possess a better accuracy-to-training-time tradeoff. It is certainly worth noting that our DeepONets required almost 2 hours to train on the largest N values while the FNOs only required 15 minutes. Of course, the modern perspective is that training is preprocessing, and that inference times are more important. In Table III, we show some inference times for predicting equilibrium configurations from designs using pretrained models. Here, we see that both the DeepONet and FNO models are capable of rapid inference, with DeepONets able to produce equilibria for 80 , 000 designs in less than 1/10 of a second, and FNOs in about 2/10 of a second. Given that all models are able to achieve high accuracy (approximately 90%) on generalization to never-seen-before designs, these results provide strong evidence that our neural operator models are well-suited to accurate and rapid inference. An alternative perspective is that neural operators can be used as an efficient and accurate forward model for real-time tasks involving TDCRs. V. CONCLUSION 
+
+In this work, we developed a mathematical framework for casting the problem of learning maps from TDCR de-signs to their equilibrium positions as an operator learning problem. We then developed four design-agnostic models based on neural operators that can generalize to new designs at runtime. We demonstrated the ability of these models to accurately and rapidly predict robot kinematics on new designs never seen before. In this work, we demonstrated results for 4-tendon TD-CRs. That said, our models are truly design-agnostic; they accept tendon paths, tensions, and offsets from the backbone. Adding more tendons will only require passing additional parameters (the number of tendons) and adding the extra paths, tensions, and offsets into the vector of parameters that determines a design. Further, in this work we designed surrogates based on DeepONets and FNOs. However, our mathematical framework is general and will lend itself well to other neural operators. This work takes significant steps toward a learned model that is accurate for the spectrum of designs rather than specific to one, enabling faster optimization, control, and planning for these robots. REFERENCES [1] E. A LMANZOR , C. L UCAS , J. B INGHAM , R. H ARTMANN , AND 
+
+M. Y IP , Static shape control of soft continuum robots using deep visual inverse kinematic models , IEEE Transactions on Robotics, 39 (2023), pp. 4689–4706. [2] S. S. A NTMAN , Nonlinear Problems of Elasticity , vol. 107 of Applied Mathematical Sciences, Springer, New York, 2 ed., 2005. [3] C. B ERGELES , F. Y. L IN , AND G. Z. Y ANG , Concentric tube robot kinematics using neural networks , in Hamlyn symposium on medical robotics, June 2015, pp. 1–2. [4] L. B HAN , P. Q IN , M. K RSTIC , AND Y. S HI , Neural operators for predictor feedback control of nonlinear delay systems , in Proceedings of the 7th Annual Learning for Dynamics & Control Conference, N. Ozay, L. Balzano, D. Panagou, and A. Abate, eds., vol. 283 of Proceedings of Machine Learning Research, PMLR, Jun 2025, pp. 179–193. [5] J. B URGNER -K AHRS , D. C. R UCKER , AND H. C HOSET , Continuum robots for medical applications: a survey , IEEE Transactions on Robotics, 31 (2015), pp. 1261–1280. [6] B. Y. C HO , D. S. E SSER , J. T HOMPSON , B. T HACH , R. J. W EB -
+
+> STER
+
+, AND A. K UNTZ , Accounting for Hysteresis in the Forward Kinematics of Nonlinearly-Routed Tendon-Driven Continuum Robots via a Learned Deep Decoder Network , IEEE Robotics and Automation Letters, 9 (2024), pp. 9263–9270. [7] P. D UPONT , N. S IMAAN , H. C HOSET , AND C. R UCKER , Continuum robots for medical interventions , Proceedings of the IEEE, 110 (2022), pp. 847–870. [8] C. D URIEZ , Control of elastic soft robots based on real-time finite element method , in Proc. IEEE Intl. Conf. on Robotics and Automation (ICRA), 2013, pp. 3982–3987. [9] G. F AGOGENIS , C. B ERGELES , AND P. E. D UPONT , Adaptive non-parametric kinematic modeling of concentric tube robots , in IEEE/RSJ international conference on intelligent robots and systems (IROS), Oct. 2016, pp. 4324–4329. [10] F. F ENG , W. H ONG , AND L. X IE , A learning-based tip contact force estimation method for tendon-driven continuum manipulator ,Scientific Reports, 11 (2021), p. 17482. [11] R. G RASSMANN , V. M ODES , AND J. B URGNER -K AHRS , Learning the forward and inverse kinematics of a 6-DOF concentric tube continuum robot in SE(3) , in 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Madrid, Spain, Oct. 2018, pp. 5125–5132. tex.booktitle: 2018 IEEE Int. Conf. Intell. Robots Syst. (IROS). [12] S. H E, C. Z OU , Z. D ENG , W. L IU , B. H E, AND J. Z HANG , Model-less optimal visual control of tendon-driven continuum robots using recurrent neural network-based neurodynamic optimization , Robotics and Autonomous Systems, 182 (2024), p. 104811. [13] R. J. W. III AND B. A. J ONES , Design and kinematic modeling of constant curvature continuum robots: A review , The International Journal of Robotics Research, 29 (2010), pp. 1661–1683. [14] M. K ASAEI , K. K. B ABARAHMATI , Z. L I, AND M. K HADEM , AData-efficient Neural ODE Framework for Optimal Control of Soft Manipulators , in The Conference on Robot Learning, PMLR, 2023, pp. 1–14. [15] , Data-efficient non-parametric modelling and control of an extensible soft manipulator , in IEEE International Conference on Robotics and Automation (ICRA), 2023, pp. 2641–2647. [16] D. P. K INGMA AND J. B A, Adam: A method for stochastic optimiza-tion , (2017). [17] N. B. K OVACHKI , Z. L I, B. L IU , K. A ZIZZADENESHELI , K. B HAT -
+
+> TACHARYA
+
+, A. M. S TUART , AND A. A NANDKUMAR , Neural oper-ator: Learning maps between function spaces , Journal of Machine Learning Research, 24 (2023), pp. 1–97. [18] A. K UNTZ , A. S ETHI , R. J. W EBSTER , III, AND R. A LTEROVITZ ,
+
+Learning the Complete Shape of Concentric Tube Robots , IEEE Transactions on Medical Robotics and Bionics, 2 (2020), pp. 140– 147. Publisher: IEEE. [19] Z. L I, N. K OVACHKI , K. A ZIZZADENESHELI , B. L IU , K. B HAT -
+
+> TACHARYA
+
+, A. M. S TUART , AND A. A NANDKUMAR , Fourier neural operator for parametric partial differential equations , in Proc. Intl. Conf. on Learning Representations (ICLR), 2021. arXiv:2010.08895. [20] N. L IANG , R. M. G RASSMANN , S. L ILGE , AND J. B URGNER -KAHRS , Learning-based Inverse Kinematics from Shape as Input for Concentric Tube Continuum Robots , in 2021 IEEE International Con-ference on Robotics and Automation (ICRA), May 2021, pp. 1387– 1393. [21] I. L OSHCHILOV AND F. H UTTER , Sgdr: Stochastic gradient descent with warm restarts , arXiv preprint arXiv:1608.03983, (2017). [22] L. L U, P. J IN , G. P ANG , Z. Z HANG , AND G. E. K ARNIADAKIS ,
+
+Learning nonlinear operators via DeepONet based on the universal approximation theorem of operators , Nature Machine Intelligence, 3 (2021), pp. 218–229. [23] S. M ATADA , L. B HAN , Y. S HI , AND N. A TANASOV , Generalizable motion planning via operator learning , in International Conference on Learning Representations (ICLR), 2025. Published as a conference paper at ICLR 2025. [24] A. O VADIA , A. K AHANA , P. S TINIS , E. T URKEL , AND G. E. K AR -
+
+> NIADAKIS
+
+, Vito: Vision transformer operator for pdes , arXiv preprint, (2023). [25] J. PATHAK , S. SUBRAMANIAN , P. HARRINGTON , S. RAJA ,A. C HATTOPADHYAY , M. M ARDANI , T. K URTH , D. H ALL , Z. L I,K. A ZIZZADENESHELI , P. H ASSANZADEH , K. K ASHINATH , AND 
+
+A. A NANDKUMAR , Fourcastnet: A global data-driven high-resolution weather model using adaptive fourier neural operators , arXiv preprint, (2022). [26] P. R AO , Q. P EYRON , S. L ILGE , AND J. B URGNER -K AHRS , How to model tendon-driven continuum robots and benchmark modelling performance , Frontiers in Robotics and AI, 7 (2021), p. 630245. [27] D. C. R UCKER AND R. J. W. III, Statics and dynamics of contin-uum robots with general tendon routing and external loading , IEEE Transactions on Robotics, 27 (2011), pp. 1033–1044. [28] D. C. R UCKER AND R. J. W EBSTER III, Statics and Dynamics of Continuum Robots With General Tendon Routing and External Loading , IEEE Transactions on Robotics, 27 (2011), pp. 1033–1044. Conference Name: IEEE Transactions on Robotics. [29] M. R USSO , M. G ANDOLFI , M. P ALPACELLI , S. L ONGHI , R. M U-
+
+> RADORE
+
+, V. Z IMMER , AND S. H ADDADIN , Continuum robots: An overview , Advanced Intelligent Systems, 5 (2023), p. 2200367. [30] C. D. S ANTINA , C. D URIEZ , AND D. R US , Model-based control of soft robots: A survey of the state of the art and open challenges , arXiv preprint arXiv:2110.01358, (2021). See also IEEE Control Systems Magazine, 43(3):30–65, 2023. [31] X. T ANG , T. Y ANG , J. W ANG , G. H AN , Q. S UN , H. P ENG , AND 
+
+Z. S UN , Neural operator-based haptic sensing along slender rods ,International Journal of Mechanical Sciences, 304 (2025), p. 110699. In Press, Journal Pre-proof. [32] T. G. T HURUTHEL , Y.-L. P ARK , C. L ASCHI , F. M ASTROGIOVANNI , 
+
+> AND
+
+E. F ALOTICO , Control strategies for soft robotic manipulators: A survey , Soft Robotics, 5 (2018), pp. 149–163. [33] J. T ILL , C. A LOI , AND D. C. R UCKER , Real-time dynamics of soft and continuum robots based on cosserat rod models , The International Journal of Robotics Research, 38 (2019), pp. 1575–1592. [34] I. D. W ALKER , Continuous backbone “continuum” robot manipula-tors , ISRN Robotics, 2013 (2013), p. 726506. [35] X. W ANG , H. C HEN , H. S ADEGHIAN , G.-Z. Y ANG , P. V ALDASTRI ,N. S IMAAN , R. C ARLONI , K. J IN , AND T. W ANG , A survey for machine learning-based control of continuum robots , Frontiers in Robotics and AI, 8 (2021), p. 730330. [36] W. X U, J. C HEN , H. Y. L AU , AND H. R EN , Data-driven methods towards learning the highly nonlinear inverse kinematics of tendon-driven surgical manipulators , The International Journal of Medical Robotics and Computer Assisted Surgery, 13 (2017), p. e1774. [37] H. YOU , Z. LI, K. AZIZZADENESHELI , N. B. KOVACHKI ,A. A NANDKUMAR , Y. Y U, AND G. E. K ARNIADAKIS , Learning physics-consistent neural operators: Towards robust deep learning for pdes , Computer Methods in Applied Mechanics and Engineering, 389 (2022), p. 114399. [38] J. Z HANG , Q. F ANG , P. X IANG , D. S UN , Y. X UE , R. J IN , K. Q IU ,R. X IONG , Y. W ANG , AND H. L U, A survey on design, actuation, modeling, and control of continuum robot , Cyborg and Bionic Sys-tems, 2022 (2022), p. 9754697.
