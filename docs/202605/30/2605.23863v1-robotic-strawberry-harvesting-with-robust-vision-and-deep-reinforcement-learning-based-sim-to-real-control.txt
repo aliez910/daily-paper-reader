@@ -1,0 +1,620 @@
+Title: Robotic Strawberry Harvesting with Robust Vision and Deep Reinforcement Learning based Sim-to-Real Control
+
+URL Source: https://arxiv.org/pdf/2605.23863v1
+
+Published Time: Mon, 25 May 2026 01:14:55 GMT
+
+Number of Pages: 21
+
+Markdown Content:
+# Robotic Strawberry Harvesting with Robust Vision and Deep Reinforcement Learning based Sim-to-Real Control 
+
+## Al Bashir a,b, †, Shao-Yang Chang c, †, Partho Ghose a,b , Prem Raj a,b , Chen-Kang Huang c
+
+## and Azlan Zahid a,b, ∗ 
+
+> a
+
+Department of Biological & Agricultural Engineering, Texas A&M University, College Station, TX 77843, USA  
+
+> b
+
+Texas A&M AgriLife Research, Texas A&M University System, Dallas, TX 75252, USA 
+
+> c
+
+Department of Biomechatronics Engineering, National Taiwan University, 10617, Taipei City, Taiwan 
+
+Abstract 
+
+This study presents a closed-loop robotic strawberry harvesting system that combines a robust vision module, simulation-trained deep reinforcement learning (DRL) control, and ROS-based real-robot execution. For perception, we propose HRAttnEdge-YOLO26-seg, a modified YOLO26-seg architecture that incorporates a high-resolution P2 branch, segmentation-path attention, and edge-supervised prototype learning to improve instance segmentation in cluttered scenes. For control, we train a target-conditioned Proximal Policy Optimization (PPO) policy in Isaac Lab to produce smooth joint-position commands for a UR10e manipulator and deploy it on a UR10e robot for target-fruit reaching and harvesting. This simulation-based approach reduces hardware dependency, lowers development cost, and allows scalable policy training without exhaustive physical trials before real deployment. The proposed vision model demonstrated the highest overall performance among the evaluated methods. On both self-collected and public datasets, the model showed a 10 to 14% im-provement in segmentation performance. In controlled in-house tests, the PPO controller produced stable and dynamically smoother motion than a inverse kinematics (IK)-based MoveIt baseline. In greenhouse trials, the proposed integrated system harvested 281 strawberries, achieving 96.6% reaching success, 91.3% grasp-and-pull success, and 84.3% overall harvesting success. These results illustrate that task-specific perception combined with simulation-trained PPO can serve as a prac-tical and resource-efficient alternative to conventional planner-dependent reaching in manipulation, enabling reliable closed-loop robotic harvesting in complex agricultural environments. 
+
+Keywords: Instance segmentation, Robot vision, PPO, Trajectory control, Isaac Lab, Motion plan-ning, Agricultural robotics. 
+
+# 1 Introduction 
+
+Harvesting is one of the most labor-intensive and cost-sensitive operations in agricultural production [1]. The problem is particularly acute in high-value specialty crops, such as strawberries, where fruit must be selected individually, handled carefully, and removed within a narrow window of maturity [2, 3]. In controlled-environment agriculture (CEA) and indoor farming systems, dense planting layouts, repeated picking cycles, and strict fruit-quality requirements further intensify these demands [4]. At the same time, persistent labor shortages [5] and increasing labor costs [6] continue to accelerate the demand for intelligent robotic harvesting systems [7]. Despite recent progress, achieving reliable robotic harvesting remains challenging because the system must simultaneously solve three tightly coupled problems: ac-curate fruit perception in cluttered scenes, stable 3D target estimation for manipulation, and efficient motion generation under uncertainty and workspace constraints [8, 9].  
+
+> †
+
+These authors contributed equally  
+
+> ∗
+
+Corresponding author 
+
+albashir@tamu.edu (A. Bashir); r13631040@ntu.edu.tw (S. Chang); partho.ghose@tamu.edu (P. Ghose); 
+
+prem.raj@tamu.edu (P. Raj); ckhuang94530@ntu.edu.tw (C. Huang); azlan.zahid@tamu.edu (A. Zahid) ORCID(s): 0000-0003-2168-2840 (A. Bashir); 0000-0002-5840-2008 (P. Ghose); 0000-0001-6202-8680 (A. Zahid) 
+
+1
+
+> arXiv:2605.23863v1 [cs.RO] 22 May 2026
+
+Figure 1: Overview of the closed-loop robotic strawberry harvesting system. An RGB-D camera acquires greenhouse fruit scenes, and the proposed HRAttnEdge-YOLO26-seg model segments target strawberries. Smoothed 3D target points are derived from the center point of the segmented mask, corresponding depth, and camera intrinsics. In parallel, a PPO policy trained in Isaac Sim/Lab generates reaching motions of the UR10e robot towards the target. All processes, including perception, target generation, robot motion, and gripper-level harvesting actions, are integrated and executed through ROS. Prior works have explored a wide range of perception and robotic control strategies [10, 11]. For perception, while geometry and point-cloud-based approaches improve spatial reasoning, they typi-cally introduce additional sensing, calibration, and computational overhead that limits real-time deploy-ment [12, 13]. Consequently, deep learning-based object detection and segmentation frameworks have been extensively adopted for fruit localization [14, 15]. On the manipulation side, most harvesting sys-tems rely on inverse-kinematics (IK) [16], motion-planning, or visual-servoing-based controllers [17, 18]. For example, Huang Z. et al. [14] and Wu S. et al. [10] consecutively developed robotic cucumber and camellia oleifera fruit-harvesting systems using a Fuzzy self-attention enhanced YOLOv8n [19] and a modified YOLO11 [20] detector models for perception. However, the control module remained depen-dent on Hybrid Visual Servo Control (HVSC) [21], which is computationally complex [21], sensitive to calibration and environmental noise [22, 23], and vulnerable to singularities that can induce unstable motion [24]. On the other hand, Arad B. et al. [11] and Bhat K. M. et al. [25] developed IK-based motion control for robotic harvesting of peppers. However, their dependence on general-purpose percep-tion techniques, such as color thresholding and a pre-trained YOLO11 model, restricts the effectiveness of downstream robotic operations. Because general-purpose perception often yields unstable masks and inaccurate boundaries in highly cluttered agricultural environments, resulting in unreliable target gen-eration [26, 27]. At the same time, IK-based controllers remain sensitive to perception noise, visibility constraints, and environmental variation, often producing inefficient or unstable trajectories [9]. To overcome these limitations, we propose a robust end-to-end perception-to-action framework for autonomous greenhouse strawberry harvesting. For perception, we introduce HRAttnEdge-YOLO26-seg ,a high-resolution, attention-guided, and edge-supervised architecture specifically designed for cluttered fruit scenes. The proposed vision model enhances small-object representation and mask fidelity through three coordinated components: a stride-4 feature branch for preserving fine spatial details, segmentation-path attention for emphasizing fruit-relevant representations, and edge-supervised prototype learning for improving boundary consistency. The resulting segmentation masks are fused with aligned depth information [28]to estimate stable and manipulation-ready 3D fruit targets. For robotic control, we apply deep reinforcement learning (DRL) [29], specifically Proximal Policy Optimization (PPO) [30] because of its stable optimized characteristics and reliable empirical performance [31, 32]. However, training a physical robot using PPO is often expensive, slow, and non-scalable, requiring extensive iterations [33] and is prone to damage to both hardware and crops [34, 35] owing to its physical trial-and-error process. To avoid these possibility of damage, in this study, we train the PPO policy algorithm in the Isaac Lab [36] simulation framework for manipulation, which facilitates scalable and domain-randomized learning to generate smooth, target-directed, and continuous joint-position motion for a UR10e robot manipulator without extensive trial-and-error in the real world. This state-of-the-art approach not only reduces development costs but also enables to transfer learned control policy from simulations to physical platforms [37, 38]. Finally, a Robot Operating System (ROS)-based execution framework 2is developed to integrate perception, 3D target estimation, robotic motion control, and gripper-level harvesting execution into a unified real-world autonomous harvesting pipeline. An overview of the proposed system is illustrated in Figure 1. The main contributions of this study are as follows: 1. We propose HRAttnEdge-YOLO26-seg , a modified YOLO26-seg [39] architecture for strawberry instance segmentation in greenhouse scenes, integrating a high-resolution P2 branch, segmentation-path attention, and edge-supervised prototype learning. 2. A target-conditioned reaching controller is developed for a UR10e manipulator using simulation-based PPO training in Isaac Lab, enabling learning-based motion generation without extensive physical trial-and-error during controller development. 3. We integrate perception and control into a ROS-based closed-loop harvesting pipeline that converts segmented fruit instances into smoothed 3D robot targets and executes sequential harvesting actions on the physical system. The proposed framework is evaluated at both the perception and system levels through vision experi-ments, robot-motion assessment, and real greenhouse harvesting trials. 
+
+# 2 Methodology 
+
+## 2.1 Vision Module and 3D Localization 
+
+2.1.1 HRAttnEdge-YOLO26-seg: a Modified YOLO26-seg for Strawberry 
+
+We address strawberry instance segmentation in cluttered and occluded greenhouse scenes. Given an RGB image I ∈ RH×W ×3, the model predicts K instances, (ˆbk, ˆck, ˆmk)Kk=1 , where ˆbk ∈ R4 is the bound-ing box, ˆck ∈ 1, . . . , C is the class label, and ˆmk ∈ 0, 1H×W is the binary mask. Our baseline is YOLO26-seg [39], a lightweight one-stage instance segmentation model whose head uses three pyramid levels: P3/8, P4/16, and P5/32. While efficient, this design is less effective in agriculture scenes, where masks are degraded due to small visible fruit regions, leaf and stem clutter, partial occlusion, and fine boundaries around the calyx and fruit edge. To address this, we propose HRAttnEdge-YOLO26-seg: a high-resolution attention-guided and edge-supervised YOLO26-seg, a modification of YOLO26-seg that improves high-resolution mask quality. The final design includes: (i) P2/4 integration into the segmen-tation head to preserve stride-4 spatial detail; (ii) Cross Stage Partial with Spatial Attention (C2PSA) applied to the segmentation path of P2/4 and P3/8 features to strengthen boundary-aware representa-tion with limited overhead; and (iii) a multi-scale fused prototype generator with boundary supervision (Proto26Edge), which adds an edge head and auxiliary edge loss to the prototype branch. The model is optimized for both detection and segmentation, with particular emphasis on high-IoU mask quality, where boundary precision is most critical. Figure 2 highlights the differences between the baseline and the proposed model. 
+
+P2/4 high-resolution branch. The baseline head uses {P3, P 4, P 5} features at strides {8, 16 , 32 } for segmentation. Strawberries often contain fine contours (calyx, specular edges, thin occluded boundaries) that might poorly represented at stride 8. We therefore introduce an additional stride-4 feature level 
+
+P2/4 and feed it into the segmentation head, yielding the four-scale feature set {P2, P 3, P 4, P 5}. Let 
+
+Fl denote the refined feature map at pyramid level l. The newly introduced P2 feature is formed by upsampling the refined P3 feature and concatenating it with the corresponding backbone feature: 
+
+F2 = ϕ2([Up( F3), B2]) , (1) where B2 is the backbone feature at P2, Up( ·) denotes upsampling, [·, ·] denotes channel concatenation, and ϕ2(·) denotes the convolutional refinement block. This additional branch retains fine spatial details that would otherwise be lost in lower-resolution features. 
+
+Segmentation-path targeted attention. To sharpen mask representation without increasing com-putation across the entire network, we apply attention only along the mask-critical path. Specifically, we 3Baseline YOLO26-seg Proposed HRAttnEdge-YOLO26-seg                                         
+
+> Input I
+> Backbone B
+> P3/8,P4/16,P5/32
+> Head H
+> FPN/PAN
+> Detect head
+> ˆb, ˆc
+> Segment26 (3 scales)
+> ˆm
+> Proto26 train: (P, S )
+> Mask decode
+> ˆmk=σ(α⊤
+> kP)
+> Outputs
+> {ˆbk,ˆck,ˆmk}Kk=1
+> Ldet (ˆb, ˆc;b⋆, c ⋆)
+> Lseg ( ˆ m;m⋆)
+> Input I
+> Backbone B
+> P2/4,P3/8,P4/16,P5/32
+> Head H
+> FPN/PAN + P2 path
+> Detect head
+> ˆb, ˆc
+> Mask-path refinement C2PSA on P2,P3
+> Segment26 (4 scales)
+> ˆm
+> Proto26Edge train: (P, S, E )
+> Mask decode
+> ˆmk=σ(α⊤
+> kP)
+> Outputs
+> {ˆbk,ˆck,ˆmk}Kk=1
+> Ldet (ˆb, ˆc;b⋆, c ⋆)
+> Lseg ( ˆ m;m⋆)Ledge ( ˆE;E⋆)
+> Lsem ( ˆS;S⋆)
+> Modified Added Auxiliary loss branch
+
+Figure 2: Side-by-side comparison of baseline YOLO26-seg and the proposed HRAttnEdge-YOLO26-seg. The proposed model integrates a stride-4 segmentation feature (+P2), applies C2PSA to the P2 and P3 mask-path features, replaces Proto26 with Proto26Edge, and introduces auxiliary semantic and boundary supervision during training. Solid arrows denote forward inference flow, whereas dashed arrows indicate gradient propagation from the corresponding loss terms during backpropagation. insert C2PSA on the stride-4 and stride-8 head outputs. Let A(·) denote the C2PSA attention operator. The refined attended features are: 
+
+˜F2 = A(F2), ˜F3 = A(F3), (2) where ˜F2 and ˜F3 are used in subsequent segmentation refinement and mask-coefficient prediction. This choice targets the two resolutions that most strongly affect boundary precision: F2 provides pixel-level geometry, while F3 offers a detail semantics balance. We also implemented a guard that prevents zero-head configurations by enforcing a valid head count in PSA: 
+
+nh = max 
+
+(
+
+1,
+
+⌊ d
+
+64 
+
+⌋) 
+
+, (3) where d denotes the PSA internal channel width. 
+
+Multi-scale prototype learning with edge supervision. The standard prototype branch, Proto26, has been replaced by a multi-scale fused prototype module, denoted as Proto26Edge . Given the feature set {˜F2, ˜F3, F4, F5}, multi-scale prototype fusion is expressed as 
+
+Fproto = ψ
+
+(˜F2 +
+
+> 5
+
+∑
+
+> l=3
+
+Up l→2(gl(Fl)) 
+
+)
+
+, (4) 4where gl(·) is a 1 × 1 channel-alignment operator, Up l→2(·) upsamples each feature to the P2 spatial resolution, and ψ(·) denotes the final fusion convolution. From Fproto , the model predicts the shared mask prototypes: 
+
+P = hproto (Fproto ) ∈ RNp×Hp×Wp , (5) where Np is the number of prototype channels. Each instance mask is reconstructed by linearly combining the prototypes with an instance-specific mask coefficient vector ci:
+
+Mi = σ
+
+
+
+> Np
+
+∑
+
+> k=1
+
+ci,k Pk
+
+ , (6) where σ(·) denotes the sigmoid activation and Pk is the k-th prototype channel. In addition to prototype learning, the fused feature Fproto is used to predict an auxiliary boundary map: 
+
+Epred = hedge (Fproto ), (7) where hedge (·) is a lightweight edge head. This auxiliary branch explicitly encourages crisp object bound-aries during training. 
+
+Loss formulation. The proposed model is optimized using a composite objective consisting of detec-tion, instance segmentation, auxiliary semantic supervision, and auxiliary boundary supervision. The total training loss is defined as 
+
+Lvision = Lbox + Lcls + Ldfl + λseg Lseg + λsem Lsem + λedge Ledge , (8) where Lbox denotes the bounding-box regression loss, Lcls the classification loss, and Ldfl the distribution focal loss inherited from the YOLO26 detection framework. The term Lseg is the instance mask loss, 
+
+Lsem is the auxiliary semantic segmentation loss produced by the prototype branch, and Ledge is an auxiliary boundary loss used to encourage sharper mask contours. For boundary supervision, a binary foreground map G is first formed by taking the union of all ground-truth instance masks in each image. The corresponding edge target is then generated by a morphological gradient operation, 
+
+Egt = Dilate( G) − Erode( G), (9) which highlights contour pixels around the foreground boundary. Let ˆE denote the predicted edge logit map from the auxiliary edge branch. The edge loss is computed as 
+
+Ledge = λbce LBCE ( ˆE, Egt ) + λdice LDice ( ˆE, Egt ), (10) where LBCE and LDice denote the binary cross-entropy and Dice losses, respectively. This auxiliary edge branch is used only during training to improve boundary awareness and is not required for standard instance-mask inference. 
+
+2.1.2 3D fruit-center localization 
+
+The perception module was implemented as a ROS node that subscribes to RGB images, corresponding depth frames, and camera intrinsics. For each segmented strawberry instance from the HRAttnEdge-YOLO26-seg model, the 2D center point (u, v ) was estimated from the mask polygon coordinates. The aligned depth value at the center pixel was then used to recover the 3D fruit-center position in the camera coordinate frame. Given pixel coordinates (u, v ), depth value Zc, and camera intrinsics (fx, f y , c x, c y ), the 3D point 
+
+(Xc, Y c, Z c) in the camera frame is computed by pinhole back-projection: 
+
+Xc = (u − cx)Zc
+
+fx
+
+, Yc = (v − cy )Zc
+
+fy
+
+, Zc = Zc. (11) This process generates a 3D target for each segmented fruit. Only valid depth values were used; detections with ≤ 75% Intersection over Union (IoU) and invalid depth were discarded. 52.1.3 Temporal association and smoothing 
+
+3D fruit targets in greenhouse scenes may fluctuate across frames because of depth noise, small segmen-tation variations, and partial occlusions. To reduce target jitter before robot execution, a lightweight temporal association and smoothing scheme was applied. Let p(j) 
+
+> t
+
+denote the 2D center of segmented mask j in frame t, and let ˆp(k) 
+
+> t−1
+
+denote the most recent 2D center stored in active track k. For each new detection, the nearest existing track is found in the image plane as 
+
+k∗(j) = arg min 
+
+> k∈K t−1
+
+∥∥∥p(j) 
+
+> t
+
+− ˆp(k)
+
+> t−1
+
+∥∥∥2
+
+, (12) where Kt−1 is the set of active tracks from the previous frame. The assignment is accepted only if the corresponding pixel distance is less than the threshold τp; otherwise, a new track is initialized. After association, the 3D fruit center, obtained from (11) for mask j, is appended to the buffer of its matched track k∗(j). For each track, a buffer of recent 3D estimates is maintained, and once the buffer is filled, the smoothed target is computed by temporal averaging: 
+
+¯q(k) 1
+
+NbNb∑
+
+> n=1
+
+q(k) 
+
+> n
+
+, (13) where q(k) 
+
+> n
+
+is the n-th buffered 3D estimate associated with track k, and Nb is the buffer length ( Nb = 15 in our experiment). The averaged point ¯q(k) is then published as the final smoothed target for downstream robot control. 
+
+## 2.2 DRL-based Target Reaching Policy in Simulation 
+
+The target reaching controller was trained in Isaac Lab environment built around the UR10e robotic arm and a sampled end-effector pose command. At each episode, a target pose was generated within a predefined reachable workspace, and the control objective was to drive the end-effector from its initial configuration to the commanded pose within a fixed episode horizon. Policy learning utilized Isaac Lab’s standard reinforcement learning workflow with PPO, in which parallel simulation environments were used. In this experiment, 64 environments were employed in parallel to gather rollout trajectories for policy and value updates. Figure 3 summarizes the overall PPO-based learning pipeline used for UR10e reaching policy training. 
+
+2.2.1 Observation and action spaces 
+
+The policy input was defined as a compact observation vector composed of robot proprioception, task command, and action history: 
+
+ot = [qrel t , ˙qrel t , cee t , at−1
+
+] , (14) where qrel t ∈ R6 and ˙qrel t ∈ R6 denote the relative joint positions and joint velocities of the UR10e, respectively, cee t denotes the commanded end-effector pose, and at−1 is the previous action applied by the policy. In this formulation, the pose command serves as the task-conditioning term that specifies the desired end-effector goal at time step t.The policy output was a continuous joint-position action 
+
+at ∈ R6, (15) corresponding to the six revolute joints of the UR10e arm. These actions were passed through Isaac Lab’s joint-position action interface after scaling, allowing the policy to generate incremental motions toward the commanded pose. The inclusion of the previous action in Eq. (14) encouraged temporal consistency and reduced abrupt changes in joint commands. 
+
+2.2.2 Reward formulation 
+
+The reward function combined target-reaching objectives with motion regularization. Let xee t ∈ R3 and 
+
+xcmd t ∈ R3 denote the current and commanded end-effector positions, respectively. The position tracking error was defined as 
+
+dt = ∥∥xee t − xcmd t
+
+∥∥2 . (16) 6Observation   
+
+> ot=
+
+[qrel t , ˙qrel t , cee t , at−1
+
+] Goal-conditioned Reach Environment                      
+
+> E(ot,at;cee t)7→(rt,ot+1 )
+> UR10e in Isaac Lab parallel simulation
+> Rollout Buffer
+> (ot,at, r t,ot+1 )
+> GAE & Returns
+> ˆAt,ˆRt
+> PPO Update
+> LPPO +Lvalue − H
+> Actor Network
+> πθ(at|ot)
+> Critic Network
+> Vϕ(ot)
+> Exported
+> (for deployment)
+> ot
+> ot
+> ot
+> at
+> (ot,at, r t,ot+1 )
+> ˆAt,ˆRt
+> update Vϕ
+> update πθ
+> trained policy
+
+Figure 3: PPO-based reaching policy learning for the UR10e manipulator in Isaac Lab. At each time step, the policy receives the observation vector ot = [ qrel t , ˙qrel t , cee t , at−1], where qrel t and ˙qrel t denote relative joint positions and velocities, cee t is the commanded end-effector pose, and at−1 is the previous action. The goal-conditioned reach environment is denoted by E(ot, at; cee t ), indicating that the current observation and action are propagated under the commanded end-effector pose to produce the immediate reward rt and the next observation ot+1 . The actor network outputs the continuous joint-position action 
+
+at, while the critic estimates the value function Vϕ(ot). Interaction tuples (ot, at, r t, ot+1 ) are stored in the rollout buffer and used to compute the generalized advantage estimate (GAE) ˆAt and return ˆRt.PPO then updates the policy and value networks. At each check-point the trained actor is exported as a TorchScript policy for ROS-based deployment. To encourage both coarse convergence and accurate final positioning, the reward included two com-plementary position terms. The first term penalized Euclidean distance to the target: 
+
+rpos (t) = − dt, (17) which encouraged global movement toward the commanded position. The second term provided fine-grained shaping near the goal through a bounded exponential form: 
+
+rf ine (t) = exp 
+
+(
+
+− dt
+
+σ
+
+)
+
+, (18) where σ > 0 controlled the sharpness of reward concentration around the target. This term increased the reward sensitivity in the near-goal region, thereby improving terminal precision. In addition to positional alignment, the controller was trained to track the commanded end-effector orientation. Let Ree t and Rcmd t denote the current and commanded end-effector rotations, respectively, and let ∆θt denote the corresponding orientation error. The orientation reward was written abstractly as 
+
+rori (t) = − ∆θt, (19) where ∆θt was computed from the mismatch between the current and target end-effector orientations. To regularize motion, two penalties were introduced. The first penalized rapid action changes: 
+
+ract (t) = − ∥ at − at−1∥22 , (20) and the second penalized high joint velocities: 
+
+rvel (t) = − ∥ ˙qt∥22 . (21) The total reward at each time step was therefore defined as 
+
+rt = w1rpos (t) + w2rf ine (t) + w3rori (t) + w4ract (t) + w5rvel (t), (22) where w1, . . . , w 5 are scalar weighting coefficients specified in the environment configuration. This re-ward formulation guided the policy toward accurate goal-reaching while discouraging oscillatory and dynamically aggressive motions. 7Camera node (RGB-D) 
+
+> Vision node (HRAttnEdge-YOLO26-seg +smooth 3D target)
+> Harvest controller (task sequencing)
+> Policy controller (PPO)
+> Command interface (reach streamer)
+> Gripper controller (SG-b-h)
+> ROS 1
+
+Figure 4: ROS-based integration architecture for greenhouse strawberry harvesting. The vision node publishes smoothed 3D fruit targets, the harvesting controller manages task sequencing, the policy controller generates target-conditioned robot actions, and the gripper branch executes deterministic grasp and release commands. 
+
+2.2.3 PPO optimization 
+
+The reaching policy was optimized using PPO with the RSL-RL [40] backend. Let πθ (at | ot) denote the stochastic policy parameterized by θ, and let Vϕ(ot) denote the value function parameterized by ϕ.PPO updates the policy by maximizing the clipped surrogate objective: 
+
+LPPO (θ) = Et
+
+[
+
+min 
+
+(
+
+ρt(θ) ˆAt, clip( ρt(θ), 1 − ϵ, 1 + ϵ) ˆAt
+
+)] 
+
+, (23) where 
+
+ρt(θ) = πθ (at | ot)
+
+πθold (at | ot) (24) is the importance sampling ratio between the updated policy and the behavior policy used to collect rollout samples, ˆAt is the estimated advantage, and ϵ is the clipping parameter. The advantage term was computed using generalized advantage estimation (GAE): 
+
+ˆAt = 
+
+> T−t−1
+
+∑
+
+> l=0
+
+(γλ )lδt+l, (25) where γ is the discount factor, λ is the GAE decay parameter, and the temporal-difference residual is 
+
+δt = rt + γV ϕ(ot+1 ) − Vϕ(ot). (26) In addition to the clipped policy objective, PPO included a value regression term and an entropy regularization term. The overall optimization objective can be written as 
+
+LPPO  
+
+> total
+
+= −L PPO + cv Lvalue − ce H[πθ (· | ot)] , (27) where cv and ce are scalar coefficients controlling the contributions of the value loss and entropy bonus, respectively. The entropy term encouraged sufficient exploration during training, while the value term stabilized learning by improving return estimation. In this study, the core PPO algorithm itself was not modified. Instead, the contribution of the control module lies in training a simulation-based reaching policy for the UR10e arm within an Isaac Lab environment, formulating the goal-conditioned reward function, and then integrating the exported policy into the full robotic strawberry harvesting pipeline for real-system execution. 
+
+## 2.3 ROS-based Integration for Harvesting 
+
+For physical deployment, we developed a ROS-based framework that integrates perception, policy-based reaching, and high-level harvesting execution within a single runtime pipeline (Figure 4). The system consists of three functional layers: (i) a perception layer for segmentation and 3D fruit-center estimation, (ii) a policy-control layer that loads the exported reaching policy and computes robot actions, and (iii) a task-execution layer that coordinates the harvesting sequence. This modular design separates perception, control, and operations logic, enabling closed-loop execution while simplifying debugging and module-level validation. The perception node publishes temporally smoothed strawberry centers as ROS PointStamped mes-sages. These targets are mapped from the camera to the UR10e operating frame using a calibrated 8coordinate transformation. Let (Xc, Y c, Z c) denote the fruit center in the camera frame. The corre-sponding robot-frame target (Xr , Y r , Z r ) is computed as: 
+
+
+
+Xr
+
+Yr
+
+Zr
+
+ = T
+
+
+
+Xc
+
+Yc
+
+Zc
+
+1
+
+ , (28) where T denotes the effective rigid transformation and offset mapping from perception space to robot workspace. The exported PPO policy generates target-conditioned joint-position actions for the UR10e arm. Because the learned policy produces spatial joint commands without explicit temporal scheduling, a command-streaming layer was introduced between policy inference and robot execution. Let ∆qt denote the policy-generated joint displacement at step t. The minimum feasible execution time is chosen as 
+
+∆tt = max 
+
+> i
+
+( |∆qt,i |
+
+˙qi, max 
+
+)
+
+, (29) where ∆qt,i is the commanded displacement of joint i and ˙qi, max is its maximum allowable velocity. The pair (∆ qt, ∆tt) is then encoded into a ROS JointTrajectory message for execution by the UR10e controller, allowing the learned target-directed motion to be applied safely on hardware. A halt mechanism was further incorporated to suppress steady-state oscillation near the target. Dur-ing continuous execution, small residual policy corrections can produce high-frequency motion updates even after the end-effector has effectively converged. Rather than using a simple position-threshold stop, which may terminate motion prematurely, the streamer monitors command transitions online and engages a halt state when the resulting motion demand exceeds a predefined safety threshold near convergence. This reduces end-effector vibration and stabilizes the final reaching state during physical harvesting. Each harvesting trial starts from a predefined home position, where the perception node localizes ripe strawberries in the workspace. A sequential harvesting routine then prioritizes the nearest detected berry, executes the learned reaching policy, and performs a downward pull-based detachment. After transferring the fruit to the collection basket, the robot proceeds to the next identified instance in the current frame. This process continues until no valid targets remain, at which point the robot returns to the home position and re-scans the scene if needed. Gripper actuation was handled separately from the reaching policy through deterministic commands during grasping and release. This separation assigns target-reaching to the learned controller while preserving a stable and repeatable grasp-and-release routine at the end effector. 
+
+# 3 Experiment 
+
+## 3.1 Experimental Setup 
+
+The vision module was trained on a Linux workstation running Ubuntu 22.04 LTS equipped with dual Intel Xeon Gold processors (3.0 GHz, 24 cores, 35.75 MB cache), 256 GB RAM, and an NVIDIA RTX A6000 GPU with 48 GB VRAM. All experiments were conducted in the Ultralytics training frame-work using mixed-precision (AMP) to improve throughput. Unless otherwise stated, training used an input resolution of 640 × 640 , batch size 16, and a maximum of 200 epochs with early stopping (pa-tience = 15). Optimization used AdamW with an initial learning rate of 2 × 10 −4 under a cosine learning-rate schedule. Standard photometric and geometric augmentations were enabled (HSV jitter, rotation/translation/scale/shear, and horizontal flips), together with composition-based augmentation suitable for instance segmentation (mosaic, MixUp, and segment copy–paste); mosaic was disabled during the final 10 epochs to stabilize late-stage boundary refinement. For the proposed Proto26Edge branch, auxiliary boundary supervision was applied throughout training with an edge-loss gain of 0.2. To ensure a fair comparison between baseline and modified architectures, all models were trained from scratch without pretrained weights. The control policy was trained on the same workstation using Isaac Lab’s manager-based reinforce-ment learning workflow with the Robotics Student League – Reinforcement Learning (RSL-RL) backend on top of Isaac Sim 5.1.0. Isaac Lab provided the vectorized environment wrappers required for large-scale parallel policy training, along with policy export utilities. The experimental deployment platform consisted of a RB-VOGUI mobile robot (Robotnik Automa-tion, Paterna, Spain) with an onboard Intel i7-based computer running Linux, a UR10e robotic arm 9Table 1: Summary of the datasets used in this study.                       
+
+> Dataset #Images #Instances (approx.) Split ratio (%) Split size (# images) Label Train Val Test Train / Val / Test Self-collected ( Dself )647 1494 70.0 15.0 15.0 453 / 97 / 97 ripe_strawberry Public ( Dpub ) [41] 3100 197,997 90.3 3.2 6.5 2800 / 100 / 200 strawberry
+
+(Universal Robot, Odense, Denmark) mounted on top of the mobile platform, an SG-b-h soft gripper (OnRobot, Odense, Denmark) attached to the tool center point, and an Intel RealSense 435i RGB-D camera mounted near the end-effector for close-range perception. During execution, the perception, pol-icy inference, and task-level harvesting controllers were operated under ROS 1 on the onboard computer, while the UR10e arm was interfaced through the PolyScope 5.19 control environment. The experiment took place in a strawberry greenhouse at the Texas A&M AgriLife Research Center in Dallas, TX, USA. 
+
+## 3.2 Datasets for Vision Model 
+
+Table 1 presents a summary of the datasets utilized for training and evaluation of the vision model in this study. We evaluated our proposed HRAttnEdge-YOLO26-seg model using two distinct strawberry datasets. The first dataset consisted of self-collected images of greenhouse-grown strawberries, captured with an Intel RealSense 435i RGB-D camera (Intel Corporation, Santa Clara, CA, USA). This dataset contained a total of 653 color images, with each image containing approximately 2.3 instances of ripe strawberries. Annotations were created using CVAT [42], following the YOLO segmentation format, which employs normalized polygon masks. This dataset was divided into 70% for training, 15% for validation, and 15% for testing. The second dataset we used is StrawDI (The Strawberry Digital Images Data Set) [41], which is publicly available. This dataset contains 3,100 color images, with an average of approximately 6.4 instances of strawberries per image. Each image has a corresponding ground truth grayscale polygon mask, where the background is coded as 0, and strawberries are labeled with values ranging from 1 to n (where n is the total number of instances). We converted these grayscale labels into the YOLO segmentation format. The dataset publisher divided the images as follows: 2,800 images (approximately 90.32%) for training, 100 (3.23%) for validation, and 200 (6.45%) for testing. We preserved this same split to train, validate, and evaluate our model, as well as to conduct comparisons with the state-of-the-art. In both datasets, the validation set was utilized to guide model convergence during training. Abla-tion studies and comparisons with state-of-the-art methods were conducted using the held-out test set completely separately. 
+
+## 3.3 Evaluation Metrics 
+
+3.3.1 Performance Assessment of Vision 
+
+The performance of the vision models was evaluated using standard metrics. Detection and segmentation performance were assessed on instance bounding boxes and masks, respectively. We report precision ( P )and recall ( R), where overlap between prediction and ground truth is measured by intersection over union (IoU). We also report mAP 50 and mAP 75 respectively, together with mAP 50:95 , which averages AP over IoU thresholds from 0.50 to 0.95 in steps of 0.05 [43, 44]. 
+
+3.3.2 Motion and Harvesting Assessment 
+
+We evaluated the integrated robotic harvesting pipeline from two complementary perspectives: (i) motion quality of the robot during target-reaching segments, and (ii) task-level success at harvesting trials of the target, while the localized target comes from the vision module. The motion analysis characterizes efficiency and smoothness of the executed trajectories, whereas the task-level metrics reflect whether the system can reliably reach and harvest strawberries under closed-loop operation. 
+
+Trajectory logging and smoothing. To assess motion quality, the transformation between the robot base frame and tool frame was sampled periodically using Transform Library-2 (TF2) during each move-10 ment segment. This produced a sequence of Cartesian samples-
+
+T = {(τi, pi)}Ni=1 , pi = [ xi, y i, z i]⊤, (30) where τi denotes the sampling time and pi denotes the tool position. To reduce the effects of transform noise and irregular timestamps, the trajectory was interpolated onto a uniform time grid and smoothed using a moving-average filter. For path-length estimation, the smoothed trajectory was further simplified using the Ramer–Douglas–Peucker [45, 46] algorithm. The resulting trajectory is denoted as-
+
+˜p(t) = [ ˜x(t), ˜y(t), ˜z(t)] ⊤. (31) 
+
+Motion metrics. Each motion segment was characterized using the metrics listed in Table 2. Let 
+
+tstart and tend denote the start and end times of a segment. The segment duration is 
+
+T = tend − tstart . (32) The straight-line distance between the initial and final tool positions is 
+
+Dstraight = ∥˜p(tend ) − ˜p(tstart )∥2 . (33) If the simplified trajectory is represented by M ordered points {sm}Mm=1 , the executed trajectory length is 
+
+Ltraj = 
+
+> M−1
+
+∑
+
+> m=1
+
+∥sm+1 − sm∥2 . (34) The mean speed is then computed as 
+
+¯v = Ltraj 
+
+T . (35) To quantify motion smoothness, velocity, acceleration, and jerk were obtained by numerical differen-tiation of the smoothed trajectory: 
+
+v(t) = d˜p(t)
+
+dt , a(t) = dv(t)
+
+dt , j(t) = da(t)
+
+dt . (36) The jerk magnitude is 
+
+j(t) = ∥j(t)∥2. (37) The root-mean-square jerk is defined as 
+
+Jrms =
+
+√
+
+1
+
+T
+
+∫ tend 
+
+> tstart
+
+j(t)2 dt, (38) which summarizes the overall smoothness of the motion over the full segment. To reduce sensitivity to isolated numerical spikes, the peak jerk was reported using a robust percentile statistic, 
+
+Jrobust peak = Qq (j(t)) , (39) where Qq (·) denotes the q-th percentile of the jerk magnitude sequence. 
+
+Task-level success metrics. In addition to motion quality, we evaluated whether the robot could successfully complete the reaching and harvesting tasks (Table 2). Let Nr denote the total number of reaching attempts. For the k-th attempt, define the binary indicator 
+
+sreach  
+
+> k
+
+=
+
+{
+
+1, if dfinal  
+
+> k
+
+≤ εr and the target is reached before timeout ,
+
+0, otherwise , (40) where dfinal  
+
+> k
+
+is the final end-effector-to-target position error and εr is the reaching tolerance ( εr = 2 cm in this experiment). The reaching success rate is then 
+
+Rsuccess = 1
+
+NrNr∑
+
+> k=1
+
+sreach  
+
+> k
+
+× 100% . (41) 11 Table 2: Motion and harvesting metrics used for system-level evaluation. 
+
+Metric Symbol Definition 
+
+Duration T Execution time of a motion segment Straight-line distance Dstraight Euclidean distance between segment start and end positions Trajectory length Ltraj Cumulative length of the executed path Mean speed ¯v Average path speed over the segment RMS jerk Jrms Overall smoothness of motion Robust peak jerk Jrobust peak High-percentile jerk magnitude Reaching success rate Rsuccess Percentage of attempts that reached the com-manded target within tolerance Harvesting success rate Hsuccess Percentage of attempts that completed grasping, detachment, and deposition 
+
+Figure 5: Qualitative comparison of strawberry instance segmentation results at the nano ( n) scale on the self-collected (top, D self ) and public (bottom, D pub ) datasets. From left to right, each row shows the input image ( I), YOLOv8n-seg, YOLO11n-seg, YOLO26n-seg, and the proposed HRAttnEdge-YOLO26-seg. The proposed model produces more complete fruit masks and tighter boundary delineation, even for small, partially occluded, and cluttered scenes. Similarly, let Nh denote the total number of harvesting attempts. For the k-th target, define 
+
+sharvest  
+
+> k
+
+=
+
+{
+
+1, if the fruit is successfully grasped, detached, and deposited ,
+
+0, otherwise . (42) The harvesting success rate is computed as 
+
+Hsuccess = 1
+
+NhNh∑
+
+> k=1
+
+sharvest  
+
+> k
+
+× 100% . (43) 
+
+## 3.4 Results 
+
+3.4.1 Vision System Results Comparative Experiments. Table 3 compares the proposed HRAttnEdge-YOLO26-seg with the baseline YOLO26-seg and prior YOLO-seg generations across nano ( n), small ( s), and medium ( m)scales on both the self-collected (D self ) and public (D pub ) datasets. Overall, the proposed model showed the strongest and most consistent performance across detection and segmentation metrics. This behav-ior is important for robotic harvesting because improvements in mAP 75 and mAP 50:95 reflect tighter instance delineation and more reliable fruit boundary localization, which directly support stable 3D target generation for downstream reaching and harvesting. In our self-collected dataset, the proposed model demonstrated the best overall performance across all three scales. The m variant yielded the strongest results, achieving detection and segmentation scores of 99.1 and 98.9, respectively, at mAP 50 . Compared to the baseline YOLO26-seg, our model improved 12 Table 3: Comparison of model performance on the self-collected and public datasets. 
+
+Model Scale Dataset P RBbox (detection) Mask (segmentation) mAP 50 mAP 75 mAP 50:95 mAP 50 mAP 75 mAP 50:95 
+
+YOLOv8-seg [19] n Dself 91.2 92.5 91.4 83.0 67.8 90.6 74.0 62.8 Dpub 84.5 73.4 81.8 74.2 69.9 81.3 72.0 51.4 s Dself 92.5 93.1 92.1 85.7 68.9 92.1 79.8 66.9 Dpub 85.4 74.6 90.0 81.6 62.9 89.6 78.5 56.3 m Dself 94.7 94.0 94.3 86.7 80.2 92.3 79.2 66.6 Dpub 86.7 86.6 85.4 72.7 68.8 85.4 72.3 62.8 YOLO11-seg [20] n Dself 91.8 92.6 92.4 83.8 71.5 91.9 81.4 63.6 Dpub 84.3 73.8 82.7 72.7 69.3 82.3 74.2 52.9 s Dself 93.9 92.8 91.2 87.9 73.1 92.6 83.2 67.3 Dpub 84.8 74.5 89.5 72.5 61.3 82.7 68.0 54.1 m Dself 95.7 91.9 94.1 88.5 79.5 93.7 77.2 68.8 Dpub 90.9 86.3 88.8 75.5 62.0 84.1 74.9 60.6 YOLO26-seg [39] n Dself 89.9 83.5 89.8 79.3 64.1 89.2 72.3 63.8 Dpub 68.0 71.4 73.8 70.2 57.6 73.8 61.9 50.9 s Dself 90.4 91.3 92.4 74.7 65.2 91.7 73.2 64.7 Dpub 77.9 78.5 79.3 68.4 57.5 76.4 67.5 55.1 m Dself 93.0 91.6 96.6 78.8 67.7 95.6 76.7 66.0 Dpub 84.7 80.4 81.9 73.5 62.0 79.1 69.2 61.6 n Dself 96.5 94.9 96.0 85.8 73.1 95.4 82.7 71.0 Dpub 89.0 85.4 84.6 73.2 61.6 84.4 72.0 60.9 s Dself 97.3 95.9 97.7 94.6 76.1 97.7 83.2 74.2 Dpub 89.3 86.2 89.2 72.2 62.1 89.4 73.5 62.5 m Dself 98.5 98.6 99.1 98.3 85.3 98.9 84.0 76.3 HRAttnEdge-YOLO26-seg (ours) Dpub 91.8 87.6 92.1 83.1 65.3 92.0 80.3 65.1 
+
+segmentation performance by 14.4%, 13.6%, and 9.5% on the n, s, and m scales, respectively, at mAP 75 .Additionally, it exhibited the highest precision and recall. This trend was consistent across all scales at mAP 50:95 , indicating that the improvements were not limited to basic foreground recovery but also extended to more precise mask formation, even under stricter IoU conditions. The public dataset posed greater challenges for all models, evident in the generally lower scores and the more significant drop under stricter overlap criteria. Yet, the proposed model remained the strongest overall performer. In comparison to the baseline YOLO26-seg, mask mAP 50 increased from 73.8 to 84.6 (14.6% ↑), 79.3 to 89.2 (12.5% ↑), and 81.9 to 92.1 (12.4% ↑) at the n, s, and m scales, respectively. Similar improvements were observed for mAP 75 and mAP 50:95 . Furthermore, the method demonstrated higher precision and recall, indicating enhanced cross-dataset robustness, which is essential for model generalizability. In our settings, the baseline YOLO26-seg consistently underperformed compared to YOLOv8-seg and YOLO11-seg on the public dataset. However, the proposed modifications rendered the YOLO26 branch not only competitive but also superior overall. Figure 5 presents qualitative comparisons of strawberry instance segmentation results produced by different models at the nano ( n) scale. 
+
+Ablation Experiments. Table 4 summarizes the effect of progressively adding the proposed com-ponents to YOLO26-seg. The performance gain follows a clear architectural trend. Adding the P2 branch yields modest but consistent improvement by preserving finer spatial detail for small fruit regions and thin boundaries. Adding segmentation-path attention provides further gain by refining these high-resolution mask features more effectively. The largest improvement appears after introducing EdgeProto, indicating that the final gain comes from the combined effect of fine-resolution features, targeted atten-tion, and boundary-aware prototype learning rather than from scale alone. The trade-off is increased overhead. The rise in GFLOPs for the +P2 and +P2+Attn. variants are expected, since extending the segmentation head from P3–P5 to P2–P5 shifts more computation to the high-resolution stride-4 13 Table 4: Ablation study of HRAttnEdge-YOLO26-seg on self-collected (D self ) and public (D pub ) datasets across nano ( n), small ( s), and medium ( m) scales. Components are progressively added starting from the YOLO26-seg baseline: the high-resolution P2 branch, segmentation-path attention, and EdgeProto. 
+
+Model variant Scale Dataset Segmentation performance Size (MB) #Params (M) Inference (ms) GFLOPs @640px mAP 50 mAP 75 
+
+Baseline (YOLO26-seg [39]) n Dself 89.2 72.3 6.4 2.69 3.7 8.9 Dpub 73.8 61.9 s Dself 91.4 73.2 23.0 10.36 4.7 29.7 Dpub 76.4 67.5 m Dself 95.6 76.7 54.0 23.51 5.8 121.5 Dpub 79.1 69.2 +P2 n Dself 89.8 76.7 6.5 2.91 12.6 23.1 Dpub 74.4 62.3 s Dself 91.7 73.9 23.1 11.16 17.21 86.4 Dpub 78.6 69.3 m Dself 96.2 77.6 54.5 26.67 23.3 329.0 Dpub 85.0 75.8 +P2+Attn. n Dself 92.3 76.8 6.5 2.93 8.8 24.1 Dpub 75.4 63.3 s Dself 94.0 75.4 23.2 11.28 10.4 90.4 Dpub 78.8 70.1 m Dself 96.4 78.7 55.1 27.17 23.7 344.8 Dpub 87.1 77.3 +P2+Attn.+EdgeProto (ours) n Dself 95.4 82.7 6.6 2.97 14.9 14.6 Dpub 84.4 72.0 s Dself 97.7 83.2 23.5 11.43 16.7 53.8 Dpub 89.4 73.5 m Dself 98.9 84.0 56.1 27.73 33.1 198.2 Dpub 92.0 80.3 
+
+feature map, and the added attention further increases processing along this dense mask path. After introducing EdgeProto, however, GFLOPs decrease relative to +P2+Attn. because the final prototype branch uses a more efficient multi-scale fusion design, even though inference time remains higher due to branch complexity and feature-fusion overhead. Relative to the baseline, the full model increases size from 6.4 to 6.6 MB (3.1% ↑), 23.0 to 23.5 MB (2.2% ↑), and 54.0 to 56.1 MB (3.9% ↑) for the n, s, and m
+
+scales, respectively, with corresponding increases in parameter count and inference time. Even so, the accuracy gain is substantial, particularly under stricter mask criteria, and the model remains practical for deployment. This is crucial for edge-oriented robotic execution, as lightweight models are often pre-ferred. In this context, the nano and small variants are appealing for resource-constrained platforms, while the medium variant provides the highest accuracy when computational resources are less limited. In our integrated robotic system, we utilized the nano variant of the proposed HRAttnEdge-YOLO26-seg vision model for harvesting operations. 
+
+3.4.2 Motion and Harvesting Results In-house motion comparison between PPO and IK-based control. Before greenhouse deploy-ment, we compared our PPO-based reaching policy controller with an IK-based MoveIt controller using 120 artificial strawberry targets in an in-house setting. This comparison was intended to assess controller behavior under controlled conditions before conducting harvest trials in the more constrained greenhouse workspace. The evaluation focused on the two shared motion primitives, namely Home →Strawberry and Strawberry →Basket. As shown in Table 5, the PPO controller produced substantially more stable motion than IK across both primitives. For Home →Strawberry motion, PPO showed lower mean duration and far smaller variability than IK, together with markedly lower RMS jerk. A similar trend was observed for Strawberry →Basket transfer, where PPO again maintained lower jerk and much tighter dispersion. Although IK-based control showed slightly higher mean speed, this did not correspond to better motion quality, because it was accompanied by substantially larger variation in execution time, path length, and 14 Figure 6: Representative in-house trajectories for qualitative comparison between the PPO-based con-troller and IK-based MoveIt: (a) 3D trajectories, (b) XY projection, (c) XZ projection, and (d) YZ projection. Each sample shows an actual Home →Target approach and the corresponding Target →Home return motion, where the target denotes the selected strawberry. Solid curves denote PPO and dashed curves denote IK-based MoveIt. Circular markers denote home, squares mark targets, hollow triangles show actual MoveIt stops, and dotted segments represent residual error. The red cross marks a repre-sentative MoveIt failure case. smoothness. These quantitative differences are consistent with the representative trajectories shown in Figure 6, where PPO follows smoother and more coherent approach-and-return paths, while IK-based MoveIt exhibits more irregular motion, larger residual target-reaching error, and a representative failure case. In practice, this behavior was also consistent with repeated full-arm rotations, mid-motion stops, failure to reach the target, and occasional contact with the robot base observed during testing. These in-house results indicate that PPO generated more predictable and dynamically smoother motion, whereas IK behaved less reliably and was therefore not considered suitable for greenhouse harvesting. 
+
+Motion and harvesting performance of the PPO controller in greenhouse settings. The greenhouse harvesting experiments were conducted using only the PPO-based controller, as IK-based method was not sufficiently reliable for operation in the constrained greenhouse workspace. A total of 281 strawberries were harvested over 130 trials initiated from the home position, while the vision system enabled a multi-target harvesting strategy with a mean of 2.16 localized berries per trial in this experi-ment. As summarized in Table 6, the Home →Strawberry motion was the most stable primitive, showing the lowest mean speed and the lowest jerk variation, which indicates controlled target approach in the cluttered greenhouse workspace. The Pull motion was shorter and faster, but also more dynamically 15 Table 5: In-house motion performance comparison between the PPO controller and IK-based MoveIt using 120 artificial strawberry targets. Values are reported as mean ± standard deviation. Here, H → Sdenotes Home to target Strawberry, and S → B denotes Strawberry to Basket.                                                                         
+
+> Controller Primitive Duration (s) Trajectory length (m) Mean speed (m/s) RMS jerk (m/s 3)Peak jerk (m/s 3)
+> PPO H→S5.95 ±1.63 1.69 ±0.40 0.29 ±0.07 693 .8±157 .75730 .8±782 .4
+> S→B3.76 ±1.83 1.55 ±0.41 0.24 ±0.07 685 .3±323 .75393 .4±867 .7
+> IK-based H→S6.76 ±6.89 0.94 ±1.04 0.33 ±0.21 1000 .9±417 .25374 .8±1338 .4
+> S→B3.88 ±6.58 0.82 ±0.63 0.26 ±0.22 1040 .7±465 .25579 .2±1043 .5
+
+Figure 7: Demonstration of greenhouse strawberry harvesting using integrated vision and trajectory control. For harvesting operations, the nano-scale HRAttnEdge-YOLO26-seg and PPO-based reaching policy were utilized. aggressive, as reflected by its substantially higher RMS jerk; this behavior is consistent with its role as the active detachment step. The Strawberry →Basket transfer exhibited intermediate timing but notice-ably larger variability, suggesting that fruit transport after detachment was less constrained and more sensitive to local geometric conditions. These motion characteristics are consistent with the represen-tative greenhouse trajectories shown in Figure 8, where the PPO controller produces smooth sequential Home →Target →Bucket motions across different target configurations. At the task level, the system achieved a reaching success rate of 96.6%, a grasp-and-pull success rate of 91.3%, and an overall harvest-ing success rate of 84.3%. The relatively small drop from reaching to grasp-and-pull indicates that the perception-to-reach pipeline and the PPO-guided manipulation remained reliable during target engage-ment. The larger drop from grasp-and-pull to final harvesting success suggests that the main limitation was not target approach, but post-contact fruit handling and retention, which was likely influenced by the use of the SG-b-h gripper, a soft general-purpose gripper rather than a strawberry-specific harvesting end-effector. Figure 7 shows representative snapshots of the harvesting process in the greenhouse. Reported segment durations reflect only active motion execution time. Fixed waiting and dwell periods in the harvesting routine, such as detection waiting at the home pose, post-motion dwell intervals, and gripper pause times, were outside the logged segment interval and were therefore not included in the reported motion metrics. Eventually, this study presents a comprehensive and practical robotic system for strawberry harvest-ing that effectively connects perception with task execution. It integrates a robust vision model with a simulation-trained DRL controller within a ROS-based system. This integration is often missing in conventional robotic harvesting architectures. The proposed vision model significantly outperformed the baseline YOLO26-seg, demonstrating impressive resilience under the cluttered, variable conditions of commercial greenhouse environments. Additionally, our perception module was specifically designed for manipulation-oriented 3D localization. This approach ensured that the generated targets were not only visually accurate but also kinematically feasible for the robotic arm. A core advantage of this framework 16 Table 6: Greenhouse motion performance of the PPO-based harvesting controller. Values are reported as mean ± standard deviation. The greenhouse experiments involved 130 trials and 281 target strawberries. Here, H → S denotes Home to target Strawberry, and S → B denotes Strawberry to Basket.                                                   
+
+> Primitive Duration (s) Trajectory length (m) Mean speed (m/s) RMS jerk (m/s 3)Peak jerk (m/s 3)
+> H→S4.95 ±0.35 0.98 ±0.23 0.20 ±0.06 617 .5±61 .25548 .4±525 .6
+> Pull 2.22 ±0.75 0.25 ±0.14 0.53 ±0.24 1180 .4±674 .55500 .2±623 .6
+> S→B4.17 ±1.04 1.23 ±0.25 0.32 ±0.23 879 .0±1360 .75267 .1±1222 .2
+
+Table 7: System-level comparison of recent robotic harvesting frameworks with ours.                                                  
+
+> Study Vision system Vision enhance. Motion control Learned reaching Sim-to-real Key limitations Huang et al.[14] F2SA-YOLOv8 ✓HVSC ××•sensor-based calibration
+> •noise-sensitive motion
+> •singularity-prone Wu et al. [10] YOLO11 ✓Visual servo ××•visibility & FoV constrained
+> •unstable motion
+> •singularity-prone Arad et al. [11] Color-thresholding ×IK-based Moveit ×✓•antedated vision system
+> •unstable motion
+> •singularity-prone Bhat et al. [25] YOLO11-seg ×IK-based Moveit ×✓•pretrained vision system
+> •unstable motion
+> •singularity-prone
+> Ours HRAttnEdge-YOLO26-seg ✓DRL-based PPO ✓✓•fruit-center targets
+> •use of commercial end-effector
+
+lies in simulation-based reaching policy learning. By utilizing PPO within Isaac Sim/Lab, a high-fidelity simulation platform, the reaching controller was trained under randomized conditions and scalable roll-outs. This approach eliminated the need for exhaustive physical trials, significantly reducing hardware dependency and development costs while outperforming traditional IK in generating smooth, target-conditioned trajectories within constrained agricultural workspaces. Ultimately, this work distinguishes itself from prior studies by delivering an end-to-end system that is simultaneously resource-efficient and reliable. Rather than relying on a platform-specific refinement process, the proposed methodology offers a scalable blueprint for autonomous harvesting, as summarized in the comparative analysis of state-of-the-art systems (Table 7). Despite these advancements, several limitations highlight the need for further investigation. The current 3D target generation relies on segmented centroids and local depth values rather than full 6D fruit pose or peduncle geometry. While sufficient for the pull-based harvesting routine utilized here, more complex detachment strategies may require orientation-sensitive interaction and explicit grasp affordance. Additionally, the target-selection logic operates sequentially without active perception or occlusion-aware viewpoint adjustment, limiting task-level planning in highly dense environments. Furthermore, the reliance on calibrated frame transformations with empirical offsets introduces a potential sensitivity to hardware reconfigurations or varying greenhouse layouts. To move from a proof-of-concept toward a commercially viable platform, future work should therefore focus on two major directions. The first is richer target representation. Extending the current fruit-center target to include peduncle localization, fruit orientation, or grasp affordance prediction would make the system more suitable for precision interaction beyond the present pull-based routine. The second is broader autonomy and robustness. This includes more extensive cross-greenhouse validation, cultivar variation, active perception under occlusion, and tighter integration between perception uncertainty and action selection during harvesting. 17 Figure 8: Representative greenhouse harvesting trajectories of the PPO-based controller: (a) 3D tra-jectories, (b) XY projection, (c) XZ projection, and (d) YZ projection. Each sample shows an actual Home →Target →Bucket motion. 
+
+# 4 Conclusion 
+
+A unified perception-to-action framework is presented in this study that integrates RGB-D fruit local-ization, simulation-trained PPO-based reaching, and ROS-based execution for greenhouse harvesting. At the perception level, the proposed HRAttnEdge-YOLO26-seg model improved instance-level fruit localization under cluttered and occluded conditions, yielding reliable targets for fruit manipulation. At the control level, the simulation-trained PPO provides a scalable alternative to hardware-intensive trial-and-error, enabling robust target-conditioned reaching while reducing the development costs and risks. Deployment on a UR10e platform demonstrated that combining specialized RGB-D perception with simulation-based learning yields a practical and effective pipeline that advances beyond conventional systems that rely on general-purpose perception and planner-driven control. Despite these contributions, this study has several limitations. The current system operates on smoothed fruit-center targets derived from segmentation and depth alignment without explicitly mod-eling peduncle geometry, grasp affordances, or full 6D pose, which may be required for more complex interaction strategies. Camera-to-robot mapping depends on calibrated transformations with empirical offsets, which potentially limits portability across setups. In addition, the harvesting policy is sequential and reactive, lacking active viewpoint adaptation and occlusion-aware planning under dense canopies. These limitations outline clear directions for developing a more autonomous and generalizable, field-ready system. 18 Acknowledgments 
+
+This research is partially supported by the United States Department of Agriculture (USDA)’s National Institute of Food and Agriculture (NIFA) Research Capacity Fund Hatch Program: TEX09954 (Accession No. 7002248) and Research Capacity Fund Multistate Hatch Program: TEX0-1-9916 (Accession No. 7008389). This publication is also supported by the Texas A&M University Division of Research Targeted Proposal Teams (TPT) funding program and Texas A&M AgriLife Research. Any opinions, findings, conclusions, or recommendations expressed in this publication are those of the authors and should not be construed to represent any official USDA or U.S. Government determination or policy. 
+
+# Credit authorship contribution statement 
+
+Al Bashir.: Conceptualization, Methodology, Formal analysis, Data curation, Validation, Writing original – review & editing, draft, Visualization. Shao-Yang Chang.: Conceptualization, Methodology, Valida-tion, Writing – review & editing. Partho Ghose.: Writing – review & editing. Prem Raj.: Writing – review & editing. Chen-Kang Huang.: Writing – review & editing. Azlan Zahid: Supervision, Funding acquisition, Writing – review & editing. 
+
+# Conflict of interest 
+
+The authors declare no competing interests. 
+
+# References 
+
+[1] H. Stemmler, E. M. Meemken, Greenhouse farming and employment: Evidence from ecuador, Food Policy 117 (5 2023). doi:10.1016/j.foodpol.2023.102443 .[2] D. Schimmelpfennig, Crop production costs, profits, and ecosystem stewardship with precision agri-culture, Journal of Agricultural and Applied Economics 50 (1) (2018) 81–103. [3] L. Pánková, R. Aulová, J. Jarolímek, Economic aspects of precision agriculture systems, AGRIS on-line Papers in Economics and Informatics 12 (3) (2020) 59–67. [4] S. Getahun, H. Kefale, Y. Gelaye, Application of precision agriculture technologies for sustain-able crop production and environmental sustainability: A systematic review, The Scientific World Journal 2024 (1) (2024) 2126734. [5] M. T. Win, Z. Rutledge, M. K. Maredia, Labor shortages and farmer adaptation strategies, Applied Economic Perspectives and Policy 47 (3) (2025) 896–913. [6] D. Charlton, J. E. Taylor, S. Vougioukas, Z. Rutledge, Can wages rise quickly enough to keep workers in the fields?, Choices 34 (2) (2019) 1–7. [7] S. Pandey, K. Kaushik, A. Tewatia, S. J. Quraishi, Robotics and automation in modern agriculture: Revolutionizing harvesting and processing, in: Precision and Intelligence in Agriculture: Advanced Technologies for Sustainable Farming, IGI Global Scientific Publishing, 2026, pp. 153–186. [8] W. Wang, C. Li, Y. Xi, J. Gu, X. Zhang, M. Zhou, Y. Peng, Research progress and development trend of visual detection methods for selective fruit harvesting robots, Agronomy 15 (8) (2025) 1926. [9] V. Rajendran, B. Debnath, S. Mghames, W. Mandil, S. Parsa, S. Parsons, A. Ghalamzan-E, Towards autonomous selective harvesting: A review of robot perception, robot design, motion planning and control, Journal of Field Robotics 41 (7) (2024) 2247–2279. [10] S. Wu, H. Chen, Y. Zhang, K. Liao, L. Li, Robot visual servo based on lightweight yolo11-smma for camellia oleifera fruits harvesting, Computers and Electronics in Agriculture 243 (2026) 111409. 
+
+doi:10.1016/j.compag.2026.111409 .[11] B. Arad, J. Balendonck, R. Barth, O. Ben-Shahar, Y. Edan, T. Hellström, J. Hemming, P. Kurtser, O. Ringdahl, T. Tielen, et al., Development of a sweet pepper harvesting robot, Journal of field robotics 37 (6) (2020) 1027–1039. 19 [12] S. Noda, M. Kogoshi, W. Iijima, Robot simulation on agri-field point cloud with centimeter resolu-tion, IEEE Access 13 (2025) 14404–14416. [13] P. Catala-Roman, E. A. Navarro, J. Segura-Garcia, M. Garcia-Pineda, Harnessing digital twins for agriculture 5.0: a comparative analysis of 3d point cloud tools, Applied Sciences 14 (5) (2024) 1709. [14] Z.-H. Huang, C.-T. Chen, N. Ikegaya, T. Chang, K. Ke, Y.-C. Chen, A robotic harvesting system for occluded cucumbers using f2sa-yolov8 and hvsc, Computers and Electronics in Agriculture 246 (2026) 111616. doi:10.1016/j.compag.2026.111616 .[15] W. Jia, Y. Tian, R. Luo, Z. Zhang, J. Lian, Y. Zheng, Detection and segmentation of overlapped fruits based on optimized mask r-cnn application in apple harvesting robot, Computers and Elec-tronics in Agriculture 172 (2020) 105380. [16] W. Huapeng, H. Handroos, Inverse kinematics analysis of a parallel redundant manipulator by means of differential evolution, in: E. Arai, T. Arai, M. Takano (Eds.), Human Friendly Mechatronics, Elsevier Science, Amsterdam, 2001, pp. 321–326. doi:10.1016/B978-044450649-8/50054-1 .[17] O. A. Al-Sharif, N. A. Abbass, A. M. Hanafi, A. O. Elnady, Enhancing robotic autonomy: a review and case study of traditional and deep learning approaches to inverse kinematics, Int J Eng Appl Sci Oct 6 Univ 1 (1) (2024) 1–8. [18] A. Calzada-Garcia, J. G. Victores, F. J. Naranjo-Campos, C. Balaguer, A review on inverse kine-matics, control and planning for robotic manipulators with and without obstacles via deep neural networks, Algorithms 18 (1) (2025) 23. [19] G. Jocher, A. Chaurasia, J. Qiu, Ultralytics yolov8 (2023). URL https://github.com/ultralytics/ultralytics 
+
+[20] G. Jocher, J. Qiu, Ultralytics yolo11 (2024). URL https://github.com/ultralytics/ultralytics 
+
+[21] E. Malis, F. Chaumette, S. Boudet, 2 1/2 d visual servoing, IEEE Transactions on Robotics and Automation 15 (2) (2002) 238–250. [22] F. Chaumette, S. Hutchinson, Visual servo control. i. basic approaches, IEEE robotics & automation magazine 13 (4) (2006) 82–90. [23] G. Chesi, A. Vicino, Visual servoing for large camera displacements, IEEE Transactions on Robotics 20 (4) (2004) 724–735. doi:10.1109/TRO.2004.829465 .[24] S. Levine, P. Pastor, A. Krizhevsky, J. Ibarz, D. Quillen, Learning hand-eye coordination for robotic grasping with deep learning and large-scale data collection, The International journal of robotics research 37 (4-5) (2018) 421–436. [25] K. M. Bhat, T. Gao, A. Mathur, R. Satishkumar, F. Yandun, D. Bauer, N. Pollard, Vision-guided autonomous dual-arm extraction robot for bell pepper harvesting, arXiv preprint arXiv:2603.13987 (2026). [26] Y. Tang, J. Qiu, Y. Zhang, D. Wu, Y. Cao, K. Zhao, L. Zhu, Optimization strategies of fruit detection to overcome the challenge of unstructured background in field orchard environment: A review, Precision Agriculture 24 (4) (2023) 1183–1219. [27] S. Espinoza, C. Aguilera, L. Rojas, P. G. Campos, Analysis of fruit images with deep learning: A systematic literature review and future directions, IEEE Access 12 (2023) 3837–3859. [28] A. Bashir, Y. Wang, M. O. Ojo, A. Zahid, A vision system for occluded cutting point localization in robotic harvesting of greenhouse lettuce, IEEE Transactions on AgriFood Electronics 4 (1) (2026) 157–167. doi:10.1109/TAFE.2025.3621592 .[29] K. Arulkumaran, M. P. Deisenroth, M. Brundage, A. A. Bharath, Deep reinforcement learning: A brief survey, IEEE signal processing magazine 34 (6) (2017) 26–38. [30] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, O. Klimov, Proximal policy optimization algo-rithms, arXiv preprint arXiv:1707.06347 (2017). 20 [31] A. Kurup, D. Sumesh, L. L. Saju, S. Suresh, Comparative analysis between proximal policy op-timization and its applications in high-complexity sequential decision-making, INTERNATIONAL JOURNAL OF ENGINEERING DEVELOPMENT AND RESEARCH 14 (1) (2026) 504–510. [32] V. K. Elumalai, et al., A proximal policy optimization based deep reinforcement learning framework for tracking control of a flexible robotic manipulator, Results in Engineering 25 (2025) 104178. [33] Y. Liu, H. Xu, D. Liu, L. Wang, A digital twin-based sim-to-real transfer for deep reinforcement learning-enabled industrial robot grasping, Robotics and Computer-Integrated Manufacturing 78 (2022) 102365. doi:10.1016/j.rcim.2022.102365 .[34] J. Liu, H. J. Yap, A. S. M. Khairuddin, Review on motion planning of robotic manipulator in dynamic environments, Journal of Sensors 2024 (1) (2024) 5969512. [35] D. Soleymanzadeh, I. Lopez-Sanchez, H. Su, Y. Li, X. Liang, M. Zheng, Towards generalist neural motion planners for robotic manipulators: Challenges and opportunities, IEEE Transactions on Automation Science and Engineering (2026). [36] M. Mittal, P. Roth, J. Tigue, A. Richard, O. Zhang, P. Du, A. Serrano-Munoz, X. Yao, R. Zurbrügg, N. Rudin, et al., Isaac lab: A gpu-accelerated simulation framework for multi-modal robot learning, arXiv preprint arXiv:2511.04831 (2025). doi:10.48550/arXiv.2511.04831 .[37] H. A. Hernández, I. F. Mondragón, S. R. González, L. F. Pedraza, Reconfigurable agricultural robotics: Control strategies, communication, and applications, Computers and Electronics in Agri-culture 234 (2025) 110161. doi:10.1016/j.compag.2025.110161 .[38] J. Silveira, J. A. Marshall, S. N. Givigi, A simulation pipeline to facilitate real-world robotic rein-forcement learning applications, in: 2025 IEEE International systems Conference (SysCon), IEEE, 2025, pp. 1–8. [39] G. Jocher, J. Qiu, Ultralytics yolo26 (2026). URL https://github.com/ultralytics/ultralytics 
+
+[40] C. Schwarke, M. Mittal, N. Rudin, D. Hoeller, M. Hutter, Rsl-rl: A learning library for robotics research, arXiv preprint arXiv:2509.10771 (2025). [41] I. Pérez-Borrero, D. Marín-Santos, M. E. Gegúndez-Arias, E. Cortés-Ancos, A fast and accurate deep learning method for strawberry instance segmentation, Computers and Electronics in Agriculture 178 (2020) 105736. doi:10.1016/j.compag.2020.105736 .[42] B. Sekachev, N. Manovich, M. Zhiltsov, A. Zhavoronkov, D. Kalinin, B. Hoff, TOsmanov, D. Kru-chinin, A. Zankevich, DmitriySidnev, M. Markelov, Johannes222, M. Chenuet, a andre, telena-chos, A. Melnikov, J. Kim, L. Ilouz, N. Glazov, Priya4607, R. Tehrani, S. Jeong, V. Skubriev, S. Yonekura, vugia truong, zliang7, lizhming, T. Truong, opencv/cvat: v1.1.0 (8 2020). doi: 10.5281/zenodo.4009388 .[43] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan, P. Dollár, C. L. Zitnick, Microsoft coco: Common objects in context, in: European conference on computer vision, Springer, 2014, pp. 740–755. doi:10.1007/978-3-319-10602-1_48 .[44] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, A. Zisserman, The pascal visual object classes (voc) challenge, International journal of computer vision 88 (2) (2010) 303–338. doi:10. 1007/s11263-009-0275-4 .[45] D. H. Douglas, T. K. Peucker, Algorithms for the reduction of the number of points required to represent a digitized line or its caricature, Cartographica: the international journal for geographic information and geovisualization 10 (2) (1973) 112–122. [46] U. Ramer, An iterative procedure for the polygonal approximation of plane curves, Computer graph-ics and image processing 1 (3) (1972) 244–256. 21
