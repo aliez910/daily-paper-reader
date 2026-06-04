@@ -1,0 +1,382 @@
+Title: SeeTraceAct: Visibility-Aware Latent Planning from Cross-Embodiment Demonstration Videos
+
+URL Source: https://arxiv.org/pdf/2606.02745v1
+
+Published Time: Wed, 03 Jun 2026 00:09:39 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# SeeTraceAct: Visibility-Aware Latent Planning from Cross-Embodiment Demonstration Videos 
+
+Jaehyeon Son 1 Junhyun Kim 1 Kyle Kam 1 Jeremiah Coholich 1 Seok Joon Kim 1
+
+Jinhoo Kim 1 Chris Dongjoo Kim 2 Jaemin Cho 2,3 Dieter Fox 2,4 Zsolt Kira 11Georgia Institute of Technology 2Allen Institute for AI 
+
+> 3
+
+Johns Hopkins University 4University of Washington 
+
+https://github.com/jaehyeon-son/SeeTraceAct 
+
+Abstract: Vision-language-action models (VLAs) are promising general-purpose robot policies, but adapting them to new tasks typically requires costly task-specific teleoperation data. As an alternative, we study one-shot demo-conditioned VLAs, where a robot policy is conditioned on a single demonstration video of an unseen task. We find that existing end-to-end approaches often strug-gle when successful execution requires precisely localizing small target regions. To address this limitation, we propose S EE TRACE ACT , a demo-conditioned VLA framework that encourages precise spatial grounding through visibility-aware pre-diction of future end-effector traces. To enable reproducible evaluation with cross-embodiment demonstrations, we introduce and release R OBO CASA -DC, a demo-conditioned extension of RoboCasa with episode-paired humanoid videos. Exper-iments on R OBO CASA -DC and a real-world benchmark, where a Franka Panda arm is conditioned on human demonstrations, show that S EE TRACE ACT outper-forms baselines, achieving the best success rate across all four R OBO CASA -DC settings and improving real-world average success by 12.5 percentage points. 
+
+## 1 Introduction 
+
+Vision-language-action models (VLAs) have recently emerged as a promising path toward general-purpose robotic agents by adapting pretrained vision-language models (VLMs) for robotic con-trol [1, 2, 3]. However, deploying VLAs on new tasks typically requires post-training on expert robot trajectories collected through teleoperation. Because collecting teleoperated robot data re-quires specialized hardware and substantial human effort, it remains a central bottleneck for scaling VLAs across diverse tasks, embodiments, and environments [4, 5, 6]. A scalable alternative is to let an end user specify a new robot task by performing it once in front of a camera. This motivates one-shot demo-conditioned VLAs, where a policy is conditioned on a single human demonstration video of an unseen target task. However, this problem is non-trivial: the cross-embodiment gap makes directly translating human demonstrations into robot actions fundamentally challenging. While methods that utilize explicit embodiment-specific retargeting have been developed [7, 8, 9], they require embodiment- and task-specific expertise beyond what an end user can provide, so we instead focus on end-to-end approaches. Prior work in this direction has learned video representa-tions and employed auxiliary objectives to ground demonstrations [10, 11, 12]. While these methods have shown promise, we find that they often struggle with precision-sensitive tasks, such as pressing the target button on a coffee machine or turning on a sink faucet (see §5.3). To address this limitation, we propose S EE TRACE ACT , a demo-conditioned VLA framework that encourages precise spatial grounding through an auxiliary future-trace prediction objective (Fig. 1). Given a demonstration video, S EE TRACE ACT learns a visual latent plan that summarizes the task-relevant motion the robot should execute. During training, this latent plan is decoded into future end-effector traces in the robot’s camera views. However, trace supervision is not always well-     
+
+> arXiv:2606.02745v1 [cs.RO] 1 Jun 2026 See :observe a one -shot demonstration 1
+> Language Instruction
+> “close the microwave door.”
+> Camera Views
+> Demonstration Video
+> Policy
+> Visual Trace Loss Action Prediction Loss
+> Trace :predict traces and their visibility (training only) 23
+> Visible Traces
+> Invisible Traces
+> Visual Latent Plan
+> Act :generate actions
+
+Figure 1: Overview of S EE TRACE ACT . Given a demonstration video, current camera views, and a language instruction, the policy encodes task-relevant information into a visual latent plan (S EE ). During training, the policy predicts future visual traces and their visibility for each camera view (T RACE ), while also predicting actions from the latent plan (A CT ). At inference time, the trace prediction component is discarded, and the policy generates actions from the latent plan (A CT ). defined, especially in multi-view setups: the end effector may leave some camera views, making its coordinates ill-posed targets. S EE TRACE ACT therefore uses a visibility-aware trace decoder that predicts both trace coordinates and their validity, preserving supervision under partial visibility. At inference time, the trace decoder is discarded, and the policy generates actions directly from the latent plan. To support reproducible evaluation and future work on demo-conditioned VLAs, we introduce and release the R OBO CASA -DC benchmark, a demo-conditioned extension of the RoboCasa [13] simu-lation environment (§4). R OBO CASA -DC supports both same-embodiment and cross-embodiment evaluation, allowing policies to be conditioned on either Panda-arm demonstrations or episode-paired humanoid videos as a proxy for human demonstrations. This complements prior evaluations that focus on real-world settings [10], use single-arm robot demonstrations in simulation [12], or do not release the human demonstrations used for simulated evaluation [11]. Experiments on R OBO CASA -DC and a real-world benchmark with a Franka Panda arm show that SEE TRACE ACT achieves the strongest results among competitive demo-conditioned VLA baselines (§5.2). On R OBO CASA -DC, S EE TRACE ACT achieves the best success rate across all four evalua-tion settings. On the real-world benchmark, where the robot is conditioned on human demonstra-tions, S EE TRACE ACT improves the average success rate by 12.5 percentage points. Our ablation study (§5.4) supports the importance of our key design choices, including visibility-aware trace supervision. Our main contributions are as follows: 1. We introduce S EE TRACE ACT , a demo-conditioned VLA framework that encourages precise spatial grounding of one-shot demonstration videos, including cross-embodiment ones, via visibility-aware prediction of future end-effector traces. 2. We introduce and release R OBO CASA -DC, a demo-conditioned extension of RoboCasa for benchmarking policies with both same- and cross-embodiment demonstration videos. 3. We show that S EE TRACE ACT achieves the strongest results among competitive baselines on ROBO CASA -DC and a real-world benchmark, with ablations supporting our key design choices. 22 Related Work 
+
+Vision-language-action models (VLAs). Early large-scale VLAs [14, 15] introduce transformer-based policies trained on extensive robot trajectories paired with web-scale vision-language data. OpenVLA [2] open-sources a VLA pretrained on the Open X-Embodiment dataset [6]. More re-cently, π0 [1] and GR00T N1 [3] combine a pretrained vision-language backbone with a diffusion-based action expert for continuous, high-frequency control. However, these VLAs still require sub-stantial task- and embodiment-specific teleoperation data for post-training, motivating our focus on one-shot demonstration videos. 
+
+One-shot demo-conditioned policies. One line of work uses kinematic retargeting between hu-mans and robots to learn from one-shot demonstrations [7, 8, 9]. These approaches enable explicit cross-embodiment transfer from human demonstrations to robot actions, but often rely on substan-tial task- or embodiment-specific engineering. We instead focus on end-to-end approaches that condition robot policies directly on demonstrations without explicit retargeting. XSkill [16] and UniSkill [11] learn cross-embodiment skill representations from human and robot videos, while Vid2Robot [10] trains an end-to-end demo-conditioned policy with video- and language-alignment objectives. ViVLA [12] learns a unified latent action space across human and robot demonstrations and trains a VLA to predict both latent action tokens and robot actions. While these methods have shown promise, we find that they can still struggle when task success depends on precisely localiz-ing small interaction regions (§5.3). S EE TRACE ACT addresses this limitation through an auxiliary visual trace objective that encourages precise spatial grounding. 
+
+Visual traces in VLAs. Several works have incorporated visual traces into VLAs: LLARVA [17] and MolmoAct [18] predict future visual traces and feed them autoregressively to the action model, while RT-Trajectory [19] uses trajectory sketches obtained from human drawings, videos, or model predictions. HAMSTER [20] uses 2D traces as an intermediate representation in hierarchical poli-cies, and TraceVLA [21] conditions the policy on past traces extracted from previous observations. Closer to our approach, ThinkAct [22] and FastThinkAct [23] condition action generation on vi-sual latent plans rather than decoded visual traces. S EE TRACE ACT differs by using visual traces to ground demonstration videos into spatial plans while explicitly handling partial visibility. 
+
+## 3 Method 
+
+3.1 Problem setting 
+
+We consider a setting in which a policy is evaluated on unseen tasks, conditioned on a single demon-stration video that may come from a different embodiment. Let T denote a distribution over robotic tasks, and let Tseen and Tunseen denote disjoint sets of seen and held-out unseen tasks sampled from this distribution. During training, for each seen task κ ∈ T seen , the policy πθ has access to multiple training tuples (ξκ, D κ, l κ), where ξκ = {(ot, q t, a t)}Tt=1 is an expert trajectory from the policy em-bodiment, Dκ is a task-matched demonstration video that may come from a different embodiment, and lκ is the corresponding language instruction. Here, ot, qt, and at denote the camera view, robot state, and robot action at timestep t, respectively. We omit the task superscript for brevity. At evaluation, the policy is given a single demonstration video D and language instruction l for an unseen task κ∗ ∈ T unseen . At each timestep t, it takes the current observation (ot, q t) and predicts an action chunk At = {at, . . . , a t+H−1} toward completing κ∗, where H denotes the action horizon: 
+
+At ∼ πθ (· | ot, q t, l, D ).
+
+3.2 Architecture 
+
+We build S EE TRACE ACT on top of the GR00T N1.5 [3] architecture, which consists of a vision-language model (VLM) and a flow-matching-based action expert. As shown in Fig. 2, our model augments this architecture with video encoding modules, learnable query tokens that form a visual 3Camera Views 
+
+> Language Instruction
+> “close the microwave
+> door. ”
+> Robot
+> States
+> Action
+> Vision -
+> Language
+> Model
+> Action
+> Expert
+> Demonstration Video
+> Learnable Query Tokens
+> Visual Latent Plan
+> Visual
+> Trace
+> Image
+> Encoder
+> Video
+> Encoder
+> Perceiver
+> Resampler
+> Trace
+> Decoder
+> Trace Decoder
+> 1
+> 0
+> 1
+> 1
+> (0.17, 0.65)
+> (-0.15, 0.40)
+> (0.24, 0.22)
+> (0.56, 0.61)
+> Validity
+> Head
+> Regression
+> Head
+> Visual Trace
+
+Figure 2: Architecture of S EE TRACE ACT . It receives camera views, a language instruction, a demonstration video, and robot states, and outputs an action chunk. We append learnable query tokens after the input tokens; their final hidden states form a visual latent plan , which is decoded into future end-effector traces during training. The trace decoder consists of a regression head that predicts the trace coordinates and a validity head that predicts whether each trace point lies within a camera view. The trace decoder is used only during training and discarded at inference time. latent plan, and a trace decoder. At each control timestep t, the VLM processes image and language tokens from the current camera views and language instruction, producing a representation ϕt.
+
+Video tokens. The left side of Fig. 2 shows how we incorporate the demonstration video. We first encode the demonstration D using a video encoder [24] pre-trained on large-scale video data, including action-centric datasets [25, 26]. We add a Perceiver Resampler [27, 28] on top of the video encoder to compress the extracted features into a compact set of video tokens (from 8,192 to 32 
+
+tokens; see App. B), and append them to the image and language tokens in the VLM input sequence. Under causal attention, this ordering lets the video tokens attend to the image and language tokens, making the demonstration representation context-dependent rather than fixed across the episode. We denote the final VLM hidden states corresponding to these video tokens by ψt.
+
+Visual latent plan. The middle of Fig. 2 illustrates how we form the visual latent plan. Following recent visual latent planning work [22, 23], we use this term to refer to a latent representation that is trained to encode future task progression and conditions action generation. Rather than assigning this planning role directly to the existing input tokens, we append a separate set of learnable query tokens after them. Under causal attention, these query tokens attend to the image, language, and video tokens, and their final hidden states constitute the visual latent plan zt.
+
+Visibility-aware trace decoder. As shown on the right side of Fig. 2, the trace decoder predicts future end-effector traces in each static camera view from the visual latent plan zt. However, the end effector may leave some camera views, making its normalized 2D image coordinates ill-posed regression targets. To address this, we use a visibility-aware trace decoder with two heads. The re-gression head predicts normalized end-effector coordinates, while the validity head predicts whether or not each trace point lies within the image, allowing off-screen points to still provide a learning signal (see ablation in §5.4). The trace decoder is discarded after training. 
+
+3.3 Training and inference 
+
+We train S EE TRACE ACT with two objectives: the action prediction loss and the auxiliary visual trace loss . The former optimizes the policy to predict robot action chunks, while the latter shapes the visual latent plan zt to encode future task progression in the robot’s image space. 
+
+Action prediction loss. Following prior works [1, 3], we train the action expert with an action prediction loss instantiated as a flow-matching objective [29]. At each control timestep t, we sample 4noise ϵ ∼ N (0, I) and draw a flow-matching timestep τ ∈ [0 , 1] from a shifted beta distribution. Given the ground-truth action chunk At, we construct the noised action chunk as Aτt = τ A t + (1 −
+
+τ )ϵ. The action prediction loss trains the action expert Vθ to predict the target velocity field from the VLM outputs ϕt, ψt, and zt, together with qt and the noised action chunk Aτt :
+
+Lact (θ) = Eτ,ϵ 
+
+h
+
+∥Vθ (ϕt, ψ t, z t, A τt , q t) − (At − ϵ)∥2i
+
+. (1) 
+
+Visual trace loss. We supervise the policy with visibility-aware 2D image-space traces, directly aligning the target with the robot’s visual observation space. For each camera view, we predict 
+
+N future trace points at a temporal stride ∆ using N learnable query tokens. We denote the fi-nal hidden states of these tokens by zt = {zt, 1, . . . , z t,N }. The corresponding trace target is Yt =
+
+{yt+∆ , y t+2∆ , . . . , y t+N ∆}, where each zt,n is supervised to predict yt+n∆, the relative coordinate of the end effector. We also define the binary validity target Mt = {mt+∆ , m t+2∆ , . . . , m t+N ∆},
+
+where mt+n∆ indicates whether the end effector lies within the camera view. The trace de-coder takes zt as input and applies two heads. The regression head outputs the predicted trace 
+
+ˆYt = {ˆyt+∆ , . . . , ˆyt+N ∆}, while the validity head outputs the predicted validity scores ˆMt =
+
+{ ˆmt+∆ , . . . , ˆmt+N ∆}. We define the masked regression loss as: 
+
+Lreg (θ) = 1max(1 , PNn=1 mt+n∆)
+
+> N
+
+X
+
+> n=1
+
+mt+n∆ ∥ˆyt+n∆ − yt+n∆∥1 . (2) We define the validity loss with binary cross-entropy: 
+
+Lvalid (θ) = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+BCE ( ˆ mt+n∆, m t+n∆) . (3) The auxiliary visual trace loss combines the regression and validity losses: 
+
+Ltrace (θ) = Lreg (θ) + λvalid Lvalid (θ), (4) where λvalid controls the relative weight of the validity loss. This loss is applied independently to each camera view and averaged across views. 
+
+Overall training objective. Our final training objective combines the action prediction loss and the visual trace loss: 
+
+Ltotal (θ) = Lact (θ) + λtrace Ltrace (θ), (5) where λtrace controls the strength of the visual trace supervision. 
+
+Inference. During inference, the VLM backbone processes the camera views, language instruction, and demonstration video to obtain the representations ϕt, ψt, and zt at control timestep t. The action expert predicts actions from ϕt, ψt, zt, qt, and the current noisy action estimate. We initialize A0 
+
+> t
+
+=
+
+ϵ ∼ N (0, I) and update it with Euler integration: A(k+1) /K t = Ak/K t + 1 
+
+> K
+
+Vθ (ϕt, ψ t, z t, A k/K t , q t)
+
+for k = 0 , . . . , K − 1. After K denoising steps, we obtain A1 
+
+> t
+
+as the final predicted action chunk. 
+
+## 4 RoboCasa-DC 
+
+Base environment. RoboCasa [13] provides a suite of 24 kitchen manipulation tasks with a 7-DoF Panda arm. Each observation consists of proprioceptive states and three camera views, including two static cameras and one wrist-mounted camera. The original benchmark provides approximately 3,000 expert Panda-arm trajectories per task for training, and evaluates trained policies on unseen seeds that vary scene layouts, object categories, and object placements. 
+
+Benchmark construction. ROBO CASA -DC extends RoboCasa with episode-paired demonstra-tions for demo-conditioned policy learning, allowing policies to condition on either cross- or same-embodiment demonstrations. Fig. 3 illustrates the cross-embodiment case, where Panda-arm trajec-tories are paired with corresponding GR-1 humanoid demonstrations. For this setting, we pair 100 Panda-arm trajectories per task with corresponding humanoid expert demonstrations across all 24 5CloseSingleDoor  
+
+> Humanoid demo
+> PnPCounterToSink
+> Panda arm trajectory Humanoid demo
+
+24 
+
+> tasks
+> •••
+
+100 
+
+> pairs
+
+Training    
+
+> ••• •••
+> CloseSingleDoor
+> Panda arm trajectory Humanoid demo
+> ••• •••
+> CoffeeServeMug
+> Panda arm trajectory Humanoid demo
+> •••
+> CoffeeServeMug
+> PnPCounterToSink
+> Humanoid demo
+> Humanoid demo
+> •••
+
+50 
+
+> seeds
+
+Evaluation 
+
+> •••
+> ••• •••
+> •••
+
+Figure 3: Cross-embodiment benchmark dataset in R OBO CASA -DC. For each of the 24 tasks, we pair 100 original Panda-arm trajectories with collected GR-1 humanoid demonstrations for training. For evaluation, we collect humanoid demonstrations for 50 pre-defined seeds per task. tasks. We collect each humanoid demonstration by restoring the corresponding Panda-arm trajec-tory’s initial state and teleoperating the humanoid in the same scene with a Leap Motion controller, providing a simulated proxy for real-world human demonstrations. For evaluation, we pre-define 50 evaluation seeds per task and collect corresponding humanoid demonstrations for each seed. For each task, we manually select the demonstration camera view that best captures task execu-tion. We also include a same-embodiment case, following prior work [11, 12], where videos from Panda-arm trajectories are used as demonstrations. We publicly release R OBO CASA -DC to support reproducible evaluation and future work on demo-conditioned policies. 
+
+Evaluation protocol. A R OBO CASA -DC evaluation split partitions the 24 tasks into seen train-ing tasks and unseen evaluation tasks. Demo-conditioned policies are trained on the paired dataset from the seen tasks. At test time, each policy is evaluated on evaluation seeds from unseen tasks while conditioning on a single demonstration video paired with each seed. This protocol tests whether a policy can extract task-relevant guidance from one-shot demonstrations, including cross-embodiment ones, rather than merely imitating expert trajectories from its own embodiment. 
+
+## 5 Experiments 
+
+5.1 Experimental setup RoboCasa-DC. We evaluate methods on two task splits of R OBO CASA -DC: a category-balanced 
+
+split (similar to [30]) and a precision-sensitive split (motivated by [31, 32]). Each split holds out five tasks as unseen evaluation tasks, while the remaining 19 tasks are used for training. The category-balanced split samples unseen tasks from different action categories: CloseDrawer , TurnOffSink-Faucet , OpenDoubleDoor , CoffeeServeMug , and PnPCounterToMicrowave . The precision-sensitive split instead holds out five tasks with small target interaction ratio (TIR) (see Fig. 7), which stress precise spatial grounding: TurnOffStove , CoffeePressButton , TurnOffSinkFaucet , PnPCoun-terToSink , and PnPStoveToCounter . We use the dataset and evaluation protocol described in §4. For 6Pick Coke  Stack Blocks  Stack Cups  Close Laptop    
+
+> Pick Block Pick Cup Press Button Stack Blocks
+> in Swapped Order
+> (a) Seen tasks
+> (b) Unseen tasks
+
+(a) Seen tasks Pick Block  Pick Cup  Press Button  Stack Blocks 
+
+> in Swapped Order
+
+(b) Unseen tasks Figure 4: (a) Four seen tasks and (b) four unseen tasks in the real-world benchmark. The yellow arrow indicates the desired path of the end effector. SEE TRACE ACT , the trace labels are generated automatically by projecting end-effector positions into each static camera view. 
+
+Real-world benchmark. We evaluate demo-conditioned policies on real-world tabletop manipula-tion tasks using a Franka Panda arm, as shown in Fig. 4. For each of four seen tasks— Pick Coke ,
+
+Stack Blocks , Stack Cups , and Close Laptop —we collect 150 episode pairs, each consisting of a tele-operated Franka trajectory and a task-matched human demonstration video; policies are trained on these pairs. For S EE TRACE ACT , we obtain trace labels from the robot trajectories during collection by projecting end-effector positions into the static camera view, following [19, 20]. For evaluation, we define four unseen tasks: Pick Block , Pick Cup , Press Button , and Stack Blocks in Swapped Order . These tasks are designed by recombining seen skills and objects, introducing a new contact interaction, and swapping the source and target objects. We test each unseen task across 10 different object positions and poses. Following prior evaluation setups [11, 12, 16], each policy is conditioned on a one-shot human demonstration video captured in a closely matched scene. We report per-task and average success rates over the unseen tasks. Hardware setup and task language instructions are provided in Fig. 6 and Table 3, respectively. 
+
+Baselines. We compare S EE TRACE ACT against three demo-conditioned baselines: Vid2Robot [10], UniSkill [11], and ViVLA [12]. For fair comparison, all baselines are re-implemented on top of the same GR00T N1.5 backbone as S EE TRACE ACT and trained with their corresponding objectives. Further implementation details are provided in App. B. 
+
+5.2 Results 
+
+Table 1 summarizes the experimental results on R OBO CASA -DC. S EE TRACE ACT achieves the best performance across all four evaluation settings, covering both category-balanced and precision-sensitive splits under same-embodiment and cross-embodiment demonstrations. This consistency is important because the two axes stress different aspects of demo-conditioned control: the precision-sensitive split requires fine-grained spatial grounding, while the cross-embodiment setting requires extracting task-relevant motion from demonstrations whose embodiment differs from the robot. Al-though absolute performance generally decreases under these harder settings, S EE TRACE ACT main-tains its advantage over the baselines, with the largest margin appearing in the precision-sensitive cross-embodiment setting. 7Category-balanced split Precision-sensitive split Method Same-emb demo Cross-emb demo Same-emb demo Cross-emb demo Vid2Robot [10] 21.5% 8.8% 12.6% 6.4% UniSkill [11] 13.3% 11.2% 10.4% 6.0% ViVLA [12] 14.4% 8.0% 8.9% 8.4% SEE TRACE ACT (Ours) 23.0% 11.6% 14.1% 12.8% 
+
+Table 1: Experimental results on R OBO CASA -DC. We report success rates averaged over the five unseen tasks in each split, with 50 evaluation episodes per task. In Same-emb demo , policies are conditioned on demonstrations from the same Panda-arm embodiment; in Cross-emb demo , policies are conditioned on simulated GR-1 humanoid demonstrations as a proxy for human videos. Pick Block Pick Cup Press Button Stack Blocks          
+
+> in Swapped Order
+> Average
+> 0
+> 25
+> 50
+> 75
+> 100
+> Success Rate (%)
+> 50
+> 30 30
+> 0
+> 27.5
+> 60 60
+> 20 10
+> 37.5
+> 60 60
+> 10 10
+> 35.0
+> 80 80
+> 30
+> 10
+> 50.0
+> Vid2Robot UniSkill ViVLA SeeTraceAct (Ours)
+
+Figure 5: Experimental results on the real-world benchmark with a Franka Panda arm. We report success rates over 10 trials for each of the four unseen tasks, along with their average. Fig. 5 shows the experimental results on the real-world benchmark. S EE TRACE ACT again achieves the strongest performance across all four unseen tasks, improving average success from 37.5% to 50.0% over the strongest baseline. These results extend the gains observed in simulation to real-world cross-embodiment demo conditioning. 
+
+5.3 Larger gains on precision-sensitive tasks 
+
+Table 1 shows that S EE TRACE ACT ’s margin over the strongest baseline is larger on the precision-sensitive split than on the category-balanced split, increasing from 1.0 to 3.0 percentage points on average across the same- and cross-embodiment settings. This suggests that visibility-aware trace supervision is especially useful when successful execution depends on accurately localizing a small task-critical interaction region. To examine this trend more directly, we train all models on all 24 R OBO CASA -DC tasks and evaluate them on 50 held-out seeds per task (Table 5), similar to [31]. We use the same-embodiment demon-strations to factor out the cross-embodiment gap. In this setting, S EE TRACE ACT again achieves the highest average success rate. To characterize where these gains arise, we measure precision sen-sitivity using the target interaction ratio (TIR), defined as the fraction of the image covered by the target interaction region (Fig. 7); a smaller TIR indicates a more precision-sensitive task. We com-pare TIR with the per-task improvement of S EE TRACE ACT over each baseline using a one-sided Spearman rank correlation test. Across the 24 tasks, TIR is negatively correlated with the gain over every baseline: Vid2Robot ( ρ = −0.80 , p < 10 −5), UniSkill ( ρ = −0.45 , p < 0.05 ), and ViVLA (ρ = −0.52 , p < 0.01 ). The correlation remains significant even when we compare S EE TRACE ACT 
+
+against the strongest baseline for each task ( ρ = −0.63 , p < 10 −3), consistent with the larger gains on precision-sensitive tasks in Table 1. 
+
+5.4 Ablation study 
+
+We ablate the main design choices of SEE TRACE ACT in the cross-embodiment setting of ROBO CASA -DC, averaging results across the category-balanced and precision-sensitive splits. We 8Method Success rate GR00T N1.5 backbone (no demonstrations) 9.0% SEE TRACE ACT w/o trace supervision 9.4% SEE TRACE ACT w/o validity head 8.2% SEE TRACE ACT w/o action-aware video encoder 9.2% SEE TRACE ACT w/ 3D trace supervision 10.4% SEE TRACE ACT (Ours) 12.2% 
+
+Table 2: Ablation study in the cross-embodiment setting of R OBO CASA -DC. Success rates are averaged over the category-balanced and precision-sensitive splits. also report the GR00T N1.5 backbone (no demonstrations) as a reference point for a standard VLA policy. Table 2 shows that simply adding demonstration inputs is not sufficient. Removing trace su-pervision reduces performance to 9.4%, close to the no-demonstration backbone at 9.0%, suggesting that explicitly supervising how the model grounds demonstrations through visual traces provides a clear benefit. Among the ablations, removing the validity head causes the largest degradation, falling to 8.2%. This supports the importance of visibility-aware supervision; forcing the model to regress ill-defined off-screen coordinates can hurt representation learning. Replacing the V-JEPA 2 [24] video encoder with the backbone VLA’s SigLIP [33] encoder also lowers performance, suggesting that an action-aware video representation is useful for extracting task progression from demonstra-tions. Finally, 3D trace supervision outperforms the other ablations but still lags behind image-space trace supervision, suggesting that 2D traces offer a training signal better matched to the model’s vi-sual inputs. 
+
+## 6 Limitations 
+
+Our study has several limitations. First, our real-world evaluation is limited to a tabletop single-arm benchmark, leaving broader evaluation across embodiments, environments, and tasks for future work. Second, our auxiliary objective assumes future trace labels during training, which may not always be readily available; however, such labels could be obtained using motion trackers or founda-tion models, following prior work [17, 21, 22, 23, 18, 19]. Finally, despite improving over baselines, the modest absolute success rates on R OBO CASA -DC show that demo-conditioned robot learning leaves substantial room for progress. 
+
+## 7 Conclusion 
+
+We presented S EE TRACE ACT , a demo-conditioned VLA framework that grounds one-shot demon-strations through visibility-aware latent planning. We also introduced R OBO CASA -DC, a bench-mark for evaluating demo-conditioned policies with same- and cross-embodiment demonstrations. Experiments show that S EE TRACE ACT achieves the strongest performance among baselines, with especially large gains on precision-sensitive tasks. These results highlight precise spatial grounding as a promising direction for demo-conditioned robot learning. 9Acknowledgments 
+
+We thank Jaeah Lee for valuable feedback on figure design, and Junghwan Yim for data collection in the course project that preceded this work. This material is based upon work partially supported by the National Science Foundation under Grant No. 2239292 and NVIDIA Academic Grant Program. 
+
+## References 
+
+[1] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Haus-man, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. X. Shi, J. Tanner, Q. Vuong, A. Walling, H. Wang, and U. Zhilinsky. π0: A vision-language-action flow model for general robot control. ArXiv , abs/2410.24164, 2024. [2] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. P. Foster, G. Lam, P. R. Sanketi, Q. Vuong, T. Kollar, B. Burchfiel, R. Tedrake, D. Sadigh, S. Levine, P. Liang, and C. Finn. Openvla: An open-source vision-language-action model. 
+
+ArXiv , abs/2406.09246, 2024. [3] NVIDIA, J. Bjorck, F. Casta˜ neda, N. Cherniadev, X. Da, R. Ding, L. J. Fan, Y. Fang, D. Fox, F. Hu, S. Huang, J. Jang, Z. Jiang, J. Kautz, K. Kundalia, L. Lao, Z. Li, Z. Lin, K. Lin, G. Liu, E. Llontop, L. Magne, A. Mandlekar, A. Narayan, S. Nasiriany, S. Reed, Y. L. Tan, G. Wang, Z. Wang, J. Wang, Q. Wang, J. Xiang, Y. Xie, Y. Xu, Z.-T. Xu, S. Ye, Z. Yu, A. Zhang, H. Zhang, Y. Zhao, R. Zheng, and Y. Zhu. Gr00t n1: An open foundation model for generalist humanoid robots. ArXiv , abs/2503.14734, 2025. [4] H. R. Walke, K. Black, A. Lee, M. J. Kim, M. Du, C. Zheng, T. Zhao, P. Hansen-Estruch, Q. H. Vuong, A. W. He, V. Myers, K. Fang, C. Finn, and S. Levine. Bridgedata v2: A dataset for robot learning at scale. In Conference on Robot Learning (CoRL) , 2023. [5] A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karamcheti, S. Nasiriany, M. K. Srirama, L. Y. Chen, K. Ellis, P. Fagan, J. Hejna, M. Itkina, M. Lepert, Y. Ma, P. Miller, J. Wu, S. Belkhale, S. Dass, H. Ha, A. Jain, A. Lee, Y. Lee, M. Memmel, S. Park, I. Ra-dosavovic, K. Wang, A. Zhan, K. Black, C. Chi, K. B. Hatch, S. Lin, J. Lu, J.-P. Mercat, A. Rehman, P. R. Sanketi, A. Sharma, C. B. Simpson, Q. Vuong, H. R. Walke, B. Wulfe, T. Xiao, J. H. Yang, A. Yavary, T. Zhao, C. Agia, R. Baijal, M. G. Castro, D. L. Chen, Q. Chen, T. Chung, J. Drake, E. P. Foster, J. Gao, D. A. Herrera, M. Heo, K. Hsu, J. Hu, M. Z. Irshad, D. Jackson, C. Le, Y. Li, K. Lin, R. Lin, Z. Ma, A. Maddukuri, S. Mirchandani, D. Morton, T. Nguyen, A. O’Neill, R. M. Scalise, D. Seale, V. Son, S. Tian, E. Tran, A. Wang, Y. Wu, A. Xie, J. Yang, P. Yin, Y. Zhang, O. Bastani, G. Berseth, J. Bohg, K. Goldberg, A. Gupta, A. Gupta, D. Jayaraman, J. J. Lim, J. Malik, R. Mart’in-Mart’in, S. Ramamoorthy, D. Sadigh, S. Song, J. Wu, M. C. Yip, Y. Zhu, T. Kollar, S. Levine, and C. Finn. Droid: A large-scale in-the-wild robot manipulation dataset. In Robotics: Science and Systems (RSS) , 2024. [6] A. O’Neill, A. Rehman, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee, A. Pooley, A. Gupta, A. Mandlekar, A. Jain, A. Tung, A. Bewley, A. Herzog, A. Irpan, A. Khazatsky, A. Rai, A. Gupta, A. Wang, A. Singh, A. Garg, A. Kembhavi, A. Xie, A. Brohan, A. Raffin, A. Sharma, A. Yavary, A. Jain, A. Balakrishna, A. Wahid, B. Burgess-Limerick, B. Kim, B. Sch¨ olkopf, B. Wulfe, B. Ichter, C. Lu, C. Xu, C. Le, C. Finn, C. Wang, C. Xu, C. Chi, C. Huang, C. Chan, C. Agia, C. Pan, C. Fu, C. Devin, D. Xu, D. Morton, D. Driess, D. Chen, D. Pathak, D. Shah, D. B¨ uchler, D. Jayaraman, D. Kalashnikov, D. Sadigh, E. Johns, E. P. Foster, F. Liu, F. Ceola, F. Xia, F. Zhao, F. Stulp, G. Zhou, G. S. Sukhatme, G. Salhotra, G. Yan, G. Feng, G. Schi-avi, G. Berseth, G. Kahn, G. Wang, H. Su, H. Fang, H. Shi, H. Bao, H. B. Amor, H. I. Christensen, H. Furuta, H. R. Walke, H. Fang, H. Ha, I. Mordatch, I. Radosavovic, I. Leal, J. Liang, J. Abou-Chakra, J. Kim, J. Drake, J. Peters, J. Schneider, J. Hsu, J. Bohg, J. Bing-ham, J. Wu, J. Gao, J. Hu, J. Wu, J. Wu, J. Sun, J. Luo, J. Gu, J. Tan, J. Oh, J. Wu, J. Lu, J. Yang, J. Malik, J. Silv´ erio, J. Hejna, J. Booher, J. Tompson, J. Yang, J. Salvador, J. J. Lim, 10 J. Han, K. Wang, K. Rao, K. Pertsch, K. Hausman, K. Go, K. Gopalakrishnan, K. Goldberg, K. Byrne, K. Oslund, K. Kawaharazuka, K. Black, K. Lin, K. Zhang, K. Ehsani, K. Lekkala, K. Ellis, K. Rana, K. P. Srinivasan, K. Fang, K. P. Singh, K.-H. Zeng, K. B. Hatch, K. Hsu, L. Itti, L. Y. Chen, L. Pinto, F.-F. Li, L. Tan, L. J. Fan, L. Ott, L. Lee, L. Weihs, M. Chen, M. Lepert, M. Memmel, M. Tomizuka, M. Itkina, M. G. Castro, M. Spero, M. Du, M. Ahn, M. C. Yip, M. Zhang, M. Ding, M. Heo, M. K. Srirama, M. Sharma, M. J. Kim, M. Z. Ir-shad, N. Kanazawa, N. Hansen, N. M. O. Heess, N. J. Joshi, N. Suenderhauf, N. Liu, N. D. Palo, N. M. Shafiullah, O. Mees, O. Kroemer, O. Bastani, P. R. Sanketi, P. Miller, P. Yin, P. Wohlhart, P. Xu, P. D. Fagan, P. Mitrano, P. Sermanet, P. Abbeel, P. Sundaresan, Q. Chen, Q. Vuong, R. Rafailov, R. Tian, R. Doshi, R. Mart´ ın-Mart´ ın, R. Baijal, R. Scalise, R. Hendrix, R. Lin, R. Qian, R. Zhang, R. Mendonca, R. Shah, R. Hoque, R. C. Julian, S. Bustamante, S. Kirmani, S. Levine, S. Lin, S. Moore, S. Bahl, S. Dass, S. D. Sonawani, S. Song, S. Xu, S. Haldar, S. Karamcheti, S. Adebola, S. Guist, S. Nasiriany, S. Schaal, S. Welker, S. Tian, S. Ramamoorthy, S. Dasari, S. Belkhale, S. Park, S. Nair, S. Mirchandani, T. Osa, T. Gupta, T. Harada, T. Matsushima, T. Xiao, T. Kollar, T. Yu, T. Ding, T. Davchev, T. Zhao, T. Arm-strong, T. Darrell, T. Chung, V. Jain, V. Vanhoucke, W. Zhan, W. Zhou, W. Burgard, X. Chen, X. Wang, X. Zhu, X. Geng, X. Liu, L. Xu, X. Li, Y. Lu, Y. J. Ma, Y. Kim, Y. Chebotar, Y. Zhou, Y. Zhu, Y. Wu, Y. Xu, Y. Wang, Y. Bisk, Y. Cho, Y. Lee, Y. Cui, Y. Cao, Y.-H. Wu, Y. Tang, Y. Zhu, Y. Zhang, Y. Jiang, Y. Li, Y. Li, Y. Iwasawa, Y. Matsuo, Z. Ma, Z. Xu, Z. J. Cui, Z. Zhang, and Z. Lin. Open x-embodiment: Robotic learning datasets and rt-x models : Open x-embodiment collaboration. In IEEE International Conference on Robotics and Automation (ICRA) , 2024. [7] S. Park, H. Bharadhwaj, and S. Tulsiani. Demodiffusion: One-shot human imitation using pre-trained diffusion policy. In IEEE International Conference on Robotics and Automation (ICRA) , 2026. [8] J. Li, Y. Zhu, Y. Xie, Z. Jiang, M. Seo, G. Pavlakos, and Y. Zhu. Okami: Teaching humanoid robots manipulation skills through single video imitation. In Conference on Robot Learning (CoRL) , 2024. [9] N. Heppert, M. Argus, T. Welschehold, T. Brox, and A. Valada. Ditto: Demonstration imitation by trajectory transformation. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2024. [10] V. Jain, M. Attarian, N. J. Joshi, A. Wahid, D. Driess, Q. Vuong, P. R. Sanketi, P. Sermanet, S. Welker, C. Chan, I. Gilitschenski, Y. Bisk, and D. Dwibedi. Vid2robot: End-to-end video-conditioned policy learning with cross-attention transformers. In Robotics: Science and Sys-tems (RSS) , 2024. [11] H. Kim, J. Kang, H. Kang, M. Cho, S. J. Kim, and Y. Lee. Uniskill: Imitating human videos via cross-embodiment skill representations. In Conference on Robot Learning (CoRL) , 2025. [12] G. Chen, M. Wang, Q. Shao, Z. Zhou, W. Mao, T. Cui, M. Zhu, Y. Deng, L. Yang, Z. Zhang, Y. Yang, H. Chen, and Y. Yue. See once, then act: Vision-language-action model with task learning from one-shot video demonstrations. ArXiv , abs/2512.07582, 2025. [13] S. Nasiriany, A. Maddukuri, L. Zhang, A. Parikh, A. Lo, A. Joshi, A. Mandlekar, and Y. Zhu. Robocasa: Large-scale simulation of everyday tasks for generalist robots. In Robotics: Science and Systems (RSS) , 2024. [14] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn, K. Gopalakrishnan, K. Haus-man, A. Herzog, J. Hsu, J. Ibarz, B. Ichter, A. Irpan, T. Jackson, S. Jesmonth, N. J. Joshi, R. C. Julian, D. Kalashnikov, Y. Kuang, I. Leal, K.-H. Lee, S. Levine, Y. Lu, U. Malla, D. Man-junath, I. Mordatch, O. Nachum, C. Parada, J. Peralta, E. Perez, K. Pertsch, J. Quiambao, K. Rao, M. S. Ryoo, G. Salazar, P. R. Sanketi, K. Sayed, J. Singh, S. A. Sontakke, A. Stone, C. Tan, H. Tran, V. Vanhoucke, S. Vega, Q. H. Vuong, F. Xia, T. Xiao, P. Xu, S. Xu, T. Yu, and 11 B. Zitkovich. Rt-1: Robotics transformer for real-world control at scale. In Robotics: Science and Systems (RSS) , 2023. [15] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, K. Choromanski, T. Ding, D. Driess, K. A. Dubey, C. Finn, P. R. Florence, C. Fu, M. G. Arenas, K. Gopalakrishnan, K. Han, K. Hausman, A. Herzog, J. Hsu, B. Ichter, A. Irpan, N. J. Joshi, R. C. Julian, D. Kalashnikov, Y. Kuang, I. Leal, S. Levine, H. Michalewski, I. Mordatch, K. Pertsch, K. Rao, K. Reymann, M. S. Ryoo, G. Salazar, P. R. Sanketi, P. Sermanet, J. Singh, A. Singh, R. Soricut, H. Tran, V. Vanhoucke, Q. H. Vuong, A. Wahid, S. Welker, P. Wohlhart, T. Xiao, T. Yu, and B. Zitkovich. Rt-2: Vision-language-action models transfer web knowledge to robotic control. In Conference on Robot Learning (CoRL) , 2023. [16] M. Xu, Z. Xu, C. Chi, M. Veloso, and S. Song. Xskill: Cross embodiment skill discovery. In 
+
+Conference on Robot Learning (CoRL) , 2023. [17] D. Niu, Y. Sharma, G. Biamby, J. Quenum, Y. Bai, B. Shi, T. Darrell, and R. Herzig. Llarva: Vision-action instruction tuning enhances robot learning. In Conference on Robot Learning (CoRL) , 2024. [18] J. Lee, J. Duan, H. Fang, Y. Deng, S. Liu, B. Li, B. Fang, J. Zhang, Y. R. Wang, S. Lee, W. Han, W. Pumacay, A. Wu, R. Hendrix, K. Farley, E. VanderBilt, A. Farhadi, D. Fox, and R. Krishna. Molmoact: Action reasoning models that can reason in space. ArXiv , abs/2508.07917, 2025. [19] J. Gu, S. Kirmani, P. Wohlhart, Y. Lu, M. Gonzalez Arenas, K. Rao, W. Yu, C. Fu, K. Gopalakr-ishnan, Z. Xu, P. Sundaresan, P. Xu, H. Su, K. Hausman, Q. Vuong, and T. Xiao. Rt-trajectory: Robotic task generalization via hindsight trajectory sketches. In International Conference on Learning Representations (ICLR) , 2024. [20] Y. Li, Y. Deng, J. Zhang, J. Jang, M. Memmel, R. Yu, C. R. Garrett, F. Ramos, D. Fox, A. Li, A. Gupta, and A. Goyal. Hamster: Hierarchical action models for open-world robot manipulation. In International Conference on Learning Representations (ICLR) , 2025. [21] R. Zheng, Y. Liang, S. Huang, J. Gao, H. Daum’e, A. Kolobov, F. Huang, and J. Yang. Tracevla: Visual trace prompting enhances spatial-temporal awareness for generalist robotic policies. In International Conference on Learning Representations (ICLR) , 2025. [22] C.-P. Huang, Y.-H. Wu, M.-H. Chen, Y.-C. F. Wang, and F.-E. Yang. Thinkact: Vision-language-action reasoning via reinforced visual latent planning. In Neural Information Pro-cessing Systems (NeurIPS) , 2025. [23] C.-P. Huang, Y. Man, Z. Yu, M.-H. Chen, J. Kautz, Y.-C. F. Wang, and F.-E. Yang. Fast-thinkact: Efficient vision-language-action reasoning via verbalizable latent planning. In 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2026. [24] M. Assran, A. Bardes, D. Fan, Q. Garrido, R. Howes, M. Komeili, M. Muckley, A. Rizvi, C. Roberts, K. Sinha, A. Zholus, S. Arnaud, A. Gejji, A. Martin, F. Robert Hogan, D. Dugas, P. Bojanowski, V. Khalidov, P. Labatut, F. Massa, M. Szafraniec, K. Krishnakumar, Y. Li, X. Ma, S. Chandar, F. Meier, Y. LeCun, M. Rabbat, and N. Ballas. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv , abs/2506.09985, 2025. [25] R. Goyal, S. E. Kahou, V. Michalski, J. Materzynska, S. Westphal, H. Kim, V. Haenel, I. Fr¨ und, P. N. Yianilos, M. Mueller-Freitag, F. Hoppe, C. Thurau, I. Bax, and R. Memisevic. The “something something” video database for learning and evaluating visual common sense. In 
+
+IEEE/CVF International Conference on Computer Vision (ICCV) , 2017. [26] W. Kay, J. Carreira, K. Simonyan, B. H. Zhang, C. Hillier, S. Vijayanarasimhan, F. Viola, T. Green, T. Back, A. Natsev, M. Suleyman, and A. Zisserman. The kinetics human action video dataset. ArXiv , abs/1705.06950, 2017. 12 [27] J. Alayrac, J. Donahue, P. Luc, A. Miech, I. Barr, Y. Hasson, K. Lenc, A. Mensch, K. Millican, M. Reynolds, R. Ring, E. Rutherford, S. Cabi, T. Han, Z. Gong, S. Samangooei, M. Monteiro, J. L. Menick, S. Borgeaud, A. Brock, A. Nematzadeh, S. Sharifzadeh, M. Binkowski, R. Bar-reira, O. Vinyals, A. Zisserman, and K. Simonyan. Flamingo: a visual language model for few-shot learning. In Neural Information Processing Systems (NeurIPS) , 2022. [28] A. Jaegle, F. Gimeno, A. Brock, O. Vinyals, A. Zisserman, and J. Carreira. Perceiver: General perception with iterative attention. In International Conference on Machine Learning (ICML) ,2021. [29] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling. In International Conference on Learning Representations (ICLR) , 2023. [30] T. Yu, D. Quillen, Z. He, R. C. Julian, K. Hausman, C. Finn, and S. Levine. Meta-world: A benchmark and evaluation for multi-task and meta reinforcement learning. In Conference on Robot Learning (CoRL) , 2019. [31] A. Goyal, V. Blukis, J. Xu, Y. Guo, Y.-W. Chao, and D. Fox. Rvt2: Learning precise manipu-lation from few demonstrations. In Robotics: Science and Systems (RSS) , 2024. [32] Y. Yin, Z. Han, S. Aarya, S. Xu, J. Wang, J. Peng, A. Wang, A. Yuille, and T. Shu. Partinstruct: Part-level instruction following for fine-grained robot manipulation. In Robotics: Science and Systems (RSS) , 2025. [33] X. Zhai, B. Mustafa, A. Kolesnikov, and L. Beyer. Sigmoid loss for language image pre-training. In IEEE/CVF International Conference on Computer Vision (ICCV) , 2023. [34] S. Ye, J. Jang, B. Jeon, S. Joo, J. Yang, B. Peng, A. Mandlekar, R. Tan, Y.-W. Chao, B. Y. Lin, et al. Latent action pretraining from videos. In International Conference on Learning Representations (ICLR) , 2025. 13 A Benchmark Details 
+
+A.1 RoboCasa-DC 
+
+To collect GR-1 humanoid demonstrations, we restore the initial simulation state of each pre-defined Panda-arm trajectory and teleoperate the humanoid in the same scene. Because the released Robo-Casa trajectories do not include the generative fixture textures needed to exactly restore the original rendered observations, we randomly assign fixture textures, replay the Panda-arm trajectories, and re-render the corresponding videos. For the cross-embodiment setting, we use the paired Panda– GR-1 episodes described in §4 for training and the pre-defined evaluation seeds for testing. In a small number of cases, we could not obtain expert humanoid demonstrations for the corresponding evaluation seeds; we exclude these seeds from all reported evaluations. For the same-embodiment case, demonstrations are rendered from the Panda-arm trajectories themselves, allowing us to use the full RoboCasa training set, up to approximately 3,000 trajectories per task. 
+
+A.2 Real-world benchmark Franka Panda Arm 
+
+> External Camera
+> Wrist Camera
+
+Figure 6: Hardware setup for the real-world experiments. The setup consists of a Franka Panda arm, an external third-person-view camera, and a wrist-mounted camera. 
+
+Hardware setup. Our real-world experiments use a 7-DoF Franka Panda arm mounted on a tabletop and equipped with a parallel-jaw gripper (Fig. 6). The visual observations are captured from two RGB cameras: a single external camera providing the third-person view and a wrist-mounted camera attached near the end effector. Both camera streams are captured at a resolution of 640 × 480 .
+
+Tasks. The language instructions for the real-world tasks shown in Fig. 4 are listed in Table 3. 
+
+## B Model Details 
+
+Common setup. For fair comparison, all methods are implemented on top of the same GR00T N1.5 architecture. Each method receives the same camera views, language instruction, demonstration video, and robot states as input, and predicts action chunks with the same horizon. Each baseline method is trained with the corresponding objectives proposed in the original work. For action pre-diction, we use an action horizon of H = 16 and perform K = 4 denoising steps at inference time. For the action prediction loss, we sample u ∼ Beta(1 .5, 1.0) and set τ = ( s − u)/s with s = 0 .999 ,following prior work [1, 3]. The hyperparameters used in our experiments are summarized in Ta-ble 4. Further details are provided in our code. 14 Task Language instruction 
+
+Seen tasks 
+
+Pick Coke “Grab the coke can and lift it up” Stack Blocks “Stack the blue block on top of the green block” Stack Cups “Stack the orange cup onto the green cup” Close Laptop “Close the laptop lid fully” 
+
+Unseen tasks 
+
+Pick Block “Grab the green block and lift it up” Pick Cup “Grab the blue cup and lift it up” Press Button “Press the pink button” Stack Blocks in Swapped Order “Stack the green block on top of the blue block” 
+
+Table 3: Real-world benchmark tasks and corresponding language instructions. 
+
+Hyperparameter Vid2Robot UniSkill ViVLA SeeTraceAct 
+
+Training 
+
+Training steps 50,000 Batch size 128 Optimizer AdamW ( β1=0 .95 , β2=0 .999 , ϵ=10 −8)Learning rate 10 −4
+
+Weight decay 10 −5
+
+Warmup steps 2500 Learning rate scheduler cosine Gradient clip norm 1.0 
+
+Demonstration video 
+
+Encoder architecture SigLIP + Perceiver ISD V-JEPA 2 + Perceiver Frame sampling method uniform timestep uniform Encoder input resolution 224 ×224 224 ×224 256 ×256 # frames sampled 64 — 64 # video tokens 32 1 32 
+
+Action prediction 
+
+Action horizon ( H) 16 Denoising steps ( K) 4
+
+Trace supervision 
+
+Validity loss weight ( λvalid ) — — — 1.0 Visual trace loss weight ( λtrace ) — — — 0.2 # future trace points ( N ) — — — 5Temporal stride ( ∆) — — — 5
+
+Table 4: Hyperparameters used for the compared methods on R OBO CASA -DC. Encoder input reso-lution follows each video encoder’s default. Following [11], UniSkill extracts demonstration frames at timesteps t and t+k at each control timestep, where k is the skill interval, while the other methods use uniformly sampled frames from the episode. 
+
+SeeTraceAct. For demonstration video encoding, we follow the open-sourced V-JEPA 2 prepro-cessing and uniformly sample 64 frames from each demonstration video. The sampled frames are resized to the video encoder input resolution of 256 × 256 . Directly feeding all video features into the VLM would substantially increase the input sequence length. With a 3D patch size of 2×16 ×16 ,a 64-frame video produces 32 × 16 × 16 = 8192 video tokens, which is much larger than the ap-proximately 200 image and language tokens used by the backbone. We therefore employ a Perceiver Resampler to compress the video features into 32 video tokens before appending them to the VLM input sequence. As in the original GR00T N1.5, robot observation images are encoded with its SigLIP [33] image encoder. 
+
+Vid2Robot [10]. Since Vid2Robot does not provide an official implementation, we re-implement the method described in the paper within our common GR00T N1.5 backbone. The original method uses a shared visual encoder for robot observations and prompt videos, so we use the SigLIP en-coder from GR00T N1.5 to encode demonstration videos as well. We then pass the resulting video 15 Task Vid2Robot UniSkill ViVLA SeeTraceAct TIR CloseDoubleDoor 83.3 51.9 85.2 72.2 6.403 CloseDrawer 98.1 100.0 94.4 94.4 4.736 CloseSingleDoor 94.4 96.3 94.4 92.6 8.801 CoffeePressButton 64.8 37.0 70.4 83.3 0.092 CoffeeServeMug 53.7 57.4 74.1 53.7 0.507 CoffeeSetupMug 25.9 18.5 27.8 24.1 0.708 OpenDoubleDoor 20.8 13.2 41.5 17.0 1.349 OpenDrawer 33.3 48.1 53.7 48.1 0.281 OpenSingleDoor 57.4 29.6 55.6 61.1 0.439 PnPCabToCounter 42.6 51.9 44.4 50.0 0.427 PnPCounterToCab 33.3 11.1 22.2 33.3 0.671 PnPCounterToMicrowave 20.4 14.8 22.2 18.5 0.452 PnPCounterToSink 37.0 14.8 31.5 38.9 0.153 PnPCounterToStove 30.2 7.5 32.1 26.4 0.366 PnPMicrowaveToCounter 27.8 9.3 51.9 33.3 0.275 PnPSinkToCounter 7.4 7.4 18.5 22.2 0.165 PnPStoveToCounter 40.7 18.5 51.9 48.1 0.165 TurnOffMicrowave 79.6 48.1 74.1 83.3 0.262 TurnOffSinkFaucet 75.9 72.2 75.9 85.2 0.116 TurnOffStove 37.0 42.6 46.3 50.0 0.049 TurnOnMicrowave 64.8 63.0 68.5 66.7 0.470 TurnOnSinkFaucet 20.4 37.0 31.5 46.3 0.189 TurnOnStove 60.4 66.0 54.7 79.2 0.067 TurnSinkSpout 87.0 94.4 88.9 87.0 0.336 Average 49.9 42.1 54.7 54.8 1.139 
+
+Table 5: Per-task success rates when training all methods on all 24 R OBO CASA -DC tasks. Results are reported in the same-embodiment setting, with evaluation on 50 held-out seeds per task. We also report the target interaction ratio (TIR), defined as the area ratio of the target interaction region to the full camera view, as visualized in Fig. 7. Lower TIR indicates higher precision sensitivity. Success rates and TIR are reported as percentages. features through a Perceiver Resampler to compress them into 32 video tokens. We train the model with the action prediction loss, the prompt–robot video contrastive loss (VVCL), and the video–text contrastive loss (VTCL). In the same-embodiment setting, we omit VVCL because it already attains its theoretical minimum. 
+
+UniSkill [11]. We use the inverse skill dynamics (ISD) module from the official UniSkill imple-mentation. At each control timestep t, UniSkill passes the demonstration frames at t and t + k to the ISD module, where k is the skill interval, to obtain a skill representation for subsequent action pre-diction. Following the original implementation, we set k = 20 frames. We project the resulting skill representation into the VLM embedding space and append it as a single token to the input image, language, and video tokens. 
+
+ViVLA [12]. Because ViVLA does not provide an official implementation, we re-implement the method described in the paper within our common GR00T N1.5 backbone. To isolate the effect of the latent action prediction objective rather than the video encoder, we use the same V-JEPA 2 video encoder and Perceiver Resampler as those used in S EE TRACE ACT to generate input video tokens. For the latent action encoder, we use the open-sourced LAPA [34]. We remove the prediction of the number of LACT tokens and instead fix the number of tokens to 9, allowing ViVLA to generate each action chunk with a single forward pass. Specifically, we divide the demonstration video into 8 equal segments and train 8 LACT tokens to predict the LAPA representations for the corresponding segments, while the remaining LACT token predicts the representation of the robot’s subsequent latent action. These 9 auxiliary tokens provide at least as much capacity as the 5 learnable query tokens used by S EE TRACE ACT .16 Figure 7: Target interaction regions in R OBO CASA -DC tasks. The highlighted region indicates the area in a static camera view where the robot must interact to complete the task. We use the area ratio of this region to the full camera view as the target interaction ratio (TIR) in §5 and Table 5; lower TIR indicates a more precision-sensitive task. 17
