@@ -1,0 +1,420 @@
+Title: GSAM: A Generalizable and Safe Robotic Framework for Articulated Object Manipulation
+
+URL Source: https://arxiv.org/pdf/2605.30740v1
+
+Published Time: Mon, 01 Jun 2026 00:43:27 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# GSAM: A Generalizable and Safe Robotic Framework for Articulated Object Manipulation 
+
+Beichen Shao 1, Mengying Xie 1, Heng Su 1, Wanyi Zhang 1, Mingyan Li 1, Yan Ding 2,3,4, Fausto Giunchiglia 5, and Chao Chen 1 ⋆ 
+
+> 1
+
+College of Computer Science, Chongqing University, Chongqing, China 
+
+cschaochen@cqu.edu.cn  
+
+> 2
+
+Lumos Robotics, China  
+
+> 3
+
+Xi’an Jiaotong-Liverpool University, China  
+
+> 4
+
+Fudan University, China  
+
+> 5
+
+Department of Information Engineering and Computer Science, University of Trento, Trento, Italy 
+
+Abstract. Articulated object manipulation is a unique challenge for ser-vice robots. Existing methods employ end-to-end policy learning, vision-motion planning, and large-language/visual-language model (LLM/VLM), but often overlook the diversity of articulated objects and the com-plexity of interactions between end-effector and handle, leading to lim-ited generalization and destructive collisions. To address this, we pro-pose GSAM, a generalizable and safe robotic framework for articulated object manipulation. Specifically, a vision-based perceiver generates the kinematic parameters. Considering that pre-trained markers in perceiver yield raw estimations that may deviate from commonsense, we present a fine-tuned VLM-based refiner, using chain-of-thought (COT) common-sense reasoning to refine perception. To prevent destructive collisions, we design an interaction constraint function generator, integrating articu-lated object, interaction pose, and obstacle avoidance knowledge into a base. LLM then functionalize these constraints and apply them to tra-jectory and posture planning. A kinematic-aware manipulation planner verifies reachability for trajectory and posture. Experiments on 50 hinge tasks across 5 object categories and 50 randomly initialized end-effector-handle configurations show that GSAM reduces standard deviation by 3.1% and improves manipulation success rate by 36.0% compared to the best baseline, respectively demonstrating the superior object generaliza-tion and interaction safety of GSAM in practical scenarios. 
+
+Keywords: Mobile manipulator · Articulated objects manipulation ·
+
+Visual-language model. 
+
+## 1 Introduction 
+
+Service robots are widely applied in offices, households, and other social envi-ronments. Articulated object manipulation is a key capability for it to enable  
+
+> ⋆
+
+Corresponding author: cschaochen@cqu.edu.cn 
+
+Beichen Shao and Mengying Xie contributed equally to this work.  
+
+> arXiv:2605.30740v1 [cs.RO] 29 May 2026 2B. Shao et al.
+
+fine-grained operations and human-robot collaboration. However, due to diverse articulated objects and complex interaction relationships between end-effector and handle, such manipulation remains prone to failure with inaccurate kine-matic parameter estimation and destructive collisions, making the development of a generalizable and safe manipulation strategy highly valuable. Prior works on articulted object manupulation utilize the end-to-end policy learning, vision-motion planning, and LLM/VLM. Specifically, end-to-end policy learning methods [1, 20, 21, 18] are tailored to a specific type and size of artic-ulated objects. These methods learn manipulation policies by imitating human demonstrations and using reinforcement learning (RL) to establish behavioral incentives. Vision-motion planning approaches [22, 23] use visual perception to estimate kinematic parameters, followed by kinematic-aware trajectory planning. LLM/VLM-based methods [9, 2, 13] identify keypoints from point cloud or vi-sual data and directly generate manipulation trajectories based on instructions. Leveraging the reasoning of LLMs and VLMs, these methods expect to intro-duce world knowledge to improve adaptability in real-world tasks. Despite the Correct  
+
+> Wrong
+> Fig. 1. Illustrations of (a) the kinematic parameters of articulated objects and (b) the correct/wrong interaction between end-effectors and handles.
+
+effectiveness of the above methods, two critical issues remain to be addressed. (1) Generalization challenge due to diverse articulated objects. As shown in Fig. 1(a), accurate estimation of kinematic parameters, including affordance (in-teraction position), category (hinge type), masks (object size) and keypoints (hinge location), is vital for manipulation. In practice, these parameters vary sig-nificantly across distinct objects. Existing approaches either train object-specific perception policies using imitation or reinforcement learning, or use external vi-sion models without fine-tuning. The former fails to generalize to unseen objects, while the latter often produces the results inconsistent with commonsense. Ad-dressing this generalization challenge remains essential. (2) Safety challenge due to complex end-effector-handle interactions. As il-lustrated in Fig. 1(b), interaction complexity depends on both the initial pose of the handle and the initial position of the end-effector. End-effectors often fail to grasp handles, especially in narrow spaces, leading to destructive collisions. En-suring safe interaction requires systematically constructing constraints based on the knowledge of articulated object, interaction pose, and obstacle avoidance. Generalizable and Safe Articulated Object Manipulation 3
+
+Existing methods focus either on motion feasibility or grasp rule generation, but rarely integrate all knowledge types simultaneously. Thus, safety remains a pressing issue in manipulation planning. In this study, we propose a Generalizable and Safe robotic framework for 
+
+Articulated object Manipulation (GSAM), which contains four modules. First, GSAM uses Kinematic Parameter Perceiver (KPP) to obtain raw kinematic parameters of articulated objects. Then, in the Kinematic Parameter Refiner (KPR), we employ a fine-tuned VLM to incorporate commonsense knowledge through COT reasoning, thereby enhancing generalization. Next, in interaction Constraint Function Generator (CFG), we construct a knowledge base integrat-ing articulated object, interaction pose and obstacle avoidance information, and employ a fine-tuned LLM to change it into constraint functions for safe interac-tion. Finally, a Kinematic-aware Manipulation Planner (KMP) ensures reacha-bility in both trajectory and posture, enhancing real executions. Our contributions are summarized as follows: 
+
+– We propose GSAM, an innovative robotic framework capable of generalizable object perception and safe end-effector-handle interaction, achieving state-of-the-art performance in articulated object manipulation. 
+
+– We develop the KPR module, which leverages the reasoning capabilities of a fine-tuned VLM to correct commonsense-inconsistent kinematic parameter estimations, thereby enhancing manipulation generalization. 
+
+– We introduce CFG, which presents a structured knowledge base and LLM functionalization to avoid destructive collisions, improving safety in multi-object scenarios. The remainder of this paper is organized as follows. Section 2 reviews related work, Section 3 presents the GSAM framework, Section 4 reports the experi-mental results, and Section 5 concludes the paper with limitations and future directions. 
+
+## 2 Related Work 
+
+Policy Learning . Due to the close link between robotic manipulation and hu-man behavior, policy learning has been widely explored in articulated object manipulation. It involves imitation learning (IL) [1, 20, 21, 18], which learns from human demonstrations, and reinforcement learning (RL) [24], which improves robustness via simulation. Some IL works [25–27] learn policies from in-the-wild human videos, but domain gaps hinder transfer to robotic settings. To ad-dress this, [32, 28, 29] employ teleoperated robot interfaces, e.g., 3D-space mouse, smartphones, VR/AR, to collect task-specific data, though they are often costly or unintuitive due to latency issues. ALOHA [31] and GELLO [38] balance cost and intuitiveness but still rely on special hardware. Recent methods [30, 32] use handheld devices mimicking grippers for data collection. However, IL approaches still require large expert datasets, even for simple tasks. RL [24] has been in-troduced to improve policy robustness, but is mostly limited to simulation. In 4 B. Shao et al. 
+
+contrast, our method follows a modular paradigm, where perception, interaction, and manipulation modules operate independently yet cooperatively, improving generalization to diverse objects. 
+
+Vision-Motion Planning. Vision-motion planning methods are popular for their flexibility in integrating object perception and interaction. They typically begin with visual estimation of kinematic parameters, followed by trajectory planning for the object interaction. Perception accuracy heavily depends on in-put types [3, 4, 9], commonly including point clouds [5, 35] and RGB-D images [7, 6, 22]. High-quality point clouds require multi-view fusion using sensors from dif-ferent angles, whereas RGB-D images can be captured via wrist-mounted cam-eras, making them more convenient for real-world collection. Existing models struggle with kinematic parameters identification. Some [8, 6] use pixel-level re-gression, while others [7] apply polar coordinates. However, all of them often ignore commonsense cues, leading to biased estimations. Moreover, traditional motion planners [36, 37] ensure reachability but overlook fine-grained interac-tions, risking collisions in narrow spaces. To address these issues, our method em-ploys RGB-D inputs [7], refines kinematic parameters via VLM’s commonsense-reasoning, and incorporates interaction constraints through LLM to enhance safety during the whole manipulation procedure. 
+
+LLM/VLM Guidance. Recent methods [33, 16, 17] have leveraged LLMs and VLMs to incorporate world knowledge into robotic manipulation. These models can directly generate keypoints and trajectory constraints for the end-effector [2, 34], enabling adaptability to complex environments. However, most works are limited to simple pick-and-place tasks. For articulated objects with rigid con-straints, these methods often underperform. For instance, [9] encoded kinematic parameters into textual formats and used LLMs for trajectory planning, but this paradigm mainly excelled in simulation. In real-world scenarios, without incorporating object and environment knowledge, the limited spatial reasoning of LLM/VLM can lead to unsafe and unconstrained interactions, causing end-effector collisions. To mitigate this, our approach constructs a comprehensive knowledge base that integrates articulated object, interaction pose, and obstacle avoidance knowledge. This knowledge base is provided to LLMs as input to im-prove spatial reasoning and generate trajectories meeting the safety constraints. 
+
+## 3 Method 
+
+In this study, we primarily consider the task of a mobile manipulator opening 1-DoF articulated objects with diverse hinge type, size and surface texture, which is particularly prevalent in practical scenarios. We assume the object has a gras-pable handle to be opened from a fully closed state. Based on the above task statement and assumption, we aim to develop a robotic framework that takes the observations of the articulated object o as input and outputs a set of 3D trajectory waypoints representing the manipulation process. An overview of the GSAM framework is illustrated in Fig. 2. GSAM starts with the vision-based kinematic parameter perceiver (KPP) module. Then, it Generalizable and Safe Articulated Object Manipulation 5RGB -D Observation      
+
+> “Open the fridge door
+> ”
+> Image
+> Encoder
+> Positional
+> Encoder
+> Transformer
+> Decoder
+> Raw Kinematic Parameters
+> Fine -tuned VLM
+> Demonstrations
+> Kinematic
+> Knowledge
+> Demonstrations
+> Chain -of -
+> Thought
+> Rank 1
+> Rank 2 Rank 3
+> Refined Kinematic Parameters Fine -tuned LLM
+> Articulated Objects
+> Knowledge
+> Interaction Pose Knowledge
+> Avoid Obstacle Knowledge
+> Enhance
+> Def phase_1(Category):
+> constraint = gripper_cons ()
+> move_gripper()
+> Def phase_2(Affordance):
+> constraint = col_cons()
+> move_end()
+> Def phase_3(Affordance):
+> constraint = articulated_cons()
+> interact_objects()
+> Constraints Python
+> Function
+> Knowledge Base Coordinate
+> Transformation
+> Constraint -based Trajectory
+> Generator
+> Inverse Kinematics Planner
+> Success
+> (a) Kinematic Parameter
+> Perceiver (KPP)
+> (b) Kinematic Parameter Refiner
+> (KPR)
+> (c) Constraint Function Generator
+> (CFG)
+> (d) Kinematic -aware Manipulation
+> Planner (KMP)
+> Failure
+
+Fig. 2. GSAM overview. KPP extracts visual features and decodes them into raw kinematic parameters. KPR refines them via VLM-based commonsense reasoning. The refined parameters and the constructed knowledge base are passed to CFG’s LLM to generate Python constraint functions. KMP then converts these into end-effector coordinates and 3D waypoints to control mobile manipulators. 
+
+comprises two modules: the VLM-based kinematic parameters refiner (KPR) for credible perception , and the constraint function generator (CFG) for safe 
+
+interaction . Finally, GSAM ends with the kinematic-aware manipulation planner (KMP) module for precise execution .
+
+3.1 Kinematic Parameter Perceiver 
+
+As shown in Fig. 2(a), the observation o consists of an RGB-D image and key-points within the image corresponding to the articulated object. Using SAM [10] as our backbone, the KPP module estimates the raw kinematic parameters K
+
+via two key steps, i.e., feature encoding and decoding. 
+
+Encoder . We employ the MAE [11] pre-trained Vision Transformer to encode the RGB-D image into a memory representation m. Then we use the positional encoder from [12], which combines Fourier mappings and MLPs to convert sparse prompts into high-dimensional embeddings. 
+
+Decoder . Following the architecture of 3DOI [7], our Transformer decoder D
+
+takes memory m, and a point query kp, and outputs a point-pooled feature h:
+
+h = D(m; kp). (1) This feature h is then passed through affordance, category, and mask identifi-cation heads, which yield the interaction position, hinge type, and object size, respectively. These identifications are combined to form the raw kinematic pa-rameters K.
+
+3.2 Kinematic Parameters Refiner 
+
+Although the KPP module can extract raw kinematic parameters from RGB-D observations, the initial predictions still suffer from keypoint drift, category am-biguity, or commonsense-inconsistent interaction locations. This is mainly caused 6 B. Shao et al. 
+
+by the structural diversity of articulated objects and the presence of occlusion, blurred boundaries, viewpoint bias in real scenes. In particular, for rotational ob-jects, valid keypoints should lie close to the hinge axis, whereas for translational objects, the keypoints should jointly define a line or surface consistent with the sliding direction. Such structural relations are typically not directly inferable from isolated visual cues alone; instead, they necessitate multi-stage reasoning that integrates object categorization, handle-type identification, and interaction semantics. To address this issue, we introduce the Kinematic Parameter Refiner (KPR) after KPP to perform semantic enhancement and structural consistency correction over the raw keypoint set P and the corresponding kinematic param-eter estimation K, producing refined kinematic parameters Krefined . As shown in Fig. 2(b), KPR adopts a parameter-efficient fine-tuned open-source vision-language model to balance domain adaptability, controllability, and deployment cost. Specifically, we employ a low-rank adaptation (LoRA) fine-tuned LLaVA-7B as the refinement backbone and design task-specific correction prompts to guide keypoint filtering, completion, and parameter refinement. Formally, the refinement process is defined as: 
+
+Krefined = Mref 
+
+ o, K, π corr 
+
+. (2) where o denotes the visual observation, K is the raw kinematic parameter set predicted by KPP, πcorr is the correction prompt set, and Mref denotes the fine-tuned refinement model. The correction prompt set πcorr consists of four components: 
+
+πcorr = {Ddemo , K, I task , P cot }. (3) Here, Ddemo denotes demonstrations, K denotes the raw kinematic parameters, 
+
+Itask denotes the task instruction, and Pcot denotes the COT textual prompt. The core motivation of this prompt design is that directly applying a VLM to filter P is unreliable, since effective keypoint refinement requires explicit de-composition of the reasoning process. For instance, valid keypoints on rotational objects are expected to co-align with the hinge-axis structure, while those on translational objects must exhibit geometric consistency with the sliding sur-face or motion direction. Critically, neither relation can be reliably inferred from isolated local visual cues alone. Inspired by [13], we therefore introduce a COT prompt that explicitly guides the model to first identify the object category, then infer the handle type around the affordance region, and finally refine the candidate keypoints by combining visual evidence with structural priors and commonsense knowledge. Through this stepwise reasoning process, the model moves beyond direct pattern matching and establishes a more reliable inference chain among object category, interaction region, and keypoint structure, thereby improving both keypoint selection quality and kinematic parameter accuracy. To avoid the computational overhead of full-parameter adaptation, we adopt LoRA for parameter-efficient fine-tuning. During training, we freeze the visual encoder and most language model parameters, and inject low-rank adaptation matrices into the attention projection layers and selected feed-forward layers. Generalizable and Safe Articulated Object Manipulation 7
+
+Supervised instruction tuning is then used to learn the mapping from raw pa-rameters to refined outputs. The training objective is formulated as the standard autoregressive cross-entropy loss: 
+
+Lsft = −
+
+> T
+
+X
+
+> t=1
+
+log p yt | y<t , o, K, π corr 
+
+, (4) where yt denotes the target token at time step t, and T is the output sequence length. Given the diversity of articulated objects, KPR does not output only a single refined solution. Instead, it produces multiple candidate keypoint sets and their corresponding candidate refined kinematic parameters, which are further ranked according to structural consistency, interaction plausibility, and commonsense compatibility. The final output is thus a ranked candidate set: 
+
+Krefined =
+
+n
+
+K(1) 
+
+> refined
+
+, K (2) 
+
+> refined
+
+, . . . , K (M )
+
+> refined
+
+o
+
+, (5) where K(1)  
+
+> refined
+
+denotes the highest-confidence candidate, and M is the number of retained candidates. Overall, the introduction of KPR endows GSAM with structural-prior-aware and semantically grounded refinement capability on top of the raw visual estima-tion. By parameter-efficiently fine-tuning an open-source vision-language model for articulated object manipulation, the system can reliably map raw kinematic predictions to refined parameter candidates without incurring substantial de-ployment cost, thus providing more accurate and consistent kinematic inputs for the subsequent constraint generation module. 
+
+3.3 Constraint Function Generator 
+
+CFG retrieves information from the pre-constructed knowledge base B and gen-erates trajectory constraint functions C tailored for articulated object manipula-tion. Furthermore, B is progressively enriched through each execution, enabling continual refinement of the reasoning and planning capabilities of the system. The CFG is organized around two core components: the construction of B and query-based constraint generation. 
+
+Knowledge Base Construction . We partition knowledge base B into three subsets Bint , Bobs , Bart , expressed as: 
+
+B = {Bint , B obs , B art }. (6) 
+
+– Interaction Pose Knowledge (Bint ). We define each entry as an ordered pair 
+
+(c, g ), where c is the textual handle description, and g is the corresponding end-effector pose, represented as the triplet (ϕ, θ, ψ ). Here, ϕ, θ, and ψ denote the roll, pitch, and yaw angles of the end-effector, respectively. Each pair is encoded as a function and stored in Bint .8 B. Shao et al. 
+
+– Obstacle Avoidance Knowledge (Bobs ). We apply the sampling-based motion planning algorithm RRT ∗ [36] to generate collision-free trajectories toward the interaction point. Rather than storing explicit coordinates, we extract coordinate transformation patterns and encode them as functions in Bobs .
+
+– Articulated Object Knowledge (Bart ). After reaching the interaction point and closing the gripper, we use ground-truth articulation parameters to guide the opening motion and record the resulting trajectory. The optimal trajec-tory is computed as: 
+
+τ ∗(q) = Tobj (q) T −1obj (qinit ) T init eef , (7) where τ ∗(q) denotes the desired end-effector pose trajectory parameterized by joint parameter q, which is either a rotation angle (revolute joint) or linear displacement (prismatic joint). qinit is the joint value at initial grasp. We then perform least-squares fitting to match predicted poses to true recorded poses: 
+
+fopen = arg min 
+
+> fM
+
+X
+
+> j=1
+
+f (pj ) − τ j
+
+> 2
+
+, (8) 
+
+Bart = { fopen }, (9) where M is the number of trajectory samples, pj is the predicted pose from the proper trajectory, and τ j is the corresponding recorded pose. The fitted function f maps predicted poses to ground-truth poses. 
+
+Bint , Bobs , and Bart respectively correspond to the end-effector interaction, ap-proaching, and opening processes of articulated objects. We construct them from simulation environments [14, 15], covering 60 instances across 5 articulated ob-ject types. 
+
+Constraint Generation . CFG maps the refined kinematic parameters Krefined 
+
+to a set of executable trajectory constraints C via a query-based generation mechanism. We implement CFG with a parameter-efficient fine-tuned Llama 3.1-8B-Instruct model, adapted by LoRA to generate constraint-function text conditioned on the task description, refined kinematic parameters, and retrieved knowledge entries. Formally, 
+
+C = Mcfg 
+
+ Krefined , B, π c
+
+, (10) where Mcfg denotes the fine-tuned instruction model, and πc is the COT prompt. The prompt explicitly decomposes the articulated manipulation task into multiple sub-stages such as interaction-pose adjustment, approach and open-ing, and guides the model to retrieve relevant knowledge from Bint , Bobs , and 
+
+Bart for stage-wise constraint generation. This stepwise reasoning improves both interpretability and executability. We fine-tune the model on a dedicated dataset composed of structured pa-rameters, constraint and knowledge entries. With most backbone parameters Generalizable and Safe Articulated Object Manipulation 9
+
+frozen and LoRA injected into the attention projection layers, the model is op-timized by supervised instruction tuning: 
+
+Lcfg = −
+
+> T
+
+X
+
+> t=1
+
+log p yt | y<t , o, K refined , B, π c
+
+, (11) where yt is the output token at step t. The resulting model can adaptively retrieve relevant knowledge and synthesize constraint functions according to the object category, interaction type, and environmental structure. 
+
+3.4 Kinematic-aware Manipulation Planner 
+
+KMP aims to generate 3D waypoints in the mobile manipulator’s coordinate frame, verify that they satisfy robot arm’s kinematic constraints, and ultimately actuate the arm to execute all interactions with articulated objects. 
+
+Coordinate Transformation and Trajectory Generation . The image co-ordinates captured by the wrist-mounted camera are transformed into the mo-bile manipulator’s coordinate frame, and then passed into the constraint-based trajectory generator to produce trajectory waypoints. The constraint-based tra-jectory generator employs minimum-snap optimization under C, partitioning the trajectory into N polynomial segments and subsequently determining the opti-mal coefficients for each segment through numerical solution. 
+
+Inverse Kinematics . The 3D waypoints {pi} produced by this process are fed into an inverse kinematics planner to compute the corresponding joint configu-rations and verify their reachability. Formally, for each waypoint pi, we solve: 
+
+qi = arg min  
+
+> q∈Rn
+
+FK( q) − pi
+
+> 2
+
+,
+
+s.t. qmin ≤ q ≤ qmax , CollisionFree( q).
+
+(12) Here, FK( q) denotes the forward-kinematics mapping, qmin , q max are joint limits, and CollisionFree( q) enforces no collisions. The solutions {qi} represent joint-space configurations for waypoints {pi} that satisfy the robot arm’s joint-limit and kinematic constraints. In practice, this inverse kinematics transformation is implemented using the Open Motion Planning Library (OMPL). 
+
+Rollback Strategy . Considering that the design of some articulated objects in the real world may deviate from common assumptions, our predicted trajectories may not always be fully accurate. For example, a door’s hinge axis is typically assumed to lie on the right or left, but it may actually be located at the top. To this end, we implement a rollback strategy: once an interaction failure occurs, we sequentially invoke the remaining kinematic knowledge in the KPR module to generate updated constraints, and retry the interaction with the current articu-lated object. This rollback will loop continuously until a successful manipulation is achieved or all kinematic parameter candidates have been retried. 10 B. Shao et al. 
+
+## 4 Experiments 
+
+4.1 Experimental Setup Environment. We conduct 50 real-robot manipulation trials in total. The benchmark contains five unseen articulated-object categories: right-hinge, left-hinge, bottom-hinge, prismatic, and textured-hinge objects. For each category, five object instances are selected, and each instance is tested from two base placements, resulting in 5 categories × 5 instances × 2 placements = 50 trials. The same 50 trials are used for all compared methods. The hardware platform consists of a Ranger Mini 3.0 mobile base, a custom metal body, and a Realman 63-F robotic arm. An Intel RealSense D435i camera is mounted on the wrist to capture RGB-D images. An NVIDIA RTX 3090 GPU is configured in the system to support computational requirements. 
+
+Baselines. We compare GSAM with three representative categories. (1) LLM/VLM guidance: Kinematic LLM, and A3VLM. (2) Policy learning: Behavior Cloning. (3) Vision-motion planning: 3DOI+Motion Planning. 
+
+– Kinematic LLM [9]: Uses LLMs to generate 3D waypoints directly. 
+
+– A3VLM [41]: Uses VLM to predict kinematic knowledge then generate 3D waypoints. 
+
+– Behavior Cloning [32, 1]: Works as an end-to-end imitation learning ap-proach. 
+
+– 3DOI+Motion Planning : Extracts kinematic parameters with the vision-based 3DOI method [7], and performs interaction through motion planning using RRT* [42]. 
+
+– OPD+Motion Planning : Obtains kinematic parameters via the OPD model [6], followed by interaction planning using RRT* [42]. 
+
+Table 1. Comparison of GSAM against baseline methods and ablation study in terms of PSR, ISR, and OSR (%). Results are reported for each hinge type and averaged across all 50 tasks in campus environments.                                                                                                                                                                            
+
+> Methods Right Hinge Prismatic Hinge Bottom Hinge Left Hinge Textured Hinge Mean ±Std PSR ISR OSR PSR ISR OSR PSR ISR OSR PSR ISR OSR PSR ISR OSR PSR ISR OSR
+> GSAM vs Baselines
+> Kinematic LLM 90.0 11.1 10.0 100.0 60.0 60.0 100.0 20.0 20.0 90.0 44.4 40.0 80.0 25.0 20.0 92.0 ±7.5 31.2 ±18.3 30.0 ±16.3
+> A3VLM 50.0 60.0 30.0 90.0 77.8 70.0 60.0 66.7 40.0 50.0 20.0 10.0 60.0 66.7 40.0 62.0 ±14.7 61.3 ±19.9 38.0 ±19.4
+> Behavior Cloning //20.0 //30.0 //20.0 //30.0 //30.0 //26.0 ±4.5
+> 3DOI+Motion Planning 50.0 80.0 40.0 100.0 70.0 70.0 70.0 71.4 50.0 60.0 66.7 40.0 70.0 85.7 60.0 70.0 ±16.7 74.8 ±7.0 52.0 ±10.6
+> OPD+Motion Planning 40.0 75.0 30.0 70.0 71.4 50.0 ///50.0 60.0 30.0 40.0 75.0 30.0 50.0 ±12.2 70.0 ±6.2 35.0 ±14.8
+> GSAM (Ours) 90.0 88.9 80.0 100.0 100.0 100.0 100.0 90.0 90.0 90.0 100.0 90.0 80.0 100.0 80.0 92.0 ±7.5 95.7 ±5.2 88.0 ±7.5
+> Ablation Study
+> GSAM w/o KPR 50.0 100.0 50.0 100.0 100.0 100.0 60.0 83.3 50.0 70.0 71.4 50.0 60.0 100.0 60.0 68.0 ±17.2 91.0 ±11.7 62.0 ±19.4
+> GSAM w/o CFG 90.0 33.3 30.0 100.0 60.0 60.0 100.0 40.0 40.0 90.0 60.0 50.0 80.0 37.5 30.0 92.0 ±7.5 44.2 ±9.6 42.0 ±11.7
+> GSAM w/o COT 60.0 66.7 40.0 100.0 80.0 80.0 70.0 57.1 40.0 70.0 71.4 50.0 80.0 50.0 40.0 76.0 ±13.6 65.0 ±10.5 50.0 ±15.5
+
+Evaluation. We adopt Perception Success Rate ( PSR ), Interaction Success Rate (ISR ), and Overall Success Rate ( OSR ) as the evaluation metrics to study the generalization and safety of all articulated object manipulation methods. Specifi-cally, PSR is defined as Psuccess /Ntotal , where Psuccess is the number of successful Generalizable and Safe Articulated Object Manipulation 11 
+
+perception cases,and Ntotal is the total number of tasks. Interaction Success Rate (ISR ) is defined as Isuccess /Psuccess , where Isuccess represents successful interac-tions without collision. For revolute hinges, a success requires an opening angle of at least 60 ◦; for prismatic hinges, it needs at least 20 cm of translation. Given sequential nature of perception and interaction, Overall Success Rate OSR is defined as PSR × ISR . Higher PSR , ISR , and OSR indicate better performance. Besides, to assess the efficiency and practical values of all methods, we report the Task Execution Time ( Time ). 
+
+4.2 Numerical Results 
+
+Numerical results are presented in Table 1, where “/” means that steps in some baselines cannot be executed independently. Since Behavior Cloning is trained in an end-to-end manner, it can only be measured by the average OSR . GSAM and Kinematic LLM achieve the same PSR , attributable to Kinematic LLM’s absence of visual perception and its dependence on kinematic parameters estimated by our perception module. 
+
+Generalization Results. Across the five categories, GSAM achieves the highest OSR (88.0%) while maintaining a relatively small standard deviation (7.5%). (1) GSAM maintains a relatively small standard deviation with highest OSR across all categories. This is due to the commonsense reasoning in KPR. Even under irregular spatial configurations, it helps uncover structural cues from images and couple mask and axis identification, enabling accurate kinematic parame-ter estimation. (2) Most baselines, except Behavior Cloning, show large OSR 
+
+fluctuations across categories. They perform best on prismatic hinge tasks, but drop sharply on right-, bottom-, left-, and textured-hinge tasks. This is partly because prismatic tasks usually present more regular handle layouts, making seg-mentation and kinematic estimation easier. In contrast, irregular hinge layouts increase spatial errors in 3DOI+Motion Planning and OPD+Motion Planning, lead to inaccurate waypoint generation in Kinematic LLM, and reduce the ro-bustness of A3VLM due to its reliance on scene-extrema depth denormalization and single-shot regression. (3) Although Behavior Cloning has low variance, its 
+
+OSR remains consistently low because imitation learning generalizes poorly to unseen objects. 
+
+Safety Results. On 50 tasks with randomly initialized interaction configura-tions, the average manipulation success rate of GSAM is 88.0%, while that of the optimal baseline 3DOI+Motion Planning is only 52.0%. (1) GSAM outperforms all baselines in OSR across all interaction configurations. Its performance stems from a structured knowledge base integrating articulated object, interaction pose, and obstacle avoidance information. CFG further synthesizes constraint-aware trajectories, effectively mitigating collisions. (2) 3DOI+Motion Planning, and OPD+Motion Planning perform better than the remaining baselines, but their collision avoidance ability needs to be further improved. They often over-look the geometric structure of the handle in the interaction stage, increasing collision risk. In addition, when addressing bottom hinge tasks, OPD+Motion Planning fails, since OPD can not estimate the objects’ kinematic parameters. 12 B. Shao et al. 
+
+(3) Kinematic LLM, A3VLM and Behavior Cloning perform poorly. Without ge-ometric or physical awareness, 3D waypoints generated by Kinematic LLM and A3VLM lead to collisions due to hallucinations. The distribution consistence requirement between training data and test objects makes Behavior Cloning difficult to output feasible trajectory under varying interaction configurations. 
+
+Time Results. On 50 tasks with randomly initialized interaction configura-
+
+Table 2. Comparison of GSAM against baseline methods and ablation study in terms of task execution time ( s). Results are reported for each hinge type and averaged across all 50 tasks in campus environments. Methods Right Hinge Prismatic Hinge Bottom Hinge Left Hinge Textured Hinge Mean ± Std                                                                          
+
+> GSAM vs Baselines
+> Kinematic LLM 37.3 47.4 57.9 56.6 62.7 52.4 ±10.1
+> A3VLM 37.1 40.9 51.4 43.8 50.8 44.8 ±6.2
+> Behavior Cloning 19.4 22.6 32.2 24.1 20.1 23.7 ±5.1
+> 3DOI+Motion Planning 33.4 44.0 42.6 40.6 42.4 40.6 ±4.2
+> OPD+Motion Planning 39.3 47.8 /48.0 50.5 46.4 ±4.9
+> GSAM (Ours) 38.4 46.0 49.2 39.4 37.5 42.1 ±5.2
+> Ablation Study
+> GSAM w/o KPR 35.4 42.2 45.0 36.3 34.6 38.7 ±4.6
+> GSAM w/o CFG 37.8 45.2 48.4 38.7 36.9 41.4 ±5.1
+> GSAM w/o COT 40.2 48.4 51.9 41.3 39.2 44.2 ±5.6
+
+tions, Behavior Cloning is the fastest method, achieving 23 .7 ± 5.1s, since it only requires a single feed-forward inference without explicit online planning. The other model-based baselines are noticeably slower, with Kinematic LLM, A3VLM, 3DOI, and ODP requiring 52 .4 ± 10 .1s, 44 .8 ± 6.2s, 40 .6 ± 4.2s, and 
+
+46 .4 ± 4.9s, respectively. GSAM attains a runtime of 42 .1 ± 5.2s, which is sub-stantially faster than Kinematic LLM and ODP and comparable to 3DOI and A3VLM, while still delivering the strongest task success rates. These results show that, although GSAM cannot match the speed of end-to-end Behavior Cloning, it remains highly competitive in wall-clock efficiency and achieves a more fa-vorable balance between efficiency and accuracy. Such a balance is crucial for leveraging the practical value of articulated objects manipulation. 
+
+4.3 Visual Results 
+
+Perception, interaction, and manipulation are essential components of articu-lated task execution. In the perception evaluation, we compare KPP+KPR with three advanced baselines: OPD, A3VLM, and 3DOI. As reported in Table 3, perception performance is assessed using two metrics Mask IoU and Axis EA-Score, which measure the accuracy of object mask prediction and kinematic axis estimation, respectively. The results show that GSAM achieves the best overall performance on both metrics, demonstrating its superior ability to lo-calize articulated object regions and estimate key kinematic parameters. This advantage mainly stems from the perception refinement capability introduced by KPR, which enhances structural understanding through commonsense rea-soning. Among the baseline methods, 3DOI generally performs better than OPD Generalizable and Safe Articulated Object Manipulation 13 
+
+and A3VLM. However, due to the lack of commonsense-guided refinement, the axes estimated by 3DOI still tend to deviate from the optimal positions, as observed in the prismatic hinge task. In addition, 3DOI is prone to identify-ing incorrect axes in several cases, including the right, bottom, and left hinge tasks. These results demonstrate that GSAM provides more accurate and robust perception performance than the advanced baselines. 
+
+Table 3. Comparison of GSAM with baseline methods. Mask IoU and Axis EA-Score are reported for each hinge category and aggregated as mean performance over all 50 campus-scale tasks. Methods Right Hinge Prismatic Hinge Bottom Hinge Left Hinge Textured Hinge Mean Mask Axis Mask Axis Mask Axis Mask Axis Mask Axis Mask Axis                                                  
+
+> A3VLM /38.5 ///44.8 /49.0 /42.5 /43.7
+> 3DOI 72.0 71.8 80.3 /76.8 85.5 73.4 70.0 75.1 78.6 75.5 76.4
+> OPD 57.0 34.1 65.8 ///62.3 42.5 60.5 36.1 61.4 37.5
+> GSAM (Ours) 79.8 82.0 90.2 /87.5 93.2 82.1 89.4 81.7 84.6 84.3 87.3
+
+For interaction and manipulation, we compare CFG+KMP with Kinematic LLM, A3VLM, and Motion Planning baselines, where OPD+Motion Planning and 3DOI+Motion Planning use different vision-based kinematic parameters as inputs to the motion planner. As shown in Fig. 3, GSAM generates intuitive and safe trajectories, whereas the baselines often suffer from interaction collisions. This advantage stems from CFG, which leverages a customized knowledge base to provide richer obstacle-avoidance constraints for trajectory planning. GSAM(Ours)  Kinematic -LLM Task  A3VLM  OPD+Motion 
+
+> Planning
+> 3DOI+Motion
+> Planning
+
+Fig. 3. Visual comparison of trajectory planning for interaction. Blue lines are ap-proaching trajectories. Red lines denote opening trajectories. Local view illustrates interactions between end-effector and handle. 
+
+4.4 Ablation Study 
+
+To study the core modules KPR and CFG, as well as their COT questioning ef-fectiveness, we conduct several degraded models. In GSAM w/o KPR, we remove the refiner KPR. In GSAM w/o CFG, we retain LLM but remove the assisted knowledge base. In GSAM w/o COT, we replace COT questioning with direct questioning in KPR and CFG. From Table 1, (1) in GSAM w/o KPR, removing KPR causes the average OSR to drop from 88.0% to 62.0%. The absence of KPR 14 B. Shao et al. 
+
+prevents the VLM from performing unbiased kinematic parameter estimation, reducing PSR from 94.0% to 68.0% and leading to task failures. The 100% ISR of GSAM w/o KPR is mainly because KPR is decoupled from the interaction stage; removing KPR only affects PSR, while ISR is determined by the down-stream CFG and KMP modules. (2) In GSAM w/o CFG, removing knowledge base hinders the LLM’s ability to generate valid motion constraints, causing ISR 
+
+to drop from 95.7% to 44.2% and OSR from 88.0% to 42.0%. (3) In GSAM w/o COT, removing COT prompting reduces PSR from 92.0% to 76.0% and ISR 
+
+from 95.7% to 65.0%. COT externalizes intermediate reasoning, offering richer contextual cues and improving long-range dependency modeling. 
+
+4.5 Comparison to Point Cloud and Real2Sim2Real 
+
+We also investigate the performance gap between GSAM and state-of-the-art point cloud-based and Real2Sim2Real methods. As shown in Fig 4, GSAM con-sistently achieves higher OSR than Where2Act [39], GAMMA [3], and URD-Former[40] under both settings. (1) In the Single-View setting, point cloud-based methods often fail in kinematic estimation due to limited structural information and noisy point clouds, as shown in the upper part of Fig. 4. URDFormer per-forms particularly poorly, since its Real2Sim2Real pipeline produces distorted assets and misaligned reconstructions, leading to near-zero real-robot success. (2) Although Multi-View input improves geometry completeness and raises OSR ,both Single-View and Multi-View methods still underperform GSAM, as shown in the lower part of Fig. 4. This gap mainly arises because articulated objects are usually observed in closed states, where functional parts are hard to distinguish, making clustering and precise segmentation difficult. (3) GSAM bypasses these limitations by leveraging commonsense kinematic reasoning through VLM, en-abling robust and reliable understanding and planning across varying scenarios. Single -   
+
+> View
+> Multi -
+> View
+> Where2Act GAMMA URDFormer
+> OSR: 0% OSR: 12% OSR: 0%
+> OSR: 68% OSR: 54%
+> GSAM
+> OSR: 88%
+> Fig. 4. Predicted segmentation and kinematic identification of a microwave.
+
+Generalizable and Safe Articulated Object Manipulation 15 
+
+## 5 Conclusion 
+
+In this study, we propose GSAM, a framework for generalizable and safe articu-lated object manipulation. GSAM introduces KPR to refine kinematic parame-ters via commonsense reasoning, improving generalization across diverse objects. CFG incorporates environmental constraints into trajectory generation, enhanc-ing interaction safety. Extensive experiments show that, compared with the best baseline, GSAM improves generalization by 3.1% across hinge tasks and reduces the collision rate by 36.0% under random end-effector-handle configurations. Despite its effectiveness, GSAM currently relies on monocular vision. Fu-ture work will integrate multimodal sensing, such as force feedback, to improve the reliability of closed-loop control. We will also extend GSAM to multi-DoF articulated objects. 
+
+Acknowledgments. This study was supported by the National Natural Science Foundation of China (Grant Nos. 62322601, 62572084 and 62506053), the Funda-mental Research Funds for the Central Universities (Grant Nos. 2024IAIS-QN017 and 2025CDJZDGF001), and the Natural Science Foundation of Chongqing (Grant No. CSTB2024NSCQ-MSX0955). 
+
+## References 
+
+1. Chi, C., Xu, Z., Pan, C., Cousineau, E., Burchfiel, B., Feng, S., Tedrake, R., Song, S.: Universal Manipulation Interface: In-The-Wild Robot Teaching Without In-The-Wild Robots. In: Proceedings of Robotics: Science and Systems (2024) 2. Huang, W., Wang, C., Li, Y., Zhang, R., Fei-Fei, L.: ReKep: Spatio-Temporal Rea-soning of Relational Keypoint Constraints for Robotic Manipulation. In: Conference on Robot Learning (2024) 3. Yu, Q., Wang, J., Liu, W., Hao, C., Liu, L., Shao, L., Lu, C.: Gamma: Generalizable Articulation Modeling and Manipulation for Articulated Objects. In: 2024 IEEE International Conference on Robotics and Automation, pp. 5419–5426 (2024) 4. Ehsani, K., Han, W., Herrasti, A., VanderBilt, E., Weihs, L., Kolve, E., Kembhavi, A., Mottaghi, R.: ManipulaTHOR: A Framework for Visual Object Manipulation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 4497–4506 (2021) 5. Liu, J., Mahdavi-Amiri, A., Savva, M.: PARIS: Part-level Reconstruction and Mo-tion Analysis for Articulated Objects. In: Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision, pp. 352–363 (2023) 6. Jiang, H., Mao, Y., Savva, M., Chang, A.X.: OPD: Single-View 3D Openable Part Detection. In: European Conference on Computer Vision, pp. 410–426 (2022) 7. Qian, S., Fouhey, D.F.: Understanding 3D Object Interaction from a Single Image. In: Proceedings of the IEEE/CVF International Conference on Computer Vision, pp. 21753–21763 (2023) 8. Sun, X., Jiang, H., Savva, M., Chang, A.X.: OPDMulti: Openable Part Detection for Multiple Objects. arXiv preprint arXiv:2303.14087 (2023) 9. Xia, W., Wang, D., Pang, X., Wang, Z., Zhao, B., Hu, D., Li, X.: Kinematic-Aware Prompting for Generalizable Articulated Object Manipulation with LLMs. In: 2024 IEEE International Conference on Robotics and Automation, pp. 2073–2080 (2024) 16 B. Shao et al. 10. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A.C., Lo, W.-Y., Dollár, P., Girshick, R.: Segment Anything. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (2023) 11. He, K., Chen, X., Xie, S., Li, Y., Dollár, P., Girshick, R.: Masked Autoencoders Are Scalable Vision Learners. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (2022) 12. Tancik, M., Srinivasan, P., Mildenhall, B., Fridovich-Keil, S., Raghavan, N., Sing-hal, U., Ramamoorthi, R., Barron, J., Ng, R.: Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains. In: Advances in Neural Information Processing Systems (2020) 13. Wei, J., Wang, X., Schuurmans, D., Bosma, M., Xia, F., Chi, E., Zhou, D., et al.: Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. In: Advances in Neural Information Processing Systems, vol. 35, pp. 24824–24837 (2022) 14. Yang, K., Cao, N., Ding, Y., Chen, C.: BestMan: A Modular Mobile Manipulator Platform for Embodied AI with Unified Simulation-Hardware APIs. Frontiers of Computer Science (2024). https://doi.org/10.1007/s11704-025-41109-6 15. Mo, K., Zhu, S., Chang, A.X., Yi, L., Tripathi, S., Guibas, L.J., Su, H.: PartNet: A Large-scale Benchmark for Fine-grained and Hierarchical Part-level 3D Object Understanding. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 909–918 (2019) 16. Su, H., Xie, M., Cao, N., Ding, Y., Shao, B., Long, X., Gu, F., Chen, C.: OVA-Fields: Weakly Supervised Open-Vocabulary Affordance Fields for Robot Opera-tional Part Detection. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), pp. 6385–6395 (2025) 17. Wang, J., Cao, N., Ding, Y., Xie, M., Gu, F., Chen, C.: SKE-Layout: Spatial Knowl-edge Enhanced Layout Generation with LLMs. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 19414–19423 (2025) 18. Levine, S., Pastor, P., Krizhevsky, A., Ibarz, J., Quillen, D.: Learning Hand-Eye Coordination for Robotic Grasping with Deep Learning and Large-Scale Data Col-lection. The International Journal of Robotics Research 37 (4-5), 421–436 (2018) 19. Shao, B., Cao, N., Ding, Y., Wang, X., Gu, F., Chen, C.: MoMa-Pos: An Efficient Object-Kinematic-Aware Base Placement Determination Framework for Mobile Ma-nipulation. In: Algorithms and Architectures for Parallel Processing, vol. 16383, pp. 254–270. Springer, Singapore (2026). https://doi.org/10.1007/978-981-95-8405-5_14 20. Fan, W., Guo, X., Feng, E., Lin, J., Wang, Y., Liang, J., Garrad, M., Rossiter, J., Zhang, Z., Lepora, N., Wei, L., Zhang, D.: Digital Twin-Driven Mixed Reality Framework for Immersive Teleoperation with Haptic Rendering. IEEE Robotics and Automation Letters 8(12), 8494–8501 (2023). https://doi.org/10.1109/LRA.2023.3325784 21. Wu, P., Shentu, Y., Yi, Z., Lin, X., Abbeel, P.: GELLO: A General, Low-Cost, and Intuitive Teleoperation Framework for Robot Manipulators. In: 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 12156–12163 (2024) 22. Gupta, A., Zhang, M., Sathua, R., Gupta, S.: Opening Articulated Objects in the Real World. In: Robotics: Science and Systems (2025) 23. Karayiannidis, Y., Smith, C., Barrientos, F.E.V., Ögren, P., Kragic, D.: An Adap-tive Control Approach for Opening Doors and Drawers under Uncertainties. IEEE Transactions on Robotics 32 (1), 161–175 (2016) Generalizable and Safe Articulated Object Manipulation 17 24. Kalashnikov, D., Irpan, A., Pastor, P., Ibarz, J., Herzog, A., Jang, E., Quillen, D., Holly, E., Kalakrishnan, M., Vanhoucke, V., Levine, S.: Scalable Deep Reinforcement Learning for Vision-Based Robotic Manipulation. In: Conference on Robot Learning, pp. 651–673 (2018) 25. Bahl, S., Gupta, A., Pathak, D.: Human-to-Robot Imitation in the Wild. In: Pro-ceedings of Robotics: Science and Systems (2022) 26. Ma, Y.J., Sodhani, S., Jayaraman, D., Bastani, O., Kumar, V., Zhang, A.: VIP: To-wards Universal Visual Reward and Representation via Value-Implicit Pre-training. In: Proceedings of the Eleventh International Conference on Learning Representa-tions (2023) 27. Wang, C., Fan, L., Sun, J., Zhang, R., Fei-Fei, L., Xu, D., Zhu, Y., Anandkumar, A.: MimicPlay: Long-Horizon Imitation Learning by Watching Human Play. In: Proceedings of the 7th Conference on Robot Learning, vol. 229, pp. 201–221 (2023) 28. Wong, J., Tung, A., Kurenkov, A., Mandlekar, A., Fei-Fei, L., Savarese, S., Martín-Martín, R.: Error-Aware Imitation Learning from Teleoperation Data for Mobile Manipulation. In: Proceedings of the 5th Conference on Robot Learning, vol. 164, pp. 1367–1378 (2022) 29. Seo, M., Han, S., Sim, K., Bang, S.H., Gonzalez, C., Sentis, L., Zhu, Y.: Deep Im-itation Learning for Humanoid Loco-Manipulation through Human Teleoperation. In: Proceedings of the 2023 IEEE-RAS 22nd International Conference on Humanoid Robots, pp. 1–8 (2023) 30. Zhao, T.Z., Kumar, V., Levine, S., Finn, C.: Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware. In: Proceedings of Robotics: Science and Systems (2023) 31. Fu, Z., Zhao, T.Z., Finn, C.: Mobile ALOHA: Learning Bimanual Mobile Ma-nipulation Using Low-Cost Whole-Body Teleoperation. In: Proceedings of the 8th Annual Conference on Robot Learning (2024) 32. Chi, C., Xu, Z., Feng, S., Cousineau, E., Du, Y., Burchfiel, B., Tedrake, R., Song, S.: Diffusion Policy: Visuomotor Policy Learning via Ac-tion Diffusion. The International Journal of Robotics Research (2024). https://doi.org/10.1177/02783649241273668 33. Kim, Y., Kim, D., Choi, J., Park, J., Oh, N., Park, D.: A Survey on Integration of Large Language Models with Intelligent Robots. Intelligent Service Robotics 17 (5), 1091–1107 (2024). https://doi.org/10.1007/s11370-024-00495-6 34. Yao, T., Wang, H., Lu, B., Ge, J., Pei, Z., Kowarschik, M., Qi, P., et al.: Sim2Real Learning with Domain Randomization for Autonomous Guidewire Navigation in Robotic-Assisted Endovascular Procedures. IEEE Transactions on Automation Sci-ence and Engineering (2025) 35. Wang, Y., Wang, Z., Nakura, M., Bhowal, P., Kuo, C.-L., Chen, Y.-T., Erickson, Z., Held, D.: ArticuBot: Learning Universal Articulated Object Manipulation Policy via Large Scale Simulation. In: Robotics: Science and Systems (2025) 36. Karaman, S., Frazzoli, E.: Sampling-Based Algorithms for Optimal Motion Plan-ning. The International Journal of Robotics Research 30 (7), 846–894 (2011) 37. Kavraki, L.E., Svestka, P., Latombe, J.-C., Overmars, M.H.: Probabilistic Roadmaps for Path Planning in High-Dimensional Configuration Spaces. IEEE Transactions on Robotics and Automation 12 (4), 566–580 (1996) 38. Wu, P., Shentu, F., Lin, X., Abbeel, P.: GELLO: A General, Low-Cost, and In-tuitive Teleoperation Framework for Robot Manipulators. In: Proceedings of the Conference on Robot Learning (2023) 18 B. Shao et al. 39. Mo, K., Guibas, L.J., Mukadam, M., Gupta, A., Tulsiani, S.: Where2Act: From Pixels to Actions for Articulated 3D Objects. In: Proceedings of the IEEE/CVF International Conference on Computer Vision, pp. 6813–6823 (2021) 40. Chen, Q., Walsman, A., Memmel, M., Mo, K., Fang, A., Fox, D., Gupta, A.: URD-Former: A Pipeline for Constructing Articulated Simulation Environments from Real-World Images. In: Robotics: Science and Systems (2024) 41. Huang, S., Chang, H., Liu, Y., Zhu, Y., Dong, H., Gao, P., Boularias, A., Li, H.: A3VLM: Actionable Articulation-Aware Vision Language Model. In: Conference on Robot Learning (2024) 42. Chen, F., Zheng, Y., Wang, Z., Chi, W., Liu, S.: RBI-RRT*: Efficient Sampling-Based Path Planning for High-Dimensional State Space. In: IEEE International Conference on Robotics and Automation (2024)
