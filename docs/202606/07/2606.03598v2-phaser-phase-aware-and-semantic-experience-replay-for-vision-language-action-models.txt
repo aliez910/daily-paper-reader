@@ -1,0 +1,886 @@
+Title: PHASER: Phase-Aware and Semantic Experience Replay for Vision-Language-Action Models
+
+URL Source: https://arxiv.org/pdf/2606.03598v2
+
+Published Time: Thu, 04 Jun 2026 00:39:13 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# PHASER: Phase-Aware and Semantic Experience Replay for Vision-Language-Action Models 
+
+Ziyang Chen 1,†, Shaoguang Wang 1,†, Weiyu Guo 1,∗, Qianyi Cai 1, He Zhang 1,Pengteng Li 1, Yiren Zhao 1, Yandong Guo 21Thrust of AI, HKUST(Guangzhou), Guangzhou, China 
+
+> 2
+
+AI 2 Robotics, Shenzhen, China 
+
+Abstract: Vision-Language-Action (VLA) models have achieved remarkable suc-cess in language-conditioned robotic manipulation. However, deploying these models in open-ended environments requires continuously acquiring novel skills, a process that inevitably triggers severe catastrophic forgetting of previously learned behaviors. While experience replay (ER) serves as a standard mitigating strategy, naive uniform sampling fundamentally misaligns with the temporal characteristics of manipulation trajectories. It systematically under-samples brief but causally crit-ical sub-skills, leading to phase starvation , and completely overlooks the varying degrees of forgetting across historical tasks. To overcome these limitations, we introduce Phaser , an architecture-agnostic continual learning framework. Phaser employs a phase-centric capacity allocation to guarantee equal memory support for all sub-skills, coupled with a multi-modal interference routing strategy that dynam-ically prioritizes historical phases at high risk of forgetting. Furthermore, to enable fully autonomous lifelong adaptation, we integrate Auto-PC , a lightweight pipeline combining unsupervised action-signal change-point detection with VLM-based semantic verification to extract temporal boundaries without intensive manual su-pervision. Evaluated across three VLA backbones on LIBERO continual learning suites, Phaser yields substantial empirical improvements, increasing Average Suc-cess Rate (ASR) by up to 31% over matched-budget ER and achieving an 87 .8% 
+
+final ASR on LIBERO-Goal CL setting. 
+
+Keywords: Continual Learning, Vision-Language-Action Models, Experience Replay 
+
+1 Introduction 
+
+Vision-Language-Action (VLA) models [ 1, 2 , 3] have achieved remarkable success in language-conditioned robotic manipulation. Deploying these models in open-ended environments requires them to continuously acquire new skills, a process that inevitably triggers catastrophic forgetting of previously learned behaviors [ 4]. To mitigate this vulnerability, experience replay (ER) [ 5 ] serves as a simple yet effective method to preserve the foundational capabilities of pretrained VLAs [6]. However, standard ER relies on a uniform sampling strategy that fundamentally misaligns with the temporal characteristics of robotic manipulation. First, it ignores the temporal non-uniformity inherent in manipulation trajectories. Because a complete task naturally decomposes into distinct phases (e.g., 
+
+approach , grasp , and transport ) that vary drastically in duration, sub-actions are distributed highly unevenly over time. Consequently, purely random or uniform frame sampling inherently allocates buffer capacity proportional to phase length, severely under-sampling brief but causally critical 
+
+> †
+
+Equal contribution. 
+
+> ∗
+
+Corresponding author: guoweyu96@gmail.com                                                                                                                      
+
+> arXiv:2606.03598v2 [cs.RO] 3 Jun 2026 68
+> 74
+> 66
+> 92
+> 78
+> 82
+> 68
+> 98
+> 96
+> 90
+> 80
+> 40 20
+> 40 30 70
+> 40 80 60 100
+> 60 40 90 100 40
+> 30 70 80 100 50
+> 80 50 100 100 40
+> 60 60 80 100 90
+> 30 70 80 100 10 80
+> 30 70 60 90 80
+> 30
+> 40 80
+> 40 40 50
+> 40 50 30 70
+> 50 30 80 40 50
+> 60 50 60 80 10 60
+> 30 30 50 20 10 30 30
+> 30 40 50 50 20 10 50
+> 30 10 30 50 20 10 10 90
+> 50 30 40 20 20 20 30 10 90
+> 40
+> 60 50
+> 30 50 100
+> 60 20 70 80
+> 50 50 50 80 10
+> 60 50 60 80 40 50
+> 30 60 60 100 40 40 30
+> 30 40 60 80 40 40 90
+> 60 30 20 100 40 10 50 60 90
+> 50 40 40 100 50 10 40 50 60 80
+
+Sequential FT 
+
+no replay buffer 
+
+> T1
+
+✗
+
+> T2
+
+✗
+
+⋯ T10 
+
+✓
+
+> each new task overwrites the
+> previous skill!
+
+ER 
+
+uniform reservoir buffer 
+
+MIR 
+
+virtual-step interference probe 
+
+PHASER (Ours) 
+
+phase-centric × interference routing                     
+
+> Global Buffer (all tasks pooled)
+> T1
+> T2
+> T3
+> ⋮···
+> T10
+> Global Buffer (per-sample)
+> T1
+> T2
+> T3
+> ⋮···
+> T10
+> Phase-Centric Buffer (LVA-routed)
+> T1
+> T2
+> T3
+> ⋮···
+> T10
+> ⟹uniform sampling (every task contributes equally) ⟹per-sample top-kby Δloss ⟹per-phase block routed by [L V A] interference
+
+Figure 1: What PHASER does and why it differs from standard experience replay. A VLA agent learns a stream of language-conditioned manipulation tasks; each demonstration trajectory decomposes into temporally extended sub-skills ( approach , grasp , transport , . . . ). The four columns contrast replay schemes under a matched budget. Sequential FT keeps no replay buffer, so each new task overwrites the previously acquired skill. ER samples uniformly from a global reservoir, allocating frame-level slots in proportion to phase duration—under-supporting brief but causally critical sub-skills ( phase starvation ) and treating all historical tasks as interchangeable. MIR retrieves per-sample top-k exemplars by virtual-step loss increase, but still selects at the frame level over a global buffer. PHASER (Ours, rightmost) replaces these choices with two structural priors: a 
+
+phase-centric buffer that guarantees equal frame support per atomic sub-skill, and a multi-modal interference router that concentrates replay on historical phases sharing perceptual context with the current task but requiring divergent kinematics. The result is a single drop-in replay scheme that significantly improves retention over matched-budget ER across three VLA backbones and two LIBERO suites, without any architectural change to the policy. sub-skills. This phenomenon, which we define as phase starvation , disproportionately degrades end-to-end task success. Second, uniform ER treats all historical tasks identically, allocating an equal replay budget to each past task. This strategy completely overlooks the fact that different historical tasks experience varying degrees of forgetting during the acquisition of a new skill. In manipulation, task interference is highly non-uniform: while some tasks share reusable sub-skills, others share overlapping perceptual contexts yet demand entirely different physical actions, posing a significantly higher risk of forgetting specific historical behaviors. To overcome the limitations of naive uniform sampling, we introduce PHASER (PH ase-Aware and Semantic Experience Replay), a novel continual learning framework that operates on two complementary levels. To resolve intra-task phase starvation, PHASER enforces a Phase-Centric Capacity Allocation . By shifting the fundamental unit of memory from the overall task down to the individual phase, it assigns an equal frame budget to every sub-skill regardless of its temporal duration, directly ensuring that brief but critical actions are adequately learned. Furthermore, to prevent inter-task budget misallocation and non-uniform forgetting, the framework employs Multi-Modal Interference Routing . By scoring historical phases against the current task using a tri-modal (Language, Vision, Action) prototype distance, it intelligently routes the replay budget toward past phases that share high perceptual context but require divergent physical actions. Crucially, because this routing is evaluated only once per task transition, it adds only marginal computational overhead. Finally, because phase-centric memory relies on temporal boundaries, we enable fully autonomous lifelong learning by integrating Auto-PC (Phase Candidates). Since directly prompting Vision-Language Models (VLMs) to segment videos empirically yields temporally imprecise boundaries [ 7], Auto-PC couples unsupervised action-signal change-point detection with a single VLM semantic verification step. This lightweight pipeline extracts and labels sub-skills automatically, securing robust downstream performance without relying on external supervision. In summary, our primary contributions are: (1) We propose PHASER , a novel, architecture-agnostic continual learning framework for Vision-Language-Action (VLA) models. By explicitly modeling the temporal structure of manipulation 2① At each task boundary — build phases of the finished task & write to memory 
+
+Trajectory of new task Tk
+
+> "put the bowl on top of the cabinet"
+
+Phase Decomposition 
+
+> Approach
+> Bowl
+> Move to
+> Cabinet
+> → 2 pre -defined phases
+
+Phase Prototypes      
+
+> φ₁ Approach
+> K = 50 frames
+> LVA
+> prototype P
+> φ₂ Move -Cab
+> K = 50 frames
+> LVA
+> prototype P
+> manual split per phase
+
+② During training of the next task — route replay from memory, then learn 
+
+Interference Routing    
+
+> cos L cos V cos A
+> context
+> ⊕action divergence
+> softmax → one phase dominates
+
+Training Batch   
+
+> ⊕
+> 4 replay ⊕4 current T k
+> (replay chosen by p i)
+
+VLA (θ)     
+
+> sample feed
+> predict
+> ⟲repeat for k = 1 .. 10
+> Phase -Centric Buffer
+> (LVA -routed)
+> T1
+> T2
+> T3
+> ⋮···
+> Tk
+> scan
+
+write 
+
+> → update θ
+> StarVLA
+
+Figure 2: PHASER pipeline overview. At each task boundary, trajectories are partitioned by phase annotation; each phase writes a fixed-size bucket ( intra-task allocation, §2.2). When training the next task, a tri-modal (L, V, A ) prototype score Ui,k ranks historical phases by interference risk, and a Boltzmann distribution pi,k =softmax( Ui,k /τ ) drives replay sampling ( inter-task routing, §2.3). Routing is computed once per transition, so per-step replay cost matches vanilla ER. trajectories, PHASER systematically overcomes the inherent limitations of standard uniform experience replay: intra-task phase starvation and inter-task budget misallocation. (2) We employ two core mechanisms within PHASER: a phase-centric capacity allocation that guarantees equal memory support for all sub-skills, and a multi-modal interference routing strategy that dynamically prioritizes historical phases at high risk of forgetting. Additionally, to enable fully autonomous operation, we introduce Auto-PC , an automated pipeline coupling unsupervised action-signal change-point detection with VLM-based semantic verification. (3) We extensively evaluate PHASER across three VLA backbones (OpenVLA-7B, QwenGR00T-3B, QwenOFT-3B) and two LIBERO suites. Under strict memory constraints, our framework yields substantial empirical improvements, increasing the Average Success Rate (ASR) by up to 31% 
+
+over matched-budget ER and achieving an 87 .8% final ASR on the LIBERO-Goal CL setting. 
+
+2 Method 
+
+We reinterpret VLA continual learning through a Semi-Markov Decision Process (SMDP) lens (Sec. 2.1) to expose the structural mismatch between trajectory data and uniform frame-level replay. PHASER addresses it via two data-side principles: (i) intra-task Phase-Centric Capacity Allocation 
+
+that equalises buffer support across sub-skills (Sec. 2.2), and (ii) inter-task Multi-Modal Interference Routing that concentrates rehearsal on historical phases most at risk of being overwritten (Sec. 2.3). Phase boundaries come from human annotation (paper default) or an automatic VLM-verified pipeline (Sec. 2.4); Fig. 2 summarises the end-to-end pipeline. 
+
+2.1 Problem Formulation & SMDP Perspective 
+
+A VLA agent sequentially learns a stream of tasks {T 1, . . . , TN }, each defined by a language instruction lk and expert trajectories Dk. Unlike i.i.d. classification, manipulation trajectories exhibit strong temporal abstraction: we model each as an SMDP of P sub-skill phases ϕp = ⟨I p, π p, β p⟩
+
+(options framework [ 8]). Because executing T requires traversing every phase, task success is upper-bounded by the weakest phase, S(T ) ≤ min p s(ϕp) (derivation in App. J). Uniform frame-level replay populates the buffer in proportion to each phase’s temporal footprint, so short but causally 3critical sub-skills (grasps, contact transitions) receive few frames and degrade first — a failure mode we call phase starvation and quantify in Sec. 3. 
+
+2.2 Intra-Task: Phase-Centric Capacity Allocation 
+
+To counter phase starvation, PHASER shifts memory allocation from macroscopic tasks to physical phases: each identified phase ϕp receives a fixed, equal budget of K frames, decoupling per-phase support from the phase’s temporal footprint. This deliberately simple rule commits only that no sub-skill is starved for executing quickly. Each phase’s buffer is populated by (i) temporal subsampling with stride ∆=3 to remove near-identical consecutive frames and (ii) reservoir sampling up to capacity K within phase boundaries. 
+
+2.3 Inter-Task: Multi-Modal Interference-Aware Routing 
+
+To defend against inter-task forgetting, PHASER scores interference between historical phases and the current task using tri-modal prototypes Pi = ( eLi , e Vi , e Ai ) — language embedding, mean visual feature, normalised kinematic signature. 
+
+Priority Scoring. The interference priority between historical phase ϕi and current training phase 
+
+ϕk is 
+
+Ui,k = Sctx i,k ·  DAi,k − γ(1 − DAi,k ), (1) with Sctx i,k = α cos( eLi , e Lk ) + (1 −α) cos( eVi , e Vk ) quantifying perceptual context overlap and DAi,k = 
+
+> 12
+
+(1 − cos( eAi , e Ak )) the action divergence. The intuition: phases sharing perceptual context but requiring divergent kinematics are highest-risk — the new task’s gradient on (L, V )-similar inputs overwrites the old action mapping unless it is rehearsed. We use α=γ=0 .5 as defaults; sensitivity is flat in a wide neighbourhood (App. G), and the Ui,k → ϵp correlation is reported in Sec. 3. 
+
+Boltzmann Sampling. Replay weights follow a Boltzmann 
+
+pi ∝ exp( Ui,k /τ ), τ =0 .25 , (2) computed once per task transition using cached prototypes; replay batches are then drawn by indexing into the resulting distribution, so PHASER adds no forward-pass cost over vanilla ER during the inner training loop. This temperature-sharpened weighting follows the adaptive memory replay 
+
+framework of Smith et al. [9] , which casts non-uniform replay as an adaptive distribution over historical samples driven by an interference signal; our Ui,k realises that signal in closed form from cached tri-modal prototypes, avoiding the online exploration step required by their bandit-style policy and keeping the per-transition cost at a single softmax over ≤ N −1 phases. 
+
+2.4 Automated Phase Boundary Sourcing 
+
+Implementing phase-centric capacity allocation (Sec. 2.2) requires defining the temporal boundaries of each sub-skill. While our primary evaluations utilize a lightweight, one-time human annotation (App. C), scaling VLA adaptation to fully open-ended environments necessitates automated phase discovery. To eliminate this human-in-the-loop dependency, we introduce Auto-PC (Phase Candi-dates), a fully automated extraction pipeline which employs an unsupervised change-point detector analyzes the low-level action signal to propose candidate temporal boundaries [ 10 ], with a following VLM processeing a subsampled trajectory video to semantically verify, refine, and label these candi-dates. The resulting boundary definition serves as a zero-overhead, drop-in replacement for manual annotations, allowing the downstream PHASER framework to operate entirely autonomously. 
+
+2.5 Experimental Setup Environments and Tasks. We evaluate on the standardized LIBERO benchmark [ 11 ], focusing on two suites that stress complementary aspects of long-horizon continual learning (CL). LIBERO-Goal 
+
+4comprises 10 single-stage tasks with distinct manipulation objectives in a shared workspace, testing skill diversity and semantic interference. LIBERO-Long features 10 compositional multi-stage tasks, evaluating structural retention under sequential action chains. Each suite is trained sequentially. 
+
+Model Architectures. To isolate the contributions of language and action heads, we span three distinct VLA backbones. OpenVLA-OFT-7B [2, 12 ] pairs a 7B Llama-2 VLM with an OFT parallel-decoding continuous-action head, conditioned on instructions via FiLM [ 13 ]. The two 3B variants [ 14 ] share an identical Qwen2.5-VL-3B language model but differ strictly in their action heads: a GR00T DiT-B regression ( QwenGR00T-3B ) versus a DiT-B denoising diffusion ( QwenOFT-3B ) [ 15 ]. This controlled axis evaluates whether PHASER’s gains transfer across deterministic and stochastic policies [ 16 ]. All backbones employ rank-32 LoRA with matched per-task training and replay budgets (App. A). 
+
+Baselines. We compare PHASER against four standard CL paradigms under identical replay budgets: • Sequential FT: Naive behavioral cloning without episodic memory, establishing the catastrophic forgetting lower bound. • ER [5]: The standard uniform reservoir replay strategy. • MIR [17 ]: Interference-aware replay that prioritizes samples with the maximum loss increase during a virtual gradient step. • iCaRL [ 18 ]: Exemplar herding with frozen ViT-base features and feature-MSE distillation against the previous-task LoRA snapshot. 
+
+Evaluation Metrics. We report two primary metrics. First, Average Success Rate (ASR ↑) is calculated over 50 zero-shot rollouts per task on the final checkpoint policy ( 500 episodes per cell). Second, we measure Negative Backward Transfer (NBT ↓) [19 ] derived from a 10 ×10 
+
+task-by-checkpoint evaluation matrix: 
+
+NBT = 1
+
+N −1 
+
+> N−1
+
+X
+
+> i=1
+
+ Ri,i − RN,i 
+
+, (3) where Rj,i is the success rate on Ti after training on Tj . Lower NBT indicates better retention, with 
+
+NBT=0 implying zero forgetting. 
+
+2.6 Main Results across VLA Backbones 
+
+Table 1 reports ASR across three backbones × two LIBERO suites, where PHASER achieves sustained performance improvements. The ER →PHASER lift is largest on LIBERO-Long, consistent with phase-centric capacity protecting brief sub-skills that uniform replay under-supports on long-horizon tasks; it survives both the deterministic-vs-stochastic head swap and the 3B→7B parameter jump, so the gain is policy-architecture agnostic. Notably, ER itself is much stronger on heavily pretrained OpenVLA-OFT-7B than on Qwen-3B variants whose action heads are largely trained from scratch, supporting the observation that pretrained VLAs are surprisingly resistant to forgetting under naive replay [6]. 
+
+3 Analysis 
+
+Unlike classification CL where forgetting manifests as uniform calibration drift, manipulation CL exhibits phase-localized instability : rollout success is a multiplicative product over sub-skills ( ASR ∝Q 
+
+> p
+
+s(ϕp)), meaning a transient failure on any single bottleneck phase deterministically ruins the trajectory regardless of how well the rest retain. Retention is therefore governed by per-phase tail variance rather than mean trajectory loss. Crucially, because natural phase durations vary by up to an order of magnitude (App. E), uniform replay systematically starves the shortest sub-skills and exacerbates this catastrophic variance. This section traces how PHASER’s structural priors suppress this failure mode through mechanism ablation, causal controls, and efficiency profiling. 5Table 1: Continual learning across three VLA backbones and two LIBERO suites. ASR ↑ (50 
+
+rollouts ×10 tasks/cell after the final task); NBT ↓ from 10 ×10 task-by-checkpoint matrix (Eq. (3) ). Best per (backbone, suite, metric) in bold . All replay methods share per-task buffer within each cell (OV-7B: B=110 /180 ; QG/QO-3B: B=1000 ); PHASER’s total matches ER within ±10% .                                                                               
+
+> OpenVLA-OFT-7B QwenGR00T-3B QwenOFT-3B
+> GOAL LONG GOAL LONG GOAL LONG
+> Method ASR ↑NBT ↓ASR ↑NBT ↓ASR ↑NBT ↓ASR ↑NBT ↓ASR ↑NBT ↓ASR ↑NBT ↓
+> Sequential FT 10.0 95.3 5.0 37.1 12.6 85.1 9.0 80.2 8.0 67.2 9.0 62.9 ER 77.6 22.2 54.6 −5.651.6 46.7 31.4 35.6 39.4 47.8 33.0 33.3 MIR 81.6 15.6 82.2 10.0 76.2 10.4 29.8 32.2 73.6 9.3 41.0 19.6 iCaRL 50.2 42.0 46.4 45.0 70.0 8.9 37.0 23.3 65.0 13.0 33.0 6.0 PHASER (Ours) 87.8 7.8 85.8 10.0 78.0 13.8 48.6 11.1 79.0 6.4 51.6 12.4
+
+3.1 Decomposing PHASER: Ablation and Causal Verification 
+
+To explicitly isolate the contributions of PHASER’s core mechanisms, we evaluate three matched-budget configurations across the full evaluation grid (Tab. 2), with a per-task breakdown of the phase-only variant detailed in App. H. Table 2: Replay-design ablation, ASR (%) ↑. Ours adds a phase floor on top of ER + routing .                             
+
+> Method OpenVLA-OFT-7B QwenGR00T-3B QwenOFT-3B
+> Goal Long Goal Long Goal Long ER + uniform 77 .654 .651 .631 .439 .433 .0
+> ER + routing 84 .823 .471 .050 .077 .050 .0
+> Ours (phase +routing) 87 .885 .878 .048 .679 .051 .6
+
+Routing requires a capacity floor for stability. While augmenting ER with multi-modal routing yields general improvements across most settings, it suffers catastrophic degradation under the strictly bounded OV-Long setting (Tab. 2). Under such extreme memory pressure, Boltzmann routing over-concentrates the limited budget, inadvertently evicting vulnerable short phases before their retention can saturate. Integrating the phase-centric capacity floor completely resolves this failure mode. Mechanistically, the capacity floor guarantees foundational kinematic stability, empowering the routing module to safely reallocate the residual buffer budget toward explicitly targeting at-risk historical phases (App. F). 
+
+Phase-localized instability and variance bounding. Per-phase action loss on QG-3B × LIBERO-Long reveals that forgetting under uniform ER is characterized not by a length-dependent decay, but by a heavy-tailed dispersion (Fig. 3). Because trajectory rollout is multiplicative, a single high-variance phase deterministically guarantees task failure. PHASER resolves this by keeping the loss tightly clustered across all length buckets. To causally verify this, we ablated the memory allocation for the initial phase ( ϕ0) while uniformly redistributing its capacity to the remaining phases. This zero-budget intervention degrades the overall ASR to 16.0%, falling strictly below both the ER baseline (31.4%) and the full PHASER framework (48.6%) (App. H, Tab. 11). Crucially, the unprotected ϕ0
+
+immediately reverts to the heavy-tailed loss regime typical of ER ( ϵϕ0 = 0 .172 ± 0.131 ), whereas the adequately buffered phases remain tightly clustered ( 0.055 ± 0.021 ). This establishes the strict per-phase capacity floor, as opposed to multi-modal routing or aggregate buffer size, as the definitive mechanism against phase-localized catastrophic forgetting. 
+
+3.2 Robustness to Phase Abstractions and Task Ordering 
+
+60.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8       
+
+> Phase Temporal Ratio rp
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> Per-phase Action Loss  p filled = Human, hollow = Auto-PC ER (pooled r= -0.04, slope = -0.10)
+> PHASER (pooled r= -0.15, slope = -0.05)
+> short
+> (rp<0.20)
+> medium
+> (0.20--0.35)
+> long
+> (rp0.35)
+> Phase-length bucket
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> Mean  p (±1  ) n=23
+> n=23
+> n=49
+> n=49
+> n=10
+> n=10
+> ER
+> PHASER
+
+Figure 3: Heteroscedastic forgetting under ER. Per-phase action loss ϵp on QG-3B × LIBERO-Long final checkpoint, pooled over Human and Auto-PC decompositions ( 4-seed average; 32 frames/phase ruling out a small-N artifact). Left: no length-dependent slope. Right: ER’s high mean/ σ persists across length buckets while PHASER stays tightly clustered. 
+
+Table 3: Phase-source robustness on LIBERO-Long: Human vs. Auto-PC. 
+
+Source OV-OFT-7B QG-3B QO-3B 
+
+Human 85 .8 48 .6 51 .6
+
+Auto-PC 89 .6 48 .0 49 .0
+
+Independence from exact phase boundaries and task order. Phase boundaries: Auto-PC matches the performance of human-annotated PHASER within the variance of random seeds on LIBERO-Long (Tab. 3). This confirms that PHASER’s efficacy stems from leveraging a structurally sound decomposition rather than relying on precise human annotations. Task order: The performance margin between PHASER and ER is either preserved or widened under Reverse and Shuffled task orderings (Tab. 4). This robust generalization occurs because ER’s uniform buffer remains static across task transitions, whereas PHASER’s multi-modal routing dynamically adapts to the current interference risk at each boundary. Table 4: Task-order robustness (ASR % ↑): Default ( T1→T 10 ), Reverse, Shuffled (seed-42/43). Method QG-Goal QG-Long QO-Goal QO-Long 
+
+Def Rev Shuf Def Rev Shuf Def Rev Shuf Def Rev Shuf ER 51.6 45.6 35.8 31.4 34.8 23.4 39.4 44.8 38.6 33.0 35.0 32.6 PHASER 78.0 79.4 81.2 48.6 54.0 57.0 79.0 69.8 73.4 51.6 52.0 55.6 
+
+∆ +26 .4 +33 .8 +45 .4 +17 .2 +19 .2 +33 .6 +39 .6 +25 .0 +34 .8 +18 .6 +17 .0 +23 .0
+
+3.3 Capacity Scaling and Compute–Memory Efficiency Capacity scaling and system efficiency. A robust continual learning framework should translate expanded memory budgets into monotonic performance gains. As evaluated on QG-3B × LIBERO-Long (Fig. 4a), while advanced sample-selection baselines like MIR improve rapidly at intermediate budgets, they suffer from severe diminishing returns at larger capacities. In contrast, PHASER scales smoothly across budget decades, consistently fully exploiting the available memory to achieve the highest retention in the high-capacity regime. Beyond raw capacity utilization, practical VLA adaptation also demands strict control over training-time overhead. Figure 4b maps the accuracy– efficiency Pareto frontier by tracking wall-clock time and peak GPU memory across backbones. While gradient-based methods incur prohibitive computational penalties, PHASER establishes a new state-of-the-art trade-off: securing substantial ASR gains with only marginal overhead relative to vanilla ER, thereby confirming its viability as a lightweight, drop-in replacement. 70.1 1 10 
+
+> Replay Buffer (% of Per-Task Demonstration Frames)
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> LIBERO-Long ASR (%,  )
+> +11.6
+> ER (uniform sampling)
+> MIR (interference-aware retrieval)
+> iCaRL (herding + feature distillation)
+> PHASER (phase-centric, Ours)
+
+(a) Capacity scaling on QG-3B / LIBERO-Long. 0 1 3 7 13 27 88 125       
+
+> Training Overhead (% of vanilla-ER wall-clock, log-scaled)
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> LIBERO-Long ASR (%,  )
+> OV
+> QG
+> QO
+> OV
+> QG
+> QO
+> OV
+> QG
+> QO
+> PHASER×OV-7B
+> PHASER×QG-3B
+> PHASER×QO-3B
+> Backbone
+> OV-7B QG-3B QO-3B
+> Method
+> ER MIR iCaRL PHASER
+
+(b) Memory–time–performance trade-off. 
+
+Figure 4: Memory–time–performance trade-offs on LIBERO-Long. (a) ASR under matched replay buffer budgets on QG-3B × Long. (b) Wall-clock training overhead versus ASR (symlog, relative to vanilla ER), where marker area denotes peak GPU memory overhead. 
+
+4 Related Work 
+
+Continual learning for VLA. Continual learning (CL) for VLAs can be broadly categorized into three paradigms. Architecture-based methods isolate task-specific parameters via dynamic adapters, autonomous routing, or evolving skill banks [ 20 , 21 , 22 , 23 ]. Regularization-based strategies mitigate catastrophic forgetting by constraining parameter drift, increasingly leveraging on-policy reinforcement learning as an implicit regularizer [ 24 ]. We adopt the data-driven (replay-based) paradigm, motivated by recent findings that simple replay is surprisingly effective on pretrained VLAs [ 6 ]. Furthermore, its plug-and-play nature allows PHASER to seamlessly complement existing architectural or regularization methods without modification. Conceptually related to our approach, LOTUS [ 25 ] and iManip [ 26 ] exploit sub-skill structures via representation learning rather than explicit replay-budget allocation. 
+
+Replay and sample selection. Experience Replay (ER) [ 5 , 27 ] and advanced sample selection strategies, including feature coresets, gradient non-interference, virtual-step interference, and den-sity/diversity mechanisms [ 18 , 19 , 17 , 28 , 29 ], uniformly treat the individual frame as the i.i.d. unit of selection. This framing systematically under-represents transient but critical manipulation phases. Furthermore, most of these methods necessitate per-sample gradient computations, which are prohibitively expensive at the billion-parameter scale of modern VLAs. PHASER addresses these bottlenecks by shifting the atomic unit of memory from the frame to the phase, serving as a drop-in replacement for uniform replay that incurs zero per-step forward-pass overhead. 
+
+5 Limitations and Future Work 
+
+Intra-phase sampling as keyframe extraction. Because VLA models inherently learn from contin-uous video, replay buffer construction is essentially a keyframe extraction problem. While PHASER currently populates phase buckets via uniform-random sampling, upgrading this to a structured 
+
+keyframe search —via semantic-logical dependency scoring [ 30 ], intra-segment redundancy prun-ing [ 31 ], or query-modulated multimodal selection [ 32 ]—could deterministically isolate the K most informative frames [33], maximizing the equal-budget upper bound. 
+
+6 Conclusion 
+
+We presented PHASER , a replay-based continual learning framework that mitigates VLA forgetting via phase-centric capacity allocation and zero-forward-cost multi-modal Boltzmann routing. Across VLA backbones and LIBERO suites, it outperforms matched-budget baselines in ASR across the vast majority of settings. These gains are robust to task-ordering permutations, scale monotonically with memory capacity, and persist under automated phase discovery. With negligible overhead, PHASER is a drop-in replacement for uniform replay, complementing architectural CL methods. 8References 
+
+[1] A. Brohan, N. Brown, J. Carbajal, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. arXiv preprint arXiv:2307.15818 , 2023. [2] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. [3] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. [4] M. McCloskey and N. J. Cohen. Catastrophic interference in connectionist networks: The sequential learning problem. Psychology of Learning and Motivation , 24:109–165, 1989. [5] D. Rolnick, A. Ahuja, J. Schwarz, T. Lillicrap, and G. Wayne. Experience replay for continual learning. Advances in neural information processing systems , 32, 2019. [6] H. Liu, C. Kim, B. Liu, M. Liu, and Y. Zhu. Pretrained vision-language-action models are surprisingly resistant to forgetting in continual learning. arXiv preprint arXiv:2603.03818 ,2026. [7] X. Zhang, Y. Lu, W. Wang, A. Yan, J. Yan, L. Qin, H. Wang, X. Yan, W. Y. Wang, and L. R. Petzold. Gpt-4v (ision) as a generalist evaluator for vision-language tasks. arXiv preprint arXiv:2311.01361 , 2023. [8] H. Fu, P. Sharma, E. Stengel-Eskin, G. Konidaris, N. L. Roux, M.-A. Côté, and X. Yuan. Language-guided skill learning with temporal variational inference. arXiv preprint arXiv:2402.16354 , 2024. [9] J. S. Smith, L. Valkov, S. Halbe, V. Gutta, R. Feris, Z. Kira, and L. Karlinsky. Adaptive memory replay for continual learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 3605–3615, 2024. [10] J. Deng, Z. Wang, S. Cai, A. Liu, and Y. Liang. Open-world skill discovery from unsegmented demonstrations. arXiv preprint arXiv:2503.10684 , 2025. [11] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone. Libero: Benchmarking knowledge transfer for lifelong robot learning. Advances in Neural Information Processing Systems , 36: 44776–44791, 2023. [12] M. J. Kim, C. Finn, and P. Liang. Fine-tuning vision-language-action models: Optimizing speed and success. arXiv preprint arXiv:2502.19645 , 2025. [13] E. Perez, F. Strub, H. De Vries, V. Dumoulin, and A. Courville. Film: Visual reasoning with a general conditioning layer. In Proceedings of the AAAI conference on artificial intelligence ,volume 32, 2018. [14] S. Community. Starvla: A lego-like codebase for vision-language-action model developing. 
+
+arXiv preprint arXiv:2604.05014 , 2026. [15] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song. Diffusion policy: Visuomotor policy learning via action diffusion. The International Journal of Robotics Research , 44(10-11):1684–1704, 2025. [16] Q. Zhang, Z. Liu, H. Fan, G. Liu, B. Zeng, and S. Liu. Flowpolicy: Enabling fast and robust 3d flow-based policy via consistency flow matching for robot manipulation. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 39, pages 14754–14762, 2025. 9[17] R. Aljundi, E. Belilovsky, T. Tuytelaars, L. Charlin, M. Caccia, M. Lin, and L. Page-Caccia. Online continual learning with maximal interfered retrieval. Advances in neural information processing systems , 32, 2019. [18] S.-A. Rebuffi, A. Kolesnikov, G. Sperl, and C. H. Lampert. icarl: Incremental classifier and representation learning. In Proceedings of the IEEE conference on Computer Vision and Pattern Recognition , pages 2001–2010, 2017. [19] D. Lopez-Paz and M. Ranzato. Gradient episodic memory for continual learning. Advances in neural information processing systems , 30, 2017. [20] Y. Luo, W. Chen, T. Liang, and Z. Li. Coral: Scalable multi-task robot learning via lora experts. 
+
+arXiv preprint arXiv:2603.09298 , 2026. [21] Z. Liu, J. Zhang, K. Asadi, Y. Liu, D. Zhao, S. Sabach, and R. Fakoor. Tail: Task-specific adapters for imitation learning with large pretrained models. In International Conference on Learning Representations , volume 2024, pages 16330–16353, 2024. [22] R. Romer, Y. Zhang, and A. P. Schoellig. Clare: Continual learning for vla models via autonomous adapter routing and expansion. arXiv preprint arXiv:2601.09512 , 2026. [23] Y. Wu, G. Wang, Z. Yang, et al. Stellar vla: Continually evolving skill knowledge in vision language action model. arXiv preprint arXiv:2511.18085 , 2025. [24] J. Hu, J. Shim, C. Tang, et al. Simple recipe works: Vision-language-action models are natural continual learners with reinforcement learning. arXiv preprint arXiv:2603.11653 , 2026. [25] W. Wan, Y. Zhu, R. Shah, and Y. Zhu. Lotus: Continual imitation learning for robot manipulation through unsupervised skill discovery. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 537–544. IEEE, 2024. [26] Z. Zheng, J.-F. Cai, X.-M. Wu, Y.-L. Wei, Y.-M. Tang, A. Wu, and W.-S. Zheng. imanip: Skill-incremental learning for robotic manipulation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 13890–13900, 2025. [27] A. Chaudhry, M. Rohrbach, M. Elhoseiny, T. Ajber, A. Alemi, and R. Zhao. On tiny episodic memories in continual learning. arXiv preprint arXiv:1902.10486 , 2019. [28] R. Aljundi, M. Lin, B. Goujaud, and Y. Bengio. Gradient based sample selection for online continual learning. Advances in neural information processing systems , 32, 2019. [29] O. Sener and S. Savarese. Active learning for convolutional neural networks: A core-set approach. arXiv preprint arXiv:1708.00489 , 2017. [30] W. Guo, Z. Chen, S. Wang, J. He, Y. Xu, J. Ye, Y. Sun, and H. Xiong. Logic-in-frames: Dynamic keyframe search via visual semantic-logical verification for long video understanding. Advances in Neural Information Processing Systems , 38:124389–124422, 2026. [31] S. Wang, W. Guo, Z. Chen, Y. Xu, X. Hu, and H. Xiong. Less is more: Token-efficient video-qa via adaptive frame-pruning and semantic graph integration. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9856–9866, 2026. [32] S. Wang, W. Guo, Z. Chen, X. Hu, and H. Xiong. Where to focus: Query-modulated multimodal keyframe selection for long video understanding. arXiv preprint arXiv:2604.17422 , 2026. [33] X. Tang, J. Qiu, L. Xie, Y. Tian, J. Jiao, and Q. Ye. Adaptive keyframe sampling for long video understanding. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pages 29118–29128, 2025. 10 A Implementation Details 
+
+Training Infrastructure. All experiments are conducted on NVIDIA A800-SXM4-80GB GPUs with 2-GPU data parallelism via PyTorch DDP. Each 10-task continual learning run requires approxi-mately 24 hours to complete. 
+
+Training Configuration and Replay Budgets. All runs use a matched per-task budget of 10 ,000 
+
+steps with a per-device batch of 4 (2 current + 2 replay) across 2 GPUs (global 4 current + 4 
+
+replay per step), learning rate 5×10 −4 with cosine decay after 5,000 steps, and rank-32 LoRA on all backbones. Replay budgets are aligned across all replay-based methods within each (backbone, suite) cell: OpenVLA-OFT-7B uses a per-task buffer of B=110 (Goal) / 180 (Long); QwenGR00T-3B and QwenOFT-3B use B=1000 on both suites. PHASER’s phase_buffer_size ×K is set to match the corresponding ER total within ±10% , so all methods compete under identical per-task memory. 
+
+Semantic Encoder. We utilize the lightweight sentence-transformers/all-MiniLM-L6-v2 
+
+model ( ∼80MB, 384-dimensional embeddings) to compute task instruction similarities for our Multi-Modal Interference score ( Ui,k ). The encoder runs on the CPU and introduces negligible computational overhead ( < 1ms per instruction pair). 
+
+Temporal Subsampling. Prior to phase-level budget allocation, we apply a uniform temporal subsampling with a stride of ∆ = 3 across all demonstration trajectories. This eliminates trivial temporal redundancy (consecutive near-identical frames) without requiring complex feature extraction, keeping the buffer construction strictly “zero-forward-cost”. Within each defined phase, the remaining capacity K is sampled uniformly at random from these subsampled candidates. 
+
+B Computational and Memory Overhead — per-backbone details 
+
+The headline efficiency frontier (Figure 4b) lives in the main paper (§3.3); per-backbone wall-clock and peak-memory numbers are tabulated below (Table 5). This section records the per-method profiling traces and the one framework-induced caveat behind the cross-backbone MIR memory numbers. Table 5: Wall-clock and GPU-memory overhead, controlled by backbone (the source data for the efficiency frontier, Fig. 4b). “Per-step”/“per-transition” columns count work beyond a vanilla ER replay sample; “Peak-mem ∆” is the maximum extra GPU memory above a vanilla ER step. † Inherited from the same-scale / same-family analog (QwenOFT-3B from QwenGR00T-3B; iCaRL / OpenVLA-7B from iCaRL / QwenGR00T-3B), not independently profiled.                                                              
+
+> Method Backbone Per-step Per-transition Peak-mem ∆
+> ER any O(0) O(0) 0 GB MIR (full virtual-step) OpenVLA-7B O(0) +22 min (12.9%) +22 .4GB MIR (snapshot-grad) QwenGR00T-3B O(0) +5 h ( 27 .0% )≈0GB MIR (snapshot-grad) QwenOFT-3B O(0) +1 .2h ( 7.4% )≈0GB iCaRL (feature distill) OpenVLA-7B ∼125% †O(0) +3 .5GB †
+> iCaRL (feature distill) QwenGR00T-3B +1 .0s ( ∼125%) O(0) +3 .5GB iCaRL (feature distill) QwenOFT-3B ∼88% O(0) +3 .5GB †
+> PHASER (Ours) OpenVLA-7B O(0) +5 min ( ∼5%) +12 GB PHASER (Ours) QwenGR00T-3B O(0) +2 .5min (2.9%) +0 .62 GB PHASER (Ours) QwenOFT-3B O(0) ∼3% †+0 .62 GB †
+
+Per-method profiling traces. All wall-clock numbers are on a single NVIDIA A800-SXM4-80GB. (i) MIR / OV-7B (full virtual-step) : each refresh costs 6.50 s mean ( σ< 0.3, max 6.93 s) and +22 .4 GB peak ∆ from the LoRA virtual-step plus candidate_size=16 forward pass; cumulative 3.61 h ( 12 .9% of ∼ 28 -h training). (ii) MIR / QG-3B (snapshot-grad) : refresh 11 ∼ 9.9 s (the in-place virtual-step itself is < 2 s; the bulk is the 16-candidate LoRA-only for-ward pass needed to score interference), peak ∆ < 2 MiB (no second backward), cumulative 
+
+∼ 5 h ( 27 .0% over an 18 .3 h ER baseline; qwengr00t_mir_lora_libero_long_refresh50_v1 
+
+vs. qwengr00t_er_lora_libero_long_aligned_v1 , both Apr 27–28 anchors). The matched QO-3B Long pair lands at ∼ 3.1 s/refresh and +7 .4% cumulative ( qwenoft_long/mir.log vs. 
+
+qwenoft_long/er.log ); a tighter QO-3B Goal anchor reports only +0 .69% , so suite mismatch alone shifts MIR overhead by 10 × on the 3B Qwen family — the OV-7B suite-invariance spot-check (below) does not extend across backbones. (iii) PHASER / QG-3B : per-transition 148 smean (scales ∝ Kstored ) = 2 .9% on a 10 k-step task; +0 .62 GB peak ∆ (+0 .42 GB frozen-encoder weights +0 .21 GB transient activations). (iv) PHASER / OV-7B : warmup-set + routing recompute through the LoRA-adapted VLA itself with warmup_num_episodes=50 ; transient peak +12 .1 GB, per-transition ∼ 4 min ( ∼ 5% ). (v) iCaRL / QG-3B (feature distill) is the only method whose overhead is paid on every training step: per-step model_time 1.53 s ( ∼ 125% above ER, +2 .8 h per task), +3 .5 GB peak ∆ from the second QwenVL forward pass. A cross-suite spot-check (OV-7B / LIBERO-Goal MIR) gives 6.33 vs. 6.50 s and 22 .8 vs. 22 .4 GB, i.e. ∼ 3% drift — the OV-7B numbers are suite-invariant, but as point (ii) shows, this property does not generalise to the 3B Qwen family. 
+
+Framework-induced MIR path asymmetry. Attempting the full-virtual-step MIR vari-ant on QG-3B aborts inside DeepSpeed ZeRO-2 at the first refresh that targets a histori-cal task: params_already_reduced[param_id]==False, Gradient computed twice for this partition. Multiple gradient reduction is currently not supported. The second backward required by virtual-step conflicts with ZeRO-2’s single-pass gradient reduction. The OV-7B virtual-step number ( +22 .4 GB) was measured in a plain-DDP framework (no ZeRO-2) where the second backward proceeds normally; the QG-/QO-3B numbers reflect the snapshot-grad path that AlphaBrain-CL is forced to use under DeepSpeed ZeRO-2. Cross-backbone comparison therefore conflates algorithm-variant and framework-variant: in any DeepSpeed-based pipeline, MIR’s effective memory cost on QG-3B is ≈ 0 GB and the OV-7B +22 .4 GB is unattainable. 
+
+C Stage Definitions for LIBERO-Goal 
+
+To support phase-centric capacity allocation, PHASER requires a one-time semantic definition of the physical phases for a given task family. These boundaries require < 5 minutes of human annotation effort per task. Table 6 details the phase decomposition used for all LIBERO-Goal experiments. 
+
+D Automatic Phase Segmentation (Auto-PC) 
+
+PHASER’s phase boundaries (§2.4) can be produced automatically by Auto-PC , a signal-then-VLM-verify pipeline that replaces the one-time human annotation of Appendix C. Below we first analyse the single cell where automatic segmentation underperforms, then detail the two-stage pipeline, an example human-vs-Auto-PC decomposition, and the verifier prompt. 
+
+OV-Goal outlier deep-dive. The one Auto-PC cell that does not track Human within seed noise is OpenVLA-OFT-7B × LIBERO-Goal: ASR drops from Human’s 87 .8% to Auto-PC’s 63 .6% (mean of two independent training seeds: 57 .4% and 69 .8% ), a −18 .0 pp gap. A single task ( T5) collapses to 6% in both seeds, indicating Auto-PC’s K=36 signal-proposed boundaries place a sub-skill at an inopportune split that the GPT-4o verifier did not catch. The cell still sits ∼ 30 pp above the matched-budget ER baseline ( 77 .6% ), so Auto-PC remains a viable annotation-free fallback but does not fully replace expert annotation when the action signal under-determines phase semantics. The other two Goal cells (QG-Goal ∆= − 1.0 pp, QO-Goal ∆= − 7.0 pp) sit within seed noise of Human; full numerical breakdown is given in the main-text Method section (§2.4). 
+
+Pipeline details. The Auto-PC pipeline is a two-stage signal+VLM design (Algorithm 1). Stage 1 computes a 1-D boundary score b(t) = α |∆a|(t) + β |∆gripper |(t) + γ v min (t) on the action stream 12 Table 6: Phase definitions for LIBERO-Goal tasks. Start/end ratios indicate the normalized temporal boundaries of each atomic skill within the full demonstration trajectory. 
+
+Task ID Phase Name (Atomic Skill) Start Ratio End Ratio 
+
+T1 Approach Handle 0.00 0.85 Pull Handle 0.85 1.00 
+
+T2 Approach Bowl 0.00 0.53 Move to Stove 0.53 1.00 
+
+T3 Approach Bottle 0.00 0.56 Lift to Cabinet 0.56 1.00 
+
+T4
+
+Approach Drawer Handle 0.00 0.21 Pull Handle 0.21 0.36 Approach Bowl 0.36 0.69 Move Bowl 0.69 1.00 
+
+T5 Approach Bowl 0.00 0.43 Move to Cabinet 0.43 1.00 
+
+T6 Approach Plate 0.00 0.39 Pushing Plate 0.39 1.00 
+
+T7 Approach Cheese 0.00 0.59 Move to Bowl 0.59 1.00 
+
+T8 Approach Knob 0.00 0.85 Twist Knob 0.85 1.00 
+
+T9 Approach Bowl 0.00 0.59 Move to Plate 0.59 1.00 
+
+T10 Approach Bottle 0.00 0.61 Move to Rack 0.61 1.00 (α=0 .3, β =1 .0, γ =0 .4); non-max suppression with top-M selection yields up to M =8 candidate boundaries per task. This stage is fully unsupervised and CPU-only. Stage 2 sends the M candidates together with a 1-fps video of one demonstration episode (one video second ≡ one simulation step) to GPT-4o in a single prompt; the VLM is instructed to (a) accept / relocate / reject each candidate, (b) optionally insert up to two missed boundaries with explicit visual evidence, and (c) emit final 
+
+K ∈ [2 , 5] phases with snake_case verb-phrase names. Stage 2 consumes one VLM call per task family. 
+
+Algorithm 1 Auto-PC: action-signal proposal + VLM verification 
+
+Require: One representative demonstration {(ot, a t, g t)}T −1 
+
+> t=0
+
+per task; task instruction ℓ; max candidates 
+
+M =8 
+
+Ensure: Phase boundaries {(sk , e k , name k )}Kk=1 , K ∈ [2 , 5] 
+
+// Stage 1 — signal-first proposal (CPU) 
+
+1: for t = 1 , . . . , T −1 do 
+
+2: b(t) ← α ∥∆at∥ + β |∆gt| + γ (∥at∥ < τ v ) ▷ kinematic + gripper + low-velocity 3: end for 
+
+4: B ← NON MAX SUPPRESS (b, w =5) 
+
+5: C ← TOP M(B, M ) ▷ candidate boundary set 
+
+// Stage 2 — VLM verification (one GPT-4o call) 
+
+6: V ← RENDER VIDEO ({ot}, fps=1) ▷ T video seconds 7: J ← GPT4 O(PROMPT (ℓ, T, C), V ) ▷ JSON: decisions, vlm_inserted, phases 8: {(sk , e k , name k )}Kk=1 ← J. phases 
+
+9: return drop-in stage_info JSON (same schema as human annotation) 
+
+Example output (Table 7) for the LIBERO-Long task “pick up the book and place it in the back compartment of the caddy” illustrates the typical Human-vs-Auto-PC contrast: human annotation 13 produces a coarse K=2 split, while Auto-PC’s signal+VLM verification recovers two additional sub-skills ( insert_book , release_and_retreat ) that occupy short but causally critical fractions of the trajectory. Table 7: stage_info comparison on the LIBERO-Long task “pick up the book and place it in the back compartment of the caddy” . Human’s coarse K=2 split collapses the whole post-approach motion into one “Transfer” phase; Auto-PC’s signal +VLM verification recovers K=4 phases, resolving the brief insert and 
+
+release sub-skills (shaded) that Human compresses into the tail of “Transfer”. Bars are proportional to each phase’s trajectory-ratio span.                                   
+
+> Human (paper default, K=2 )Auto-PC (signal +VLM, K=4 )
+> kPhase Span Ratio kPhase Span Ratio 1Approach Book [0 .00 ,0.28] 1approach_book [0 .00 ,0.41]
+> 2Transfer Book to Caddy [0 .28 ,1.00] 2transport_book [0 .41 ,0.82]
+> 3insert_book [0 .82 ,0.93]
+> 4release_and_retreat [0 .93 ,1.00]
+
+Verification prompt. The verbatim GPT-4o prompt template used in Stage 2 is given in the boxed listing below (system message + user template V3; the placeholders {instruction} , {n_total} ,and {candidates_block} are substituted per task, the last being a list of the Stage-1 candidates formatted as Ci: t=<sec>s evidence=<tags> score=<float> ). 
+
+Auto-PC Stage-2 prompt (GPT-4o, signal-first → VLM-verify, condensed)               
+
+> [system] Expert robot motion analyst. Decompose long-horizon manipulation demos into K coherent phases. Output strictly valid JSON. [user] TASK: "{instruction}" INPUTS (1) 1 MP4 of one demo (1 fps; 1 video sec == 1 sim step; total {n_total} steps; ratio of step t = t / {n_total}). (2) Action-signal candidate boundaries (integer steps): {candidates_block} TASK (3 steps) S1. For every candidate Ci emit one decision: accept | relocate (give new_t within ±10, cite visual cue) | reject. S2. Optional vlm_inserted (max 2): only if video shows a clear missed boundary; cite specific visual evidence. S3. Select final K ∈[2,5] phases; adjacent phases visually distinct; snake_case names ( ≥2 words, ≤25 chars); verbs from {approach, grasp, transport, release, insert, push, pull, open, close, turn}. OUTPUT (strict JSON, no prose) {"decisions": [{"id":"Ci","action":...,"new_t":...,"reason":"..."}, ...], "vlm_inserted": [{"t":...,"reason":"..."}, ...], "phases": [{"name":"...","start_ratio":0.00,"end_ratio":0.XX}, ...]} HARD CONSTRAINTS: one decision per Ci; phases cover [0,1] exactly with phase[i].end_ratio == phase[i+1].start_ratio; ratios rounded to 0.01.
+
+E Phase Length Non-Uniformity 
+
+PHASER’s equal-per-phase capacity allocation is a non-trivial intervention only if phase durations are themselves non-uniform; otherwise the rule reduces to uniform frame sampling. Table 8 reports the empirical phase-length distribution across the four LIBERO suite × decomposition pairs that appear in the main grid. We compute rp = end _ratio − start _ratio for every phase in every task, then aggregate per-suite (mean, σ, CV across all phases) and per-task (max/min ratio, median and worst across the 10 tasks). The PHASER boost column reports (1 /K )/r min , the over-supply factor PHASER’s floor provides to the shortest phase relative to ER’s proportional allocation. Two patterns emerge. (i) The finer Auto-PC decomposition consistently exposes greater non-uniformity than Human ( CV=0 .57 vs. 0.43 on Goal; 0.44 vs. 0.34 on Long) and a wider PHASER boost ( 5.6× vs. 3.0× on Goal), reflecting that human annotators tend to merge short transient sub-skills into adjacent longer phases. (ii) Even under conservative Human annotation, 11% (4/36 )of Auto-PC Goal phases and 15% (7/46 ) of Auto-PC Long phases occupy less than 10% of their trajectory; these are exactly the sub-skills ( grasp closure , handle pull , insert ) whose action signal 14 Table 8: Phase length non-uniformity across LIBERO suites and decompositions. K is the total phase count across 10 tasks. The per-task max/min ratio captures within-task disparity (median and worst-case across the 10 tasks). The shortest-phase rmin is the smallest individual phase ratio observed; PHASER boost 
+
+= (1 /K avg )/r min quantifies how much PHASER over-supplies that phase relative to ER’s frame-proportional allocation. Both Human (paper-default 5-min/task manual) and Auto-PC (signal + VLM) decompositions are reported. 
+
+Suite Decomp. Counts Phase rp stats Per-task max/min PHASER 
+
+tasks K mean σ CV median worst boost Goal Human 10 22 0.45 0.20 0.43 1.50 × 5.67 × 3.0×
+
+Goal Auto-PC 10 36 0.28 0.16 0.57 4.00 × 9.20 × 5.6×
+
+Long Human 10 36 0.28 0.10 0.34 1.54 × 3.27 × 2.5×
+
+Long Auto-PC 10 46 0.22 0.10 0.44 4.07 × 5.86 × 3.1×
+
+is brief but mechanically decisive. Uniform ER sampling under-represents these by construction; PHASER’s per-phase floor over-supplies them by the boost factor in Tab. 8, directly mapping the structural prior onto buffer capacity. 
+
+F Empirical Anatomy of Multi-Modal Routing 
+
+We visualise PHASER’s Boltzmann routing distribution on the QwenGR00T-3B × LIBERO-Long anchor run. Figure 5 shows the full task-by-historical-phase sampling probability matrix and its Shannon entropy versus the uniform reference; Figure 6 shows the per-pair amplification ratio against the priority score Ui,k , confirming that routing is selective rather than blanket. p0, 0 p0, 1 p0, 2 p0, 3 p1, 0 p1, 1 p1, 2 p1, 3 p2, 0 p2, 1 p2, 2 p3, 0 p3, 1 p3, 2 p3, 3 p4, 0 p4, 1 p4, 2 p4, 3 p5, 0 p5, 1 p5, 2 p5, 3 p6, 0 p6, 1 p6, 2 p6, 3 p7, 0 p7, 1 p7, 2 p7, 3 p8, 0 p8, 1 p8, 2                
+
+> Historical Phase pi,j(i = source task 0-indexed, j = phase index)
+> T1
+> T2
+> T3
+> T4
+> T5
+> T6
+> T7
+> T8
+> T9
+> Training Task  Tk (0-indexed)
+> 30 25 25
+> 17 17 15
+> 35 11 10
+> 17 16 9
+> 10 76
+> 866
+> 775
+> 10 55
+> 754
+> phaser_lora_libero_long_buf278_v1 [=0.6, =1.0, T=0.25, min_p=0.02]
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> 0.35
+> Sampling Probability  pi, k
+
+(a) Routing probability matrix. T1 T2 T3 T4 T5 T6 T7 T8 T9   
+
+> Task Being Trained
+> 2.0
+> 2.5
+> 3.0
+> 3.5
+> 4.0
+> 4.5
+> 5.0
+> Routing Entropy  H(p) (bits)
+> -0.02
+> -0.06
+> -0.41
+> -0.22
+> -0.04
+> -0.05
+> -0.05
+> -0.09
+> -0.05
+> phaser_lora_libero_long_buf278_v1 [=0.6, =1.0, T=0.25, min_p=0.02]
+> ER baseline (uniform)
+> PHASER (interference-aware)
+
+(b) Routing entropy vs. uniform refer-ence. 
+
+Figure 5: PHASER concentrates replay on high-interference historical phases. (a) Sam-pling probability pi,k of every historical phase pi,j (i= source task, j= phase index, both 0-indexed) at the start of training task Tk, on QwenGR00T-3B × LIBERO-Long with matched buffer (phase _buffer _size =278 ). The matrix is strictly lower-triangular by construction. Bright cells highlight just-added cluster phases that current-task gradients are most likely to overwrite (e.g., T2
+
+pours 35% of probability onto p1,1 “Transfer White Mug to Plate”). (b) Per-task Shannon entropy 
+
+H(p), well below the uniform-ER reference log 2(# active phases ).
+
+Routing targets phase difficulty; the per-phase buffer caps the ceiling. To verify that the Boltzmann routing translates its design ( Ui,k → pi,k amplification, Fig. 6a) into a downstream effect on retention, we correlate the cumulative routing weight each historical phase (t, k ) accrued across all post-task transitions i ∈ { t+1 , . . . , 9},
+
+Up =
+
+9X
+
+i=t+1 
+
+pi, (t,k ), ¯Up = Up/(9 − t),
+
+against its final-checkpoint per-phase action loss ϵp from Fig. 3 ( n=34 phases, PHASER side, Human-
+
+K=36 labelling). The marginal correlation is positive (Pearson r= + 0 .24 , Spearman ρ= + 0 .39 ,15 0.4 0.2 0.0 0.2 0.4                 
+
+> Ui,k(PHASER priority score, learned encoder (L,V,A))
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> Amplification ratio  pi, k/(1/ N)
+> uniform 1/ N
+> amp=6.1×
+> (T8 train
+> T6 Twist-Knob)
+> (a) Routing monotone amplifies high-interference phases
+> Quintile mean
+> 0123456
+> Amplification ratio p/(1/ N)
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> 35
+> Count of (transition, phase) pairs
+> suppressed
+> amp 0.7×
+> (31.7%)
+> protected
+> amp 2×
+> (4.8%)
+> uniform
+> (b) Distribution: non-uniform, with long protected tail
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 9
+> Training-task index  k
+
+Figure 6: Routing budget is reallocated, not flattened. Empirical anatomy of PHASER’s Boltzmann routing across all 9 task transitions of the QwenGR00T-3B / LIBERO-Goal anchor run ( 104 (transition, historical phase) pairs). (a) Per-pair amplification pi,k /(1 /N k) vs. priority score Ui,k ; the U-quintile mean rises monotonically from 0.64 × to 1.62 × — a 2.5× swing that confirms the Boltzmann mapping behaves as designed. The most-amplified outlier is T6 “Twist-Knob” when training T8 “put bowl on top of cabinet”: both share the stove/cabinet workspace (high Sctx ) but require disjoint kinematics (twist vs. place, high DA). (b) Distribution of amplification ratios: only 4.8% of pairs sit in the protected long tail ( ≥ 2× uniform), 31 .7% are suppressed below 0.7×, and 50% stay within 
+
+[0 .7×, 1.3×] — selective, not blanket. 
+
+pρ=0 .022 ): phases that ended with higher loss are exactly the ones routing had directed more replay toward. This corroborates the design intent — Boltzmann probability is targeting where retention is actually at risk, not where it is already safe. Phase age ( 9−t) trivially confounds this signal because older phases simply have more transitions over which to accumulate weight (age vs ϵp: r= + 0 .33 ,
+
+p=0 .06 ); the partial correlation corr( Up, ϵ p | age )= − 0.094 (p=0 .60 ) is mildly in the expected protective direction but not statistically distinguishable from zero. Combined with the zero-budget control of Appendix H — where removing the per-phase buffer for a single phase triples its loss to 0.172 ±0.131 while leaving routing intact — the picture is consistent: the equal-per-phase floor 
+
+K provides the dominant retention guarantee (a hard upper bound), and the Boltzmann routing reallocates the residual budget toward the phases the priority score Ui,k flags as highest-risk. This decomposition matches the mechanism ablation in Table 2: ER + routing (routing without a phase floor) collapses on OV-Long because routing concentrates samples onto a few phases and starves the rest, whereas adding the floor ( Ours ) recovers it. The full table of per-phase (Up, ¯Up, age , ϵ p) values is released alongside the code; Figure 7 visualises the two scatters. 
+
+G Hyperparameter Sensitivity and Modality Justification 
+
+A core design choice is formulating the priority score Ui,k from a tri-modal (L, V, A ) representation rather than language alone. The sweep in Figure 8 validates this: the context-blend coefficient α
+
+exhibits a pronounced inverted-U peak at α=0 .5, with language-only ( α=1 , ASR = 74 .4% ) and vision-only ( α=0 , ASR = 73 .0% ) endpoints both suboptimal versus the multi-modal anchor ( 78 .0% ). The action-redundancy penalty γ shows the same peak at 0.5: disabling it ( γ=0 ) loses 3 pp, over-penalising ( γ=2 ) loses 8.4 pp — confirming DA’s contribution. Boltzmann temperature is flat over 
+
+T ∈ [0 .25 , 1.0] and only degrades near argmax ( T ≤ 0.10 ), matching the diversity-collapse prediction of §3.1. The takeaway: VLA forgetting is most severe where two tasks share perceptual context but require divergent physical execution (e.g., grasping vs. pushing the same object). Penalising action-space redundancy and rewarding action-space conflict via DA on top of a balanced (L, V ) context similarity routes the replay budget to the historical phases facing the highest gradient-overwriting risk. 16 0.0 0.2 0.4 0.6 0.8 
+
+cumulative routing weight Up          
+
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> 0.12
+> 0.14
+> per-phase loss  p
+> Pearson r= +0.24
+> p=0.17
+> partial | age:
+> r=0.09 p=0.6
+> 0.02 0.04 0.06 0.08 0.10 0.12
+
+mean routing density Up     
+
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> 0.12
+> 0.14
+> per-phase loss  p
+> Pearson r= +0.18
+> p=0.31
+> partial | age:
+> r=0.08 p=0.66
+
+Routing concentrates on harder phases; per-phase buffer caps the ceiling 
+
+(PHASER × QwenGR00T-3B × LIBERO-Long, n = 34 phases) Figure 7: Routing concentrates on harder phases. Final-checkpoint per-phase loss ϵp vs. cumulative routing weight Up (left) and mean routing density ¯Up (right) on the QwenGR00T-3B × LIBERO-Long PHASER anchor run ( n=34 historical phases). Marker area encodes phase age (9 −t). The marginal trends are weakly positive (Pearson r shown), reflecting that the priority score Ui,k correctly targets the phases most at risk. Partial correlations controlling for age are mildly negative ( r≈− 0.09 ,
+
+p> 0.5): once the trivial age confound is removed, the residual routing-driven protective effect is small because the equal-per-phase buffer K already caps each phase’s worst-case loss (Appendix H). 0.0 0.2 0.4 0.6 0.8 1.0               
+
+> context (vision text)
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> ASR (%)
+> (a) sweep
+> PHASER (50-trial)
+> best ( =0.5)
+> ER 51.6%
+> 0.0 0.5 1.0 1.5 2.0
+> redundancy
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> (b) sweep
+> PHASER (50-trial)
+> best ( =0.5)
+> ER 51.6%
+> 10 110 0
+> Boltzmann temperature T
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> (c) Tsweep
+> PHASER
+> best (T=0.25)
+> ER 51.6%
+> PHASER hyperparameter sensitivity on QwenGR00T × LIBERO-Goal (open marker = 10-trial preview)
+
+Figure 8: PHASER is robust within a wide hyperparameter region : 50-trial ASR on QwenGR00T-3B × LIBERO-Goal as we sweep (a) the modality blend αcontext ∈ [0 , 1] between text and vision context similarity, (b) the redundancy penalty γredundancy , and (c) the Boltzmann temperature T . All curves stay ≥ 20 pp above the same-budget ER baseline ( 51 .6% , gray dashed). Open markers denote 10-trial preview points; filled markers are 50-trial × 500-episode evaluations. 
+
+H Per-Task Breakdowns 
+
+This section provides per-task expansions of the main-text cells (the OV-Goal and QG-Long cells of Table 1, and the zero-budget causal control of §3.1). 
+
+H.1 Per-task breakdown (OpenVLA-7B × LIBERO-Goal). Table 9 expands the OV-Goal column of Table 1 into per-task success rates. PHASER recovers exactly the tasks where ER collapses — most visibly the T4 drawer-pull bottleneck ( 46 →70 ) and T5 (26 →74 ) — lifting aggregate ASR from 
+
+77 .6% to 87 .8% and cutting NBT from 22 .2 to 7.8.
+
+H.2 Per-task profile on QwenGR00T-3B / LIBERO-Long: where routing protects most. We decompose the QwenGR00T-3B × LIBERO-Long cell — the hardest setting in Table 1 — into per-task final-checkpoint ASR (Table 10). Three tasks ( T4, T 8, T 9) account for the majority of PHASER’s +19 pp aggregate lead over ER. All three have ≥ 3 phases, and two share a critical sub-phase pair with an earlier task ( T8 inherits “approach + transfer alphabet soup to basket” from 
+
+T1; T9 inherits “approach + transfer moka pot to stove” from T3). When later training on T8/T 9
+
+17 Table 9: Per-task breakdown of the OpenVLA-7B × LIBERO-Goal cell — a per-task expansion of the OV-Goal column of Table 1. Per-task final-checkpoint success rate (%); aggregate ASR/NBT match the main table. 
+
+Method T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 ASR ↑ NBT ↓
+
+Sequential FT 0 0 0 0 0 0 0 0 0 100 10.0 95.3 ER ( B=110 ) 96 72 92 46 26 72 82 98 98 94 77.6 22.2 
+
+PHASER (Ours) 98 92 80 70 74 92 78 100 96 98 87.8 7.8 
+
+overwrites the earlier representation, PHASER’s Boltzmann routing concentrates replay on exactly these high-similarity historical phases, recovering 50% / 40% where both ER and MIR collapse below 30% . On T6, T 7, T 10 , ER already attains 60 –80% and PHASER trails by 10 –30 pp — the cases where adaptive routing approaches uniform because historical similarity is low across all phases. The per-task evidence localises the where of routing’s contribution and complements the cell-averaged reading from Table 2. Table 10: Per-task final-checkpoint ASR (%) on QwenGR00T-3B × LIBERO-Long. |ϕ| is the number of human-annotated phases. ∆ is PHASER minus max(ER , MIR) . Shaded rows are tasks where PHASER’s protection exceeds +20 pp over both ER and MIR. Aggregate ASR is the 10 -trial matrix average (the 50 -trial main-table numbers differ by < 4 pp and preserve the same task ranking); iCaRL is reported at 50 -trial resolution. ID Task summary |ϕ| SFT ER MIR iCaRL PHASER ∆                                                                                                      
+
+> T1alphabet soup + tomato sauce →basket 4000810 +10
+> T2cream cheese + butter →basket 40030 58 50 +20
+> T3stove on + moka pot 4090 20 56 100 +10
+> T4black bowl →bottom drawer + close 30010 50 60 +50
+> T5two mugs →two plates 4030 50 36 50 0
+> T6book →caddy compartment 290 80 90 66 80 −10
+> T7mug + plate + chocolate pudding 4070 30 14 40 −30
+> T8alphabet soup + cream cheese →basket 40020 34 50 +30
+> T9two moka pots →stove 40020 16 40 +20
+> T10 yellow mug →microwave 3060 40 30 40 −20
+> Mean 9.0 33.0 31.0 37.0 52.0 +19 .0
+
+H.3 Zero-budget causal control: implementation and per-task breakdown. The zero-budget control reported in Sec. 3.1 (Table 11) is a single-line YAML override over the baseline PHASER con-figuration. Setting continual_learning.algorithm.zero_budget_phase_idx: 0 triggers the following modification to the phase-fill routine: 1. For every task Tk, the bucket associated with phase index 0 is left empty (capacity 0). 2. The released allocation K is redistributed uniformly across the task’s remaining |ϕk|− 1 phases: each surviving phase is allotted ⌊K · | ϕk|/(|ϕk|− 1) ⌋ frames, with any single-frame remainder absorbed by the first sibling. For a baseline of K=278 and |ϕk|=4 this yields 370 frames for 3
+
+siblings, exactly preserving the 1112 -frame per-task total. 3. The Boltzmann routing distribution is left untouched. Empty buckets are automatically filtered out by PHASER’s existing _PhaseStore.active_phase_ids mask, so no other code path requires modification and the routing temperature, prototypes, and per-step replay path remain bit-equivalent to baseline. A 5-step smoke validation confirms the invariant: after task 1, the baseline buffer registers 
+
+4×278=1112 frames across 4 active phase ids, while the zero-budget run registers 3×370+2=1112 
+
+frames across 3 active phase ids — identical total memory, one phase id with size 0.The summary statistics (aggregate ASR collapse to 16 .0% , zeroed-phase loss 0.172 ±0.131 , sibling-phase loss 0.055 ±0.021 ) are quoted inline in Sec. 3.1 and collected in Table 11; this appendix also provides the per-task breakdown (Table 12) that the summary aggregates over. 18 Table 11: Causal control: zero-budget on ϕ0 (QG-3B × LIBERO-Long, memory-matched). Zeroing the leading “approach” phase and redistributing its frames uniformly to siblings (total memory held fixed, routing untouched) drops ASR below ER.        
+
+> Configuration ASR (%) ↑
+> ER 31 .4
+> PHASER 48 .6
+> PHASER, ϕ0zeroed 16 .0
+
+Table 12: Per-task breakdown of the zero-budget causal control (Sec. 3.1, Table 11). ¯ϵ(0)                                                     
+
+> pis the action loss on the zeroed phase ϕ0of that task ( 32 frames ×4diffusion seeds). Per-task ASR is from the 50 -trial last-only LIBERO-Long evaluation; the aggregate is 16 .0% (vs. baseline PHASER 48 .6% ). Tasks are listed in canonical LIBERO-Long order, which matches the training order.
+> kZeroed phase ϕ0name ASR (%) ↑¯ϵ(0)
+> p↓
+> T1approach white mug 00.210
+> T2approach white mug (var.) 32 0.196
+> T3approach yellow + white mug 00.483
+> T4approach stove knob 48 0.295
+> T5approach alphabet soup 00.185
+> T6approach alphabet soup (var.) 70 0.093
+> T7approach first moka pot 00.090
+> T8approach cream cheese box 40.096
+> T9approach black bowl 40.054
+> T10 approach book 00.015 Aggregate 16.0 0.172 ±0.131
+
+Two patterns clarify the causal mechanism. First, task-level success is gated by the zeroed phase: five of ten tasks collapse to exactly 0% because the leading “approach” sub-skill is the prerequisite for every subsequent kinematic move; if that phase is no longer replay-protected and its representation drifts under later training, the rollout never reaches the manipulable object. Second, the zeroed-phase loss is recency-modulated in the expected direction: tasks trained 6–9 task-boundaries before evaluation ( T1–T5) show losses 0.19 –0.48 , while the last-trained task ( T10 , just 0 task-boundaries before evaluation) holds at 0.015 — close to its training-time loss. The two observations together rule out the alternative reading that the ASR collapse comes from the redistribution to siblings: sibling phases (Table 11, 0.055 ± 0.021 ) remain at baseline-PHASER level, so the policy degradation is localised to the explicitly starved ϕ0 slots and propagates to task-level failure only because each task’s pipeline starts at ϕ0.
+
+I Video Demonstrations 
+
+Qualitative rollout videos are available at the project page https://anonymous.4open.science/ r/rollout_video-F1D8 (selected representative rollouts, one per cell). We provide three clips under matched-budget continual learning. 
+
+(1) Continual-learning dynamics (OpenVLA-7B × LIBERO-Long). The headline clip animates a lower-triangular retention matrix , revealed one row per newly-learned task; the freshly-revealed row plays its actual rollouts while older rows freeze on their last frame. Row +Tk is the checkpoint right after learning task k; each cell is a rollout of an earlier task i≤k re-evaluated there (green success / red failure). Both methods learn each new task (the diagonal is green), but as the stream continues the ER baseline (left) forgets earlier tasks — its triangle reddens (retaining 20 /55 cells) — while PHASER (right) keeps every task it has learned (the triangle stays green, 55 /55 ), the forgetting-vs-retention contrast that the NBT matrix (Eq. (3)) quantifies. 19 (2) Single-task close-up (OpenVLA-7B × LIBERO-Long). The second clip fixes one task ( “turn on the stove and put the moka pot on it” ) and replays it at every checkpoint after it is first learned. ER learns the skill but each subsequently learned task overwrites it, degrading it to failure, whereas PHASER keeps executing it across the entire remaining task stream — a single column of the retention matrix viewed as a time series. 
+
+(3) Final-checkpoint film-strip (QwenGR00T-3B × LIBERO-Goal). The third clip shows all 
+
+10 tasks at the final checkpoint, ER (top row) vs. PHASER (bottom row): ER stalls on the tasks where uniform replay starves a brief contact-transition sub-skill, whereas PHASER completes the manipulation. 
+
+J Supporting Analysis: Phase Starvation Under Uniform Sampling 
+
+This appendix gives a back-of-the-envelope analysis of why uniform frame-level replay under-supports brief phases, motivating the equal-budget allocation rule in Sec. 2.2. As above, this is a structural observation, not a formal generalisation guarantee. 
+
+J.1 Phase starvation under uniform allocation. Let dp denote the duration of phase ϕp, such that 
+
+PPp=1 dp = D. Let B be the total memory budget. Under uniform sampling, the expected replay capacity E[bp] allocated to ϕp is: 
+
+E[bp] = B · dp
+
+D (4) For fleeting bottleneck actions, dp ≪ D and E[bp] becomes small. Under standard sample-complexity arguments, the per-phase generalisation error ϵp scales like O(1 /pbp), so phases that are temporally short under uniform sampling are over-proportionally vulnerable. Combined with the structural observation that overall success is upper-bounded by the weakest phase ( S(T ) ≤ min p s(ϕp)), this gives the qualitative picture: under uniform replay the buffer is dominated by long, easy phases and the short, causally critical phases are the first to degrade — the empirical pattern we report as phase starvation (Sec. 3). 
+
+J.2 Equal-allocation is the max-min point of a fixed budget. A simple constrained-optimisation check formalises the intuition that uniform-per-phase allocation is the natural rule when one wants to protect the weakest phase. We seek an allocation vector b = [ b1, . . . , b P ]:
+
+max  
+
+> b
+
+(min  
+
+> p
+
+bp) (5) s.t. 
+
+> P
+
+X
+
+> p=1
+
+bp ≤ B, bp ≥ 0 ∀p (6) Let bmin = min p bp. Suppose there exists an asymmetric allocation strategy where some phase q
+
+receives strictly less than average, bq < BP . Then bmin ≤ bq < BP .Conversely, if we enforce a strictly uniform Phase-Centric Capacity Allocation, b1 = b2 = · · · =
+
+bP = BP ≡ K, we achieve: 
+
+bmin = BP = K (7) Since any deviation from equal allocation forces at least one phase to receive less than BP , equal allocation maximises the worst-case per-phase budget. We take this as the design motivation for allocating a fixed capacity K to every identified phase; the practical benefit — reduced per-phase forgetting — is verified empirically in Sec. 3 rather than inherited from this bound. 20
