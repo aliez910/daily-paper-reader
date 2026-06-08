@@ -1,0 +1,666 @@
+Title: Grasp-Then-Plan with Failure Attribution: A Closed Two-Stage Framework for Precise and Generalizable Robotic Manipulation
+
+URL Source: https://arxiv.org/pdf/2606.03385v1
+
+Published Time: Wed, 03 Jun 2026 01:23:24 GMT
+
+Number of Pages: 32
+
+Markdown Content:
+# Grasp-Then-Plan with Failure Attribution: A Closed Two-Stage Framework for Precise and Generalizable Robotic Manipulation 
+
+Jiahao Xu Peiyuan Wang Hanzhuo Zhang Zihao Yu Tianyu Fu 
+
+Hao Chen Xuanhao Xiang Jianbo Yu Chenchen Fu Wanyuan Wang School of Computer Science and Engineering, Southeast University, China 
+
+https://sites.google.com/view/gtp-fa/ 
+
+## Abstract 
+
+In robotic manipulation, the tight coupling between grasping and motion planning often obscures the true source of failure, leading to inefficient trial-and-error. To enable efficient long-horizon manipulation, we propose GTP-FA (Grasp-Then-Plan with Failure Attribution), a task-oriented two-stage ‘grasp-then-plan’ framework that generates grasp candidates and performs downstream motion planning con-ditioned on the selected grasp. Given a failed manipulation trajectory, we learn a failure attribution model that generalizes to unseen grasps and produces a stable distribution over failure modes for diagnosis-guided optimization. Based on these attribution results, we then optimize both modules in a diagnosis-driven manner: on the grasping side, we inject task-level priors and risk penalties into grasp candidate scoring and optimization to suppress unstable or task-incompatible grasps; on the planning side, we target high-risk initial states through data collection and fine-tuning to address genuine planning bottlenecks. We evaluate the proposed framework in both simulation and real-robot experiments, and show that GTP-FA improves the corresponding base learners across RL, IL, diffusion-policy, and VLA-based settings, achieving substantially higher overall task success rates. Project page: here. 
+
+## 1 Introduction 
+
+In long-horizon robotic manipulation, the grasp often determines whether a task is feasible [Mao et al., 2025, Ma et al., 2024, Tang et al., 2025, Wei et al., 2024]. For constrained placement or tool-use tasks, even a strong downstream planning/control policy can fail if the selected grasp occludes critical interaction regions, restricts the reachable motion space, or otherwise conflicts with the task objective [Tang et al., 2023]. In practice, such grasp-induced failures are often observed only as “planning failures”: the policy is forced to act from an infeasible or unfavorable initial condition, leading to collisions, compensatory behaviors, and inefficient learning signals [Huang et al., 2025, Duan et al., 2024, Lin et al., 2025]. A natural remedy is to decompose manipulation into “grasp-then-plan.” However, decomposition alone does not remove the coupling between grasping and downstream execution, because grasping is not task-agnostic: the task dictates how the object should be grasped [Wen et al., 2022]. Optimizing only geometric feasibility or grasp stability may produce grasps that are stable but task-incompatible. Moreover, friction, material properties, and execution noise can make grasp stability fragile under dis-tribution shift [Mousavian et al., 2019, Fang et al., 2020, Weng et al., 2022]. Although reinforcement learning, imitation learning, and vision-language-action models have substantially improved robotic policy learning [Chen et al., 2025, Xu et al., 2025, Black et al., 2024, Hu et al., 2024, Escoriza et al., 2025, Intelligence et al., 2025a,b, Tao et al., 2024, Ball et al., 2023], failure data in strongly coupled grasp–execution settings still entangles grasp-side and downstream-policy causes. Without explicit 
+
+> Preprint.
+> arXiv:2606.03385v1 [cs.RO] 2 Jun 2026
+
+failure attribution, end-to-end fine-tuning may incorrectly assign grasp errors to the downstream policy, contaminating training data and weakening generalization. Thus, improving robustness requires answering a basic question: should a failure be attributed to grasping or to downstream planning/control? 
+
+We propose GTP-FA (Grasp-Then-Plan with Failure Attribution), a closed-loop framework that links grasp selection to downstream outcomes and uses attribution to apply optimization pressure to the correct module. Concretely, we learn a failure attribution model that maps an execution outcome to a structured distribution over failure modes and estimates how responsibility is shared between grasping and planning. To make attribution reliable under unseen grasps, we impose a local-consistency prior in the diagnostic space. This diagnostic signal then guides what to optimize (grasping vs. planning), what data to collect, and which failure types to prioritize. Our contributions are threefold: (i) we introduce a task-centric Grasp-Then-Plan closed-loop frame-work that explicitly binds grasp selection to downstream success; (ii) we develop a failure attribution mechanism and improve its stability under unseen grasps to ensure optimization pressure is applied to the correct module; and (iii) we propose a diagnosis-driven bidirectional optimization strategy that routes updates to the grasp side or downstream policy side based on the attributed failure source, improving task success across RL, imitation-learning, diffusion-policy, and VLA-based learners. 
+
+## 2 Related Work 
+
+Six-DoF grasp synthesis and task-oriented grasping. Large-scale benchmarks have driven rapid progress in 6-DoF grasping, yielding RGB-D/point-cloud-based methods for grasp estimation and generation, including generative and implicit formulations for handling occlusion and clutter [Fang et al., 2020, Ma et al., 2024, Mousavian et al., 2019, Weng et al., 2022]. However, grasp stability alone does not ensure task success. Task-oriented grasping therefore incorporates task context, e.g., conditioning grasps on language or vision–language inputs [Tang et al., 2023, Wei et al., 2024, Wen et al., 2022], or injecting semantic and geometric priors via foundation models for improved generalization [Tang et al., 2025, Huang et al., 2024]. VLM-based grasp correction further revises grasps at execution time [Lee et al., 2025]. In contrast, our work links grasp selection and its induced failure modes to downstream planning failures through explicit diagnostic signals, enabling more targeted optimization of both grasping and planning. 
+
+Failure detection, diagnosis, reasoning, and recovery. Prior work on long-horizon manipulation addresses failure handling through detection [Inceoglu et al., 2023], diagnosis and attribution [Sagar et al., 2024], and reasoning or recovery [Lin et al., 2025, Duan et al., 2024, Agia et al., 2024, Huang et al., 2025]. While these approaches improve failure observability and recovery, they offer limited system-level credit assignment in grasp–plan pipelines, leaving unclear whether failures stem from grasping or planning. In contrast, we introduce grasp–planning-aware failure attribution that explicitly distinguishes grasp-side and planning-side failures, and use the attribution both as supervision and as an optimization-routing signal, enabling a diagnosis-driven bidirectional improvement loop. 
+
+Coupling between grasp selection and downstream policy execution. Grasp–planning systems are commonly implemented as two-stage pipelines that select a grasp and then plan motions con-ditioned on it, often leading to mismatches such as feasible grasps with infeasible plans, or vice versa. To reduce this coupling, some methods jointly optimize grasp and motion using unified objectives or differentiable costs [Urain et al., 2022]. Others address long-horizon decision making via reinforcement or imitation learning, including behavior cloning, diffusion policies, and RL-based policy optimization, leveraging demonstrations or online adaptation to improve robustness and gen-eralization [Sontakke et al., 2023, Kim et al., 2025, Ma et al., 2023, Yuan et al., 2024, Lu et al., 2024]. In parallel, recent vision–language–action models improve generalization through instruction tuning and structured prompting [Niu et al., 2024, Liu et al., 2025]. However, existing methods are often tied to a specific grasp–motion optimization formulation or a particular class of policy learner, and lack a general failure-diagnosis and optimization-routing mechanism that can be shared across base algorithms. In contrast, GTP-FA provides a base-learner-agnostic, diagnosis-driven interface: it distinguishes grasp-side failures from downstream-policy failures, routes optimization pressure to the corresponding module, and can be applied to RL, imitation-learning, diffusion-policy, and VLA-based learners. 23 Problem Definition 
+
+We study task-oriented grasp-then-plan robotic manipulation. Given a language instruction τ and a visual observation o (possibly multi-view RGB/RGBD), the system first selects a grasp 
+
+g ∈ G ⊂ SE(3) × R, (1) where SE(3) specifies the 6-DoF gripper pose, and the additional R dimension denotes the grip-per width or other continuous grasp parameters. Conditioned on the fixed grasp, a downstream planning/control policy then produces an action sequence a1: H :
+
+g ∼ πg ( · | τ, o ), at ∼ π( · | st, o t, τ, g ). (2) The outcome of an episode is denoted by y ∈ { 0, 1}, indicating whether the task is successfully completed. Because grasping and planning are tightly coupled, failures are often difficult to attribute directly. We therefore structure failures using a failure-mode set 
+
+M = {FM -G1 , FM -G2 , FM -P}, (3) where FM-G1 denotes task-irrelevant grasp contact/functionality, FM-G2 denotes unstable grasping or slippage during execution, and FM-P denotes downstream planning/control or policy insufficiency. Our goal is to learn an attribution model D that outputs a probability distribution over failure modes for a given rollout: 
+
+D(τ, o, g, ξ ) → p(m | τ, o, g, ξ ), m ∈ M , (4) where ξ is an observable execution summary (e.g., drop/collision indicators and end-effector goal errors). This distribution is used to allocate responsibility between the grasping and planning components and to provide signals for subsequent targeted optimization. Overall, we aim to maximize task success under task and environment variations: 
+
+max   
+
+> πg,π
+
+E(τ,o )∼D task [Pr( y = 1 | τ, o )] , (5) where Dtask denotes the task and environment distribution. 
+
+## 4 Method 
+
+4.1 Overview 
+
+GTP-FA formulates task-oriented grasp-then-plan manipulation as a closed-loop execute–diagnose– update process. Because the same observable failure may arise from grasp-functional mismatch, grasp instability, or downstream policy insufficiency, naive end-to-end optimization can misattribute grasp-side errors to the planning/policy side. To address this issue, GTP-FA first uses a Failure Attribution Discriminator D to predict a structured distribution over failure modes from a single execution, and introduces a local-consistency prior through a Grasp-Conditioned Representation Space E to stabilize attribution for unseen grasps. The fused diagnosis is then used as an optimization-routing signal: when failures are mainly attributed to the grasp side, the system updates grasp selection with task priors and risk penalties; when failures are mainly attributed to the planning/policy side, the system improves the downstream module through hard-P mining, distribution reshaping, data resampling, and responsibility-weighted learning. The overall GTP-FA optimization pipeline is shown in Figure 1. 
+
+4.2 Failure Attribution Discriminator D
+
+Following the failure-mode definition in Sec. 3, we learn a Failure Attribution Discriminator D to perform post-hoc diagnosis for each execution. Given the task instruction, observation, selected grasp, and execution summary, D estimates whether a failure mainly originates from grasp-functional mismatch, grasp instability, or downstream planning/control insufficiency. The execution summary ξ
+
+includes events such as slip/drop indicators, collision events, and end-effector errors. This diagnostic distribution is used to assign responsibility between the grasp side and the downstream policy side, avoiding the incorrect use of grasp-induced failures as supervision for downstream policy learning. 3Figure 1: Overview of GTP-FA. Given a task description, GTP-FA performs task-aware grasp optimization, executes the selected grasp, diagnoses the resulting outcome, and routes optimization signals to either the grasp side or the planning side in a closed-loop execute–diagnose–update pipeline. The optimized grasp-then-plan interface is then transferred to real-robot deployment. Since manually obtaining consistent failure-attribution labels can be expensive and subjective, we construct weak supervision through controlled repeated trials under fixed grasp conditions. For each grasp condition g, we run the downstream policy K times while only changing the random seed or adding small perturbations, and compute the empirical terminal success rate: 
+
+ˆqend (g) = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+I{y(k)end = 1 }. (6) Intuitively, ˆqend (g) measures whether the task is usually achievable under the current grasp condition. We then generate high-confidence pseudo-labels: clear functional/contact-region mismatch is labeled as FM-G1; For failed executions under a non-G1 grasp condition, a high terminal success rate indicates that the task is generally realizable under this grasp; therefore, the observed failure is more likely attributed to FM-P. In contrast, a low terminal success rate together with slip or drop events indicates FM-G2. Ambiguous samples are discarded or handled with soft labels to reduce noise. After training, the output of D is used for failure explanation, responsibility assignment, and opti-mization routing. When pD (FM -P) is high, the system emphasizes downstream planning/policy updates; when pD (FM -G2) is high, the system suppresses unstable grasps and triggers grasp-side optimization. Details of weak-label construction, threshold sensitivity, discriminator inputs, and training are provided in Appendix A.1. 
+
+4.3 Failure Attribution Generalization to Unseen Grasps 
+
+Since the failure attribution discriminator D is trained from weak pseudo-labels collected on a finite set of post-grasp initializations, its predictions can become unstable when test-time grasps involve unseen contact regions, wrist poses, or post-grasp states. To improve attribution reliability under such grasp distribution shifts, we introduce a Grasp-Conditioned Diagnostic Representation Space E.The key idea is that grasp conditions inducing similar post-grasp initialization states should exhibit similar local failure-mode distributions. For each grasp condition g, we extract a grasp-conditioned initialization feature xg , which describes the post-grasp state induced by the selected grasp, such as object pose, relative gripper pose, contact region, or other observable state features. We map this feature into a diagnostic embedding space: 
+
+e = fθ (xg ) ∈ Rd. (7) The embedding model is trained with weak failure labels and success/failure signals so that diagnosti-cally similar grasp conditions are locally close in the representation space. 4Figure 2: Failure attribution and diagnostic signal generation. Given a task instruction, visual obser-vation, candidate grasp, and execution summary, the discriminator D performs post-hoc diagnosis for a single execution and outputs a probability distribution over three failure modes. To improve attribution stability for unseen grasps, the system uses the grasp-conditioned representation space 
+
+E to construct a neighborhood diagnostic prior, which is fused with the output of D to produce a reliable diagnostic signal for grasp-side optimization and planning-side downstream policy learning. Given an unseen grasp at test time, we retrieve its k nearest neighbors Nk(e) from an embedding bank built from training and rollout samples, and construct a neighborhood diagnostic prior by weighted voting: 
+
+˜pE (m | e) = X 
+
+> j∈N k(e)
+
+wj I{mj = m}, wj = exp(sim( e, e j )/t )
+
+P  
+
+> ℓ∈N k(e)
+
+exp(sim( e, e ℓ)/t ) . (8) Here, mj denotes the failure-mode label of a neighboring sample, and wj assigns larger weights to more similar grasp conditions. This prior provides a smoother local diagnostic estimate when D is uncertain on an unseen grasp. We then fuse this neighborhood prior with the discriminator prediction: 
+
+pfuse (m | τ, o, g, ξ, e ) = (1 − α)pD (m | τ, o, g, ξ ) + α˜pE (m | e), (9) where α is determined by the confidence of D. When D is confident, the system relies more on the direct discriminator prediction; when D is uncertain, it relies more on the neighborhood diagnostic prior. The fused attribution pfuse provides a more stable diagnostic signal for the grasp-side and planning-side optimization routing in Sec. 4.4. Figure 2 illustrates the overall attribution pipeline, including weak-label construction, discriminator prediction, grasp-conditioned embedding, and D/E fusion. Details of the embedding objective, nearest-neighbor prior, and fusion implementation are provided in Appendix A.1.3. 
+
+4.4 Diagnosis-driven Bidirectional Optimization 
+
+We use the fused attribution result from Sec. 4.3 as an optimization-routing signal to decide whether a failure should be mainly assigned to the grasp side or the downstream planning/policy side. Given an execution sample (τ, o, g, ξ, y ), the fused diagnostic model outputs a failure-mode distribution 
+
+pfuse (m). For brevity, we write pfuse (m) to denote pfuse (m | τ, o, g, ξ, e ) for the current sample. We define the grasp-side and planning-side responsibility weights as 
+
+wG = pfuse (FM -G1) + pfuse (FM -G2) , wP = pfuse (FM -P) . (10) Here, wG indicates that the failure is more likely caused by grasp-functional mismatch or grasp insta-bility, while wP indicates downstream planning/control insufficiency. GTP-FA routes optimization pressure according to these weights, instead of applying undifferentiated end-to-end updates to all failed samples. 5Grasp-side update. When wG is high, the system treats the failure as more likely induced by the grasp condition and updates grasp selection and scoring. Specifically, we first train a lightweight risk predictor from the fused diagnostic signal to estimate the instability risk of each candidate grasp: 
+
+rϕ(z(g)) ≈ pfuse (FM -G2 | τ, o, g, ξ, e ), (11) where z(g) denotes the internal representation or scoring feature of the candidate grasp. We then augment the original grasp score sbase (g; o) with a task-prior term and a diagnostic risk penalty: 
+
+g∗ = arg max 
+
+> g∈G (o)
+
+h
+
+sbase (g; o) + λs prior (g; πVLM (τ )) − βr ϕ(z(g)) 
+
+i
+
+. (12) Here, sprior denotes a coarse task-prior constraint produced by the VLM prior, which suppresses grasps that occupy functional regions, block release motions, or hinder subsequent manipulation; 
+
+πVLM (τ ) denotes a task-prior generator that maps the language instruction to coarse functional-region or release-motion constraints. rϕ(z(g)) down-weights unstable grasps that are likely to slip or drop; and λ and β control the strengths of the task prior and risk suppression, respectively. Thus, the grasp module optimizes not only geometric stability, but also task feasibility and downstream execution requirements. More details on grasp-side risk calibration, task-prior scoring, and VLM prompt construction are provided in Appendices A.2.3 and A.3. 
+
+Planning-side update. When wP is high and the grasp-side risk is low, the sample is more likely to correspond to a planning-dominant hard start. We aggregate the planning-failure risk for each candidate grasp condition g from rollouts: 
+
+rP (g) = E [pfuse (FM -P) | g] , (13) and combine it with low FM-G1/FM-G2 risks to obtain the planning-dominant hard-P subset GhardP .This subset represents initial states where the grasp side is relatively feasible but downstream planning or policy execution remains difficult. Detailed screening criteria and threshold settings are provided in Appendix A.2. During downstream policy training, we increase the coverage of hard-P samples through distribution reshaping: 
+
+g ∼ (1 − ρ) Unif( Gfull ) + ρ Unif( GhardP ), (14) where ρ controls the degree to which the training distribution is biased toward planning-bottleneck samples. During standard evaluation, we always set ρ = 0 , ensuring that all methods are compared under the same evaluation distribution. For interactive reinforcement-learning methods such as PPO and SAC, this corresponds to start-state resampling during training. For data-driven methods such as BC, DP, and VLA, it corresponds to diagnosis-driven reconstruction and resampling of training data, rollout data, or fine-tuning data. We further use the planning-side responsibility weight wP to reweight the policy objective: 
+
+min  
+
+> θ
+
+E [wP · L down (θ; τ, o, g, ξ, y )] , (15) where Ldown denotes the training objective of the corresponding base learner, such as an RL loss, behavior-cloning loss, diffusion-policy training loss, or VLA fine-tuning objective. When wG is high, the contribution of the sample to planning-side updates is reduced, preventing grasp-induced failures from being incorrectly used to train the downstream policy. Overall, GTP-FA iterates an execute–diagnose–update loop: execution produces trajectories and event summaries, diagnosis estimates failure responsibility, and the update stage assigns optimization pressure to either the grasp side or the planning side. Through this diagnosis-driven bidirectional update, the system reduces training contamination caused by misattribution and achieves more stable performance improvements in strongly coupled long-horizon manipulation tasks. 
+
+## 5 Experiments 
+
+5.1 Experimental Setup 
+
+We evaluate GTP-FA in both simulated and real-robot environments. The simulation experiments are conducted on eight long-horizon manipulation tasks from ManiSkill3: StackCube, PokeCube, 6LiftPegUpright, PlaceSphere, PickCube, PushCube, PullCube, and PullCubeTool. These tasks cover diverse grasp–execution coupling scenarios, including stacking, pushing, pulling, placing, picking, pose adjustment, and tool use. The real-robot experiments are conducted on a Franka Research 3 platform to verify the feasibility of our method in physical environments. For VLA fine-tuning, we use 100 converted expert trajectories in simulation and 300 real expert trajectories for the real-robot 
+
+π0.5 / GTP-FA-π0.5 setting; the detailed task setup and execution protocol are provided in Sec. 5.4 and Appendix A.6. For VLA-based experiments, we instantiate the VLA learner with π0.5 using LoRA fine-tuning, and report the corresponding rows as π0.5 variants in the main tables. For each learner, we evaluate the original policy, module-level ablation variants, and the corresponding full GTP-FA version. We denote the ablation setting by a two-bit suffix GP , where G indicates whether grasp-side optimization is enabled and P indicates whether planning-side or downstream-policy optimization is enabled. Thus, 
+
+00 denotes the original policy, 01 denotes planning-side-only optimization, 10 denotes grasp-side-only optimization, and 11 denotes naive joint optimization without failure attribution. Full GTP-FA further adds failure attribution and diagnostic routing on top of this setting. In simulation, we report two metrics, success_once and success_at_end . The former measures whether an episode ever reaches a successful state, while the latter measures whether the task remains successful at the end of the episode. Since VLA evaluation records only terminal task success, we report only success_at_end for VLA. Real-robot experiments are evaluated using task-level success rate. For implementation, PPO, SAC, BC, DP, and their GTP-FA variants are mainly trained and evaluated on a workstation with 2× RTX 4090 GPUs. VLA experiments are conducted on a 3× A100 server due to the higher memory cost of fine-tuning and inference. Real-robot experiments are deployed on a Franka Research 3 platform equipped with a Robotiq gripper and base/wrist D435i cameras, with perception and policy inference running on an RTX 4090 workstation. Hardware differences only affect training and inference throughput; they do not change the task definitions, ablation settings, evaluation protocol, or success metrics. Full training budgets, random seeds, evaluation episodes, compute resources, and key hyperparameters are provided in Appendix A.6. 
+
+5.2 Results 
+
+Table 1 summarizes the simulation results of GTP-FA on eight ManiSkill3 tasks and five classes of downstream learners. This section focuses on the overall improvement of the full GTP-FA framework over the corresponding original base algorithm ( 00 ). Red numbers indicate the best result in each task column, and the last column reports the average change relative to the corresponding 00 baseline; for full GTP-FA rows, this column represents the average gain in terminal success rate. Overall, full GTP-FA improves the terminal success rate for PPO, BC, DP, SAC, and the VLA-based 
+
+π0.5 learner, indicating that the framework is not tied to a specific policy-learning paradigm. For data-driven methods such as BC, DP, and π0.5, the gains are more pronounced, with improvements of +54.0 pp, +25.7 pp, and +17.8 pp, respectively; the gain for SAC is relatively smaller because the original SAC baseline is already strong on several tasks. These results support our central hypothesis: in strongly coupled grasp–execution scenarios, simply strengthening the downstream policy is insufficient for stable task improvement. By distinguish-ing grasp-functional mismatch, grasp instability, and planning/policy insufficiency, and by routing optimization pressure to the corresponding module, GTP-FA achieves more reliable overall improve-ments across different base learners. More detailed final-performance comparisons, complete training curves, and VLA training diagnostics are provided in Appendix A.4. 
+
+5.3 Ablation Studies 
+
+Table 1 further reports module-level ablations: 01 enables only planning-side optimization, 10 
+
+enables only grasp-side optimization, and 11 denotes naive grasp–plan joint optimization without failure attribution. Full GTP-FA further incorporates failure attribution and diagnostic routing. First, planning-side-only optimization cannot reliably resolve grasp–plan coupling. Under 01 , only DP obtains a positive gain (+8.8 pp), whereas PPO, BC, SAC, and π0.5 show signed changes of -27.9, -9.4, -54.5, and -31.4 pp, respectively. This indicates that directly updating the downstream 7Table 1: Simulation results and module ablations on eight ManiSkill3 tasks. Each entry reports 
+
+success_once / success_at_end . For VLA-based results, we instantiate the VLA learner with 
+
+π0.5 and report only success_at_end , since success_once is unavailable in our VLA evalua-tion. The suffix GP indicates whether grasp-side optimization ( G) and planning-side/downstream optimization ( P ) are enabled: 00 denotes the original policy, 01 planning-side-only optimization, 
+
+10 grasp-side-only optimization, and 11 naive joint optimization without failure attribution. Full GTP-FA further adds failure attribution and diagnostic routing. Red numbers indicate the best value for each task and metric when available, and Green values highlight the average gains of full GTP-FA variants. The last column reports the average signed change relative to the corresponding 00 baseline in percentage points (pp), where positive values indicate improvement and negative values indicate degradation. 
+
+Method Task Avg. ∆ (pp) Stack Poke LiftPeg Place Pick Push Pull PullTool 
+
+Original downstream policies ( 00 )
+
+PPO-00 65.2% / 29.1% 75.0% / 34.4% 99.3% / 25.0% 82.6% / 82.6% 99.2% / 41.6% 100% / 51.0% 99.3% / 41.2% 29.4% / 29.3% 0.0 / 0.0 
+
+BC-00 0.0% / 0.0% 65.3% / 46% 41.3% / 2.3% 0.0% / 0.0% 0.1% / 0.0% 4.5% / 4.3% 71.3% / 27.8% 0.1% / 0.1% 0.0 / 0.0 
+
+DP-00 0.0% / 0.0% 53.1% / 40.5% 6.9% / 0.3% 0.0% / 0.0% 0.2% / 0.1% 0.0% / 0.0% 0.0% / 0.0% 0.0% / 0.0% 0.0 / 0.0 
+
+SAC-00 22.8% / 14.3% 64.3% / 64.3% 88.1% / 75.3% 86.7% / 86.2% 99% / 92.4% 99% / 93% 99.2% / 93.1% 65.3% / 60.3% 0.0 / 0.0 
+
+π0.5-00 – / 89.4% – / 46.1% – / 20.6% – / 73.3% – / 95.2% – / 93.4% – / 78.7% – / 19.2% – / 0.0 
+
+Planning-side-only optimization ( 01 )
+
+PPO-01 52.1% / 42.8% 16.3% / 9.9% 3.1% / 0.8% 30.8% / 28.5% 35.8% / 4.2% 63.5% / 14% 35.8% / 4.2% 5.3% / 5.3% -50.8 / -27.9 
+
+BC-01 0.0% / 0.0% 1.7% / 0.6% 0.8% / 0.0% 0.1% / 0.1% 0.0% / 0.0% 25.2% / 4.5% 0.2% / 0.2% 0.0% / 0.0% -19.3 / -9.4 
+
+DP-01 7.2% / 4.3% 6.3% / 3.8% 1.1% / 0.1% 1.1% / 0.0% 26.6% / 26.5% 15.8% / 14.7% 63.1% / 62.3% 0.0% / 0.0% +7.6 / +8.8 
+
+SAC-01 17.6% / 9.8% 27.4% / 24.2% 10.4% / 6.2% 25.7% / 23.4% 32.6% / 29.2% 26.3% / 20.3% 42.1% / 21.9% 8.3% / 7.2% -54.3 / -54.5 
+
+π0.5-01 – / 36.2% – / 13.4% – / 1.6% – / 21.3% – / 46.7% – / 71.1% – / 74.7% – / 0.0% – / -31.4 
+
+Grasp-side-only optimization ( 10 )
+
+PPO-10 23.2% / 9.4% 1.3% / 1.7% 12.2% / 3.7% 0.0% / 0.0% 4.5% / 0.6% 9.3% / 7.8% 4.5% / 0.6% 1.6% / 1.6% -74.1 / -38.6 
+
+BC-10 0.0% / 0.0% 0.2% / 0.2% 0.5% / 0.1% 0.0% / 0.0% 0.3% / 0.2% 0.0% / 0.0% 0.0% / 0.0% 1.3% / 1.2% -22.5 / -9.8 
+
+DP-10 0.0% / 0.0% 0.0% / 0.0% 0.0% / 0.0% 0.0% / 0.0% 0.2% / 0.1% 0.0% / 0.0% 0.0% / 0.0% 3.5% / 3.4% -7.1 / -4.7 
+
+SAC-10 18.4% / 7.7% 1.5% / 1.2% 7.9% / 6.4% 1.2% / 0.3% 51.7% / 50.5% 58.1% / 52.4% 21.5% / 20.3% 8.6% / 4.1% -57.0 / -54.5 
+
+π0.5-10 – / 0.0% – / 7.3% – / 0.0% – / 10.2% – / 30.3% – / 28.5% – / 5.4% – / 1.2% – / -54.0 
+
+Naive grasp–plan optimization without attribution ( 11 )
+
+PPO-11 86.4% / 68.7% 34.8% / 34.5% 88.2% / 41.3% 77.8% / 75.8% 18.5% / 6.5% 0.3% / 0.1% 18.5% / 6.5% 53.4% / 53.2% -34.1 / -6.0 
+
+BC-11 24.2% / 14.2% 41.2% / 34.6% 48.0% / 22.0% 36.1% / 36.1% 10.8% / 8.1% 68.7% / 56.7% 90.1% / 66.1% 34.4% / 33.7% +21.4 / +23.9 
+
+DP-11 6.3% / 3.4% 32.7% / 25.8% 1.5% / 0.3% 0.0% / 0.0% 36.1% / 32.8% 11.7% / 10.1% 73.7% / 65.3% 49.1% / 48.9% +18.9 / +18.2 
+
+SAC-11 26.6% / 13.2% 43.6% / 41.3% 75.5% / 67.3% 81.7% / 71% 79.2% / 77.4% 91.6% / 90.4% 93.4% / 90.2% 68.2% / 63.1% -8.3 / -8.2 
+
+π0.5-11 – / 92.4% – / 53.6% – / 31.2% – / 85.4% – / 95.6% – / 92.8% – / 79.2% – / 25.0% – / +4.9 
+
+Diagnosis-driven GTP-FA with failure attribution 
+
+GTP-FA-PPO 90.4% / 80.7% 81.2% / 72.6% 96.3% / 48.7% 93.1% / 89.5% 91.2% / 80.4% 98.1% / 68.3% 96.1% / 71.7% 75.9% / 74.3% +9.0 / +31.3 GTP-FA-BC 84.5% / 69.6% 74.7% / 63.8% 72.4% / 37.5% 67.3% / 67.3% 82.7% / 72% 80.1% / 69.9% 94.6% / 85.3% 48.2% / 48.2% +52.6 / +54.0 GTP-FA-DP 7.1% / 5.5% 63.1% / 54.5% 23.3% / 7.7% 0.5% / 0.1% 34.9% / 34.8% 10.5% / 10.3% 78.0% / 73.5% 60.1% / 59.9% +27.1 / +25.7 GTP-FA-SAC 65.1% / 53.6% 68.0% / 66.5% 86.5% / 77.2% 90.6% / 87.3% 99.5% / 95.2% 97.2% / 95.6% 98.4% / 96.8% 77.2% / 69.6% +7.0 / +7.7 GTP-FA-π0.5 – / 95.2% – / 76.6% – / 71.2% – / 92.1% – / 96.6% – / 95.4% – / 85.2% – / 45.1% – / +17.8 
+
+policy can contaminate the learning signal when failed samples contain grasp-functional mismatch or grasp instability. Similarly, grasp-side-only optimization is also insufficient: 10 underperforms the corresponding 00 baseline for all base learners, with PPO, SAC, and π0.5 decreasing by -38.6, -54.5, and -54.0 pp, respectively. This shows that improving grasp candidates alone cannot replace downstream policy adaptation. Second, naive joint optimization 11 improves BC and DP by +23.9 and +18.2 pp, respectively, but still decreases PPO and SAC by 6.0 and 8.2 pp, while π0.5 gains only +4.9 pp. This suggests that jointly optimizing grasping and planning is not necessarily stable; without failure attribution, optimization pressure can still be assigned to the wrong module. In contrast, full GTP-FA achieves positive gains for all base learners. Compared with the 00 baseline, GTP-FA-PPO, GTP-FA-BC, GTP-FA-DP, GTP-FA-SAC, and GTP-FA-π0.5 improve by +31.3, +54.0, +25.7, +7.7, and +17.8 pp, respectively. These results show that failure attribution is not merely an auxiliary component, but a key mechanism that enables grasp-side and planning-side optimization to cooperate reliably. Additional threshold-sensitivity analyses, closed-loop iteration curves, and complete training dynamics are provided in Appendices A.1 and A.4. 
+
+5.4 Real-Robot Experiments 
+
+We further evaluate GTP-FA on a Franka Research 3 robot equipped with a Robotiq gripper and base/wrist Intel RealSense D435i cameras. We consider five long-horizon real-robot manipulation tasks: placing an orange into a pink tray, stacking a blue cube onto an orange cube, pushing a yellow cube with a stick, pulling a yellow cube with a hook, and grasping the red handle of a gray cup to pour its contents into a blue-gray cup. For the real-robot VLA setting, we instantiate the base policy with π0.5 and compare the original π0.5 baseline with GTP-FA-π0.5. Both methods are adapted using 8Table 2: Real-robot evaluation protocol and results. Each task is evaluated over 50 real-robot trials and reported using task-level success rate. ∆ denotes the absolute improvement of GTP-FA-π0.5 over the original π0.5 baseline in percentage points.                              
+
+> Task description π0.5GTP-FA-π0.5∆(pp) Trials
+> Place the orange into the pink tray. 10% 92% +82 50 Stack the blue cube onto the orange cube. 4% 74% +70 50 Pick up the red end of the stick and push the yellow cube into the red target area. 24% 86% +62 50 Pick up the red part of the hook and pull the yellow cube into the red target area. 16% 78% +62 50 Pick up the red handle of the gray cup and pour the contents into the blue-gray cup. 2% 54% +52 50
+> Average 11.2% 76.8% +65.6 –
+
+the same 300 real-robot expert trajectories, so the performance difference mainly reflects the effect of task-aware grasp selection and diagnosis-driven optimization. Table 2 reports the real-robot evaluation results on all five tasks. Each task is evaluated over 50 physical trials using task-level success rate. Overall, the original π0.5 baseline achieves only 11.2% average success, whereas GTP-FA-π0.5 improves the average success rate to 76.8%, yielding an absolute gain of +65.6 pp. Specifically, GTP-FA improves orange-to-tray, cube-stacking, P OKE CUBE ,PULL CUBE TOOL , and P OUR WATER from 10%, 4%, 24%, 16%, and 2% to 92%, 74%, 86%, 78%, and 54%, respectively. The low success rate of the original π0.5 baseline in the real world is mainly due to the fact that these tasks require not only visual-language understanding, but also precise task-compatible grasping and stable post-grasp execution. In physical environments, camera viewpoint, object scale, occlusion, hand-eye calibration error, contact uncertainty, and object slippage can amplify early grasping errors. Since the π0.5 policy directly predicts actions from visual observations and language instructions without explicit grasp-candidate filtering or grasp-conditioned diagnosis, an unsuitable or unstable grasp can easily make later placement, stacking, pushing, pulling, or pouring fail. These results suggest that the real-world bottleneck is not only policy expressiveness, but also the lack of an explicit interface for selecting task-compatible grasps before VLA execution. In contrast, GTP-FA-π0.5 first selects a grasp that is more compatible with the downstream objective by considering task semantics, grasp candidates, and diagnostic risk, and then hands off a more reliable post-grasp state to the downstream π0.5 policy. This reduces the propagation of grasping errors to later stages and is especially beneficial for cube stacking, tool use, and pouring, where the contact region, functional tool end, and object pose are critical. Thus, the real-robot gains of GTP-FA arise not merely from stronger VLA fine-tuning, but from the coordination between task-aware grasping, failure attribution, and downstream policy optimization. More real-robot success/failure videos, execution-interface screenshots, and grasp-pose visualizations are provided on the project page: https://sites.google.com/view/gtp-fa/. 
+
+## 6 Conclusion 
+
+We presented GTP-FA, a closed-loop Grasp-Then-Plan framework for long-horizon robotic manipu-lation that addresses failure-attribution ambiguity caused by the strong coupling between grasping and downstream planning/control. By distinguishing grasp-functional mismatch, grasp instability, and planning/policy insufficiency, GTP-FA routes optimization pressure to the appropriate module and enables coordinated grasp-side optimization and planning-side policy learning. Experiments in simulation and on real robots show that GTP-FA improves task success across diverse base learners, including PPO, BC, DP, SAC, and VLA, demonstrating that the framework is not tied to a specific policy-learning paradigm. Although our VLA experiments instantiate the learner with π0.5, the pro-posed interface only requires rollout data and downstream fine-tuning samples, and is not specific to this backbone. Ablation studies further show that optimizing only one side or performing naive joint optimization without attribution cannot reliably resolve strongly coupled failures. Future work will extend GTP-FA to more objects, robot platforms, and complex multi-stage tasks, while incorporating finer-grained online feedback to further improve robustness in physical environments. 9References 
+
+Christopher Agia, Rohan Sinha, Jingyun Yang, Zi-ang Cao, Rika Antonova, Marco Pavone, and Jeannette Bohg. Unpacking failure modes of generative policies: Runtime monitoring of consistency and progress. arXiv preprint arXiv:2410.04640 , 2024. Philip J Ball, Laura Smith, Ilya Kostrikov, and Sergey Levine. Efficient online reinforcement learning with offline data. In International Conference on Machine Learning , pages 1577–1594. PMLR, 2023. Kevin Black, Noah Brown, Danny Driess, et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. Kang Chen, Zhihao Liu, Tonghe Zhang, Zhen Guo, Si Xu, Hao Lin, Hongzhi Zang, Quanlu Zhang, Zhaofei Yu, Guoliang Fan, et al. πrl: Online rl fine-tuning for flow-based visionlanguage-action models. arXiv preprint arXiv:2510.25889 , 2025. Jiafei Duan, Wilbert Pumacay, Nishanth Kumar, Yi Ru Wang, Shulin Tian, Wentao Yuan, Ranjay Krishna, Dieter Fox, Ajay Mandlekar, and Yijie Guo. Aha: A vision-language-model for detecting and reasoning over failures in robotic manipulation. arXiv preprint arXiv:2410.00371 , 2024. Adrià López Escoriza, Nicklas Hansen, Stone Tao, Tongzhou Mu, and Hao Su. Multi-stage manipulation with demonstration-augmented reward, policy, and world model learning. arXiv preprint arXiv:2503.01837 , 2025. Hao-Shu Fang, Chenxi Wang, Minghao Gou, and Cewu Lu. Graspnet-1billion: A large-scale benchmark for general object grasping. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 11444–11453, 2020. Yingdong Hu, Fanqi Lin, Pingyue Sheng, Chuan Wen, Jiacheng You, and Yang Gao. Data scaling laws in imitation learning for robotic manipulation. arXiv preprint arXiv:2410.18647 , 2024. Haoxu Huang, Fanqi Lin, Yingdong Hu, Shengjie Wang, and Yang Gao. Copa: General robotic manipulation through spatial constraints of parts with foundation models. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 9488–9495. IEEE, 2024. Yixuan Huang, Novella Alvina, Mohanraj Devendran Shanthi, and Tucker Hermans. Fail2progress: Learning from real-world robot failures with stein variational inference. arXiv preprint arXiv:2509.01746 , 2025. Arda Inceoglu, Eren Erdal Aksoy, and Sanem Sariel. Multimodal detection and identification of robot manipula-tion failures. arXiv preprint arXiv:2305.04639 , 2023. Physical Intelligence, Ali Amin, Raichelle Aniceto, Ashwin Balakrishna, Kevin Black, Ken Conley, Grace Connors, James Darpinian, Karan Dhabalia, Jared DiCarlo, et al. π∗
+
+> 0.6
+
+: A VLA that learns from experience. 
+
+arXiv preprint arXiv:2511.14759 , 2025a. Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, et al. π0.5: A vision–language–action model with open-world generalization. arXiv preprint arXiv:2504.16054 , 2025b. Changyeon Kim, Minho Heo, Doohyun Lee, Jinwoo Shin, Honglak Lee, Joseph J Lim, and Kimin Lee. Subtask-aware visual reward learning from segmented demonstrations. arXiv preprint arXiv:2502.20630 , 2025. Sungjae Lee, Yeonjoo Hong, and Kwang In Kim. Graspcorrect: Robotic grasp correction via vision-language model-guided feedback. arXiv preprint arXiv:2503.15035 , 2025. Zijun Lin, Jiafei Duan, Haoquan Fang, Dieter Fox, Ranjay Krishna, Cheston Tan, and Bihan Wen. Failsafe: Reasoning and recovery from failures in vision-language-action models. arXiv preprint arXiv:2510.01642 ,2025. Haichao Liu, Sikai Guo, Pengfei Mai, Jiahang Cao, Haoang Li, and Jun Ma. Robodexvlm: Visual language model-enabled task planning and motion control for dexterous robot manipulation. arXiv preprint arXiv:2503.01616 ,2025. Jingxian Lu, Wenke Xia, Dong Wang, Zhigang Wang, Bin Zhao, Di Hu, and Xuelong Li. Koi: Accelerating online imitation learning via hybrid key-state guidance. arXiv preprint arXiv:2408.02912 , 2024. Haoxiang Ma, Modi Shi, Boyang Gao, and Di Huang. Generalizing 6-dof grasp detection via domain prior knowledge. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 18102–18111, 2024. 
+
+10 Yecheng Jason Ma, Vikash Kumar, Amy Zhang, Osbert Bastani, and Dinesh Jayaraman. Liv: Language-image representations and rewards for robotic control. In International Conference on Machine Learning , pages 23301–23320. PMLR, 2023. Chuan Mao, Haoqi Yuan, Ziye Huang, Chaoyi Xu, Kai Ma, and Zongqing Lu. Universal dexterous functional grasping via demonstration-editing reinforcement learning. arXiv preprint arXiv:2512.13380 , 2025. Arsalan Mousavian, Clemens Eppner, and Dieter Fox. 6-dof graspnet: Variational grasp generation for object manipulation. In Proceedings of the IEEE/CVF international conference on computer vision , pages 2901– 2910, 2019. Dantong Niu, Yuvan Sharma, Giscard Biamby, Jerome Quenum, Yutong Bai, Baifeng Shi, Trevor Dar-rell, and Roei Herzig. Llarva: Vision-action instruction tuning enhances robot learning. arXiv preprint arXiv:2406.11815 , 2024. Som Sagar, Jiafei Duan, Sreevishakh Vasudevan, Yifan Zhou, Heni Ben Amor, Dieter Fox, and Ransalu Senanayake. From mystery to mastery: Failure diagnosis for improving manipulation policies. arXiv preprint arXiv:2412.02818 , 2024. Sumedh Sontakke, Jesse Zhang, Séb Arnold, Karl Pertsch, Erdem Bıyık, Dorsa Sadigh, Chelsea Finn, and Laurent Itti. Roboclip: One demonstration is enough to learn robot policies. Advances in Neural Information Processing Systems , 36:55681–55693, 2023. Chao Tang, Dehao Huang, Lingxiao Meng, Weiyu Liu, and Hong Zhang. Task-oriented grasp prediction with visual-language inputs. In 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,pages 4881–4888. IEEE, 2023. Chao Tang, Dehao Huang, Wenlong Dong, Ruinian Xu, and Hong Zhang. Foundationgrasp: Generalizable task-oriented grasping with foundation models. IEEE Transactions on Automation Science and Engineering ,2025. Stone Tao, Arth Shukla, Tse-kai Chan, and Hao Su. Reverse forward curriculum learning for extreme sample and demonstration efficiency in reinforcement learning. arXiv preprint arXiv:2405.03379 , 2024. Julen Urain, Niklas Funk, Jan Peters, and Georgia Chalvatzaki. Se (3)-diffusionfields: Learning smooth cost functions for joint grasp and motion optimization through diffusion. arXiv preprint arXiv:2209.03855 , 2022. Yi-Lin Wei, Jian-Jian Jiang, Chengyi Xing, Xian-Tuo Tan, Xiao-Ming Wu, Hao Li, Mark Cutkosky, and Wei-Shi Zheng. Grasp as you say: Language-guided dexterous grasp generation. Advances in Neural Information Processing Systems , 37:46881–46907, 2024. Bowen Wen, Wenzhao Lian, Kostas Bekris, and Stefan Schaal. Catgrasp: Learning category-level task-relevant grasping in clutter from simulation. In 2022 International Conference on Robotics and Automation (ICRA) ,pages 6401–6408. IEEE, 2022. Thomas Weng, David Held, Franziska Meier, and Mustafa Mukadam. Neural grasp distance fields for robot manipulation. arXiv preprint arXiv:2211.02647 , 2022. Feng Xu, Guangyao Zhai, Xin Kong, Tingzhong Fu, Daniel FN Gordon, Xueli An, and Benjamin Busam. Stare-vla: Progressive stage-aware reinforcement for fine-tuning vision-language-action models. arXiv preprint arXiv:2512.05107 , 2025. Jianwei Yang, Hao Zhang, Feng Li, Xueyan Zou, Chunyuan Li, and Jianfeng Gao. Set-of-mark prompting unleashes extraordinary visual grounding in gpt-4v. arXiv preprint arXiv:2310.11441 , 2023. Xiu Yuan, Tongzhou Mu, Stone Tao, Yunhao Fang, Mengke Zhang, and Hao Su. Policy decorator: Model-agnostic online refinement for large policy model. arXiv preprint arXiv:2412.13630 , 2024. 
+
+11 A Technical appendices and supplementary material 
+
+A.1 Additional Details for Failure Attribution A.1.1 Weak Failure-Attribution Label Construction 
+
+We run K controlled repeated trials under a fixed grasp condition g and record the following grasp-level statistics. 
+
+End success rate. 
+
+ˆqend (g) = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+I{y(k)end = 1 }. (16) 
+
+Success-once rate. To capture non-stationary outcomes in which the task succeeds at some inter-mediate time step but fails at termination, we also compute 
+
+ˆqonce (g) = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+I{y(k)once = 1 }. (17) 
+
+Non-stationary fraction. 
+
+frac unstable (g) = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+I{y(k)once = 1 ∧ y(k)end = 0 }. (18) In addition, we record an execution event summary ξ, including slip/drop indicators, grasp-holding duration, terminal-state deviation, and other task-specific execution events. We construct pseudo-labels following the priority rule “separate G1 first, then distinguish P from G2” , and only use high-confidence samples for supervised training. 
+
+(1) FM-G1: functional/contact-region mismatch. If an execution provides clear evidence of a wrong contact region or task-functional mismatch, we directly label the sample as FM-G1 . Typical cases include grasps that make a key sub-operation structurally infeasible, grasps in which the gripper blocks a critical workspace, or grasp poses that lack the degrees of freedom required by the downstream task. This rule is applied first so that functional grasp failures are isolated before considering planning-side or stability-related failures. 
+
+(2) Distinguishing FM-P and FM-G2 for non-G1 samples. For the remaining samples, we use 
+
+ˆqend (g) together with instability events to distinguish planning-side failures from grasp-instability failures. Given two thresholds θlow < θ high , we use the following rule: • If ˆqend (g) ≥ θhigh , the task is usually realizable under grasp condition g. Failures under this grasp are therefore more likely to be caused by planning/policy insufficiency or execution stochasticity, and are labeled as FM-P .• If ˆqend (g) ≤ θlow , the task is rarely completed under grasp condition g. If we also observe clear instability events, such as dropping or a high non-stationary fraction, the sample is labeled as 
+
+FM-G2 .• If ˆqend (g) ∈ (θlow , θ high ), the sample lies in an ambiguous middle range where FM-G2 and FM-P are difficult to separate reliably. We treat such samples as uncertain and either discard them or handle them with soft labels to reduce pseudo-label noise. 
+
+(3) Successful samples and filtering. When ˆqend (g) is extremely high, the corresponding grasp condition can be treated as an approximately successful grasp condition and used for class balancing or contrastive construction. When frac unstable (g) is high, it provides an auxiliary stability cue that increases the confidence of FM-G2 supervision. Overall, we retain only high-confidence samples for supervised attribution learning, which reduces pseudo-label noise and mitigates confusion between FM-G2 and FM-P. These labels are not intended as ground-truth causal annotations; rather, they provide high-confidence diagnostic supervision for routing optimization signals between the grasp side and the downstream policy side. 12 (a) Fused attribution macro-F1 under different weak-label thresholds. 
+
+> (b) Final GTP-FA-PPO success rate under different weak-label thresholds.
+
+Figure 3: Sensitivity analysis of weak failure-attribution thresholds. The left figure reports the macro-F1 of the fused attribution model, which measures how well the fused diagnostic prediction matches the constructed pseudo-labels across failure modes. The right figure reports the final 
+
+success_at_end of the complete GTP-FA-PPO pipeline. The results show that conservative high-confidence thresholds, especially (θlow , θ high ) = (0 .2, 0.8) , provide a better balance between attribution quality and downstream task performance. 
+
+Threshold sensitivity analysis. The thresholds θlow and θhigh control the trade-off between label coverage and label purity. A narrow ambiguous region produces more pseudo-labeled samples but may force uncertain cases into hard labels, whereas a wider high-confidence band discards more ambiguous samples but yields cleaner supervision. To study this effect, we sweep eight threshold pairs, ranging from conservative high-confidence bands such as (0 .2, 0.8) to the permissive no-ambiguity setting (0 .45 , 0.45) , as shown in Fig. 3. For each pair, we re-generate weak labels, train the failure attribution discriminator D, train the grasp-conditioned embedding model E, evaluate the fused attribution model, and then run the complete GTP-FA-PPO closed-loop pipeline to measure the final task success rate. We measure attribution quality using macro-F1 over the three failure modes, computed between the fused diagnostic prediction and the constructed high-confidence pseudo-labels. For each failure mode m ∈ M , we compute its F1 score and report the macro-average: 
+
+F1 m = 2 Precision m Recall m
+
+Precision m + Recall m
+
+, m ∈ M ,
+
+Macro -F1 = 1
+
+|M| 
+
+X
+
+> m∈M
+
+F1 m.
+
+(19) As shown in Fig. 3a, the fused attribution macro-F1 remains close to saturation for several reasonable threshold pairs, including (0 .2, 0.8) , (0 .2, 0.7) , (0 .3, 0.7) , and (0 .3, 0.6) . This indicates that the weak-label construction rule is robust within a meaningful range of high-confidence thresholds. In contrast, when θlow and θhigh are too close, e.g., (0 .45 , 0.45) , the ambiguous region is effectively removed and more uncertain samples are forced into hard pseudo-labels, leading to a drop in attribution quality. Fig. 3b further shows that attribution quality is not the only factor that matters: different thresholds also lead to different closed-loop task success rates. The pair (0 .2, 0.8) achieves the highest final 
+
+success_at_end of 80 .7% , while the overly permissive setting (0 .45 , 0.45) drops to 59 .3% . Fig-ure 3b reports threshold sensitivity under a representative GTP-FA-PPO closed-loop setting. Other base algorithms and tasks follow the same weak-label construction, D/E fusion, and hard-P screen-ing procedure with the same default threshold setting; we therefore do not show them individually here. These results suggest that a conservative threshold band improves pseudo-label purity and produces more stable diagnosis-driven optimization. Therefore, we use (θlow , θ high ) = (0 .2, 0.8) as the default setting in our main experiments. 
+
+A.1.2 Discriminator Inputs and Training 
+
+The failure attribution discriminator D takes multi-source evidence from a single execution (τ, o, g, ξ ).Here, τ denotes the task instruction, o denotes key visual/state observations such as the post-grasp initial state, terminal state, and their deviations, g denotes the selected grasp condition, and ξ denotes execution-summary features such as slip/drop indicators, grasp-holding duration, collision events, and terminal deviation. These inputs provide complementary evidence for distinguishing functional grasp mismatch, grasp instability, and planning/policy insufficiency. 13 We implement D with a lightweight encode–fuse–classify architecture. Task, observation, grasp, and execution-summary features are first encoded by separate small encoders and then concatenated into a fused representation. A classification head outputs a categorical distribution over the three failure modes: 
+
+pD (m | τ, o, g, ξ ), m ∈ M = {FM -G1 , FM -G2 , FM -P}. (20) The discriminator is trained on the high-confidence pseudo-labeled dataset constructed in Ap-pendix A.1.1. Given a pseudo-label ˜m, we minimize the cross-entropy loss: 
+
+LD = −E(τ,o,g,ξ, ˜m)
+
+ log pD ( ˜ m | τ, o, g, ξ ). (21) After training, D provides both a failure-mode prediction and a confidence score. The predicted distribution is used as the failure explanation and diagnostic routing signal in the main text. When combined with the grasp-conditioned neighborhood prior from E, the confidence of D also determines how much the final fused attribution should rely on the discriminator prediction versus the embedding-based prior. 
+
+A.1.3 Grasp-Conditioned Diagnostic Embedding and D/E Fusion 
+
+To improve failure attribution generalization to unseen grasps, we introduce a Grasp-Conditioned Diagnostic Representation Space E in addition to the failure attribution discriminator D. The key assumption is that grasp conditions inducing similar post-grasp initialization states should exhibit similar diagnostic outcomes. Therefore, E does not directly predict actions; instead, it learns a representation space for nearest-neighbor retrieval and diagnostic prior estimation. 
+
+Grasp-conditioned embedding. For each grasp condition g, we extract a grasp-conditioned ini-tialization feature xg from the environment or rollout records. This feature describes the post-grasp state induced by the selected grasp, such as object pose, relative gripper pose, contact region, or other observable state features. We learn an embedding function 
+
+e = fθ (xg ) ∈ Rd. (22) Given a rollout dataset 
+
+DE = {(xg,i , y i, m i)}Ni=1 , (23) where yi ∈ { 0, 1} denotes the success or failure outcome and mi ∈ M denotes the high-confidence failure-mode label constructed by the weak-labeling rule, successful samples can also be used as auxiliary supervision to improve the separability of success and failure structures in the embedding space. 
+
+Local diagnostic-consistency objective. We encourage grasp conditions with similar diagnostic outcomes to be close in the embedding space. For each anchor sample i, we construct a positive set 
+
+P(i) consisting of samples that share the same failure mode or the same success/failure attribute. Let 
+
+ei = fθ (xg,i ). We use a supervised contrastive objective: 
+
+Lcon = − X
+
+> i
+
+1
+
+|P (i)|
+
+X
+
+> p∈P (i)
+
+log exp(sim( ei, e p)/t )
+
+P 
+
+> a̸=i
+
+exp(sim( ei, e a)/t ) , (24) where sim( ·, ·) is a similarity function and t is a temperature parameter. This objective encourages grasp conditions with similar diagnostic attributes to form local clusters in the representation space. We further attach lightweight prediction heads to the embedding representation to predict the suc-cess/failure label and the failure-mode label: 
+
+Laux = CE(ˆ yi, y i) + CE( ˆ mi, m i). (25) The final training objective for E is 
+
+min  
+
+> θ
+
+LE = Lcon + λLaux , (26) where λ controls the weight of the auxiliary classification losses. This design enables E to capture both local diagnostic consistency and basic discriminative structure. 14 Neighborhood diagnostic prior. After training, we maintain an embedding bank constructed from training or rollout samples: 
+
+B = {(ej , m j )}Mj=1 . (27) For an unseen grasp, its grasp-conditioned feature is mapped to an embedding e. We retrieve its 
+
+k nearest neighbors Nk(e) from the embedding bank and construct a diagnostic prior by weighted voting over their failure-mode labels: 
+
+˜pE (m | e) = X 
+
+> j∈N k(e)
+
+wj I{mj = m}, (28) where the neighbor weight is defined as 
+
+wj = exp(sim( e, e j )/t )
+
+P  
+
+> ℓ∈N k(e)
+
+exp(sim( e, e ℓ)/t ) . (29) This prior can be interpreted as a local vote over diagnostically similar grasps. When D becomes unre-liable on unseen grasps or distribution-shifted samples, ˜pE (m | e) provides a smoother neighborhood constraint. 
+
+Fusion with discriminator D. Finally, we fuse the single-execution diagnostic prediction from D
+
+with the neighborhood diagnostic prior from E:
+
+pfuse (m | τ, o, g, ξ, e ) = (1 − α)pD (m | τ, o, g, ξ ) + α˜pE (m | e). (30) For simplicity, we write it as pfuse (m) when the conditioning variables are clear. Here, α ∈ [0 , 1] is determined by the confidence of D. If D is confident on the current sample, we use a smaller α so that the fused result relies more on the discriminator prediction. If D is uncertain, we use a larger α
+
+so that the fused result relies more on the neighborhood diagnostic prior. This D/E fusion mechanism reduces attribution noise on unseen grasps and stabilizes failure-mode prediction under mild grasp distribution shifts. The fused attribution pfuse is then used for responsibility assignment, hard-P sample screening, grasp-side risk suppression, and planning-side policy updates. 
+
+A.2 Formulaic Supplements for Diagnosis-driven Bidirectional Optimization A.2.1 Definition of the hard-P subset 
+
+Given a candidate grasp condition g, we perform conditional aggregation of the fused diagnosis outputs over the subset of rollouts that use g, obtaining expectation estimates of planning-side and grasp-side risks: 
+
+¯pP (g) = E[pfuse (FM -P | · ) | g] ,
+
+¯pG1(g) = E[pfuse (FM -G1 | · ) | g] ,
+
+¯pG2(g) = E[pfuse (FM -G2 | · ) | g] .
+
+(31) We then define the planning-dominant hard-P subset as 
+
+GhardP = {g ∈ G full | ¯pP (g) ≥ δP , ¯pG1(g) ≤ δG1, ¯pG2(g) ≤ δG2, n (g) ≥ nmin } , (32) where n(g) denotes the number of diagnostic samples collected for grasp condition g. (δP , δ G1, δ G2)
+
+control the confidence-based screening for “planning-dominant” starts: δP enforces sufficiently high planning-failure risk, while δG1, δ G2 suppress grasp-side (G1/G2) contamination so that the subset better matches start conditions that are relatively feasible in grasping but challenging for planning. In our implementation, the hard-P screening procedure is shared across different base algorithms. The system first uses the current downstream policy to generate rollouts under candidate grasp conditions, and then estimates the planning-side and grasp-side risks of each grasp condition using the fused D/E 
+
+diagnostic outputs. To avoid unstable estimates caused by too few rollouts, we require each candidate grasp condition to have a minimum number of diagnostic samples, and select at most a fixed number of hard-P starts from the candidates that satisfy the screening criteria. In the main experiments, we set the minimum aggregation count to 5 and select at most 200 hard-P starts. The screening thresholds 15 are set to δP = 0 .65 , δG2 = 0 .25 , and δG1 = 0 .20 . This requires a candidate start to have sufficiently high planning-failure risk while keeping the risks of grasp-functional mismatch and grasp instability low. As a result, GhardP better approximates a set of starts where the grasp side is relatively feasible but downstream planning or policy execution remains challenging. Note that the screening thresholds (δP , δ G1, δ G2) are different from the weak-label thresholds 
+
+(θlow , θ high ) in Appendix A.1.1. The latter are applied to the repeated-trial success rate ˆqend (g)
+
+under a fixed grasp condition and are used to construct high-confidence pseudo-labels, whereas the former are applied to the averaged failure-mode probabilities after D/E fusion and are used to select planning-dominant hard-P starts. The two sets of thresholds are sequentially related in the pipeline but are not the same hyperparameters. 
+
+A.2.2 Distribution reshaping as an importance-weighting view 
+
+Let μfull (g) denote the baseline sampling distribution over the full pool Gfull , and μhardP (g) denote the sampling distribution over GhardP . In training, we adopt the mixed reset distribution 
+
+μρ(g) = (1 − ρ) μfull (g) + ρ μ hardP (g), (33) where ρ ∈ [0 , 1] controls the focus strength on planning-bottleneck regions. This reshaping can be interpreted as explicit importance reweighting over the baseline distribution: for any expectation term 
+
+f (g),
+
+Eg∼μρ [f (g)] = Eg∼μfull 
+
+ μρ(g)
+
+μfull (g) f (g)
+
+
+
+, (34) where 
+
+ωρ(g) = μρ(g)
+
+μfull (g) (35) acts as an explicit upsampling weight for hard planning starts. This equivalence highlights that “focusing on GhardP at the reset-distribution level” matches “importance weighting at the sample level” in objective effect. During closed-loop training, we do not inject hard-P samples in the initial iteration, i.e., ρ = 0 .Starting from later iterations, the system uses the hard-P subset mined from the previous iteration to reshape the training distribution. For interactive reinforcement learning methods such as PPO and SAC, this is implemented as start-state resampling during training, where planning-bottleneck starts are sampled from GhardP with a certain probability. In the main experiments, this ratio is set to 
+
+ρ = 0 .2. For data-driven methods such as BC, DP, and π0.5, this process does not rely on online reset interaction. Instead, it corresponds to restructuring and resampling the training data, rollout data, or fine-tuning data induced by grasp conditions, so that the model is exposed more often to samples that are genuinely difficult for the planning side but relatively feasible for the grasp side. During standard evaluation, we always set ρ = 0 , i.e., no hard-P starts are injected, so that different methods are compared under the same evaluation distribution. Therefore, distribution reshaping only affects sample coverage during training or data construction, while leaving the final evaluation protocol unchanged. 
+
+A.2.3 Grasp-side Risk Calibration and Task-prior Scoring 
+
+Sec. 4.4 gives the unified scoring form for grasp-side updates. Here we further explain the concrete meaning and implementation of the task-prior score sprior , the risk predictor rϕ, and the final grasp score. First, the base grasping model assigns an original score sbase (g; o) to each candidate grasp g ∈ G (o).This score mainly reflects geometric feasibility, grasp stability, or the internal quality estimate of the base grasping model. However, in task-oriented manipulation, relying only on sbase may select grasps that are geometrically stable but incompatible with the downstream task. We therefore introduce a task-prior score sprior (g; πVLM (τ )) .Here, πVLM (τ ) denotes a structured task prior obtained from a VLM using the task instruction and visualized candidate grasps. This prior does not directly predict a continuous grasp pose. Instead, it specifies preferred grasp regions, forbidden grasp regions, buffer regions, and geometric constraint rules. These rules are then converted into candidate-grasp scores or filtering masks. For example, if a 16 candidate grasp lies in a functional contact region, a release-blocking region, or an obviously unstable region, its prior score is reduced; if it lies in a task-preferred region, its prior score is increased. The concrete VLM prompts and task-specific filtering examples are provided in Appendix A.3. Second, we train a lightweight risk predictor rϕ(z(g)) using the fused failure-attribution signal. Here, 
+
+z(g) can be the candidate-grasp feature from the base grasp scorer, the grasp-pose encoding, or an intermediate representation from the grasp-scoring network. This predictor estimates the risk that the current candidate grasp will induce an FM-G2 failure, i.e., grasp instability, slip, or drop: 
+
+rϕ(z(g)) ≈ pfuse (FM -G2 | τ, o, g, ξ, e ). (36) In implementation, rϕ can be used as a calibration head on top of the base grasp scorer, or as a lightweight fine-tuning signal for the grasping model. The final GTP-FA grasp-side score is written as 
+
+SGTP -FA (g) = sbase (g; o) + λs prior (g; πVLM (τ )) − βr ϕ(z(g)) . (37) Here, λ controls the strength of the task prior, and β controls the strength of instability-risk suppres-sion. The final grasp is selected by 
+
+g∗ = arg max  
+
+> g∈G (o)
+
+SGTP -FA (g). (38) This design injects both task-semantic constraints and diagnostic risk signals into grasp-side opti-mization. The task prior mainly reduces FM-G1 failures caused by functional mismatch, while risk calibration mainly suppresses FM-G2 failures caused by unstable grasps. Together, they encourage the grasp module to output candidates that are not only geometrically feasible, but also better suited for downstream planning and policy execution. 
+
+A.3 Coarse-grained: VLM-guided Task-prior Constraints A.3.1 Task-prior prompting and candidate grasp filtering 
+
+To incorporate high-level task semantics into low-level grasp selection while avoiding direct con-tinuous pose prediction by VLMs/LLMs, we formulate task-prior construction as a candidate grasp filtering problem. The system first uses GraspNet to generate a set of geometrically feasible grasp candidates, and then provides the task instruction, scene observation, and visualized grasp candidates to a VLM/LLM. The goal of the VLM is not to predict the final grasp pose, but to identify which can-didate grasps are more consistent with the downstream task and which candidates should be avoided because they occupy functional regions, destabilize the object, or make subsequent placement/release difficult. We use a structured prompt to elicit coarse task-level grasp constraints. The prompt asks the model to identify: (i) which object or object part should interact with the environment during task execution; (ii) which region should be preferred for grasping; (iii) which region should be avoided because grasping it may block the functional part, destabilize manipulation, or hinder later placement/release; and (iv) when no explicit functional part exists, which geometric constraints favor stable execution, such as avoiding bottom, corner, or release-unfriendly grasps. The model returns a structured response including preferred_grasp_region , forbidden_grasp_region , optional_buffer_region ,
+
+geometric_rule , and explanation , which is then converted into a pruning rule over the candidate grasp set. This design uses VLM reasoning only as a coarse task-level prior, while leaving low-level grasp geometry to GraspNet, TaskScore, and subsequent optimization. It therefore exploits the semantic reasoning capability of VLMs/LLMs without relying on them for high-precision continuous action prediction. General VLM Prompt for Task-prior Grasp Filtering 
+
+> Prompt:
+> You are given a robot manipulation scene and a task instruction. Your goal is not to predict an exact grasp pose, but to identify task-prior grasping constraints. Please analyze: 1. Which object or object part should interact with the environment during task execution?
+
+17 2. Which region should be grasped by the robot gripper? 3. Which region should be avoided because grasping it would block the functional part, destabilize the object, or make the subsequent placement/release difficult? 4. If the task does not have an explicit functional part, infer geometric constraints that favor stable execution, such as avoiding bottom, corner, or release-unfriendly grasps. Return the result as: 
+
+> preferred_grasp_region : forbidden_grasp_region : optional_buffer_region : geometric_rule : explanation :
+
+A.3.2 Task-specific prior rules 
+
+For tool-use tasks with explicit functional parts, the VLM prior mainly prevents the gripper from occupying the region that must interact with the environment. In P ULL CUBE TOOL , the hook tip and hook-root region are functional parts used to engage and pull the cube. Therefore, the prior keeps grasps on the elongated straight handle, especially the middle-to-rear handle region, while removing grasps on the hook tip, the curved hook, and the hook-root transition, which may block the hook from engaging the cube. In P OKE CUBE , the front end of the peg serves as the functional contact point for pushing the cube. Grasping near this end may block or weaken the poking interaction. The prior therefore preserves grasps on the rear half of the peg and removes candidates near the front functional end. In L IFT PEG UPRIGHT , the peg can in principle be grasped at multiple locations, but grasps close to an end tend to induce off-center torque and unstable rotation during lifting. We therefore prune grasps near the red end and retain grasps around the middle region or the opposite colored side, which are more favorable for stable lifting and posture adjustment. For tasks without explicit functional parts, the VLM prior mainly encodes execution-feasibility constraints. In P LACE SPHERE , the sphere has no semantic functional end, so the prior favors top-down or upper-side grasps that support stable lifting, placement, and release. Candidates approaching from below, near the table-contact region, or from release-unfriendly directions are removed. In S TACK CUBE , the target cube can be grasped from several valid directions. We therefore apply only a weak prior: clearly unfavorable candidates, such as bottom grasps, corner grasps, or grasps whose centers lie outside the main body of the red cube, are pruned, while most stable side and top-down grasps are retained. For P ICK CUBE , P USH CUBE , and P ULL CUBE , which are also single-cube manipulation tasks, we use similar weak filtering rules and omit separate visualizations for space. 
+
+A.3.3 Visualization of task-prior grasp filtering 
+
+Figure 4 visualizes the effect of VLM/LLM-guided task-prior filtering. For each task, we show the raw GraspNet candidates, the task-consistent candidates retained after filtering, and the pruned candidates. The VLM prior does not merely reduce the number of candidates; instead, it removes grasps that may be geometrically feasible but inconsistent with the downstream task. For example, in PULL CUBE TOOL and P OKE CUBE , many removed grasps occupy the functional end of the tool; in LIFT PEG UPRIGHT , removed grasps concentrate near the unstable end region; in P LACE SPHERE , the prior removes candidates that are unfavorable for lifting or release; and in S TACK CUBE , the prior is conservative and mainly removes bottom, corner, or off-object grasps. This coarse task prior provides a more appropriate search space for the subsequent grasp-side optimiza-tion. It prunes task-inconsistent candidates before fine-grained scoring and continuous refinement, reducing functional grasp failures of type FM-G1 and lowering the chance that downstream policy learning is contaminated by poor grasp-induced initial conditions. 18 Task Raw candidates Kept candidates Dropped candidates 
+
+> STACK CUBE
+> PLACE SPHERE
+> LIFT PEG UPRIGHT
+> POKE CUBE
+> PULL CUBE TOOL
+
+Figure 4: Visualization of VLM/LLM-guided task-prior grasp filtering. Each row shows one task, and the three columns show the raw GraspNet candidates, the retained task-consistent candidates, and the pruned candidates, respectively. Yellow grasps denote the original candidates, green grasps denote retained candidates, and red grasps denote dropped candidates. The task prior removes grasps that occupy functional regions, induce unstable manipulation, or make subsequent placement/release difficult, while preserving candidates that are more consistent with downstream task execution. 
+
+A.3.4 Real-world SoM-guided Task-prior Construction 
+
+To further illustrate how task priors are constructed in real-robot settings, we visualize the VLM-guided task-prior grasp selection process on three real-robot tasks: P OKE CUBE , P ULL CUBE TOOL ,and P OUR WATER . Consistent with the formulation in the main text and Appendix A.3, the VLM does not directly output a continuous 6-DoF grasp pose. Instead, given the task instruction and visual observation, it identifies task-relevant object regions, functional parts, preferred grasp regions, and regions that should be avoided. These coarse semantic constraints are then converted into grasp-candidate filtering or scoring rules, and are combined with GraspNet candidates, task-prior scoring, and diagnostic risk calibration to select the final execution grasp. 19 (a) P OKE CUBE : grasp the red end of the stick for pushing. 
+
+> (b) P ULL CUBE TOOL : grasp the red part of the hook for pulling.
+> (c) P OUR WATER : grasp the red han-dle of the gray cup for pouring.
+
+Figure 5: Real-world SoM-guided task-prior grasp selection. For each task, we show SoM Stage 1 region marking, SoM Stage 2 target/function-part selection, and the final chosen grasp overlay. SoM marks help the VLM ground task semantics to concrete image regions, thereby generating task-compatible grasp priors for P OKE CUBE , P ULL CUBE TOOL , and P OUR WATER .Specifically, we use Set-of-Mark (SoM) prompting as a visual grounding interface for real-world images [Yang et al., 2023]. This step explicitly visualizes candidate regions, target objects, and functional parts with readable indices, masks, or bounding marks, enabling the VLM to more reliably associate language instructions with image regions. Importantly, the SoM marks do not directly determine the final continuous grasp pose, nor do they replace the low-level grasp detector. Rather, they help the VLM generate structured task priors, such as preferred grasp regions, forbidden grasp regions, buffer regions, and geometric constraint rules. These priors are then converted into filtering rules or scoring terms for grasp candidates, corresponding to the task-prior score sprior (g; πVLM (τ )) 
+
+in the grasp-side objective. Figure 5 shows the SoM-guided task-prior grasp selection process for the three real-robot tasks. Each task proceeds through three stages. SoM Stage 1 marks candidate regions in the real image, helping the model identify objects, tools, and target areas in the scene. SoM Stage 2 further selects the target object or functional part according to the task instruction. The Chosen Grasp Overlay then visualizes the final task-compatible grasp location on the real image for downstream execution. In P OKE CUBE , the robot needs to grasp the red end of the stick and use the stick to push the yellow cube into the red target area. The key challenge is to distinguish the graspable part of the stick from the functional contact geometry required for pushing the cube. The SoM marks help the VLM locate the stick, the yellow cube, and the red target area, and further generate a task-compatible grasp prior. The final grasp should allow the robot to stably control the stick while preserving an effective contact geometry for pushing the yellow cube. In P ULL CUBE TOOL , the robot needs to grasp the red part of the hook and use the hook to pull the yellow cube into the red target area. This task is particularly sensitive to the functional part of the tool: if the grasp occupies the hook tip or the curved contact region, the tool may fail to hook or pull the cube effectively. Therefore, the SoM-guided task-prior selection first localizes the hook, the yellow cube, and the target area, and then selects a grasp region that does not interfere with the hook’s functional end. The final chosen grasp overlay shows that the system prefers a grasp location that supports stable tool control while preserving the hook interaction function. In P OUR WATER , the robot needs to grasp the red handle of the gray cup and pour its contents into the blue-gray cup. Here, the grasp region has a clear semantic meaning: the robot should grasp the red handle rather than the cup body or rim. Grasping the cup body may obstruct the pouring motion or induce an object pose that is unsuitable for transferring the contents into the target cup. The SoM marks help the VLM distinguish the cup body, handle, target cup, and surrounding background regions, and identify the red handle as the preferred task-relevant grasp region. The final selected grasp provides a more suitable initial object pose for the downstream pouring motion. These real-robot visualizations show that SoM-guided task-prior grasp selection can translate func-tional semantics in language instructions into actionable image-region constraints. It does not replace the low-level grasp detector or directly predict continuous grasp poses. Instead, it provides task-level semantic priors for grasp-candidate filtering and grasp scoring. In this way, GTP-FA can suppress grasps that occupy functional regions, disrupt tool-object interaction, or hinder later release or pouring motions, thereby providing a more reliable grasp-conditioned state for downstream VLA execution. 20 A.4 Virtual environment experiment results 
+
+This section provides additional simulation results to complement the main results in Sec. 5.2 and Sec. 5.3. We include final success_at_end comparisons, full learning curves for both 
+
+success_at_end and success_once , closed-loop iteration curves for GTP-FA, and VLA training-loss diagnostics. These figures provide a more detailed view of the final performance, learning dynamics, and diagnosis-driven closed-loop improvement process. All experiments follow the setup described in Sec. 5; detailed protocols and hyperparameters are provided in Appendix A.6. 
+
+A.4.1 Final success-at-end comparisons 
+
+Figure 6 summarizes the final success_at_end performance across the five downstream policy learners and eight ManiSkill3 tasks. The grouped bars compare the original policies, module-level ablations, and the corresponding GTP-FA variants. Overall, GTP-FA achieves the best or competitive final performance in most task–algorithm combinations. The gains are particularly pronounced for data-driven learners such as BC and DP, where the original policies are more sensitive to grasp-induced distribution shift and error attribution. For stronger baselines such as SAC and VLA, GTP-FA still improves several challenging tasks, indicating that diagnosis-driven routing can enhance both weak and strong downstream learners. 
+
+Figure 6: Final success_at_end across ablation settings and downstream learners. Each group compares the original downstream policy ( 00 ), planning-side-only optimization ( 01 ), grasp-side-only optimization ( 10 ), naive grasp–plan optimization without attribution ( 11 ), and the full GTP-FA variant. Error bars denote the variability across repeated runs or seeds. GTP-FA achieves stronger and more consistent final performance across diverse downstream learners and manipulation tasks. 21 (a) PPO (b) SAC  
+
+> (c) BC (d) DP
+
+Figure 7: Full success_at_end learning curves across all simulation tasks. Each subfigure corre-sponds to one downstream learner and reports the performance of five settings: the original policy (00 ), planning-side-only optimization ( 01 ), grasp-side-only optimization ( 10 ), naive grasp–plan optimization without attribution ( 11 ), and the full GTP-FA variant. Overall, GTP-FA consistently im-proves terminal success, convergence behavior, or training stability across diverse tasks and learning paradigms.   
+
+> (a) PPO (b) SAC
+> (c) BC (d) DP
+
+Figure 8: Full success_once learning curves across all simulation tasks. This metric measures whether the policy reaches a successful state at least once during an episode. Across PPO, SAC, BC, and DP, GTP-FA generally improves or stabilizes success-reaching behavior, and in conjunction with Figure 7, shows that the proposed attribution-guided framework improves both reaching success and maintaining success until episode termination. 22 A.4.2 Full success-at-end learning curves 
+
+Figure 7 summarizes the full success_at_end learning curves across all simulation tasks for four downstream learners: PPO, SAC, BC, and DP. Each subfigure corresponds to one algorithm and contains the results for all eight tasks under the five settings ( 00 , 01 , 10 , 11 , and GTP-FA). Since 
+
+success_at_end requires the task to remain successful at episode termination, it provides a strict measure of execution stability in long-horizon manipulation. Overall, GTP-FA consistently achieves stronger or more stable terminal performance across a wide range of tasks and algorithms. The improvements are particularly clear for PPO and BC, where diagnosis-driven routing and distribution reshaping substantially improve convergence and final success rates. For SAC, whose original baseline is already strong on several tasks, GTP-FA still yields gains or preserves strong performance on challenging settings. For DP, GTP-FA improves several tasks such as P OKE CUBE , P ULL CUBE , and P ULL TOOL , although the magnitude of the gains remains task-dependent. These results show that the benefits of failure attribution are reflected not only in final numbers, but also in the full optimization dynamics. 
+
+A.4.3 Full success-once learning curves 
+
+Figure 8 shows the full success_once learning curves across all simulation tasks for PPO, SAC, BC, and DP. Unlike success_at_end , this metric only requires the policy to reach a successful state at least once during an episode, and therefore reflects whether the policy can find successful behaviors even if it cannot always maintain them until termination. Across most tasks and algorithms, GTP-FA improves or stabilizes success_once , indicating that the proposed framework enhances both the ability to discover successful states and the robustness of subsequent policy updates. Comparing Figure 8 with Figure 7 further reveals that some baselines can occasionally reach success but fail to preserve it, whereas GTP-FA more consistently improves both metrics. This supports the central claim of the paper: attribution-guided optimization helps distinguish grasp-side and planning-side bottlenecks, leading to more effective downstream refinement. 
+
+A.4.4 Closed-loop improvement across GTP-FA iterations 
+
+Figure 9 visualizes the closed-loop improvement process of GTP-FA across PPO, SAC, BC, and DP. Each subfigure compares iter_00 , iter_01 , and the final model for one downstream learner. These curves correspond to the execute–diagnose–update loop: initial rollouts are diagnosed, planning-dominant hard samples are mined, and the grasp-side and downstream policy modules are updated accordingly. Across many tasks, later iterations and the final model improve over the initial iteration or yield more stable terminal success, supporting the effectiveness of the diagnosis-driven closed loop. Some tasks show non-monotonic or task-dependent behavior, which is expected in long-horizon contact-rich manipulation; nevertheless, the overall trend indicates that failure attribution provides useful guidance for iterative refinement. 
+
+A.4.5 VLA training-loss diagnostics 
+
+Figure 10 reports training-loss curves for π0.5 under different ablation settings. All settings exhibit a rapid loss decrease during the early training phase followed by gradual convergence, indicating that the fine-tuning procedure is stable. GTP-FA often reaches a lower final training loss or enters a low-loss region faster, suggesting that diagnosis-driven data restructuring provides more informative fine-tuning samples. We emphasize that these loss curves are used only as training diagnostics; the main conclusions are based on task-level success metrics, where GTP-FA-π0.5 also achieves clear improvements over the original π0.5 policy. 
+
+Summary. The supplementary curves lead to three observations. First, GTP-FA improves final terminal success across a broad range of algorithms and tasks. Second, the full learning curves show that these gains are reflected not only in final numbers but also in training dynamics, where GTP-FA often improves convergence speed, asymptotic performance, or stability. Third, the closed-loop iteration curves support the core design of GTP-FA: failure attribution enables the system to identify whether the bottleneck lies in grasping or downstream planning, and to use this diagnosis to guide subsequent data reshaping and policy updates. 23 (a) PPO (b) SAC  
+
+> (c) BC (d) DP
+
+Figure 9: GTP-FA closed-loop iteration curves across downstream learners. Each subfigure shows the evolution from iter_00 to iter_01 and the final model for one base learner. The curves illustrate how the execute–diagnose–update loop uses failure attribution to guide hard-sample mining, distribution reshaping, and subsequent policy updates. Overall, later iterations or the final models improve or stabilize performance on many tasks, supporting the effectiveness of diagnosis-driven closed-loop refinement. 
+
+Figure 10: VLA ( π0.5) training-loss diagnostics across all simulation tasks. The curves show that VLA fine-tuning is stable across settings. GTP-FA tends to reach lower or faster-converging training loss, while the final evaluation is still determined by task success rather than loss alone. 24 A.5 Real-World Experimental Results 
+
+This section provides supplementary real-world results on the Franka Research 3 platform. The main paper reports quantitative results on five real-world manipulation tasks: placing an orange into a pink tray, stacking a blue cube onto an orange cube, pushing a yellow cube with a stick, pulling a yellow cube with a hook, and grasping the red handle of a gray cup to pour its contents into a blue-gray cup. Here, we further present real-system observations, grasp-planning visualizations, and representative success and failure rollouts to illustrate the behavioral differences between the original π0.5 baseline and GTP-FA-π0.5. Figure 11 provides an overview of the real-world hardware platform, sensing configuration, and teleoperation-to-deployment pipeline used in our experiments. 
+
+Figure 11: Real-world Franka system used in our experiments. The figure shows the Franka Research 3 platform, Robotiq gripper, base/wrist D435i cameras, key observation and control settings, and the teleoperation-to-deployment pipeline. 
+
+A.5.1 Real-robot execution interface, tasks, and demonstration data 
+
+In this section, we consistently denote the real-robot VLA baseline as the original π0.5 policy, and our method as GTP-FA-π0.5. The real-world experiments use a Franka Research 3 arm equipped with a Robotiq gripper, base/wrist cameras, and a VLA policy deployment interface. Figure 11 summarizes the real-world hardware platform used in our experiments. Here we further focus on the online execution interface and task-level observations. The interface shows the base-camera view, wrist-camera view, robot state traces, and the task prompt used by the policy. For π0.5-based experiments, the simulated tasks use 100 converted expert trajectories for each fine-tuning setting. For the real-robot setting, both the original π0.5 baseline and GTP-FA-π0.5 are adapted using the same 300 real expert trajectories. This ensures that the comparison between the two real-robot methods reflects the effect of explicit grasp selection and diagnosis-driven optimization, rather than differences in demonstration data. We evaluate five real-world manipulation tasks. In the orange-to-tray task, the robot receives the instruction “place the grasped orange into the pink tray” and must complete a long-horizon manipulation sequence involving approach, grasping, lifting, transport, tray alignment, release, and withdrawal. In the cube-stacking task, the robot receives an instruction such as “pick up the blue cube and stack it on the orange cube,” and must grasp the blue cube, lift it, align it above the orange cube, release it, and maintain a stable stacked configuration. In the P OKE CUBE task, the robot grasps the red end of a stick and pushes a yellow cube into a red target area. In the P ULL CUBE TOOL task, the robot grasps the red part of a hook and pulls a yellow cube into a red target area. In the P OUR WATER 
+
+task, the robot grasps the red handle of a gray cup and pours its contents into a blue-gray cup. These tasks require reliable grasp-conditioned execution, but expose different sources of difficulty: orange-to-tray stresses stable grasping and release, cube stacking stresses small-object localization and precise alignment, tool-use tasks stress functional-part preservation, and pouring further requires a grasp-induced cup pose suitable for transport, alignment, and tilting. 25 (a) GTP-FA-π0.5 succeeds on the orange-to-tray task. (b) Original π0.5 fails on the orange-to-tray task.     
+
+> (c) GTP-FA-π0.5succeeds on the cube-stacking task. (d) Original π0.5fails on the cube-stacking task.
+
+Figure 12: Real-robot execution interfaces for the two representative manipulation tasks. Each interface shows the base-camera view, wrist-camera view, robot state traces, and the task prompt used by the policy. The original π0.5 baseline directly predicts actions from visual observations and language prompts, whereas GTP-FA-π0.5 first selects a task-compatible grasp and then initializes downstream execution from the selected grasp-conditioned state. 
+
+A.5.2 GraspNet candidates versus selected execution grasp 
+
+Figure 13 visualizes the difference between the raw GraspNet output and the final grasp used by GTP-FA. Given real camera observations and the reconstructed target-object point cloud, GraspNet first proposes a set of geometrically feasible candidate grasps. However, these raw candidates are not necessarily task-compatible: some may approach the object from an unfavorable direction, occupy a region required for subsequent placement or release, or lead to an unstable post-grasp state. GTP-FA therefore applies task-prior filtering and diagnostic risk calibration to select a single execution grasp that is more suitable for the downstream task. For the orange-to-tray task, the selected grasp should not only lift the orange stably, but also preserve a post-grasp pose that allows the downstream π0.5 policy to transport and release the orange into the tray. For the cube-stacking task, the selected grasp must be more precise: it should grasp the blue cube stably while leaving the cube pose suitable for accurate placement on the orange cube. These visualizations highlight that GTP-FA-π0.5 does not simply rely on the raw grasp set produced by GraspNet. Instead, it converts a diverse set of raw grasp candidates into a task-compatible unique grasp pose for execution. For P OKE CUBE , P ULL CUBE TOOL , and P OUR WATER , which involve explicit functional parts, the corresponding task-prior grasp-selection visualizations are provided in Appendix A.3.4. There, the SoM-guided process shows how VLM grounding identifies task-relevant object regions, functional parts, and preferred grasp areas, and how these semantic constraints are converted into grasp-candidate filtering or scoring rules. 
+
+A.5.3 Orange-to-tray task 
+
+In the orange-to-tray task, the object and target container are relatively large, making them easier to localize from the base and wrist cameras. Nevertheless, the original π0.5 baseline achieves only about 10% success, while GTP-FA-π0.5 reaches about 92%. This indicates that the main difficulty 26 (a) Raw GraspNet candi-dates for orange-to-tray.   
+
+> (b) Single selected grasp for orange-to-tray.
+> (c) Raw GraspNet candi-dates for cube stacking.
+> (d) Selected execution grasp for cube stacking.
+
+Figure 13: Raw GraspNet candidates versus the selected unique execution grasp on real observations. The raw GraspNet output contains multiple geometrically feasible grasp poses, but not all of them are suitable for the downstream task. GTP-FA applies task-prior filtering and diagnostic risk calibration to select a single task-compatible grasp, providing a more reliable post-grasp initial condition for 
+
+π0.5 execution. is not only visual recognition, but also whether the robot can establish a stable and task-compatible grasp before downstream execution. The original π0.5 baseline often fails during the grasping stage. Although the policy receives the correct task prompt and can observe both the orange and the tray, it frequently remains in repeated approach or grasp-attempt behaviors, or produces a grasp that does not support stable transport and release. In our real-robot setup, the orange is also close to the maximum opening width of the Robotiq gripper, making grasping physically challenging: small approach-pose errors, gripper-closing errors, or contact offsets can prevent a secure closure or produce only marginal contact. This further amplifies grasp instability for the original π0.5 policy. This behavior is illustrated by the failure interface in Figure 12b and the frame sequence in Figure 15. Without explicit grasp-candidate filtering and grasp-conditioned diagnosis, the downstream action sequence is highly sensitive to grasp pose errors and post-grasp distribution shift. In contrast, GTP-FA-π0.5 first selects a grasp that is compatible with the subsequent placement stage. The selected grasp provides a more reliable post-grasp starting condition for the downstream π0.5
+
+policy, reducing object slip, unstable lifting, and release failure. As shown in Figure 14, the robot approaches the orange, establishes a stable grasp, lifts the object, transports it above the tray, releases it, and completes the task successfully. 
+
+A.5.4 Cube-stacking task 
+
+We further evaluate the real-robot cube-stacking task, where the robot must pick up the blue cube and stack it on the orange cube. This task is more sensitive to execution precision than orange-to-tray, because the robot must localize small objects, grasp the blue cube with a suitable pose, align it above the orange cube, and release it without disturbing the stacked configuration. In this task, the original 
+
+π0.5 baseline achieves about 4% success, whereas GTP-FA-π0.5 achieves about 74%. A key challenge in the real setup is that the base camera is relatively far from the workspace. As a result, the blue and orange cubes occupy only a small region in the base-camera image. The original 
+
+π0.5 baseline often fails to reliably localize the blue cube or to maintain accurate spatial alignment during grasping and placement. As shown in the failure interface in Figure 12d, even when the task 
+
+Figure 14: Representative successful real-robot rollout of GTP-FA-π0.5 on the orange-to-tray task. Frames are ordered chronologically from left to right and top to bottom. The robot approaches the orange, establishes a stable grasp, transports the object above the tray, releases it, and completes the task successfully. 27 Figure 15: Representative failure rollout of the original π0.5 baseline on the orange-to-tray task. Frames are ordered chronologically from left to right and top to bottom. The baseline can produce partially reasonable motions, but without explicit grasp-conditioned diagnosis and grasp selection, the execution is more sensitive to grasp instability and post-grasp distribution shift, leading to task failure. 
+
+Figure 16: Representative successful real-robot rollout of GTP-FA-π0.5 on the cube-stacking task. We select 18 frames from the success video and order them chronologically according to their original frame indices. The robot approaches the blue cube, establishes a stable grasp, lifts it, moves above the orange cube, aligns the object, releases it, and completes a stable stack. prompt is correct, the policy may produce inaccurate approach motions, incorrect grasping behavior, or placement errors. GTP-FA-π0.5 mitigates this issue by explicitly grounding the execution on a selected grasp. The grasp-selection stage first converts raw GraspNet candidates into a unique task-compatible grasp on the blue cube. This grasp not only supports stable lifting, but also induces a post-grasp cube pose that is more favorable for the subsequent stacking stage. The downstream π0.5 policy then starts from a more reliable grasp-conditioned state, improving the chance of successful alignment and placement. Representative success and failure rollout sequences for this task are shown in Figures 16 and 17, respectively. 
+
+Figure 17: Representative failure rollout of the original π0.5 baseline on the cube-stacking task. We select 9 frames from the failure video and order them chronologically according to their original frame indices. Due to small-object localization difficulty and the absence of explicit grasp-conditioned diagnosis, the baseline is more likely to produce inaccurate approach, grasping, or placement behavior, causing the stacking task to fail. 
+
+A.5.5 Tool-use and pouring task observations 
+
+Beyond orange-to-tray and cube stacking, we further evaluate three real-robot tasks that rely more heavily on functional-part selection: P OKE CUBE , P ULL CUBE TOOL , and P OUR WATER . The quan-titative results are reported in Table 2 in the main text. The original π0.5 baseline achieves about 24%, 16%, and 2% success on P OKE CUBE , P ULL CUBE TOOL , and P OUR WATER , respectively, while GTP-FA-π0.5 improves the success rates to about 86%, 78%, and 54%. These results further show that real-robot success depends not only on whether π0.5 understands the language goal, but also on whether the system selects the correct functional grasp region. In P OKE CUBE , the robot needs to grasp the red end of the stick and use the stick to push the yellow cube into the red target area. The grasp must allow stable control of the stick while preserving an 28 effective contact geometry for pushing. If the grasp is unstable or induces an unfavorable stick pose, the downstream policy can fail during the contact-rich pushing phase even if it predicts plausible motions. GTP-FA restricts grasp selection to regions that better support pushing control through task priors and candidate-grasp filtering, improving the stability of the subsequent tool-use behavior. In P ULL CUBE TOOL , the robot needs to grasp the red part of the hook and pull the yellow cube into the red target area. This task is highly sensitive to the functional end of the tool. If the grasp occupies the hook tip, the curved contact region, or a region that interferes with the hook-cube interaction, the tool may fail to engage or pull the cube effectively. GTP-FA preserves the functional interaction region of the hook while selecting a grasp that supports stable tool control, thereby reducing failures caused by functional-region occlusion. In P OUR WATER , the robot needs to grasp the red handle of the gray cup and pour its contents into the blue-gray cup. This task is more difficult than simple pushing or pulling because it requires not only stable grasping, but also a post-grasp cup pose that supports transport, alignment, and tilting. The original π0.5 baseline has a very low success rate because direct visual-language action prediction can easily produce errors in handle localization, grasp stability, or pouring pose. GTP-FA explicitly identifies the red handle as the task-relevant grasp region and suppresses unstable or pouring-unfriendly grasps through diagnostic risk calibration, providing a more reliable cup pose for downstream pouring. These tasks show that the grasp region itself carries task semantics for tool use and container manipulation. The task prior does not simply reduce the number of grasp candidates; instead, it helps preserve grasps that support subsequent functional interaction and suppresses grasps that occupy functional parts, disrupt tool-object contact, or hinder pouring motions. The SoM-guided task-prior grasp selection process for these tasks is visualized in Appendix A.3.4, and additional real-robot videos are provided on the project page. 
+
+A.5.6 Summary and supplementary videos 
+
+The real-world visualizations support four observations. First, explicit grasp selection provides a more stable and task-compatible post-grasp state for downstream π0.5 execution. In the orange-to-tray task, although the orange and tray are relatively large and visually observable, the original π0.5
+
+baseline still often fails during grasping. This shows that successful task execution requires more than visual-language understanding; it also requires a physically stable grasp, especially when the object size is close to the gripper opening limit. Second, the cube-stacking task exposes a stronger precision bottleneck. The target cubes occupy only a small portion of the base-camera view, and the final placement requires accurate alignment. The original π0.5 baseline is therefore prone to target-localization, grasp-pose, and placement errors. By contrast, GTP-FA-π0.5 uses task-aware grasp selection and diagnosis-driven optimization to produce a more reliable grasp-conditioned starting point for stacking. Third, P OKE CUBE , P ULL CUBE TOOL , and P OUR WATER show that real-robot manipulation often requires functional-part-level grasp selection. For sticks, hooks, and cups, if the grasp occupies the tool interaction end, disrupts contact geometry, or induces a pose unsuitable for pouring, the downstream policy can hardly compensate for the early grasp error through action prediction alone. GTP-FA combines VLM task priors, GraspNet candidates, and diagnostic risk calibration to select grasps that are more consistent with both task semantics and downstream execution requirements. Fourth, the comparison between raw GraspNet candidates and the selected unique execution grasp shows that GTP-FA does not merely add a grasp detector before π0.5 execution. Instead, it explicitly filters and calibrates grasp candidates according to task compatibility and diagnostic risk, thereby reducing grasp-induced downstream failures. Together, these results show that π0.5 policies can benefit substantially from an explicit grasp-then-plan interface with failure attribution, especially in real-world long-horizon manipulation where contact errors, visual scale changes, small-object localization errors, and post-grasp distribution shifts are common. More real-robot videos are provided on the project page: https://sites.google.com/view/gtp-fa/. The videos include successful GTP-FA-π0.5 executions on all five real-world tasks and representative failure cases of the original π0.5 baseline, further illustrating the behavioral differences between the two methods. 29 Table 3: Key hyperparameters for the original policies, ablation variants, and GTP-FA variants.                                              
+
+> Method Main Training Hyperparameters Evaluation Setting
+> PPO Seeds = 0, 1, 2; number of environments = 2048; rollout steps = 16; update epochs = 8; minibatches = 32; total timesteps = 50M; learning rate = 3×10 −4; discount factor γ= 0 .8; GAE
+> λ= 0 .9.During training, we use 16 eval-uation environments, 50 evalua-tion steps, and an evaluation fre-quency of 25. Final evaluation uses 8 parallel environments and 12,500 evaluation steps. SAC Seeds = 0, 1, 2; number of environments = 64; rollout steps = 50; total timesteps = 1M; replay buffer size = 1M; batch size = 1024; learning starts = 4000; policy learning rate = 3×10 −4;Q-function learning rate = 3×10 −4;γ= 0 .8;τ= 0 .01 ;entropy coefficient α= 0 .2with automatic entropy tuning. Training evaluation uses 50 episodes. Final evaluation uses 500 episodes. The evaluation fre-quency is 25. BC Seeds = 0, 1, 2; total training iterations = 5,000–10,000; batch size = 1024; learning rate = 3×10 −4; number of demonstra-tions = 200; maximum episode steps = 50; state normalization enabled. Training evaluation uses 50–100 episodes with 8–16 evaluation environments. Final evaluation uses 500 episodes. DP Seeds = 0, 1, 2; total training iterations = 100,000; batch size = 1024; learning rate = 1×10 −4; number of demonstrations = 200; observation horizon = 2; action horizon = 8; prediction horizon = 16; diffusion-step embedding dimension = 64; U-Net dimensions = [64, 128, 256]; number of groups = 8. Training evaluation uses 50 episodes. Final evaluation uses 500 episodes with 10 evaluation environments. The evaluation frequency is 5,000. VLA Pi0.5 LoRA fine-tuning; number of converted trajectories = 100; training steps = 20,000; batch size = 32; action horizon = 10; input images are resized to 224 ×224 ; LoRA variants include gemma_2b_lora and gemma_300m_lora .Evaluation episodes = 100; eval-uation seeds = 0, 1, and 2; eval-uation chunks = 500; evaluation action horizon = 10.
+
+A.6 Experimental Protocols and Key Hyperparameters 
+
+This section provides additional details on the main training settings, key hyperparameters, com-putational resources, and real-robot evaluation protocol used in our experiments. Unless otherwise specified, all simulation experiments use the pd_joint_delta_pos control mode and the PhysX CUDA backend. For PPO, SAC, BC, and DP, we run experiments with three random seeds. For VLA experiments, due to the higher cost of fine-tuning and inference, we report task-level terminal success under a fixed evaluation protocol. For VLA-based experiments, the simulated tasks use 100 converted expert trajectories for each fine-tuning setting. For the real-robot setting, both the original VLA baseline and GTP-FA-VLA are adapted using the same 300 real expert trajectories, ensuring that the performance comparison reflects the effect of explicit grasp selection and diagnosis-driven optimization rather than differences in demonstration data. 
+
+A.6.1 Key Hyperparameters for Original Policies, Ablations, and GTP-FA 
+
+The meanings of 00 /01 /10 /11 follow the definitions in the main text: 00 denotes the original policy, 
+
+01 denotes planning-side-only optimization, 10 denotes grasp-side-only optimization, 11 denotes naive grasp–plan optimization without failure attribution, and GTP-FA denotes the full method with failure attribution and diagnostic routing. Table 3 summarizes the main hyperparameters used for the original policies, ablation variants, and GTP-FA variants. For the full GTP-FA framework, the closed-loop optimization pipeline additionally includes the failure-attribution discriminator D, the grasp-conditioned embedding model E, the D/E fusion module, hard-P start screening, and the TaskScore/risk head. Table 4 summarizes the shared hyperpa-rameters used across GTP-FA variants. Here, (θlow , θ high ) are used to construct weak failure-attribution labels, while (δP , δ G1, δ G2) are used to screen planning-dominant hard-P starts from the fused failure-mode probabilities. For PPO and SAC, hard-P injection is implemented as start-state resampling during training. For BC, DP, and VLA, it corresponds to diagnosis-driven restructuring and resampling of training data, rollout data, or fine-tuning data. During standard evaluation, no hard-P starts are injected, ensuring that all methods are compared under the same evaluation distribution. 30 Table 4: Shared hyperparameters used in GTP-FA. 
+
+Module Hyperparameter Value 
+
+Closed-loop optimization Number of iterations Niters 2hard-P injection Initial hard-P ratio 0hard-P injection Training hard-P ratio ρ after the first iteration 0.2 hard-P injection Evaluation hard-P ratio 0FAD rollout Number of FAD environments 512 FAD rollout Number of repeated trials K per grasp condi-tion 100 Weak-label construction θlow 0.2 Weak-label construction θhigh 0.8 Data split Split ratio 0.8 Data split Split seed 0Discriminator D Epochs 80 Discriminator D Batch size 1024 Discriminator D Learning rate 3 × 10 −4
+
+Discriminator D Validation ratio 0.2 Discriminator D Sampler weighted Embedding model E Epochs 200 Embedding model E Batch size 256 Embedding model E Learning rate 3 × 10 −4
+
+Embedding model E G2 fraction threshold 0.25 Embedding model E Success threshold 0.95 
+
+D/E fusion k 25 
+
+D/E fusion Temperature 0.2 
+
+D/E fusion Fusion scope g2p_top2 
+
+D/E fusion Fusion rule switch 
+
+D/E fusion Confidence threshold 0.97 hard-P screening Top-K 200 hard-P screening Minimum count 5hard-P screening δP 0.65 hard-P screening δG2 0.25 hard-P screening δG1 0.20 TaskScore / risk head Epochs 50 TaskScore / risk head Maximum samples 200,000 
+
+A.6.2 Training and Computational Resources 
+
+The hardware platforms differ only in training and inference throughput; all reported results use the same task definitions, ablation settings, evaluation distributions, and success metrics. PPO, SAC, BC, DP, and their GTP-FA variants are mainly trained on a workstation with 2× RTX 4090 GPUs and an AMD Ryzen 9 9950X CPU. VLA experiments are conducted on a server with 3× A100 GPUs and an AMD EPYC 7453 CPU due to the higher memory and inference cost of VLA fine-tuning. Real-robot experiments are conducted on the Franka Research 3 platform, with policy deployment and perception inference supported by an RTX 4090 workstation. These hardware differences only affect training and inference throughput, and do not change the task definition, evaluation protocol, or success metrics. Table 5 summarizes the computational resources used for each experiment type. 
+
+A.6.3 Real-Robot Experimental Protocol 
+
+Real-robot experiments are conducted on a Franka Research 3 robot equipped with a Robotiq gripper, a base Intel RealSense D435i camera, a wrist-mounted Intel RealSense D435i camera, and a VLA policy deployment interface. Policy inference and perception are supported by an RTX 4090 workstation, as summarized in Appendix A.6.2. For the real-robot setting, we instantiate the base 31 Table 5: Computational resources used in our experiments.          
+
+> Experiment Type Methods Hardware
+> Simulation RL / IL / DP experi-ments PPO, SAC, BC, DP and their GTP-FA variants
+> 2×RTX 4090, AMD Ryzen 9 9950X Simulation VLA experiments π0.5-00/01/10/11, GTP-FA-
+> π0.5
+> 3×A100, AMD EPYC 7453 CPU Real-robot experiments Original π0.5, GTP-FA-π0.5Franka Research 3 + Robotiq gripper + base/wrist D435i cameras, Intel Xeon Gold 6226R, RTX 4090
+
+policy with π0.5 and compare the original π0.5 baseline with GTP-FA-π0.5. Both methods are adapted using the same 300 real-robot expert trajectories, so the comparison isolates the effect of task-aware grasp selection and diagnosis-driven optimization. We evaluate five real-world manipulation tasks: (i) placing an orange into a pink tray; (ii) stacking a blue cube onto an orange cube; (iii) picking up the red end of a stick and pushing a yellow cube into a red target area; (iv) picking up the red part of a hook and pulling a yellow cube into a red target area; and (v) picking up the red handle of a gray cup and pouring the contents into a blue-gray cup. Each task is evaluated over 50 physical trials, and the task-level success rates are reported in Table 2 in the main text. The original π0.5 baseline directly predicts actions from visual observations, language instructions, and robot states. GTP-FA-π0.5 first performs task-aware grasp selection and then initializes down-stream policy execution from the selected grasp-conditioned state. A trial is counted as successful only if the desired final task condition is satisfied at the end of execution: the orange must be stably placed inside the pink tray; the blue cube must remain stably stacked on the orange cube after the gripper opens and releases it; the yellow cube must reach the red target area in P OKE CUBE and P ULL CUBE TOOL ; and at least 90% of the plastic pellets initially contained in the gray cup must be poured into the blue-gray target cup in P OUR WATER .A trial is counted as a failure if the robot fails to grasp the target object or functional part, drops the object or tool, moves the object to an incorrect location, fails to release the object properly, fails to pour enough contents into the target cup, loses stable control during execution, or terminates in a state that does not satisfy the task goal. Additional real-world execution interfaces, grasp-planning visualizations, successful rollout sequences, and representative failure cases are provided in Appendix A.5. 
+
+A.7 Limitations and Broader Impacts Limitations. GTP-FA has been validated on a range of simulated and real-robot manipulation tasks, while extending the evaluation to more robot platforms, object categories, and open-world scenarios remains a valuable direction for future work. The current attribution module relies on weak supervision from repeated trials and observable execution summaries, and richer online feedback could further improve diagnostic robustness in complex settings. 
+
+Broader impacts. The proposed framework may improve the reliability and sample efficiency of robotic manipulation systems by reducing failure misattribution and unsafe trial-and-error. Potential negative impacts include unsafe deployment in physical environments, unintended object damage, or misuse in automated manipulation systems without appropriate supervision. In our experiments, all real-robot trials are conducted in a controlled laboratory setting with human supervision, limited tabletop objects, and no human subjects. 
+
+Existing assets and licenses. Our experiments build on publicly available research software and assets, including ManiSkill3 environments, GraspNet-style grasp generation, and open-source implementations of the base learners when available. We cite the corresponding papers in the main text and follow their released licenses and terms of use. The real-robot data used in this work are collected by the authors in a controlled laboratory setting. 32

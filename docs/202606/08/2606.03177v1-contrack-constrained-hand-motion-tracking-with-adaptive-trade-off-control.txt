@@ -1,0 +1,955 @@
+Title: ConTrack: Constrained Hand Motion Tracking with Adaptive Trade-off Control
+
+URL Source: https://arxiv.org/pdf/2606.03177v1
+
+Published Time: Wed, 03 Jun 2026 00:46:01 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# ConTrack: Constrained Hand Motion Tracking with Adaptive Trade-off Control 
+
+Yutong Liang, Quanquan Peng, Ri-Zhao Qiu, and Xiaolong Wang 
+
+University of California San Diego 
+
+Abstract. Human demonstrations provide strong priors for robot ma-nipulation, yet it is non-trivial to transfer them to execute on real robots due to the kinematic gap. In dexterous manipulation, it remains chal-lenging to track long-horizon, contact-rich sequences even in simulators: a reference-tracking policy must keep objects on their target trajectories while preserving demonstrated joint motion and contact timing. Exist-ing approaches often rely on hand-crafted reward tuning that require per-sequence tuning and break under limited interaction budgets. We in-troduce ConTrack, a reinforcement learning (RL) framework that scales with tracking data. ConTrack treats object tracking as a constraint and allocates remaining control authority to motion fidelity, which allows it to adapt task–style trade-offs online using a dual-variable update. In ad-dition, ConTrack also stabilizes long-horizon learning with an adaptive mid-trajectory reset library that reuses policy-reachable simulator states. Our qualitative and quantitative results in simulation tracking and real robot demonstrate that ConTrack improves success and object pose ac-curacy significantly over prior arts while preserving joint and contact fidelity. Website: https://www.lyt0112.com/projects/ConTrack .
+
+Keywords: Dexterous manipulation · In-hand manipulation · Reference tracking · Multi-objective reinforcement learning 
+
+## 1 Introduction 
+
+Recent progress in robot manipulation has been driven by scaling robot data and training general-purpose policies [2,15,25,40]. A parallel trend aims to learn from humans, motivated by the abundance of human demonstrations and their potential to supervise dexterous behavior at scale [4, 19, 20, 28, 29, 35, 44, 50]. Yet many of these pipelines extract high-level intent or coarse motion cues from human observations and still rely on an additional stage to calibrate end-effector interaction for contact-rich manipulation [4, 50]. This extra stage matters because dexterous manipulation is dominated by contact, and contact is where human-to-robot transfer is least forgiving. Com-pared to collecting robot-native demonstrations through teleoperation inter-faces [8,9,45], human data introduces a systematic mismatch between the demon-strated hand motion and what a robot hand can physically realize. The root cause is morphological and actuation differences between human hands and robot   
+
+> arXiv:2606.03177v1 [cs.RO] 2 Jun 2026 2Y. Liang et al.
+> Fig. 1: ConTrack enables long-horizon, contact-rich dexterous hand tracking. With adaptive task–style trade-off control, ConTrack yields physically plausible object mo-tion balancing hand-object contacts and geometric tracking. This aligns the embodi-ment gap between human hands and dexterous hands while transferring human dex-terous play data to real robots (Tasks from top to bottom: functional tool usage, articulated object interaction, and in-hand rotation).
+
+end effectors, which manifest as a kinematic gap when one attempts to execute human motion directly. One intuitive way to address the kinematic gaps is retargeting. Optimization-based retargeting aligns a human hand trajectory to a robot hand by minimiz-ing geometric errors, supported by rigid-body dynamics toolkits [5] and vision-based teleoperation systems that infer targets [13, 34]. Neural retargeting fur-ther improves scalability by learning fast mappings from human to robot kine-matics [47]. Purely geometric objectives tend to be fragile once contact sched-ules matter. Recent work incorporates physical feasibility and object-centric goals, either through physics-informed retargeting that reasons about contact, or through functional retargeting that prioritizes object motion over joint-level imitation [30, 31]. Learned tracking controllers further reduce per-clip optimiza-tion by training neural policies to follow time-indexed references [26]. These approaches still leave an open question: when the reference is not jointly realiz-able, how should a system choose a trade-off between task success and motion style without per-sequence manual tuning. In other domains, tracking-centric formulations have reduced reliance on manual reward engineering and improved scalability with diverse motion data [24, 29, 32, 33, 41, 48]. Inspired by this shift, we propose ConTrack , a reference-tracking reinforcement learning framework for contact-rich hand–object inter-action in physics simulation. ConTrack introduces an online task–style mixing mechanism that adapts the trade-off during training via a dual-variable update, ConTrack 3
+
+and an adaptive mid-trajectory reset library that stabilizes long-horizon learn-ing by restarting from policy-reachable simulator states near the current failure boundary. The resulting policy can deviate from the reference when required by physics while remaining anchored to the demonstrated motion and contact cues. We present quantitative and qualitative evaluations on GRAB [39], ARC-TIC [11], and DexterHand [23]. ConTrack improves success and object pose accuracy while preserving joint and contact fidelity. We also include a real-world feasibility study on a bimanual xArm7+xHand platform to verify that the learned trajectories are executable on real hardware. In sum, our contributions are: 
+
+– An online adaptive task–style mixing mechanism based on a dual-variable update. 
+
+– An adaptive mid-trajectory reset library that reuses policy-reachable simu-lator states. 
+
+– A framework that transforms physically-infeasible reference motion into ex-ecutable robotic trajectories, evaluated across three benchmark tiers of in-creasing contact complexity and validated on real-world bimanual manipu-lation setup. 
+
+## 2 Related Work 
+
+Dexterous manipulation from human demonstrations Human hand– object recordings are used as supervision for robotic dexterity, with simulation and policy learning bridging the embodiment gap from captured kinematics to robot actuation [3, 6, 11, 23, 39]. The supervision signal spans larger motion-capture datasets, touch sensing, and video or teleoperation sources [8, 9, 12–14, 17, 18, 21, 27, 34, 38, 45, 49]. To make references executable, methods range from object-centric conditioning [7] and residual reinforcement learning on top of im-itation [22] to tracking-centric controllers [26] and functional retargeting that prioritizes object outcomes [30]; across settings, task success and motion fidelity can disagree, so a learner must allocate limited interaction budget to resolve the trade-off. 
+
+Reference tracking in physics simulation Reference tracking has a long his-tory in physics-based character control, where motion capture clips specify the desired behavior and reinforcement learning discovers feedback control that is ro-bust to perturbations and missing information [24,29,32,33,41,48]. Long-horizon training often benefits from curricula that emphasize later states and from ex-ploration strategies that expand the reachable set of states over time [10,36,46]. These ideas motivate mid-trajectory training, but dexterous hand–object inter-action introduces a sharp complication. Directly resetting to the reference can be physically inconsistent because contacts and object configurations are coupled through discontinuous dynamics. This mismatch motivates ConTrack’s emphasis on policy-reachable mid-trajectory states, which preserves the efficiency benefits 4 Y. Liang et al. 
+
+of mid-clip training while avoiding unrecoverable starts induced by infeasible reference configurations. 
+
+Constrained and multi-objective reinforcement learning Balancing task tracking against imitation is often implemented through a single shaped reward that mixes task terms and style terms with fixed weights [22, 26, 32, 33, 41]. In clip-conditioned tracking with contact discontinuities, fixed mixtures can require retuning as task difficulty and signal scale shift across clips and across phases of a clip [22, 26, 30]. Constrained reinforcement learning instead treats task suc-cess as a requirement and optimizes a secondary objective within the feasible set, commonly via primal–dual updates, reward-constrained policy optimization, and Lagrangian relaxations [1, 16, 42]. Closely related work studies how to learn stylistic behavior from imperfect demonstrations under a task optimality con-straint [43]. ConTrack adopts this constrained viewpoint, using the normalized task constraint and an online dual update to adjust the task–style allocation during training. 
+
+## 3 Method 
+
+ConTrack models object tracking problem as a constraint and allocates remain-ing optimization pressure to style fidelity. Three components make this practical under a fixed interaction budget: an online dual controller (Sec. 3.2) that ad-justs the task–style allocation, a reset library (Sec. 3.3) that restarts rollouts from policy-reachable states near the current failure boundary, and contact pri-ors (Sec. 3.4) that anchor the style objective to reference interaction patterns. 
+
+3.1 Preliminaries 
+
+In our setup, each reference clip induces a finite-horizon MDP with horizon T and discrete time index t ∈ { 0, . . . , T − 1}. The simulator has physical state xt ∈ X ,including robot joints, object poses, and their velocities. The reference provides time-indexed targets. It includes a joint trajectory qref  
+
+> t
+
+∈ RD over D actuated joints and object pose targets for O objects, given by translations pref  
+
+> t,o
+
+∈ R3
+
+and unit quaternions ¯qref  
+
+> t,o
+
+∈ S3 for o ∈ { 1, . . . , O }. Additionally, we provide link-level contact annotations for L hand links, given by binary contact events 
+
+cref  
+
+> t,o,ℓ
+
+∈ { 0, 1} and object-local contact points yref  
+
+> t,o,ℓ
+
+∈ R3 for ℓ ∈ { 1, . . . , L }. The joint reference qref 0: T −1 is obtained by retargeting captured human hand motion to the robot embodiment [5, 31, 47]. We treat the reference index as part of the state and define st = ( xt, t ).A stochastic policy π(at | st) selects an action at ∈ RD . The agent receives a reward that we decompose as 
+
+r(st, a t) = rg (st, a t) + rs(st, a t) + rp(st, a t), (1) ConTrack 5
+
+where rg measures task success through object pose tracking, rs measures style fidelity through hand kinematics and contacts, and rp penalizes high-frequency motion. The policy controls the robot through residual joint targets around the ref-erence. At frame t, the policy outputs a residual joint displacement at and we set the joint position target as: qtar  
+
+> t
+
+= qref  
+
+> t
+
++ at.This parameterization keeps exploration near the reference while allowing corrective deviations that compensate for kinematic and dynamic mismatch. We evaluate task and style with discounted returns using a discount factor 
+
+γ ∈ (0 , 1] 
+
+Jg (π) = Eπ
+
+"T −1X
+
+> t=0
+
+γtrg (st, a t)
+
+#
+
+, Js(π) = Eπ
+
+"T −1X
+
+> t=0
+
+γtrs(st, a t)
+
+#
+
+. (2) ConTrack maximizes style while meeting a minimum level of task success: 
+
+max  
+
+> π
+
+Js(π) s.t. Jg (π) ≥ αJ ⋆g , (3) where α ∈ (0 , 1] is a target task ratio and J⋆g is a clip-specific normalizer defined as a running maximum of a moving estimate of Jg during training. The ratio 
+
+Jg /J ⋆g is dimensionless and makes the constraint comparable across clips with different task scales. 
+
+3.2 Adaptive Task–Style Mixing 
+
+Fixed reward weights are brittle in contact-rich tracking because difficulty varies across clips and within a single clip. ConTrack therefore adapts the task–style trade-off online using a scalar controller driven by the normalized task return. We connect Eq. 3 to an online weight controller through a Lagrangian relax-ation [1, 42, 43] 
+
+L(π, λ ) = Js(π) − λ
+
+
+
+α − Jg (π)
+
+J⋆g
+
+
+
+, (4) where λ ∈ R is a scalar controller state. Larger λ increases pressure to satisfy the task constraint, while smaller λ allocates more optimization capacity to style. PPO [37] uses an advantage estimate to update the policy. We compute three advantage estimates, Ag from the task reward rg , As from the style reward 
+
+rs, and Ap from the penalty reward rp, and update the policy using a mixed advantage 
+
+Amix = wtask Ag + (1 − wtask )As + Ap, (5) where wtask ∈ [0 , 1] is shared across all parallel environments of the clip. We map this scalar state to a convex mixing weight 
+
+wtask = σ(λ), (6) where σ is the logistic sigmoid. 6 Y. Liang et al. 
+
+Algorithm 1: CMDP-style task constraint with an online dual con-troller                                                          
+
+> Input: target ratio α, step size η
+> Data: dual state λ, running task estimate ˆJg, running maximum J⋆g
+> 1while training do
+> 2collect rollouts under the current reset distribution // ▷Sec. 3.3
+> 3Gg←discounted episodic return from rg
+> 4ˆJg←runningmean( Gg);J⋆g←max {J⋆g,ˆJg}
+> 5λ←λ+η
+> 
+> α−ˆJg/J ⋆g
+> 
+> // ▷Eq. 7
+> 6wtask ←σ(λ)
+> 7compute Ag, A s, A p
+> 8Amix ←wtask Ag+ (1 −wtask )As+Ap
+> 9update πusing Amix
+
+We update λ from an online estimate of the task return Jg . Let ˆJg be a run-ning estimate of Jg under the current policy, and let J⋆g be its running maximum. The update is 
+
+λ ← λ + η α − ˆJg
+
+J⋆g
+
+!
+
+, (7) where η > 0 is a step size. The ratio ˆJg /J ⋆g is scale-free across clips. When it drops below α, Eq. 7 increases wtask and shifts optimization toward task tracking. When it stays above α, the update decreases wtask and allocates more capacity to style. 
+
+3.3 Adaptive Mid-Trajectory Reset Library 
+
+Long-horizon tracking is inefficient when training always starts from the first reference frame, and curriculum strategies that restart from later states can substantially improve coverage [10, 36]. Early failures dominate the rollout dis-tribution, and later contact phases receive few learning updates. ConTrack ad-dresses this with a mid-trajectory reset library indexed by reference frame. For each frame k ∈ { 0, . . . , T − 1}, the library stores a simulator state that contains robot joints and velocities and object poses and velocities. Resetting to a stored state initializes the simulator consistently and sets the current reference index to k.
+
+Online refresh. In human motion tracking without object interaction, resets are often initialized by setting the simulator directly to the reference motion at a chosen frame [32, 33, 41]. In hand–object interaction, such resets can be phys-ically inconsistent because contact configurations may not be realizable under the simulator dynamics. Resetting by copying the reference state can therefore produce unrecoverable starts. ConTrack instead refreshes the reset library from ConTrack 7
+
+Algorithm 2: Adaptive mid-trajectory reset library 
+
+Input: clip length T , temperature τ , smoothing coefficient β
+
+Data: for all k ∈ [0 , T − 1] : cached simulator states B[k], EMA continuation length ¯ℓk , best length ℓmax  
+
+> k
+> 1
+
+foreach completed episode do  
+
+> 2
+
+ts ← start frame; te ← end frame  
+
+> 3
+
+for k ← ts to te do  
+
+> 4
+
+ℓ ← te − k + 1 ; ¯ℓk ← (1 − β)¯ℓk + βℓ  
+
+> 5
+
+if ℓ > ℓ max  
+
+> k
+
+then  
+
+> 6
+
+B[k] ← simulator state at frame k; 
+
+> 7
+
+ℓmax  
+
+> k
+
+← ℓ 
+
+> 8
+
+uk ← ¯ℓk /(T − k) for all k // ▷ survival ratio, Eq. 9  
+
+> 9
+
+sample k ∝ exp ( −uk /τ ) // ▷ Eq. 10  
+
+> 10 11
+
+reset simulator to B[k] and set reference index to k
+
+empirically reachable states collected from rollouts of the current policy. Con-sider a completed episode that starts at frame tstart and terminates at frame 
+
+tend . For each visited frame k ∈ [tstart , t end ] we define the continuation length 
+
+ℓk = tend − k + 1 . (8) We maintain an exponential moving average ¯ℓk of ℓk and a running maximum 
+
+ℓmax  
+
+> k
+
+. If a rollout achieves ℓk > ℓ max  
+
+> k
+
+, we overwrite the stored state at frame k
+
+with the visited simulator state and set ℓmax  
+
+> k
+
+= ℓk. This keeps the library aligned with policy-reachable states that support longer continuations. 
+
+Difficulty-aware sampling. We define a survival ratio 
+
+uk = ¯ℓk
+
+T − k , (9) and sample reset frames with 
+
+p(k) ∝ exp 
+
+
+
+− uk
+
+τ
+
+
+
+, (10) where τ > 0 is a temperature parameter. This concentrates training on segments where the policy tends to fail quickly relative to the remaining horizon. This produces rollouts that repeatedly practice entering difficult contact phases, and the reset distribution moves earlier as tracking improves. 
+
+3.4 Contact Priors 
+
+We use reference contact annotations as an auxiliary style prior. Let ct,o,ℓ ∈ { 0, 1}
+
+denote the contact event between link ℓ and object o observed in simulation at 8 Y. Liang et al. 
+
+Fig. 2: Contact priors from data. Red dots mark reference object contact points. Dur-ing reinforcement learning, the style objective encourages each contacting link to match its target contact.             
+
+> (a) GRAB Waterbottle Offhand (b) GRAB Wineglass Offhand
+> (c) ARCTIC Waffleiron Use (d) ARCTIC Mixer Use
+> (e) ARCTIC Box Use (f ) DexterHand Ring
+> (g) DexterHand Cuboid-0 (h) DexterHand Cuboid-1
+
+Fig. 3: Simulation snapshots. 
+
+frame t, and let yt,o,ℓ ∈ R3 denote the corresponding object-local contact point. The style reward includes a contact event overlap term that rewards agreement with the reference contact events cref 
+
+> t,o,ℓ
+
+. When both the simulator and reference indicate contact, we additionally penalize the distance between yt,o,ℓ and the annotated contact point yref 
+
+> t,o,ℓ
+
+.We map dataset contact annotations to the robot link set and use them as link-level contact targets. Fig. 2 visualizes the targets. We evaluate contact fidelity with explicit event and point metrics and ablate contact priors in Sec. 4. See appendix for annotation processing. 
+
+## 4 Experiments 
+
+4.1 Benchmarks 
+
+We evaluate ConTrack on reference clips spanning bimanual interaction and dexterous in-hand manipulation. Each clip defines an independent reference-tracking task with horizon T , and we train one policy per clip. We group clips into three tiers of increasing contact complexity. GRAB [39] focuses on bi-manual rigid-object interaction. ARCTIC [11] adds articulated objects and ConTrack 9
+
+Table 1: Benchmark clips and reference-only statistics. Max disp: max object AABB diagonal displacement. End2End rot: end-to-end rotation between first and last frame. Contact occ.: fraction of frames with any hand–object contact.                                                                                   
+
+> Dataset Clip Time(s) Hand Articulated Max disp(m) End2End rot(rad) Contact occ. GRAB
+> cubemedium_offhand 3.0 bimanual False 0.581 1.426 0.819
+> cylindermedium_offhand 3.0 bimanual False 0.805 2.675 0.942
+> hammer_use 6.0 bimanual False 0.304 0.001 0.878
+> waterbottle_offhand 4.0 bimanual False 0.470 0.439 0.808
+> wineglass_offhand 3.0 bimanual False 0.595 0.751 0.967 ARCTIC
+> box_use 4.1 bimanual True 0.140 0.171 1.000
+> mixer_use 10.0 bimanual True 0.271 1.785 1.000
+> notebook_use 3.0 bimanual True 0.272 2.962 1.000
+> waffleiron_use 4.0 bimanual True 0.231 0.358 1.000 DexterHand
+> Cuboid_00 3.0 single-hand False 0.098 3.082 1.000
+> Cuboid_01 2.0 single-hand False 0.060 2.849 1.000
+> Cylinder 5.0 single-hand False 0.113 2.477 1.000
+> Ring 5.0 single-hand False 0.105 2.415 1.000
+
+multi-object contact. DexterHand [23] targets continuous single-hand in-hand rotation. Table 1 summarizes clip statistics computed from the reference signals. Fig. 3 shows representative simulated rollouts, and additional rollouts are shown in appendix. 
+
+4.2 Training and Evaluation Protocol 
+
+All learning-based methods are trained for 5000 PPO [37] updates per clip un-der a fixed simulator-step budget. Mid-trajectory resets redistribute interaction along the clip without increasing total steps. During training each method uses its own reset strategy. For evaluation we always reset from the first reference frame so that progress reflects end-to-end tracking. We evaluate with fixed pose-break thresholds of 0.10 m translation error and 
+
+1.00 rad rotation error. Let pt,o ∈ R3 and ¯qt,o ∈ S3 denote the simulated trans-lation and unit quaternion of object o at frame t, and let pref 
+
+t,o and ¯qref 
+
+t,o be the reference targets. Define ∆p t,o = ∥pt,o − pref 
+
+t,o ∥2 and ∆θ t,o = 2 arccos   ¯q⊤
+
+t,o ¯qref 
+
+t,o 
+
+.An episode terminates at the first index τ such that some object violates ∆p τ,o >
+
+0.10 or ∆θ τ,o > 1.00 , or at τ = T − 1 if it reaches the end. We report success rate SR as the fraction of evaluation episodes with τ = T − 1, and progress as the normalized termination index progress = τT −1 , where τ is the termination frame index. 
+
+4.3 Metrics 
+
+We report both task tracking and style fidelity. Task metrics are mean object translation error in meters and mean object rotation error in radians with respect to the reference object tracks. For an episode with termination index τ , we compute 
+
+Epos = 1(τ + 1) O
+
+τX
+
+t=0 
+
+OX
+
+o=1 
+
+∆p t,o , Erot = 1(τ + 1) O
+
+τX
+
+t=0 
+
+OX
+
+o=1 
+
+∆θ t,o . (11) 10 Y. Liang et al. 
+
+Table 2: Main experiment: baseline comparison under the fixed 5000-update budget. We report mean and standard deviation across clips.                                                                                   
+
+> Method Progress ↑Obj pos (m) ↓Obj rot (rad) ↓Finger err (rad) ↓Contact F1 ↑Contact pt (m) ↓
+> Ours 0.899 ±0.195 0.026 ±0.006 0.272 ±0.105 0.163 ±0.014 0.784 ±0.072 0.018 ±0.005 ManipTrans 0.743 ±0.292 0.012 ±0.009 0.207 ±0.078 0.277 ±0.089 0.620 ±0.068 0.030 ±0.010 DexMachina 0.246 ±0.052 0.038 ±0.018 0.348 ±0.121 0.147 ±0.016 0.708 ±0.041 0.024 ±0.003 SPIDER 0.444 ±0.341 0.201 ±0.113 1.104 ±0.599 0.157 ±0.019 0.191 ±0.225 0.036 ±0.011
+
+Style metrics include mean arm and finger joint position errors in radians with respect to the reference joint trajectories. Let qt ∈ RD denote the robot joint configuration and qref  
+
+> t
+
+the reference target at frame t. We report the mean ab-solute joint error, aggregated over frames up to τ , and separately averaged over arm and finger joints. To quantify contact fidelity, we aggregate contact event classification over time and over annotated link–object pairs. Let ct,o,ℓ ∈ { 0, 1} denote whether link 
+
+ℓ contacts object o at frame t in simulation, and let cref  
+
+> t,o,ℓ
+
+denote the reference contact annotation. We compute precision, recall, and F1 from the aggregated confusion matrix of ct,o,ℓ against cref 
+
+> t,o,ℓ
+
+. We also report contact point error in meters in object-local coordinates on matched contact events. Since early termi-nation shortens the effective horizon, we always report progress alongside error metrics. 
+
+4.4 Baselines and Ablations 
+
+We compare ConTrack against three baselines that resolve the task–style con-flict in different ways: ManipTrans [22] 1, DexMachina [30] 2, and SPIDER [31]. ManipTrans starts from an imitative controller and uses residual reinforcement learning to correct execution errors under contact dynamics. DexMachina targets functional retargeting with object-centric goals. SPIDER constructs a physically feasible retargeted trajectory without policy learning. We evaluate all methods under the same termination rule and metrics. We study three ablations that isolate the mechanisms responsible for stability and trade-off control. The first ablation replaces adaptive task–style mixing in Sec. 3.2 with fixed mixing weights. The second ablation replaces the reset library in Sec. 3.3 with simpler reset strategies that do not adapt to the current failure boundary. The third ablation removes contact priors from the style objective. Unless stated otherwise, all variants use the same observations, action space, and termination rule. 
+
+4.5 Main Results 
+
+Table 2 reports our main experiment: a baseline comparison under the fixed 5000-update budget. Table 3 shows ConTrack results per clip across tiers. Con- 
+
+> 1
+
+We reimplement ManipTrans to match our environment and evaluation setup.  
+
+> 2
+
+DexMachina’s code is not fully open source, so we integrated their Virtual Object Controllers into our codebase. ConTrack 11 
+
+Table 3: Ours: tracking metrics on the benchmark set.                                                                                                                        
+
+> Dataset Clip Progress ↑Obj pos (m) ↓Obj rot (rad) ↓Finger err (rad) ↓Contact F1 ↑Contact pt (m) ↓
+> GRAB
+> cubemedium_offhand 0.994 0.023 0.226 0.166 0.765 0.015
+> cylindermedium_offhand 1.000 0.043 0.349 0.186 0.693 0.016
+> hammer_use 0.984 0.026 0.175 0.195 0.875 0.014
+> waterbottle_offhand 1.000 0.018 0.141 0.159 0.745 0.012
+> wineglass_offhand 1.000 0.029 0.200 0.170 0.915 0.011 ARCTIC
+> box_use 1.000 0.020 0.110 0.152 0.865 0.021
+> mixer_use 0.853 0.026 0.231 0.167 0.653 0.023
+> notebook_use 0.993 0.030 0.234 0.160 0.731 0.023
+> waffleiron_use 0.931 0.031 0.262 0.148 0.766 0.020 DexterHand
+> Cuboid_00 0.745 0.029 0.381 0.152 0.766 0.020
+> Cuboid_01 0.987 0.025 0.400 0.147 0.781 0.014
+> Cylinder 0.928 0.018 0.349 0.150 0.856 0.021
+> Ring 0.272 0.024 0.474 0.169 0.789 0.025 GRAB Avg 0.996 0.028 0.218 0.175 0.798 0.013 ARCTIC Avg 0.944 0.027 0.209 0.157 0.754 0.022 DexterHand Avg 0.733 0.024 0.401 0.155 0.798 0.020 Overall Avg 0.899 0.026 0.272 0.163 0.784 0.018
+
+Table 4: Ablation for adaptive vs. fixed task–style mixing. 
+
+Variant Progress ↑ Obj pos (m) ↓ Obj rot (rad) ↓ Finger err (rad) ↓ Contact F1 ↑ Contact pt (m) ↓
+
+Adaptive (ours) 0.899 ± 0.195 0.026 ± 0.006 0.272 ± 0.105 0.163 ± 0.014 0.784 ± 0.072 0.018 ± 0.005 Fixed task 0.764 ± 0.172 0.026 ± 0.004 0.250 ± 0.031 0.157 ± 0.021 0.679 ± 0.131 0.022 ± 0.004 Fixed 1:1 0.868 ± 0.107 0.029 ± 0.008 0.297 ± 0.029 0.165 ± 0.028 0.701 ± 0.106 0.023 ± 0.002 
+
+Track reaches near-complete progress on GRAB and strong progress on ARC-TIC, while DexterHand remains challenging within the same budget. Manip-Trans attains the lowest object pose error but drifts in finger motion and con-tacts. DexMachina preserves finger motion and contact fidelity more closely but makes limited progress under the same budget. SPIDER stays close in kinemat-ics but struggles to maintain object tracking once contact dynamics dominate. ConTrack narrows this gap by adapting the task–style balance online and by stabilizing long-horizon learning through mid-trajectory resets. 
+
+Failure analysis for DexterHand Ring. DexterHand Ring is the hardest clip under our fixed budget and failures concentrate in a rotation-dominant phase rather than emerging from gradual drift. With longer training the clip becomes feasible under the same thresholds. See appendix for extended-budget results and termination statistics. 
+
+4.6 Ablations Adaptive vs. Fixed Task–Style Mixing Table 4 shows that adaptive mixing improves progress while preserving contact fidelity compared to fixed mixing variants. Fig. 4 instantiates this trade-off and plots each trained policy as a point in the plane of progress and contact F1. For a policy π, let g(π) ∈ [0 , 1] 
+
+denote its mean progress and let f (π) ∈ [0 , 1] denote its mean contact F1 against the reference contact annotations. We say π1 dominates π2 if g(π1) ≥ g(π2) and 
+
+f (π1) ≥ f (π2) with at least one strict inequality. Sweeping the target ratio 
+
+α traces an empirical Pareto frontier across the tested range. In our sweep, 12 Y. Liang et al. 0.800 0.825 0.850 0.875 0.900 0.925 0.950 0.975 1.000 
+
+Progress 
+
+> 0.82
+> 0.83
+> 0.84
+> 0.85
+> 0.86
+> 0.87
+> Contact F1
+> 100%
+> 50%
+> 33%
+> 67%
+> = 0.6
+> = 0.7
+> = 0.8
+> = 0.9
+
+Fig. 4: Task–style trade-off controlled by the target ratio α. Each round point is a policy trained with a fixed α, and each square point is a policy trained with a fixed task–style mixing weight, with task weight annotated. Sweeping α traces an empirical Pareto-optimal frontier between progress and contact fidelity, and fixed reward mixing baselines fall inside this frontier. 
+
+Table 5: Ablation for reset library trick.                                                                   
+
+> Variant Progress ↑Obj pos (m) ↓Obj rot (rad) ↓Finger err (rad) ↓Contact F1 ↑Contact pt (m) ↓
+> Adaptive library (Ours) 0.899 ±0.195 0.026 ±0.006 0.272 ±0.105 0.163 ±0.014 0.784 ±0.072 0.018 ±0.005 Reset from start 0.700 ±0.270 0.039 ±0.010 0.370 ±0.045 0.168 ±0.011 0.739 ±0.088 0.017 ±0.002 Reset uniform 0.727 ±0.348 0.033 ±0.010 0.298 ±0.080 0.152 ±0.016 0.714 ±0.119 0.021 ±0.004
+
+fixed reward mixing policies are dominated by points on this frontier, which means that for some achieved progress level, the adaptive update attains higher naturalness as measured by contact fidelity under the same budget. 
+
+Reset Library Ablation Table 5 shows that the reset library improves progress under the same budget compared to always resetting from the first frame and to a uniform mid-clip reset. Fig. 5 tracks the distribution of sampled reset frames throughout training. Early updates concentrate resets near the end of the clip where short-horizon tracking is feasible. As learning expands the reachable suffix, resets move earlier, so training continually targets the current transition point between success and failure. 
+
+Contact Prior Reward Ablation Table 6 indicates that contact priors pro-vide complementary supervision for contact-rich tracking. Removing either con-tact term reduces progress or contact accuracy, suggesting that the priors help resolve contact dynamics that are not fully specified by object pose errors alone. ConTrack 13 0 100 200 300 400 500 600 
+
+Frame Index 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Survival Ratio
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> Iteration
+
+Fig. 5: Reset library dynamics over the 5000 training updates. As the policy learns to track further into the clip, the set of reachable mid-trajectory states expands toward earlier frames, allowing resets to move backward and concentrate learning on the re-maining difficult segments. 
+
+Table 6: Ablation for contact prior reward.                                                                  
+
+> Variant Progress ↑Obj pos (m) ↓Obj rot (rad) ↓Finger err (rad) ↓Contact F1 ↑Contact pt (m) ↓
+> Full (Ours) 0.899 ±0.195 0.026 ±0.006 0.272 ±0.105 0.163 ±0.014 0.784 ±0.072 0.018 ±0.005 w/o contact reward 0.861 ±0.173 0.032 ±0.010 0.320 ±0.044 0.168 ±0.019 0.699 ±0.092 0.020 ±0.005 w/o contact distance reward 0.868 ±0.057 0.032 ±0.011 0.288 ±0.071 0.149 ±0.016 0.753 ±0.089 0.023 ±0.005
+
+4.7 Real-world Feasibility 
+
+We study real-world feasibility on a tabletop bimanual platform with two xArm7 arms and two xHands. For each clip, we stream the policy-predicted joint refer-ences from the simulator to a separate real-time controller over TCP. Each side tracks 7 arm joints and 12 hand joints, with outer reference updates at 0.15 sand an internal arm control loop running at 250 Hz. Fig. 6 shows representative executions, and additional experiments are shown in appendix. 
+
+## 5 Conclusion 
+
+Limitations. Our constrained formulation uses an online normalization based on a running maximum of task return estimates, which provides stable scal-ing in practice but does not strictly guarantee satisfaction of the constraint. Contact priors rely on the availability and quality of contact annotations, and tracking remains challenging for the hardest in-hand manipulation clips under a limited interaction budget. Finally, our hardware study currently focuses on executing joint commands on the real arm–hand platform. Extending the system with richer perception and tighter sim-to-real alignment could further broaden robustness in real-world deployment. In summary, we presented ConTrack, a constrained reference-tracking rein-forcement learning framework for long-horizon, contact-rich hand–object inter-action in physics simulation. ConTrack separates task success from style fidelity 14 Y. Liang et al.   
+
+> (a) GRAB Cylinder Medium Offhand
+> (b) GRAB Hammer Use
+
+Fig. 6: Real-world experiment snapshots on the bimanual xArm7+xHand platform. 
+
+and controls their trade-off online through a scalar dual controller. To address the instability of learning long clips from the first frame, ConTrack maintains an adaptive mid-trajectory reset library that refreshes entries from policy-reachable simulator states, and samples start frames to focus learning on difficult segments. Across bimanual interaction and in-hand manipulation benchmarks under a fixed training budget, ConTrack improves progress and contact fidelity while retaining accurate object tracking, and exposes an interpretable target ratio that traces a smooth task–style trade-off frontier. ConTrack 15 
+
+## References 
+
+1. Achiam, J., Held, D., Tamar, A., Abbeel, P.: Constrained policy optimization. In: Precup, D., Teh, Y.W. (eds.) Proceedings of the 34th International Conference on Machine Learning. Proceedings of Machine Learning Research, vol. 70, pp. 22–31. PMLR (06–11 Aug 2017) 2. Barreiros, J., Beaulieu, A., Bhat, A., Cory, R., Cousineau, E., Dai, H., Fang, C.H., Hashimoto, K., Irshad, M.Z., Itkina, M., et al.: A careful examination of large behavior models for multitask dexterous manipulation. arXiv preprint arXiv:2507.05331 (2025) 3. Brahmbhatt, S., Tang, C., Twigg, C.D., Kemp, C.C., Hays, J.: ContactPose: A dataset of grasps with object contact and hand pose. In: The European Conference on Computer Vision (ECCV) (August 2020) 4. Cai, X., Qiu, R.Z., Chen, G., Wei, L., Liu, I., Huang, T., Cheng, X., Wang, X.: In-n-on: Scaling egocentric manipulation with in-the-wild and on-task data. arXiv preprint arXiv:2511.15704 (2025) 5. Carpentier, J., Saurel, G., Buondonno, G., Mirabel, J., Lamiraux, F., Stasse, O., Mansard, N.: The pinocchio c++ library – a fast and flexible implementation of rigid body dynamics algorithms and their analytical derivatives. In: IEEE Inter-national Symposium on System Integrations (SII) (2019) 6. Chao, Y.W., Yang, W., Xiang, Y., Molchanov, P., Handa, A., Tremblay, J., Narang, Y.S., Van Wyk, K., Iqbal, U., Birchfield, S., Kautz, J., Fox, D.: DexYCB: A bench-mark for capturing hand grasping of objects. In: IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) (2021) 7. Chen, Y., Wang, C., Yang, Y., Liu, C.K.: Object-centric dexterous manipulation from human motion data. In: CoRL (2024) 8. Cheng, X., Li, J., Yang, S., Yang, G., Wang, X.: Open-television: Teleoperation with immersive active visual feedback. arXiv preprint arXiv:2407.01512 (2024) 9. Chi, C., Xu, Z., Pan, C., Cousineau, E., Burchfiel, B., Feng, S., Tedrake, R., Song, S.: Universal manipulation interface: In-the-wild robot teaching without in-the-wild robots. arXiv preprint arXiv:2402.10329 (2024) 10. Ecoffet, A., Huizinga, J., Lehman, J., Stanley, K.O., Clune, J.: Go-explore: a new approach for hard-exploration problems. arXiv preprint arXiv:1901.10995 (2019) 11. Fan, Z., Taheri, O., Tzionas, D., Kocabas, M., Kaufmann, M., Black, M.J., Hilliges, O.: ARCTIC: A dataset for dexterous bimanual hand-object manipulation. In: Pro-ceedings IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (2023) 12. Fu, R., Zhang, D., Jiang, A., Fu, W., Funk, A., Ritchie, D., Sridhar, S.: Gigahands: A massive annotated dataset of bimanual hand activities. In: Proceedings of the Computer Vision and Pattern Recognition Conference. pp. 17461–17474 (2025) 13. Handa, A., Van Wyk, K., Yang, W., Liang, J., Chao, Y.W., Wan, Q., Birchfield, S., Ratliff, N., Fox, D.: Dexpilot: Vision-based teleoperation of dexterous robotic hand-arm system. In: ICRA (2020) 14. Hsieh, J., Tu, K.H., Hung, K.H., Ke, T.W.: Dexman: Learning bimanual dexterous manipulation from human and generated videos (2025) 15. Intelligence, P., Black, K., Brown, N., Darpinian, J., Dhabalia, K., Driess, D., Esmail, A., Equi, M., Finn, C., Fusai, N., et al.: pi0.5: a vision-language-action model with open-world generalization. arXiv preprint arXiv:2504.16054 (2025) 16. Ishihara, Y., Takasugi, N., Kawakami, K., Kinoshita, M., Aoyama, K.: Constraints as rewards: Reinforcement learning for robots without reward functions. arXiv preprint arXiv:2501.04228 (2025) 16 Y. Liang et al. 17. Jian, J., Liu, X., Li, M., Hu, R., Liu, J.: Affordpose: A large-scale dataset of hand-object interactions with affordance-driven hand pose. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV). pp. 14713– 14724 (October 2023) 18. Jiang, N., Liu, T., Cao, Z., Cui, J., Chen, Y., Wang, H., Zhu, Y., Huang, S.: Full-body articulated human-object interaction. In: ICCV (2023) 19. Kareer, S., Patel, D., Punamiya, R., Mathur, P., Cheng, S., Wang, C., Hoffman, J., Xu, D.: Egomimic: Scaling imitation learning via egocentric video. In: ICRA. IEEE (2025) 20. Kareer, S., Pertsch, K., Darpinian, J., Hoffman, J., Xu, D., Levine, S., Finn, C., Nair, S.: Emergence of human to robot transfer in vision-language-action models. arXiv preprint arXiv:2512.22414 (2025) 21. Kim, J., Kim, J., Na, J., Joo, H.: ParaHome: Parameterizing Everyday Home Ac-tivities Towards 3D Generative Modeling of Human-Object Interactions . In: 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). pp. 1816–1828. IEEE Computer Society (2025) 22. Li, K., Li, P., Liu, T., Li, Y., Huang, S.: Maniptrans: Efficient dexterous bimanual manipulation transfer via residual learning. In: CVPR (2025) 23. Liang, Y., Xu, S., Zhang, Y., Zhan, B., Zhang, H., Liu, L.: Dextercap: An affordable and automated system for capturing dexterous hand-object manipulation (2026) 24. Liao, Q., Truong, T.E., Huang, X., Gao, Y., Tevet, G., Sreenath, K., Liu, C.K.: Beyondmimic: From motion tracking to versatile humanoid control via guided dif-fusion (2025) 25. Liu, S., Wu, L., Li, B., Tan, H., Chen, H., Wang, Z., Xu, K., Su, H., Zhu, J.: Rdt-1b: a diffusion foundation model for bimanual manipulation. arXiv preprint arXiv:2410.07864 (2024) 26. Liu, X., Adalibieke, J., Han, Q., Qin, Y., Yi, L.: Dextrack: Towards generalizable neural tracking control for dexterous manipulation from human references. In: ICLR (2025) 27. Lu, J., Huang, C.H.P., Bhattacharya, U., Huang, Q., Zhou, Y.: Humoto: A 4d dataset of mocap human object interactions. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV). pp. 10886–10897 (October 2025) 28. Luo, H., Wang, Y., Zhang, W., Zheng, S., Xi, Z., Xu, C., Xu, H., Yuan, H., Zhang, C., Wang, Y., et al.: Being-h0. 5: Scaling human-centric robot learning for cross-embodiment generalization. arXiv preprint arXiv:2601.12993 (2026) 29. Luo, Z., Yuan, Y., Wang, T., Li, C., Chen, S., Castaneda, F., Cao, Z.A., Li, J., Minor, D., Ben, Q., et al.: Sonic: Supersizing motion tracking for natural humanoid whole-body control. arXiv preprint arXiv:2511.07820 (2025) 30. Mandi, Z., Hou, Y., Fox, D., Narang, Y., Mandlekar, A., Song, S.: Dexmachina: Functional retargeting for bimanual dexterous manipulation. arXiv preprint arXiv:2505.24853 (2025) 31. Pan, C., Wang, C., Qi, H., Liu, Z., Bharadhwaj, H., Sharma, A., Wu, T., Shi, G., Malik, J., Hogan, F.: Spider: Scalable physics-informed dexterous retargeting. arXiv preprint arXiv:2511.09484 (2025) 32. Peng, X.B., Abbeel, P., Levine, S., van de Panne, M.: Deepmimic: Example-guided deep reinforcement learning of physics-based character skills. ACM Trans. Graph. 
+
+37 (4), 143:1–143:14 (Jul 2018) 33. Peng, X.B., Guo, Y., Halper, L., Levine, S., Fidler, S.: Ase: Large-scale reusable ad-versarial skill embeddings for physically simulated characters. ACM Trans. Graph. 
+
+41 (4) (Jul 2022) ConTrack 17 34. Qin, Y., Yang, W., Huang, B., Van Wyk, K., Su, H., Wang, X., Chao, Y.W., Fox, D.: Anyteleop: A general vision-based dexterous robot arm-hand teleoperation system. arXiv preprint arXiv:2307.04577 (2023) 35. Qiu, R.Z., Yang, S., Cheng, X., Chawla, C., Li, J., He, T., Yan, G., Yoon, D.J., Hoque, R., Paulsen, L., et al.: Humanoid policy˜ human policy. In: CoRL (2025) 36. Resnick, C., Raileanu, R., Kapoor, S., Peysakhovich, A., Cho, K., Bruna, J.: Back-play:" man muss immer umkehren". arXiv preprint arXiv:1807.06919 (2018) 37. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., Klimov, O.: Proximal policy optimization algorithms (2017) 38. Song, Y.R., Li, J., Fu, R., Murphy, D., Zhou, K., Shiv, R., Li, Y., Xiong, H., Owens, C.E., Du, Y., et al.: Opentouch: Bringing full-hand touch to real-world interaction. arXiv preprint arXiv:2512.16842 (2025) 39. Taheri, O., Ghorbani, N., Black, M.J., Tzionas, D.: GRAB: A dataset of whole-body human grasping of objects. In: European Conference on Computer Vision (ECCV) (2020) 40. Team, S.A.: Spirit-v1.5: Clean data is the enemy of great robot foundation models. Spirit AI Blog (2026) 41. Tessler, C., Guo, Y., Nabati, O., Chechik, G., Peng, X.B.: Maskedmimic: Unified physics-based character control through masked motion inpainting. ACM Trans-actions on Graphics (TOG) (2024) 42. Tessler, C., Mankowitz, D.J., Mannor, S.: Reward constrained policy optimization. arXiv preprint arXiv:1805.11074 (2018) 43. Wen, K., Li, C., He, J., Hutter, M.: Constrained style learning from imperfect demonstrations under task optimality. arXiv preprint arXiv:2507.09371 (2025) 44. Wen, R., Chen, G., Cui, Z., Du, M., Gou, Y., Han, Z., Huang, L., Lei, M., Li, Y., Li, Z., et al.: Gr-dexter technical report. arXiv preprint arXiv:2512.24210 (2025) 45. Xu, M., Zhang, H., Hou, Y., Xu, Z., Fan, L., Veloso, M., Song, S.: Dexumi: Using human hand as the universal manipulation interface for dexterous manipulation. arXiv preprint arXiv:2505.21864 (2025) 46. Xu, S., Chao, Y.W., Bian, L., Mousavian, A., Wang, Y.X., Gui, L.Y., Yang, W.: Dexplore: Scalable neural control for dexterous manipulation from reference-scoped exploration (2025) 47. Yin, Z.H., Wang, C., Pineda, L., Bodduluri, K., Wu, T., Abbeel, P., Mukadam, M.: Geometric retargeting: A principled, ultrafast neural hand retargeting algorithm. In: IROS (2025) 48. Ze, Y., Chen, Z., Araujo, J.P., Cao, Z.a., Peng, X.B., Wu, J., Liu, K.: Twist: Teleoperated whole-body imitation system. In: Lim, J., Song, S., Park, H.W. (eds.) Proceedings of The 9th Conference on Robot Learning. Proceedings of Machine Learning Research, vol. 305, pp. 2143–2154. PMLR (27–30 Sep 2025) 49. Zhao, S., Zhu, X., Chen, Y., Li, C., Xie, L., Zhang, X., Ding, M., Tomizuka, M.: Dexh2r: Task-oriented dexterous manipulation from human to robots (2026) 50. Zheng, R., Niu, D., Xie, Y., Wang, J., Xu, M., Jiang, Y., Castañeda, F., Hu, F., Tan, Y.L., Fu, L., et al.: Egoscale: Scaling dexterous manipulation with diverse egocentric human data. arXiv preprint arXiv:2602.16710 (2026) 18 Y. Liang et al. 
+
+Table 7: Sharpa Wave: tracking metrics on the benchmark set.                                     
+
+> Dataset Progress ↑Obj pos (m) ↓Obj rot (rad) ↓Finger err (rad) ↓Contact F1 ↑Contact pt (m) ↓
+> GRAB 0.999 0.020 0.128 0.165 0.795 0.011 ARCTIC 0.842 0.020 0.175 0.157 0.764 0.019 DexterHand 0.998 0.019 0.256 0.155 0.782 0.013 Overall 0.929 0.020 0.192 0.158 0.777 0.015
+
+## A Additional Clip Snapshots 
+
+We additionally benchmark on the Sharpa Wave embodiment. Table 7 reports the same six metrics as Table 3. More snapshots are shown in Figs. 7, 8, and 9. 
+
+## B Reward Specification 
+
+We specify the per-step reward as r = rg + rs + rp with task terms rg , style terms rs, and smoothness penalties rp. At reference frame t, let qt ∈ RD be the robot joint configuration and let qref  
+
+> t
+
+be the reference target. For each object o,let pt,o ∈ R3 and ¯qt,o ∈ S3 denote the simulated translation and unit quaternion, with targets pref  
+
+> t,o
+
+and ¯qref  
+
+> t,o
+
+. We partition qt into arm joints qat ∈ RDa and finger joints qft ∈ RDf and partition qref  
+
+> t
+
+analogously into qa, ref  
+
+> t
+
+and qf, ref  
+
+> t
+
+, with D =
+
+Da + Df . We define tracking errors eat = qat − qa, ref  
+
+> t
+
+, eft = qft − qf, ref  
+
+> t
+
+, and 
+
+ept = [ pt, 1 − pref  
+
+> t, 1
+
+; . . . ; pt,O − pref  
+
+> t,O
+
+] ∈ R3O . For object rotation we use the per-object quaternion angle error θt,o = 2 arccos   ¯q⊤ 
+
+> t,o
+
+¯qref 
+
+> t,o
+
+ and its mean ¯θt = 1
+
+> O
+
+POo=1 θt,o .Let ˙qt be joint velocities from the simulator and let ¨qt be finite-difference joint accelerations using the simulator time step. We define object linear velocities ˙pt,o ,angular velocities ωt,o , linear accelerations ¨pt,o , and angular accelerations ˙ωt,o 
+
+analogously, and stack them across objects into vectors ˙pt ∈ R3O , ωt ∈ R3O ,
+
+¨pt ∈ R3O , and ˙ωt ∈ R3O . For contact supervision, let ct,o,ℓ ∈ { 0, 1} indicate a simulated contact between object o and link ℓ at frame t, and let yt,o,ℓ ∈ R3
+
+be the corresponding contact point in object coordinates, with targets cref  
+
+> t,o,ℓ
+
+and 
+
+yref 
+
+> t,o,ℓ
+
+. We define Ot,ℓ = {o | ct,o,ℓ = 1 , c ref  
+
+> t,o,ℓ
+
+= 1 }, Lt = {ℓ | |O t,ℓ | > 0}, and 
+
+d2 
+
+> t,ℓ
+
+= 1
+
+> |O t,ℓ |
+
+P 
+
+> o∈O t,ℓ
+
+∥yt,o,ℓ − yref 
+
+> t,o,ℓ
+
+∥22.For a vector z ∈ Rm, we define the normalized squared error mse( z) = 1 
+
+> m
+
+∥z∥22.Table 8 lists the exact reward terms, kernel widths, and coefficients used in our experiments. 
+
+## C Observation Specification 
+
+We use an asymmetric actor–critic. The actor observes a compact state that is sufficient for feedback tracking, while the critic receives additional signals that reduce value-estimation variance and make long-horizon training stable. ConTrack 19      
+
+> (a) GRAB Cube Medium Offhand
+> (b) GRAB Cylinder Medium Offhand
+> (c) GRAB Hammer Use
+> (d) GRAB Waterbottle Offhand
+> (e) GRAB Wineglass Offhand
+
+Fig. 7: Additional GRAB clips. 
+
+Actor observations. Let qt ∈ RD and ˙qt ∈ RD denote robot joint positions and velocities at reference index t. For each object o ∈ { 1, . . . , O }, let pt,o ∈ R3
+
+and ¯qt,o ∈ S3 denote object translation and unit quaternion, and let ˙pt,o ∈ R3
+
+and ωt,o ∈ R3 denote linear and angular velocities. Define the stacked pose vector zt = [ qt; pt, 1; ¯ qt, 1; . . . ; pt,O ; ¯ qt,O ] ∈ RD+7 O and the stacked velocity vector 
+
+vt = [ ˙ qt; ˙ pt, 1; ωt, 1; . . . ; ˙ pt,O ; ωt,O ] ∈ RD+6 O. The actor input is 
+
+oactor  
+
+> t
+
+= [ zt−d; vt−d] ∈ R2D+13 O, (12) where d ≥ 0 is an environment-step observation delay sampled during training. We add zero-mean Gaussian noise to the actor observation terms during training. 
+
+Critic observations. The critic receives the current uncorrupted pose and velocity vectors zt and vt. It also receives binary contact indicators ct ∈ { 0, 1}LO that mark whether each of L tracked hand links is in contact with each object at index 
+
+t. In addition, the critic observes a short stack of future reference poses. Let K
+
+be the number of future reference indices. Define zref  
+
+> t
+
+∈ RD+7 O analogously to 
+
+zt using the reference targets and stack it as zref  
+
+> t:t+K
+
+∈ R(K+1)( D+7 O). The critic also receives reference contact flags cref  
+
+> t
+
+∈ { 0, 1}LO and a normalized phase scalar 20 Y. Liang et al.     
+
+> (a) ARCTIC Box Use
+> (b) ARCTIC Mixer Use
+> (c) ARCTIC Notebook Use
+> (d) ARCTIC Waffleiron Use
+
+Fig. 8: Additional ARCTIC clips.     
+
+> (a) DexterHand Cuboid-0
+> (b) DexterHand Cuboid-1
+> (c) DexterHand Cylinder
+> (d) DexterHand Ring
+
+Fig. 9: Additional DexterHand clips. 
+
+φt = t/ (T − 1) ∈ [0 , 1] . The critic input concatenates these terms: 
+
+ocritic  
+
+> t
+
+= [ zt; vt; ct; zref  
+
+> t:t+K
+
+; cref  
+
+> t
+
+; φt]. (13) 
+
+## D Controller and Reset Hyperparameters 
+
+ConTrack uses one scalar controller for the task–style balance and one reset dis-tribution for long-horizon stability. Unless stated otherwise, all hyperparameters below are held fixed across clips and tiers. 
+
+Dual controller. We use target ratio α = 0 .9 in the main results, step size 
+
+η = 0 .05 in Eq. 7, and initialize λ = 0 so that wtask = σ(λ) = 0 .5 at the start of training. We compute ˆJg as the mean episodic task return over the most recent 
+
+100 completed episodes and set J⋆g as the maximum value of ˆJg over the most recent 20 updates. In practice, α is the main user-facing knob. Decreasing αConTrack 21 
+
+Table 8: Reward terms, functional forms, and coefficients used in our experiments. We use mse( z) = ∥z∥22/m , where m is the dimension of z.
+
+Term Expression Weight 
+
+Task Reward: rg
+
+tracking_obj_pos exp 
+
+
+
+−mse( ept )/σ 2
+
+> p
+
+
+
+, σp = 0 .05 m +500 
+
+tracking_obj_rot exp  −¯θ2 
+
+> t
+
+/σ 2
+
+> θ
+
+, σθ = 0 .5 rad +500 
+
+Style Reward: rs
+
+tracking_arm exp 
+
+
+
+−mse( eat )/σ 2
+
+> q
+
+
+
+, σq = 0 .5 rad +10 
+
+tracking_finger exp 
+
+
+
+−mse( eft )/σ 2
+
+> q
+
+
+
+, σq = 0 .5 rad +10 
+
+contact_reward 1
+
+> L
+
+PLℓ=1 I
+
+h
+
+∃o, c t,o,ℓ = 1 , c ref  
+
+> t,o,ℓ
+
+= 1 
+
+i
+
++100 
+
+contact_distance_reward 1
+
+> |L t|
+
+P 
+
+> ℓ∈L t
+
+exp 
+
+
+
+−d2
+
+> t,ℓ
+
+/σ 2
+
+> c
+
+
+
+, σc = 0 .03 m +100 
+
+Penalty Term: rp
+
+qvel_penalty_arm 1 − exp  −mse( ˙ qat )/σ 2
+
+> v
+
+, σv = 1 .0 −1
+
+qvel_penalty_finger 1 − exp 
+
+
+
+−mse( ˙ qft )/σ 2
+
+> v
+
+
+
+, σv = 1 .0 −1
+
+qvel_penalty_obj_pos 1 − exp  −mse( ˙ pt)/σ 2
+
+> v
+
+, σv = 1 .0 −1
+
+qvel_penalty_obj_rot 1 − exp  −mse( ωt)/σ 2
+
+> v
+
+, σv = 1 .0 −0.1
+
+qacc_penalty_arm 1 − exp  −mse(¨ qat )/σ 2
+
+> a
+
+, σa = 50 .0 −10 
+
+qacc_penalty_finger 1 − exp 
+
+
+
+−mse(¨ qft )/σ 2
+
+> a
+
+
+
+, σa = 50 .0 −10 
+
+qacc_penalty_obj_pos 1 − exp  −mse( ¨ pt)/σ 2
+
+> a
+
+, σa = 50 .0 −100 
+
+qacc_penalty_obj_rot 1 − exp  −mse( ˙ ωt)/σ 2
+
+> a
+
+, σa = 50 .0 −10 
+
+allocates more optimization capacity to style, and Fig. 4 sweeps α to trace a trade-off curve. 
+
+Reset library. We update the per-frame continuation length statistic ¯ℓk with an exponential moving average using coefficient 0.05 . We sample reset frames from 
+
+p(k) ∝ exp( −uk/τ ) with temperature τ = 1 .0. With probability 0.5, we instead sample a failure-boundary frame from the top 64 sharp changes in uk and shift the reset 100 frames earlier. 
+
+## E Contact Annotation Processing 
+
+Reference clips store contact labels and points at the capture segment level. For each object, we store a binary contact tensor and object-local contact points for 15 hand segments. Contact is extracted offline with a fixed proximity threshold of 5 mm and stored in the reference file. ConTrack uses a link-level contact prior that matches the xHand embodi-ment. We map the 15 segments into 10 link groups, and we aggregate segment-level contacts into per-link binary events and contact points. For each link group 
+
+ℓ with segment index set Sℓ, we define 
+
+cref 
+
+t,o,ℓ = max 
+
+s∈S ℓ
+
+cseg 
+
+t,o,s , yref 
+
+t,o,ℓ =
+
+P
+
+s∈S ℓ cseg 
+
+t,o,s yseg 
+
+t,o,s 
+
+max  P 
+
+s∈S ℓ cseg 
+
+t,o,s , 1 , (14) 22 Y. Liang et al. 
+
+where cseg  
+
+> t,o,s
+
+∈ { 0, 1} and yseg  
+
+> t,o,s
+
+∈ R3 are the segment-level contact event and object-local point. Missing points are stored as NaN in the reference and treated as zero, so the aggregation reduces to a well-defined average on contacting seg-ments. The segment-to-link grouping is 
+
+index_link1 : {index_proximal },
+
+index_link2 : {index_middle , index_distal },
+
+middle_link1 : {middle_proximal },
+
+middle_link2 : {middle_middle , middle_distal },
+
+ring_link1 : {ring_proximal },
+
+ring_link2 : {ring_middle , ring_distal },
+
+pinky_link1 : {pinky_proximal },
+
+pinky_link2 : {pinky_middle , pinky_distal },
+
+thumb_link1 : {thumb_proximal },
+
+thumb_link2 : {thumb_middle , thumb_distal }.
+
+(15) We align these targets to the action step rate using nearest-neighbor sampling in time. 
+
+## F Interaction Budget and Compute 
+
+All experiments use a single NVIDIA GeForce RTX 4090 GPU, we train Con-Track, ManipTrans, and DexMachina for 5000 PPO updates per clip. For our method, training for 5000 updates takes about 1.9 to 2.9 hours per clip. Each update collects 16 action steps per environment, and we select the number of parallel environments per clip to saturate GPU throughput. In our benchmark runs, this yields roughly 5.6 × 10 8 to 6.4 × 10 8 simulator steps per clip. Since the rollout collection size per update is fixed, mid-trajectory resets change the distribution of visited reference indices but not the total interaction budget. 
+
+## G DexterHand Ring Failure Analysis 
+
+DexterHand Ring is the least reliable clip under the fixed 5000 -update protocol. To separate feasibility from budget, we train ConTrack longer on this clip. With 
+
+100 000 PPO updates, ConTrack reaches a 94% success rate under the same pose-break thresholds. We exclude this extended-budget result from the fixed-budget tables to keep the comparison protocol consistent. To localize the failure mode at 5000 updates, we analyze 4096 evaluation episodes under the same termination rule. We find that 82% of terminations are triggered by the rotation pose-break condition. At termination, the mean object translation error remains 2.2 cm, which indicates that failures are driven primarily by loss of orientation rather than gross positional drift. Termination ConTrack 23 
+
+indices also concentrate around action step 81 out of the T = 297 action steps of the clip, suggesting a phase-specific instability concentrated in a rotation-dominant segment. Taken together, these statistics point to a narrow contact–rotation transition as the bottleneck. More accurate modeling of rotational contact dynamics and training curricula that align reset timing to fast rotational phases are promising directions for extending ConTrack in this regime.
