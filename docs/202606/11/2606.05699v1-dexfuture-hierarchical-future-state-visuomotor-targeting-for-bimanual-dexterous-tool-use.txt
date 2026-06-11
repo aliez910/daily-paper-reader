@@ -1,0 +1,779 @@
+Title: DexFuture: Hierarchical Future-State Visuomotor Targeting for Bimanual Dexterous Tool Use
+
+URL Source: https://arxiv.org/pdf/2606.05699v1
+
+Published Time: Fri, 05 Jun 2026 00:55:17 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# DexFuture: Hierarchical Future-State Visuomotor Targeting for Bimanual Dexterous Tool Use 
+
+Runfa Blark Li, Kuang-Ting Tu, Nikola Raicevic, Dwait Bhatt, Xinshuang Liu, Keito Suzuki, Ki Myung Brian Lee, Nikolay Atanasov, Truong Nguyen 
+
+UC San Diego 
+
+Figure 1: DexFuture is a hierarchical system for bimanual dexterous tool use that couples a high-level Future-State Visuomotor Target Predictor with a low-level Target-Conditioned Structured Dex-terous Policy . It removes the need for privileged future demonstration targets by predicting a coarse future-state target trajectory from visuomotor history. The predicted targets provide long-horizon guidance for the low-level policy to execute high-frequency contact-rich actions. 
+
+Abstract: Bimanual dexterous tool use remains challenging for robots due to high-dimensional hand configurations and complex hand-tool-object dynamics and contact. Most existing control policies depend on future configuration refer-ences provided from demonstrations, while future action-conditioned world mod-els require slow online planning over high-dimensional action sequences. A sig-nificant challenge is generating a dynamically consistent future reference trajec-tory without relying on privileged states from demonstrations or slow counter-factual planning. We propose DexFuture , a hierarchical system that couples a high-level Future-State Visuomotor Target Predictor with a low-level Target-Conditioned Structured Dexterous Policy . Conditioned on egocentric RGB, pro-prioceptive and geometric history, the high-level predictor constructs structured hand-tool-object visuomotor embeddings and uses a horizon-conditioned trans-former to generate a multi-step future target trajectory. Then, the low-level policy tracks them with a target-conditioned per-link transformer. This hierarchy decou-ples coarse future reference generation from fine-grained action control, and slow long-horizon semantic prediction from high-frequency execution. On OakInk2 bimanual tool-use tasks, DexFuture achieves 90% of the privileged-oracle per-formance, compared to 7% for a no-reference policy. DexFuture operates at 
+
+60 Hz, approximately 250 × faster than DexWM-style Cross-Entropy Method (CEM) planning with a future action-conditioned world model. Project Website: 
+
+https://blarklee.github.io/DexFuture_official_website/ 
+
+Keywords: Bimanual Dexterous Tool Use, Visuomotor Future-State Prediction, Target-Conditioned Control 
+
+> arXiv:2606.05699v1 [cs.RO] 4 Jun 2026
+
+## 1 Introduction 
+
+Bimanual dexterous tool use remains a central challenge in robot learning, requiring two high-DoF hands to coordinate indirect contacts through a tool while interacting with an object. Re-cent learning-based methods have made impressive progress by leveraging demonstrations as strong guidance for dexterous control. In particular, target-conditioned policies make high-DoF manipula-tion more tractable by providing the policy with future reference targets extracted from demonstra-tion trajectories [1, 2, 3, 4, 5]. These targets can encode future hand motion, object pose, fingertip relations, and task-level cues. However, they are also privileged. At deployment, the robot ob-serves the current scene and proprioception, but does not have access to the future demonstration state. Thus, a key bottleneck is generating a dynamically meaningful future target trajectory without relying on privileged future demonstrations. A natural alternative is to learn an action-conditioned world model and use online planning to select future actions [6]. This enables counterfactual rollouts, but requires optimizing over many high-dimensional candidate action sequences at inference. For dexterous tool use, such planning remains computationally prohibitive for the high frequency needed for stable contact-rich control. A plau-sible compromise is to retain a fast target-conditioned policy and make only the high-level target predictor action-conditioned. However, this exposes a dependency loop: future actions depend on predicted future targets, while the predictor itself would require future actions as input. This mo-tivates a different formulation: rather than planning over future actions online, can we predict the future target interface directly from visuomotor history while still preserving the control advantages of future targets? We propose DexFuture , a hierarchical future-state visuomotor control framework for bimanual dex-terous tool use, illustrated in Fig. 1. DexFuture couples a high-level Future-State Visuomotor Target Predictor with a low-level Target-Conditioned Structured Dexterous Policy. The predictor observes recent egocentric RGB frames and proprioceptive/geometric states, and predicts a coarse future tar-get trajectory over multiple policy steps. The policy then tracks the predicted and interpolated targets at every step to produce high-frequency bimanual actions. This hierarchy separates what/where the manipulation should progress toward in the future from how to execute contact-rich actions, while also separating slow long-horizon prediction from fast per-step control. We evaluate DexFuture on challenging bimanual tool-use tasks from OakInk2 [7], including cutting, pouring, wiping, shearing, and stirring. DexFuture removes the need for privileged future demon-stration targets while recovering most of the performance of the oracle target-conditioned policy. Compared with a no-target policy, it substantially improves task success, showing that future targets remain essential for dexterous tool use. Compared with DexWM-style CEM planning [6], Dex-Future executes at the policy control rate, highlighting the practical advantage of amortized target prediction over online action-sequence optimization. Our contributions are summarized as follows: • We propose DexFuture , a hierarchical future-state visuomotor targeting framework that couples a high-level Future-State Visuomotor Target Predictor with a low-level Target-Conditioned Struc-tured Dexterous Policy, separating coarse future-state guidance from high-frequency dexterous action execution. • We introduce an action-free future target prediction module that replaces privileged future demonstration targets with predicted targets conditioned on RGB and proprioceptive/geometric history, using structured visuomotor tokenization and sparse multi-horizon target prediction. • We validate DexFuture on challenging bimanual dexterous tool-use tasks, showing that predicted targets recover most of the privileged-oracle performance, strongly outperform no-target control, and execute substantially faster than DexWM-style CEM planning. 22 Related Work 
+
+Dexterous manipulation from demonstrations and targets. Learning dexterous manipulation directly from sparse task rewards is difficult due to the high DOF of hands and contact-rich dynam-ics. A common strategy is to leverage human demonstrations, retargeted references, or structured future targets to make policy learning tractable [8, 9, 10, 11, 12, 2, 4, 1, 13, 3, 5]. Large hand-object datasets and egocentric manipulation datasets further provide rich supervision for learning hand trajectories, object interactions, and task structure [14, 15, 16, 17, 7, 18]. These works show the importance of demonstration-guided or target-conditioned control, especially for high-DoF dex-terous hands. However, the future reference or target used by the policy is often extracted from the demonstration trajectory and contains privileged future hand, tool, or object states that are unavail-able at deployment. DexFuture aims to retain the performance of target-conditioned policies, while obviating demonstration targets by predicting the future target from visuomotor history. 
+
+World models and action-conditioned planning. World models learn predictive representations for decision making and have been widely used with model-predictive control and trajectory opti-mization [19, 20, 21, 22, 23]. Recent predictive representation models and video world models fur-ther scale future prediction with latent objectives or controllable generative models [24, 25, 26, 27]. For dexterous manipulation, DexWM [6] learns an action-conditioned world model from large-scale videos and uses the cross entropy method (CEM) to plan next actions [28]. Such action-conditioned models are suitable for counterfactual rollouts, but online planning over high-dimensional dexter-ous action sequences is expensive and difficult to run at contact-control frequency. Our proposed method, DexFuture, takes a different route: it uses an action-free predictor to generate future-state targets directly, then delegates high-frequency action execution to a target-conditioned policy. 
+
+## 3 Method 
+
+3.1 Hierarchical Problem Formulation 
+
+Figure 2 shows an overview of DexFuture. Let st be the current robot-object state, at be the biman-ual hand action, and gdemo  
+
+> t+h
+
+be a future demonstration target with horizon h. A target-conditioned dexterous policy can be written as 
+
+at ∼ πϕ(· | st, g demo  
+
+> t+h
+
+). (1) The target gdemo  
+
+> t+h
+
+provides future reference for high-DoF dexterous control but it is privileged: at inference, the robot observes the current scene and proprioception, not the future demonstration state of the hands, tool, or object. Thus, our main objective is to predict future targets from the visuomotor history. We assume access to a history of K RGB observations and proprioceptive/geometric cues: 
+
+Ot−K:t = {Iτ , p τ }tτ =t−K , (2) where Iτ is the RGB observation and pτ denotes structured proprioceptive and available geometric cues. Given this visuomotor history, DexFuture predicts future targets up to horizon h as: 
+
+ˆgt+h = Fθ (Ot−K:t; H). (3) Here, Fθ is our Future-State Visuomotor Target Predictor , and ˆgt+h is the predicted target trajectory, which has the same representation as the demonstrations gdemo  
+
+> t+h
+
+, but is inferred from observation history rather than being given from demonstrations. In practice, we predict targets up to a finite horizon H with coarser intervals, such as H = {0, 2, . . . , 16 }, and use interpolation for intermediate control steps. The low-level policy then executes 
+
+at+δ ∼ πϕ(· | st+δ , ˜gt+δ ), ˜gt+δ = Interp ( {ˆgt+h}h∈H , δ ) , (4) This formulation yields a compact hierarchy: Fθ predicts an action-free future target window over multiple low-level steps, while πϕ executes high-frequency actions using the interpolated targets. 3Figure 2: DexFuture overview. DexFuture is a hierarchical system that separates bimanual dexter-ous manipulation into slow future target generation and fast action-level control. A. Given recent egocentric RGB observations and proprioceptive/geometric states, we construct structured visuo-motor tokens instead of passing dense image patches to the predictor. Hand-link embeddings are obtained by projecting each link into the image and cross-attending to local visual patches, while tool/object embeddings are built by anchor-aligned visual sampling and entity-state/geometry em-beddings. B. The Horizon-Conditioned Target Transformer takes the structured embedding history as memory and predicts sparse future structured embeddings at horizons H = {0, 2, 4, . . . , 16 }. Fu-ture embeddings are first initialized from the latest observed state and modulated with learned future-index embeddings and Fourier horizon encodings, then refined via self-attention and cross-attention to the visuomotor history using AdaLN-Zero transformer blocks. The predicted embeddings are decoded into auxiliary geometric states for supervision, and a 900 -D future target used by the low-level policy. C. The target-conditioned structured dexterous policy consumes the current state and the predicted target, tokenizes the bimanual hand-tool-object system into per-link and scene embed-dings, and outputs a bimanual action distribution through a transformer encoder and policy head. 
+
+D. During receding-horizon execution, a single forward pass of the visuomotor predictor produces a target trajectory over multiple time steps. Intermediate targets are linearly interpolated to allow high-frequency feedback control. The predictor is trained with supervised latent, state, and target losses, while the policy is trained with PPO against a tracking reward. Unlike action-conditioned world-model planning, the predictor does not require candidate future actions as input, avoiding online action-sequence optimization and the circular dependency between future actions and future targets. The following sections describe how DexFuture constructs struc-tured visuomotor embeddings, predicts sparse-horizon future targets, and executes them with the target-conditioned policy. We also provide more details and pseudo-code in the supplementary .
+
+3.2 Future-State Visuomotor Target Predictor 
+
+The Future-State Visuomotor Target Predictor predicts the target states tracked by the low-level policy, rather than future pixels or actions. This follows the DexFuture hierarchy: the predictor provides coarse future hand-tool-object state guidance, while fine contact-rich control is handled by the low-level policy. The target states exhibit a kinematic structure that allows decomposition into the hand, tool and the object. Therefore, it is unnecessary to use all visual patches from the images to encode the visuomotor history, which may also be poorly aligned with the output. Instead, we propose a more structured embedding that exploits the physical relationship between the visual and proprioceptive information to extract only the relevant visual information. For each observed frame, a frozen visual encoder extracts patch-level image features. Each hand link is projected into the image, and we collect the local visual neighborhood around the projected link. The query vector for the projected link, constructed from its identity, 3D position, and 2D projection, only attends to this local visual neighborhood to produce a link-level visuomotor embedding. Tool and object embeddings are constructed from their current state, geometry, type, projected center, 4and visual features. Together, these embeddings form a compact physical representation as 
+
+Zt = {zhand  
+
+> t,i
+
+}Nh 
+
+> i=1
+
+∪ { ztool  
+
+> t
+
+, z obj  
+
+> t
+
+}, (5) where Zt is the structured embeddings at time t, Nh is the number of hand-link tokens, zhand  
+
+> t,i
+
+is the embedding for hand link i, and ztool  
+
+> t
+
+, z obj  
+
+> t
+
+are the tool and object embeddings. 
+
+Horizon-Conditioned Target Transformer. Given the structured history Zt−K:t, DexFuture pre-dicts future targets at sparse timesteps over a horizon. The observed history embeddings serve as memory. Future query vectors are initialized from the latest visuomotor embeddings Zt, since fu-ture manipulation states are naturally predicted as transformations of the current hand-tool-object state. Each future timestep h ∈ H receives a horizon embedding, allowing the shared transformer to specialize its prediction for near and distant futures. We write this prediction compactly as 
+
+ˆZt+h = Tθ (Zt, Z t−K:t, h ), h ∈ H , (6) where Tθ is the horizon-conditioned transformer and ˆZt+h is the predicted structured embeddings at timestep h. Architecturally, this module uses adaptive layer-normalization conditioning from conditional diffusion transformer (CDiT) blocks [29]. Horizon information modulates transformer updates through adaptive normalization and gated residual paths. However, unlike diffusion models, we remove the iterative denoising in DexFuture to directly regress sparse future targets for fast inference. The predicted future embeddings are decoded into auxiliary physical states and the target representation used by the dexterous policy: 
+
+ˆgt+h = Dθ ( ˆZt+h), h ∈ H , (7) where Dθ is the target decoder. The decoded target has the same layout as the demonstration target used by the policy so that the policy interface remains the same. During training, Fθ is supervised from demonstration using a future imitation target loss and an auxiliary future embedding loss: 
+
+Lpred = λstate Lstate + λtarget Ltarget . (8) Here, Lstate supervises future hand-link, tool, and object states, while Ltarget supervises the decoded policy target. The exact target decomposition is described in the supplementary material .
+
+3.3 Target-Conditioned Structured Dexterous Policy 
+
+DexFuture can be paired with any low-level dexterous controller that consumes a structured future target. In our experiments, we instantiate the controller as a target-conditioned per-link transformer policy, inspired from [5]. The policy tokenizes the current bimanual hand-tool-object state and the target into hand-link tokens, scene tokens, and a policy token. A transformer encoder processes these tokens, and the final policy token parameterizes a Gaussian action distribution, 
+
+at ∼ N (μϕ(st, ˜gt), Σϕ) , (9) where μϕ is the action mean and Σϕ is a learned diagonal covariance. The policy is trained with PPO [30] using tracking rewards against demonstration trajectories. The reward includes tracking terms for wrist pose, hand-link/fingertip positions, object pose, object ve-locity, object angular velocity, and energy regularization. During privileged baseline evaluation, the target is replaced with the demonstration target. 
+
+3.4 Hierarchical Receding-Horizon Execution 
+
+At inference time, DexFuture executes the system hierarchy in a receding-horizon manner. At re-fresh time tj , the predictor observes the recent history and produces a sparse future target sequence. For each low-level control step tj + δ before the next refresh, the policy receives an interpolated target and computes an action from the current state: 
+
+ˆgtj :tj +H = Fθ (Otj −K:tj ; H), atj +δ ∼ πϕ(· | stj +δ , Interp(ˆ gtj :tj +H , δ )) . (10) This execution scheme enables the predictor to operate at a slower timescale while the policy remains reactive at the control timescale. The predicted targets need not be physically exact action-level rollouts. Instead, they provide coarser future state guidance, while the low-level policy performs finer contact-level correction and action execution. 5Table 1: Quantitative results on bimanual tool-use tasks of Oakink2 dataset [7]. SR: Success Rate; E t: Tool & Object Translation Error; E j: Hand Joint Error; E ft: Fingertip Error.                                                                                                                                  
+
+> Task ID Task / Tool (R) / Object (L) Methods SR (%) ↑E t (cm) ↓E j (cm) ↓E ft (cm) ↓
+> 083f7@0 cut / chop knife / bread Maniptrans (GT target) 55.69 1.31 2.42 2.01 PhysGraph (GT target) 90.05 0.69 2.17 1.42
+> PhysGraph (No target) 4.16 1.87 3.11 2.68 DexFuture (Pred target) 83.49 1.06 2.08 2.04 9fc3e@0 cut / fruit knife / apple Maniptrans (GT target) 70.58 0.84 2.99 1.97
+> PhysGraph (GT target) 87.87 0.98 2.04 2.17 PhysGraph (No target) 20.5 1.42 2.34 2.45 DexFuture (Pred target) 89.79 0.61 2.03 2.40 1292e@0 pour / mug / mug Maniptrans (GT target) 45.60 6.78 3.50 3.35
+> PhysGraph (GT target) 49.77 5.93 3.07 4.33 PhysGraph (No target) 1.82 8.37 4.13 4.48 DexFuture (Pred target) 41.05 7.27 3.82 3.85 817fb@0 wipe / big brush / whiteboard Maniptrans (GT target) 50.05 1.55 2.17 2.24 PhysGraph (GT target) 62.24 1.33 1.54 1.86
+> PhysGraph (No target) 8.99 2.77 2.68 2.58 DexFuture (Pred target) 56.96 1.50 2.42 2.43 fc88d@0 wipe / small brush/ whiteboard Maniptrans (GT target) 71.21 1.21 2.44 1.79 PhysGraph (GT target) 80.65 1.11 2.49 1.50
+> PhysGraph (No target) 4.87 2.23 3.72 3.04 DexFuture (Pred target) 67.17 1.25 3.02 1.70 e1fa6@0 shear / scissors / paper Maniptrans (GT target) 15.16 1.18 3.31 2.25 PhysGraph (GT target) 35.84 1.35 2.52 1.83
+> PhysGraph (No target) 0.00 1.78 3.70 2.68 DexFuture (Pred target) 30.69 1.62 2.97 1.92 9bb17@5 shear / scissors / paper Maniptrans (GT target) 51.68 1.93 2.26 2.86 PhysGraph (GT target) 59.21 1.90 3.12 2.70
+> PhysGraph (No target) 11.18 3.85 3.81 3.93 DexFuture (Pred target) 48.66 2.49 2.73 2.90
+
+## 4 Experimental Results 
+
+4.1 Experimental Setup 
+
+We evaluate DexFuture on challenging bimanual dexterous tool-use tasks from OakInk2 [7], in-cluding cutting, pouring, wiping, shearing, and stirring. Each task requires coordinated interaction among two dexterous hands, a tool, and an object. We compare DexFuture against two strong target-conditioned dexterous policy baselines: ManipTrans [4] and PhysGraph [5]. For these baselines, the target is provided from the ground-truth future demonstration state. We also include a no-target variant of the PhysGraph policy, which removes the future target input and tests whether the policy can perform the task from the current state alone. We report success rate (SR), tool/object transla-tion error Et, hand joint error Ej , and fingertip error Ef t . Higher SR is better, while lower tracking errors are better. Implementation details, reward terms, training hyperparameters, evaluation metrics definition, and results of more tasks are provided in the supplementary .
+
+4.2 Policy Evaluation with Predicted Future Targets 
+
+The core question of policy evaluation is whether DexFuture can retain the benefit of target-conditioned dexterous control without using privileged future demonstration targets at inference. Table 1 summarizes the policy performance. The “no-target” policy shows that simply removing the future target makes high-DoF dexterous tool use nearly infeasible, while DexFuture recovers a strong target signal from visuomotor history. Compared with the privileged structured-policy, DexFuture achieves about 90% of the average suc-cess rate of privileged baselines ( 59 .69% vs. 66 .52% ), despite using predicted targets instead of ground-truth future demonstration targets. On the fruit-knife cutting task, DexFuture even slightly outperforms the privileged baseline in success rate ( 89 .79% vs. 87 .87% ) and tool/object translation error ( 0.61 cm vs. 0.98 cm). On the bread-cutting, whiteboard-wiping, and paper-shearing tasks, DexFuture remains close to the privileged baseline while significantly outperforming the no-target 6variant. These results support our main claim: future target guidance is essential for dexterous tool use, but it does not have to be provided by online privileged demonstration state. 
+
+4.3 Future-State Visuomotor Target Prediction 
+
+Table 2: Future-state target prediction accu-racy. We report 3D error, UV error, and PCK within 5/10 pixels.                                         
+
+> Task ID 3D ↓UV ↓PCK@5 ↑PCK@10 ↑
+> 083f7@0 1.47 3.32 79.56 98.37 9fc3e@0 0.87 2.56 91.34 99.78 598a5@0 1.31 2.73 90.24 97.82 1292e@0 2.31 6.91 38.49 80.02 817fb@0 4.54 8.74 19.33 68.27 e1fa67@0 5.54 25.58 7.98 32.93 9bb17@5 4.50 12.86 22.31 54.15 cde36@1 1.65 5.41 76.93 95.76
+
+We next evaluate the Future-State Visuomotor Target Predictor independently from the policy. Table 2 reports future-state prediction quality with 3D error in cm, 2D UV error in pixels, and PCK (Percentage of Correct Keypoints) in 5 and 10 pixels. The predictor performs accu-rately on cutting/stirring tasks, while shearing is more challenging. The performance of the target predictor shows a consistent pattern with that of the overall policy. Challenging tasks in-volve narrow tool-object contact regions, and abrupt motion changes, making future states harder to infer from the observation history alone. The tasks considered for testing are all unseen during training. We provide the full training tasks ID in the Supplementary Material .Table 3: Ablation on future prediction horizon. 
+
+We compare different future horizon schedules.                                             
+
+> Task ID 3D ↓UV ↓PCK@5 ↑PCK@10 ↑
+> 083f7@0 h24 1.66 4.05 71.87 97.54 083f7@0 h16 1.47 3.32 79.56 98.37 083f7@0 h8 1.19 3.68 76.99 96.34 9fc3e@0 h24 1.11 2.95 86.66 99.27 9fc3e@0 h16 0.87 2.56 91.34 99.78 9fc3e@0 h8 0.84 2.46 92.15 99.72 598a5@0 h24 1.77 3.97 73.56 97.46 598a5@0 h16 1.31 2.73 90.24 97.82 598a5@0 h8 1.38 2.86 89.72 97.40
+
+Table 3 shows the effect of the receding hori-zon, which is directly tied to the temporal hier-archy in DexFuture. A short horizon is easier to predict, but provides less future guidance to the controller. A long horizon covers more policy steps, but becomes harder to predict reliably. We choose h16 as the default horizon, corre-sponding to {0, 2, 4, . . . , 16 }, which provides the best overall trade-off. This supports our hi-erarchical design that the high-level predictor produces future targets at a slower timescale, while the policy executes dense low-level actions. 
+
+4.4 Qualitative Results 
+
+Figure 3 visualizes representative rollouts. The no-target policy often loses stable hand-tool-object coordination, confirming that current-state feedback alone is insufficient for these tasks. In contrast, DexFuture produces motions that closely follow the oracle target-conditioned policies: the hands maintain tool grasp, approach the object with appropriate alignment, and complete contact-rich interactions such as cutting, wiping, and shearing. These qualitative results complement Table 1, which shows that DexFuture is not simply improving a scalar success metric, but restoring the coordinated structure that target-conditioned dexterous policies rely on. The predicted target acts as a coarse future guidance, while the policy performs the local contact correction for execution. 
+
+4.5 Comparison with Action-Conditioned Planning 
+
+To validate our choice of action-free predictor with a policy rather than an action-conditioned world model with planning for dexterous tool use, we further compare DexFuture with the strongest action-conditioned dexterous world-model planning baseline following DexWM [6]. We train the default DexWM model on the EgoDex dataset [18], evaluate on DexWM’s default dataset to get comparable results to those reported in [6], then further evaluate variants with and without finetuning on our OakInk2 tool-use tasks. We test both short and long-horizon planning. The best performance was obtained by finetuning on the OakInk2 dataset, and by using a planning horizon of 1 (next RGB frame as the goal). However, it still underperforms DexFuture. More importantly, testing using the same single 3090Ti GPU, DexWM’s default CEM-based planning runs at approximately 0.24 Hz, 7Figure 3: Qualitative comparison on bimanual dexterous tool-use tasks. From top to bottom: 1. chop knife cutting bread (083f7@0). 2. fruite knife cutting apple (9fc3e@0). 3. shear paper with scissors (9bb17@5). 4. wipe whiteboard with brush (fc88d@0). From left to right: 1. ManipTrans with ground-truth target. 2. PhysGraph with ground-truth target 3. PhysGraph without target. 4. Our DexFuture with predicted target. The privileged baselines can access the demonstration targets, while DexFuture infers the future target from visuomotor history alone. The no-target policy fails to maintain robust hand-tool-object interaction, whereas DexFuture recovers stable tool use and produces rollouts comparable to the oracle policies. We include more tasks and full videos in the 
+
+Supplementary Material .while DexFuture executes at the policy control rate of 60 Hz. The 250 × speed gap is critical for high-DoF dexterous manipulation, where contact-rich actions must be updated at high frequency. These results highlight the practical advantage of our hierarchy: instead of optimizing over counterfactual future action sequences online, DexFuture amortizes future target generation into a low-frequency visuomotor predictor and leaves high-frequency action control to the policy. The full comparison is described in the Supplementary Material .
+
+## 5 Conclusion 
+
+We presented DexFuture , a hierarchical future-state visuomotor targeting framework for bimanual dexterous tool use. DexFuture removes the need for privileged future demonstration targets by pre-dicting future targets conditioned on RGB and proprioceptive/geometric history, while a low-level structured policy executes high-frequency contact-rich actions. This design preserves the benefit of target-conditioned dexterous control without requiring future demonstration states or slow online action-sequence planning. Experiments on challenging tool-use tasks show that DexFuture mostly retains the performance of privileged baselines, strongly outperforms no-target control, and runs substantially faster than counterfactual planning. 
+
+## 6 Limitations and Future Work 
+
+The main remaining bottleneck is future target prediction under difficult contacts. Tasks with nar-row contact regions or abrupt tool motion remain challenging. The high-level predictor must be robust enough to guide the precise action of low-level policy. Potential future solutions should focus on uncertainty-aware or contact-aware prediction, stronger visual grounding under occlusion, and deployment to a real robot. 8References 
+
+[1] Z. Mandi, Y. Hou, D. Fox, Y. Narang, A. Mandlekar, and S. Song. Dexmachina: Functional retargeting for bimanual dexterous manipulation, 2025. URL https://arxiv.org/abs/ 2505.24853 .[2] X. Liu, J. Adalibieke, Q. Han, Y. Qin, and L. Yi. DexTrack: Towards generalizable neural tracking control for dexterous manipulation from human references. In ICLR , 2025. [3] Z. Luo, J. Cao, S. Christen, A. Winkler, K. Kitani, and W. Xu. Omnigrasp: Grasping diverse objects with simulated humanoids. In NeuRIPS , 2024. [4] K. Li, P. Li, T. Liu, Y. Li, and S. Huang. ManipTrans: Efficient dexterous bimanual manipula-tion transfer via residual learning. 2025. [5] R. B. Li, D. Kim, X. Liu, K. Suzuki, D. Bhatt, N. Raicevic, X. Lin, K. M. B. Lee, N. Atanasov, and T. Nguyen. Physgraph: Physically-grounded graph-transformer policies for bimanual dex-terous hand-tool-object manipulation, 2026. URL https://arxiv.org/abs/2603.01436 .[6] R. G. Goswami, A. Bar, D. Fan, T.-Y. Yang, G. Zhou, P. Krishnamurthy, M. Rabbat, F. Khor-rami, and Y. LeCun. World models for learning dexterous hand-object interactions from human videos, 2026. URL https://arxiv.org/abs/2512.13644 .[7] X. Zhan, L. Yang, Y. Zhao, K. Mao, H. Xu, Z. Lin, K. Li, and C. Lu. OAKINK2: A dataset of bimanual hands-object manipulation in complex task completion. In CVPR , pages 445–456, June 2024. [8] A. Handa, K. Van Wyk, W. Yang, J. Liang, Y.-W. Chao, Q. Wan, S. Birchfield, N. D. Ratliff, and D. Fox. Dexpilot: Vision-based teleoperation of dexterous robotic hand-arm system. In 
+
+IEEE International Conference on Robotics and Automation (ICRA) , pages 9164–9170, 2020. [9] Y. Qin, Y.-H. Wu, S. Liu, H. Jiang, R. Yang, Y. Fu, and X. Wang. Dexmv: Imitation learning for dexterous manipulation from human videos. European Conference on Computer Vision (ECCV) , 2022. [10] Y. Chen, T. Wu, S. Wang, X. Feng, J. Jiang, S. McAleer, Y. Geng, H. Dong, Z. Lu, S.-C. Zhu, and Y. Yang. Towards human-level bimanual dexterous manipulation with reinforcement learning. NeuRIPS , 2022. [11] Y. Qin, B. Huang, Z.-H. Yin, H. Su, and X. Wang. Dexpoint: Generalizable point cloud reinforcement learning for sim-to-real dexterous manipulation. Conference on Robot Learning (CoRL) , 2022. [12] Y. Xu, W. Wan, J. Zhang, H. Liu, Z. Shan, H. Shen, R. Wang, H. Geng, Y. Weng, J. Chen, et al. Unidexgrasp: Universal robotic dexterous grasping via learning diverse proposal generation and goal-conditioned policy. CVPR , 2023. [13] Z. Jiang, Y. Xie, K. Lin, Z. Xu, W. Wan, A. Mandlekar, L. Fan, and Y. Zhu. Dexmimicgen: Automated data generation for bimanual dexterous manipulation via imitation learning. In 
+
+2025 IEEE International Conference on Robotics and Automation (ICRA) , 2025. [14] Y.-W. Chao, W. Yang, Y. Xiang, P. Molchanov, A. Handa, J. Tremblay, Y. S. Narang, K. Van Wyk, U. Iqbal, S. Birchfield, J. Kautz, and D. Fox. DexYCB: A benchmark for capturing hand grasping of objects. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2021. [15] Z. Fan, O. Taheri, D. Tzionas, M. Kocabas, M. Kaufmann, M. J. Black, and O. Hilliges. ARC-TIC: A dataset for dexterous bimanual hand-object manipulation. In Proceedings IEEE Con-ference on Computer Vision and Pattern Recognition (CVPR) , 2023. 9[16] O. Taheri, N. Ghorbani, M. J. Black, and D. Tzionas. GRAB: A dataset of whole-body human grasping of objects. In European Conference on Computer Vision (ECCV) , 2020. [17] Y. Liu, Y. Liu, C. Jiang, K. Lyu, W. Wan, H. Shen, B. Liang, Z. Fu, H. Wang, and L. Yi. Hoi4d: A 4d egocentric dataset for category-level human-object interaction. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 21013–21022, June 2022. [18] R. Hoque, P. Huang, D. J. Yoon, M. Sivapurapu, and J. Zhang. Egodex: Learning dexter-ous manipulation from large-scale egocentric video, 2025. URL https://arxiv.org/abs/ 2505.11709 .[19] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap. Mastering diverse control tasks through world models. Nature , pages 1–7, 2025. [20] N. Hansen, X. Wang, and H. Su. Temporal difference learning for model predictive control. In 
+
+International Conference on Machine Learning (ICML) , 2022. [21] N. Hansen, H. Su, and X. Wang. Td-mpc2: Scalable, robust world models for continuous control. In International Conference on Learning Representations (ICLR) , 2024. [22] Y. Seo, D. Hafner, H. Liu, F. Liu, S. James, K. Lee, and P. Abbeel. Masked world models for visual control. In Conference on Robot Learning (CoRL) , 2022. [23] Y. Seo, J. Kim, S. James, K. Lee, J. Shin, and P. Abbeel. Multi-view masked world models for visual robotic manipulation. ICML , 2023. [24] M. Assran, Q. Duval, I. Misra, P. Bojanowski, P. Vincent, M. Rabbat, Y. LeCun, and N. Bal-las. Self-supervised learning from images with a joint-embedding predictive architecture. In 
+
+IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023. [25] A. Bardes, Q. Garrido, J. Ponce, X. Chen, M. Rabbat, Y. LeCun, M. Assran, and N. Ballas. Revisiting feature prediction for learning visual representations from video. arXiv preprint arXiv:2404.08471 , 2024. [26] A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun. Navigation world models. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025. [27] W. Peebles and S. Xie. Scalable diffusion models with transformers. In IEEE/CVF Interna-tional Conference on Computer Vision (ICCV) , 2023. [28] R. Y. Rubinstein. The cross-entropy method for combinatorial and continuous optimization. 
+
+Methodology and Computing in Applied Probability , pages 127–190, 1999. [29] A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun. Navigation world models. arXiv preprint arXiv:2412.03572 , 2024. [30] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov. Proximal policy optimization algorithms, 2017. 10 7 Appendix 
+
+7.1 Comparison with Action-Conditioned Planning 
+
+In this section, we complete the comparison in Section 4.5. We compare DexFuture against an action-conditioned world-model planning baseline following DexWM [6]. The original DexWM planner performs image-goal CEM: at each MPC step, a goal RGB image is encoded into a DexWM visual latent, candidate future robot trajectories are sampled, and each candidate is rolled out through the action-conditioned world model. Candidates are scored by the MSE between the predicted visual latent and the goal-image latent. The planner then refits the CEM distribution using the elite samples and executes the first action before replanning. In the original DexWM CEM baseline, their CEM-planning configuration is highly expensive sup-ported by 8 H100 GPUs for inference: prediction horizon is 3, CEM optimization steps is 10, can-didate samples per CEM iteration is 1024, and elite samples are 10 for distribution refitting. This setting is computationally heavy because every CEM iteration requires thousands of autoregressive visual world-model rollouts. To make the baseline feasible to run, we implement a state-based CEM variant. Instead of scoring candidates by image-latent distance to a goal RGB frame, we score predicted future states directly in the target state space used by the controller. The state-based CEM uses a smaller online budget: horizon 16, 128 samples, 16 elites, and 4 CEM iterations, with micro-batched mixed-precision scor-ing. This reduces memory and compute while aligning the planning objective with the downstream policy. On our single 3090Ti evaluation GPU, this CEM-based planning runs at around 0.24 Hz, far below the control frequency needed for contact-rich dexterous manipulation. Despite these adapta-tions, DexWM-style online planning remains substantially slower than DexFuture, which amortizes future target prediction into System-1 and executes System-0 at the policy control rate of 60 Hz. We evaluate four DexWM-style baselines by varying two factors: the world-model checkpoint and the planning horizon. For the checkpoint, following DexWM’s default training, we first train on EgoDex [18] dataset and test the original checkpoint to get the equivalent results as DexWM’s paper reported, then we finetune DexWM on OakInk2 [7]. For the horizon, we evaluate a short-horizon oracle setting with horizon 1, where the planner is given the next-frame ground-truth goal at every step, and a longer-horizon setting with horizon 16. In the image-goal DexWM formulation, the horizon-1 setting corresponds to using the next RGB frame as the goal, while in our state-based adaptation, the analogous setting uses the next ground-truth target state. 
+
+Figure 4: Qualitative results of DexWM-style CEM-based Planning. From left to right: Finetune + Horizon 1; No-finetune + Horizon 1; Finetune + Horizon 16; No-finetune + Horizon 16. Table 4: Quantitative results of DexWM-style CEM-based Planning. Speed is tested on the same single 3090Ti GPU. SR: Success Rate; E t: Tool & Object Translation Error; E j: Hand Joint Error; E ft: Fingertip Error.                                    
+
+> Ablations Speed (Hz) ↑SR (%) ↑E t (cm) ↓E j (cm) ↓E ft (cm) ↓
+> DexWM (GT target, Finetune + Horizon 1) 0.24 69.57 1.20 2.29 1.93 DexWM (GT target, No-finetune + Horizon 1) 0.24 02.94 3.65 3.41 DexWM (GT target, Finetune + Horizon 16) 0.24 02.82 2.78 2.55 DexWM (GT target, No-finetune + Horizon 16) 0.24 03.17 2.97 2.92 DexFuture (Pred target, Horizon 16) 60 83.49 1.06 2.08 2.04
+
+11 Figure 4 and table 4 indicate that dense goals and finetuning are both essential for the world model planning. With the per-step densest ground truth guidance, DexWM achieves impressive perfor-mance. However, the ground truth targets are not always available during the inference, the rollouts sampling also require significant longer time than a well-trained policy, further diminishing the practical efficiency of a future action-conditioned world model on high-DoF dexterous tasks. By comparison, our proposed Please check the full video comparison for more details. 
+
+7.2 Relation to Action Chunking and Direct Action Prediction 
+
+DexFuture is related to action-chunking and diffusion-based visuomotor policies since all of these methods reason over a short future horizon. However, the predicted quantity is fundamentally dif-ferent. Action-chunking methods such as ACT directly generate future motor commands, while diffusion or flow-based policies model the distributions over future action trajectories. Our point is that direct action generation couples two problems that DexFuture separates: predicting where the hand-tool-object system should progress, and deciding how to achieve that progress through contact-rich actions. This distinction is especially important for high-DoF dexterous hands. In an action chunk, the temporal plan and the low-level motor command are both encoded in action space. If contact occurs earlier or later than predicted, or if the tool-object alignment changes slightly, the remaining action chunk becomes unrobust. Receding-horizon execution can mitigate this by querying the policy repeatedly, but the policy still has to learn long-horizon task progress and fine contact correction through direct action prediction. DexFuture instead predicts a future target-state sequence, not a motor-command sequence. The low-level policy observes the current simulator state at every step and converts the current predicted target into an action, allowing contact correction. Therefore, DexFuture should not be interpreted as an action-chunking method. Action-chunking predicts future actions; DexFuture predicts future target states. Action chunks are executed directly or through receding-horizon aggregation; DexFuture targets are interpreted by a separate policy. This separation lets the high-level module focus on coarse future-state guidance, while the low-level controller remains responsible for high-frequency dexterous contact execution. DexFuture is also different from large VLA or diffusion foundation policies. These models generally map observations, and optionally language, to actions or action chunks. DexFuture instead assumes a target-conditioned dexterous controller and studies how to produce its future target input without privileged demonstration state. These directions are complementary: a direct-action policy or VLA backbone could potentially serve as the low-level controller, while DexFuture’s target predictor provides structured long-horizon guidance. 
+
+7.3 Method and Implementation Details 7.3.1 Observation and Target Notation 
+
+Let a demonstration trajectory be denoted by 
+
+τ = {It, p t, s t, g demo  
+
+> t
+
+}Tt=1 , (11) where It is the egocentric RGB observation, pt contains structured proprioceptive and geometric cues available to the predictor, st is the simulator state used by the policy, and gdemo  
+
+> t
+
+is the demon-stration target consumed by the target-conditioned dexterous policy. The Future-State Visuomotor Target Predictor receives a history window 
+
+Ot−K:t = {Iτ , p τ }tτ =t−K , (12) and predicts targets over a finite horizon set 
+
+H = {h1, . . . , h M }. (13) In our default setting, K = 8 , so the predictor observes 9 frames, and H = {0, 2, 4, . . . , 16 }. We additionally evaluate alternative horizon schedules and show results in Table 3. 12 The structured state contains Nℓ hand-link entries and two scene-level entries for the tool and object. Our model supports multiple tools and objects, where the multi entities in the environment are pooled to a tool entry and an object entry. This design facilitates the tasks where multi objects and tools are involved in the tool use. In our implementation, Nℓ = 56 for the two hands, and the resulting structured token set has N = Nℓ + 2 = 58 tokens per frame. The target gt has the same semantic layout as the policy’s original demonstration target, so the downstream controller can consume either 
+
+gdemo  
+
+> t
+
+or the predicted target ˆgt without changing the policy interface. 
+
+7.3.2 Structured Visuomotor Tokenization 
+
+The predictor does not run future prediction over all dense image patches. Instead, it converts each observation frame into a compact set of physical tokens corresponding to hand links, the tool, and the object. Let Ψ be a frozen visual encoder. For each frame It, the visual encoder produces patch features 
+
+V raw  
+
+> t
+
+= Ψ( It) ∈ RP ×dv , (14) where P is the number of image patches and dv is the raw visual feature dimension. A learned projection maps these features into the structured token space, 
+
+Vt = Wv V raw  
+
+> t
+
++ Epatch , Vt ∈ RP ×d. (15) Here, d is the structured token dimension and Epatch is a learned patch-position embedding. In our implementation, the frozen visual encoder is DINOv2 ViT-L/14, dv = 1024 , and d = 256 . The projection is important because hand-link queries, tool/object descriptors, and future tokens are all represented in the same structured token space. 
+
+Hand-link tokens. For each hand link ℓ, let xt,ℓ ∈ R3 be its 3D position, ut,ℓ ∈ R2 be its projected image coordinate, and ˙xt,ℓ ∈ R3 be its finite-difference velocity. We define a link-conditioned geometric feature 
+
+ξt,ℓ = [ ˙ xt,ℓ , γ x(xt,ℓ ), γ u(ut,ℓ )] , (16) where γx and γu are Fourier feature embeddings for 3D and 2D coordinates. Each link also has a learned identity embedding eℓ. The base link query is 
+
+q0 
+
+> t,ℓ
+
+= LN ( Wid eℓ + Wξ ξt,ℓ ) . (17) The identity embedding tells the model which physical link is being queried, while ξt,ℓ tells the model where that link is, where it projects in the image, and how it is moving. However, a fixed additive query is still limited: the same link identity should attend to image evidence differently when it is near a tool, far from the object, or moving quickly during contact. We therefore use feature-wise linear modulation (FiLM) to adapt the query according to the current link geometry and motion: 
+
+(αt,ℓ , β t,ℓ ) = ffilm (ξt,ℓ ), qt,ℓ = (1 + αt,ℓ ) ⊙ q0 
+
+> t,ℓ
+
++ βt,ℓ . (18) Conditioning FiLM on ξt,ℓ makes the query geometry-dependent while preserving the link identity. For example, the same fingertip token can produce different attention queries depending on whether it is approaching the tool, already in contact, or moving away from the object. Around the projected coordinate ut,ℓ , we gather a local patch neighborhood Ω( ut,ℓ ). The hand-link token is computed by cross-attention from the link query to the local visual patch tokens: 
+
+zhand  
+
+> t,ℓ
+
+= qt,ℓ + MHA  qt,ℓ , {V t,i + ρ(¯ ui − ut,ℓ )}i∈Ω( ut,ℓ )
+
+ , (19) where ρ(·) encodes relative 2D offsets between the queried link and the local patch centers. In our implementation, Ω( ·) is a 5 × 5 patch window. Thus each hand-link token is a local visual-geometric descriptor grounded at a physical link. 13 Tool and object tokens. Tool and object tokens are constructed from scene entities. To support scenes with different numbers of tools or objects, we allocate a fixed maximum number of entity slots Emax and use a binary validity mask ωt,e ∈ { 0, 1} for each slot. If a scene contains fewer than 
+
+Emax entities, unused slots are masked out and do not contribute to pooling. If a scene contains more than Emax entities, the current implementation keeps the first Emax entity specifications. Let e ∈ { 1, . . . , E max } index an entity slot, with state rt,e , static geometry descriptor me, type label 
+
+ce, projected center (xct,e , u ct,e ), and a set of anchors {(xat,e,k , u at,e,k )}Ak=1 . The state rt,e contains position, orientation, linear velocity, and angular velocity. The geometry descriptor me is static for each entity, while the center and anchor locations are transformed and projected according to the current entity pose. Each anchor samples a visual patch feature from the projected image location. We define 
+
+at,e,k = Wa[xat,e,k , u at,e,k ] + Wvis Vt, sample( uat,e,k ). (20) Anchor features are averaged over valid anchors: 
+
+¯at,e = 1
+
+AeAeX
+
+> k=1
+
+at,e,k . (21) The entity token is 
+
+zent  
+
+> t,e
+
+= LN  Etype (ce) + Wr rt,e + Wmme + Wc[xct,e , u ct,e ] + ¯ at,e 
+
+ . (22) The final scene tokens are obtained by type-masked pooling. Let 
+
+Etool  
+
+> t
+
+= {e : ωt,e = 1 , c e = tool }, Eobj  
+
+> t
+
+= {e : ωt,e = 1 , c e = object }. (23) Then 
+
+ztool  
+
+> t
+
+= 1
+
+|E tool  
+
+> t
+
+|
+
+X
+
+> e∈E tool
+> t
+
+zent  
+
+> t,e
+
+, zobj  
+
+> t
+
+= 1
+
+|E obj  
+
+> t
+
+|
+
+X
+
+> e∈E obj
+> t
+
+zent  
+
+> t,e
+
+. (24) Thus, although each frame may contain a variable number of valid scene entities, the predictor receives a fixed-size scene representation with one tool token and one object token per frame. Unlike hand link tokens using local cross-attention over a patch window, we use such anchor-aligned visual sampling and pooling for scene (object/tool) tokens. This is sufficient because tool/object en-tities are spatially larger and already have explicit state, geometry, center, and multi-anchor informa-tion, while hand links are small and benefit more from local visual attention. In our implementation, anchor points are selected deterministically from the entity mesh vertices using evenly spaced vertex indices, transformed by the current entity pose, and projected into the egocentric image. This gives each scene token access to multiple local visual regions rather than only the object center. 
+
+7.3.3 Horizon-Conditioned Target Transformer 
+
+Given history tokens Zt−K:t, the predictor estimates future structured tokens ˆZt+h for each h ∈ H .We first project structured tokens into a transformer hidden space: 
+
+Xτ = Win Zτ , τ ∈ [t − K, t ]. (25) The observed tokens form the memory 
+
+M = Flatten( Xt−K:t), (26) where flattening is over time and token index. For each horizon hj ∈ H , where j indexes the output horizon slot, the future query tokens are initialized from the latest observed structured state. Let i ∈ { 1, . . . , N } denote the structured token index, corresponding to a hand link, tool token, or object token. We initialize 
+
+Y 0  
+
+> hj,i
+
+= Xt,i + Eslot (i) + Eframe (j), (27) 14 where Eslot (i) is a learned embedding for the physical token slot and preserves whether the query corresponds to a specific hand link, the tool, or the object. Eframe (j) is a learned embedding for the discrete future output slot. The slot embedding provides token identity, while the frame embedding distinguishes different predicted slots in the output sequence. The numeric prediction horizon is encoded separately by Fourier features: 
+
+chj = fh(γ(hj )) , (28) where γ(hj ) is the Fourier encoding of the actual future offset hj . This is different from only using a learned output-slot embedding: the same output slot can correspond to different numeric horizons under different horizon schedules, while chj explicitly tells the model the actual future offset. Each transformer block uses horizon-conditioned adaptive normalization. For a token sequence Yh
+
+at horizon h, we define 
+
+AdaLN( Yh, c h) = LN( Yh) ⊙ (1 + s(ch)) + b(ch), (29) where s(ch) and b(ch) are horizon-conditioned scale and shift. One block updates the future queries as 
+
+Yh ← Yh + αsa (ch) MSA(AdaLN( Yh, c h)) , (30) 
+
+Yh ← Yh + αca (ch) MCA(AdaLN( Yh, c h), M ), (31) 
+
+Yh ← Yh + αff (ch) FFN(AdaLN( Yh, c h)) . (32) Here, MSA is self-attention among predicted future tokens, MCA is cross-attention from future queries to observed memory tokens, and FFN is the feed-forward network. The gates αsa , αca ,and αff are also functions of the horizon condition. The adaptive conditioning is inspired from CDiT-style transformers [29], but our model is not a diffusion model: it has no noise injection, denoising objective, reverse sampling chain, or stochastic generation process. It directly regresses future structured tokens. After L blocks, we project back to the structured token space: 
+
+ˆZt+h = Wout Y Lh . (33) The prediction heads decode ˆZt+h into auxiliary future state predictions and the future policy target: 
+
+ˆxlink 
+
+> t+h
+
+, ˆulink 
+
+> t+h
+
+, ˆvlink 
+
+> t+h
+
+, ˆxscene  
+
+> t+h
+
+, ˆuscene  
+
+> t+h
+
+, ˆvscene  
+
+> t+h
+
+, ˆgt+h = Dθ ( ˆZt+h). (34) In our implementation, the transformer hidden dimension is 384 , the structured token dimension is 
+
+256 , and the default horizon set contains 9 prediction horizons. The future query slots are initialized from the current structured token set and then transformed by horizon-conditioned blocks. 
+
+7.3.4 Target Representation 
+
+The decoded target ˆgt+h is designed to match the semantic interface consumed by the target-conditioned dexterous policy. It is a bimanual target, 
+
+ˆgt+h = [ˆ gRt+h, ˆgLt+h], (35) where each side contains future wrist information, hand-link or joint information, object motion information, fingertip relation terms, and shape-level task cues. In our implementation, to follow a fair setup to ManipTrans [4] and PhysGraph [5], the full target is 900 -dimensional, consisting of two 450 -dimensional hand-side targets. This includes wrist pose and velocity, joint delta positions and velocities, object pose and velocity, fingertip distance terms, and BPS shape features. This target is not meant to be a physically exact rollout. It is a structured future coarse guidance for the policy. The downstream policy still observes the current state at every control step and performs contact-level correction through feedback control. 15 7.3.5 Predictor Training Objective 
+
+The predictor is trained by supervised future prediction from demonstration replay. For each sam-pled time t, the model predicts ˆZt+h and ˆgt+h for all h ∈ H . The loss is 
+
+Lpred = λz Lz + λstate Lstate + λtarget Ltarget . (36) The latent consistency loss stabilizes horizon-latent prediction: 
+
+Lz = ∥ ˆZt − Zt∥. (37) The structured-state loss supervises hand-link and scene predictions: 
+
+Lstate = X
+
+> h∈H
+
+[λx∥ˆxt+h − xt+h∥ + λu∥ˆut+h − ut+h∥ + λv ∥ˆvt+h − vt+h∥] , (38) where the terms are applied to both hand-link and scene-level predictions with separate weights. The target loss is a component-wise loss over the target representation: 
+
+Ltarget = X
+
+> h∈H
+
+X
+
+> b∈B
+
+λbdb
+
+
+
+ˆgbt+h, g demo ,b t+h
+
+
+
+, (39) where B indexes target components such as wrist, link, object, fingertip, and shape terms. Most components use Smooth-L1 distance. For quaternion components, we normalize both predicted and ground-truth quaternions and align their sign hemisphere before computing the loss, since q and −q
+
+represent the same rotation. 
+
+7.3.6 Target-Conditioned Structured Dexterous Policy 
+
+The dexterous policy receives the current simulator state st and a target gt. The target can either be the privileged demonstration target gdemo  
+
+> t
+
+or the DexFuture-predicted target ˆgt. Following Phys-Graph [5], the policy groups st and ˆgt to structured hand-link inputs, then tokenizes the bimanual system hand-link inputs into hand-link tokens, scene tokens, and a policy token: 
+
+H0 
+
+> t
+
+= {hlink  
+
+> t,i
+
+}Np 
+
+> i=1
+
+∪ { htool  
+
+> t
+
+, h obj  
+
+> t
+
+, h pol  
+
+> t
+
+}. (40) A transformer encoder produces final tokens HLt . The policy token hL, pol  
+
+> t
+
+parameterizes a Gaussian action distribution: 
+
+at ∼ N 
+
+
+
+μϕ(hL, pol  
+
+> t
+
+), diag( σ2
+
+> ϕ
+
+)
+
+
+
+. (41) The value function uses the policy token and training-time privileged features: 
+
+Vϕ(st) = fV (hL, pol  
+
+> t
+
+, s priv  
+
+> t
+
+). (42) Inspired by Physgraph [5], we describe the controller as a target-conditioned per-link transformer policy, which can be replaced by any target-referenced based policy. The method contribution of this paper is the future-target predictor and the hierarchical target-generation pipeline, rather than the design of low-level controller. 
+
+7.3.7 PPO Reward 
+
+The policy is trained with PPO using imitation-style rewards. Let sdemo  
+
+> t
+
+be the demonstration state aligned to the current progress index. The reward is a weighted sum of exponential tracking terms and regularization: 
+
+rt = X
+
+> m∈M
+
+βm exp  −αmdm(st, s demo  
+
+> t
+
+) − βE ∥at∥2. (43) The set M includes wrist position and rotation, fingertip or link position, object position and rota-tion, object linear and angular velocity, wrist velocity, and joint velocity terms. For bimanual tasks, rewards from the two hands are summed, and success requires both sides to satisfy the task-specific success criterion. 16 We conducted two phases of PPO training. Since the visuomotor predictor is always frozen, we always leverage the predicted targets rather than the demonstration for training. However, the input RGB to the visuomotor predictor are separate to two stages. In the stage one, we only use the offline causal RGB from demonstration to stabilize the policy training. In the second stage, we switch the RGB input to the online causal rendered RGB from rollout rather than offline demonstration, this enables the full hierarchical system to be fully closed-loop. 
+
+7.3.8 Receding-Horizon Target Execution 
+
+During execution, the predictor runs at a slower semantic timescale than the policy. At refresh time 
+
+tj , it predicts a sparse target sequence 
+
+ˆgtj :tj +H = Fθ (Otj −K:tj ; H). (44) For an intermediate control step tj +δ, the target is obtained by linear interpolation. Let ha ≤ δ ≤ hb
+
+be neighboring horizons in H. Then 
+
+˜gtj +δ = (1 − η)ˆ gtj +ha + ηˆgtj +hb , η = δ − ha
+
+hb − ha
+
+. (45) The policy then acts as 
+
+atj +δ ∼ πϕ(· | stj +δ , ˜gtj +δ ). (46) This allows the target predictor to produce coarse future-state guidance over a window, while the policy executes high-frequency feedback control at every simulator step. In the default setting, the history length is K = 8 and the horizon set is 
+
+H = {0, 2, 4, 6, 8, 10 , 12 , 14 , 16 }. (47) Thus, at refresh time tj , the predictor consumes observations from 
+
+Otj −8: tj = {Iτ , p τ }tj  
+
+> τ=tj−8
+
+,
+
+and predicts sparse future targets 
+
+{ˆgtj , ˆgtj +2 , ˆgtj +4 , . . . , ˆgtj +16 }.
+
+The policy acts at every simulator step, so targets for intermediate steps such as tj +1 , t j +3 , . . . , t j +15 are obtained by linear interpolation between neighboring sparse predictions. 
+
+7.4 Pseudocode 
+
+17 Algorithm 1 Training the Future-State Visuomotor Target Predictor 
+
+Require: Demonstration dataset D, frozen visual encoder Ψ, horizon set H, history length K,predictor Fθ , loss weights λ.
+
+Ensure: Trained predictor Fθ .
+
+1: while not converged do 
+
+2: Sample a minibatch of time indices t and windows from D:
+
+{Iτ , p τ }tτ =t−K , {gdemo  
+
+> t+h
+
+}h∈H .
+
+3: for τ = t − K, . . . , t do 
+
+4: Encode RGB observation: 
+
+V raw  
+
+> τ
+
+← Ψ( Iτ ).
+
+5: Project visual tokens into the structured token space: 
+
+Vτ ← Wv V raw  
+
+> τ
+
++ Epatch .
+
+6: Construct structured visuomotor tokens: 
+
+Zτ ← Tokenize( Vτ , p τ ),
+
+where Tokenize( ·) builds hand-link tokens by local visual cross-attention and tool/object tokens by anchor-aligned scene pooling. 
+
+7: end for 
+
+8: Form the observed structured history: 
+
+Zt−K:t ← { Zt−K , . . . , Z t}.
+
+9: for h ∈ H do 
+
+10: Initialize future query tokens: 
+
+Y 0 
+
+> h
+
+← Win Zt + Eslot + Eframe (h).
+
+11: Compute horizon condition: 
+
+ch ← fh(γ(h)) .
+
+12: end for 
+
+13: for ℓ = 1 , . . . , L do 
+
+14: for h ∈ H do 
+
+15: Update future query tokens: 
+
+Y ℓh ← HCTBlock  Y ℓ−1 
+
+> h
+
+, W in Zt−K:t, c h
+
+ .
+
+16: end for 
+
+17: end for 
+
+18: for h ∈ H do 
+
+19: Decode future structured tokens: 
+
+ˆZt+h ← Wout Y Lh .
+
+20: Decode future policy target: 
+
+ˆgt+h ← Dθ ( ˆZt+h).
+
+21: end for 
+
+22: Compute prediction objective: 
+
+Lpred ← λz Lz + λstate Lstate + λtarget Ltarget .
+
+23: Update predictor parameters: 
+
+θ ← θ − η∇θ Lpred .
+
+24: end while 
+
+18 Algorithm 2 Training the Target-Conditioned Structured Dexterous Policy 
+
+Require: Simulator environment, demonstration dataset D, target source G, policy πϕ, PPO opti-mizer. 
+
+Ensure: Trained target-conditioned policy πϕ.
+
+1: while not converged do 
+
+2: Reset parallel environments to demonstration-aligned initial states. 
+
+3: for rollout step t = 1 , . . . , T roll do 
+
+4: Read current simulator state st.
+
+5: if privileged target mode then 
+
+6: Obtain demonstration target: 
+
+˜gt ← gdemo  
+
+> t+h
+
+.
+
+7: else 
+
+8: Obtain predicted target from target cache: 
+
+˜gt ← Interp  ˆgtj :tj +H , t − tj
+
+ .
+
+9: end if 
+
+10: Tokenize current state and target: 
+
+H0 
+
+> t
+
+← PolicyTokenize( st, ˜gt).
+
+11: Compute policy distribution: 
+
+πϕ(· | st, ˜gt) ← PolicyTransformer( H0 
+
+> t
+
+).
+
+12: Sample action: 
+
+at ∼ πϕ(· | st, ˜gt).
+
+13: Step simulator: 
+
+st+1 ← EnvStep( st, a t).
+
+14: Compute imitation-style reward: 
+
+rt ← X
+
+> m∈M
+
+βm exp  −αmdm(st, s demo  
+
+> t
+
+) − βE ∥at∥2.
+
+15: Store transition: 
+
+(st, ˜gt, a t, r t, s t+1 ).
+
+16: end for 
+
+17: Update ϕ with PPO using collected rollouts. 
+
+18: end while 
+
+19 Algorithm 3 DexFuture Receding-Horizon Execution 
+
+Require: Trained predictor Fθ , trained policy πϕ, horizon set H, history length K, predictor refresh stride S.
+
+Ensure: Executed bimanual manipulation trajectory. 
+
+1: Initialize observation history buffer Ot−K:t.
+
+2: for refresh time tj = 0 , S, 2S, . . . do 
+
+3: Predict sparse future target sequence: 
+
+ˆgtj :tj +H ← Fθ (Otj −K:tj ; H).
+
+4: for δ = 0 , . . . , S − 1 do 
+
+5: Interpolate target for the current control step: 
+
+˜gtj +δ ← Interp  ˆgtj :tj +H , δ  .
+
+6: Read current simulator state stj +δ .
+
+7: Query target-conditioned policy: 
+
+atj +δ ∼ πϕ
+
+ · | stj +δ , ˜gtj +δ
+
+ .
+
+8: Step simulator: 
+
+stj +δ+1 ← EnvStep  stj +δ , a tj +δ
+
+ .
+
+9: Record the new RGB/state observation and update the history buffer O.
+
+10: end for 
+
+11: end for 
+
+20
