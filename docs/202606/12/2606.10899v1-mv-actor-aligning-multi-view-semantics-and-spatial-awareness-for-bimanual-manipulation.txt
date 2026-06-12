@@ -1,0 +1,813 @@
+Title: MV-Actor: Aligning Multi-View Semantics and Spatial Awareness for Bimanual Manipulation
+
+URL Source: https://arxiv.org/pdf/2606.10899v1
+
+Published Time: Wed, 10 Jun 2026 01:19:10 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# MV-Actor: Aligning Multi-View Semantics and Spatial Awareness for Bimanual Manipulation 
+
+Yinchen Tian 1 Huan Li 2 Muyao Peng 1 Xi Wang 3 Yan Wang 2 You Yang 1,* 
+
+> 1
+
+School of Electronic Information and Communications, Huazhong University of Science and Technology, Wuhan, China 
+
+> 2
+
+Institute for AI Industry Research (AIR), Tsinghua University, Beijing, China 
+
+> 3
+
+AIR Wuxi Innovation Center, Tsinghua University, Wuxi, China 
+
+> *
+
+Corresponding author 
+
+Abstract 
+
+Robotic manipulation has been widely applied in industrial scenarios. Compared with single-arm manipulation, biman-ual manipulation is equipped with multiple cameras to cap-ture information from different viewpoints. However, ex-isting multi-view policies encode each view independently or fuse view features shallowly, resulting in limited shar-ing semantic perception and unreliable spatial awareness. In this paper, we propose MV-Actor , a multi-view perception framework that builds a unified semantic-spatial representa-tion for bimanual manipulation. First, MV-Actor performs Multi-view Semantic Interaction to share semantic percep-tion across views. Then it uses Semantic-Spatial Token Inter-action to ground visual semantics with feed-forward recon-struction model features and acquire reliable spatial aware-ness. Finally, a Guided Metric Depth Repair module refines degraded sensor depth to provide more reliable metric an-chors under consumer-grade depth noise. In simulation ex-periments conducted on the PerAct2 bimanual benchmark, MV-Actor achieves a state-of-the-art average success rate of 87.8%. In real-world evaluations with more frequent view-point changes and unstable consumer-grade depth, MV-Actor outperforms both RGB and RGB-D baselines, further demon-strating the benefit of sharing semantic perception and reli-able spatial awareness for bimanual manipulation. 
+
+Code: TianYinchen56/MV-Actor 
+
+# 1 INTRODUCTION 
+
+Robot manipulation plays a central role in scenarios such as industrial assembly [1]. Existing single-arm methods typi-cally rely on a single camera, so the policy perceives the scene from only one viewpoint [2, 3], leaving the available visual information inherently limited. In contrast, bimanual systems are commonly equipped with multiple cameras, such as wrist-mounted and external views [4, 5]. However, most bimanual policies often use these camera streams as separate visual inputs, so the perception is insufficiently shared across views. To leverage these multi-view observations, existing meth-ods construct multi-view representations in two main ways. 
+
+Figure 1: Representative simulation and real-robot tasks. Left: success rates (%) on representative simulation and real-robot biman-ual tasks. Right: start/end examples for the same tasks. MV-Actor achieves consistently best performance compared to existing meth-ods. 
+
+The first category [4, 6–8] encodes each view independently and fuses the resulting features at the policy level. This al-lows policies to receive observations from multiple cameras, but the correspondence between different views is not fully considered. The second category [9–13] goes one step fur-ther by using sensor depth to lift visual features into a shared 3D space, such as voxels or point clouds. This shared spa-tial frame enables explicit multi-view alignment, but its re-liability depends on depth sensor quality. Therefore, exist-ing approaches either fuse views without multi-view associa-tion or rely on fragile depth-based alignment, leaving sharing semantic perception and reliable spatial awareness from multi-camera observations unresolved. Based on the above insight, we propose MV-Actor, a multi-view perception framework for bimanual manipulation that constructs a unified semantic-spatial representation. On the semantic side, semantic perception is shared between features corresponding to the same physical region across different 1
+
+> arXiv:2606.10899v1 [cs.RO] 9 Jun 2026
+
+views, enabling visual tokens to draw semantic evidence from other cameras. On the spatial side, the rapid development of feed-forward reconstruction models has made it possible to obtain implicit spatial geometry priors from multi-view RGB images alone [14–16]. Our visual semantic features interact with spatial features produced by feed-forward reconstruc-tion models, endowing the representation with reliable spa-tial awareness. Then the Head-Aware Routing Gate adap-tively fuses the semantic and spatial refinements, with sep-arate weights for the translation and rotation branches. Fur-thermore, to address the degradation of consumer-grade depth sensors, MV-Actor repairs depth information to provide reli-able geometric support for Multi-view Semantic Interaction and reliable spatial awareness. In simulation experiments on the PerAct2 bimanual benchmark, MV-Actor achieves a state-of-the-art average success rate of 87.8%. On a real bimanual platform, even under degraded consumer-grade depth condi-tions, MV-Actor outperforms voxel, point-cloud, and RGB-only baselines across three categories of bimanual tasks, with representative task outcomes shown in Fig. 1. Our contribu-tions can be summarized as follows: • We propose MV-Actor , a multi-view perception frame-work for bimanual manipulation. MV-Actor treats multi-camera observations as related views of the same scene and builds a unified representation that improves sharing semantic perception and reliable spatial aware-ness. • We propose Multi-view Semantic Interaction to share semantic perception across physically matched regions, and Semantic-Spatial Token Interaction to enrich visual features with reliable spatial awareness from reconstruc-tion priors. A depth repair module further recovers reli-able metric depth from degraded depth sensor. • We evaluate MV-Actor in simulation and on a real bi-manual robot equipped with consumer-grade depth cam-eras. MV-Actor achieves state-of-the-art performance on PerAct2 (87.8%) and outperforms both explicit 3D and RGB-only baselines in real-world experiments. 
+
+# 2 Related Work 
+
+## 2.1 Multi-View Perception 
+
+Multi-view perception provides rich and complementary ob-servations for robot scene understanding [8, 17–22]. Existing methods can be broadly divided into two categories. The first category encodes each view independently or sim-ply fuses feature from every single view. ACT [4], π0 [7], and RDT-1B [6] concatenate per-view tokens and feed them di-rectly into the policy network. MVMwM [17], ReViWo [18], and 3D-MVP [19] attend over per-view tokens to aggregate information. RVT [20] and RVT-2 [21] render virtual views to fuse multi-view features, BFA [8] selects best-view fea-tures, and PEAfowl [22] aggregates local 3D neighbors by spatial proximity. A common limitation of these methods is that observations of the same physical region from different cameras are never explicitly associated, leaving sharing se-mantic perception across views underexploited. The second category uses sensor depth to lift features into a shared 3D space. PerAct [9] voxelizes the workspace and fuses multi-view features in a volumetric grid. Act3D [10], 3D Diffuser Actor [11], 3DFA [12], and ManiVID-3D [13] lift features into point clouds or 3D representations for ac-tion prediction. These methods achieve multi-view fusion through spatial alignment, but depend heavily on depth sensor quality—consumer-grade cameras frequently produce holes and noise on transparent or reflective surfaces, degrading the resulting 3D representations. Recently, feed-forward recon-struction models such as DUSt3R [14], MeMix [15], and Pi3 [16] can produce dense pointmaps and spatial tokens from multi-view RGB images alone, and related work in VLM and VLA [23–25] has shown that such spatial features improve spatial awareness in language-conditioned tasks. However, these priors have not yet been fully exploited in robot manip-ulation policies. 
+
+## 2.2 Policy Learning for Bimanual Manipula-tion 
+
+Bimanual manipulation requires coordinated motion and tem-porally precise interactions between two end-effectors, pos-ing challenges beyond single-arm control. Imitation-learning methods remain the dominant paradigm: PerAct2 [26] ex-tends voxel-based policies to dual arms, VoxAct-B [27] mod-els dual-arm dependencies, InterACT [28] introduces action chunking for bimanual coordination, RDT-1B [6] scales dif-fusion policies, and 3DFA [12] generates actions via 3D flow matching [29–31]. In parallel, VLA models such as RT-1 [3], RT-2 [32], Octo [33], OpenVLA [34], π0 [7], and π0.5 [35] transfer pretrained visual-language knowledge into robot con-trol, with generative action heads based on diffusion, flow matching, or autoregressive sequence modeling further im-proving action modeling [2, 36, 37]. While these architec-tures have advanced bimanual manipulation, most treat the multi-view perception front-end as a fixed input representa-tion without exploring how to build richer perceptual features from multi-camera observations. 
+
+## 2.3 Discussion 
+
+In summary, existing multi-view manipulation policies mainly follow two paradigms. Independent-encoding meth-ods concatenate or fuse per-view features inside the pol-icy network, but they do not explicitly associate observa-tions across views. 3D-lifting methods align views in an explicit geometric space, but their reliability is constrained by sensor-depth quality. PEAfowl [22] is the closest prior, it also enhances multi-view VLA policies with geometry-aware cross-view aggregation. However, it builds cross-view representations through learned depth distributions and lo-cal lifted-neighbor aggregation, whereas MV-Actor explic-2Depth Dec. 
+
+Policy Backbone Semantic and Spatial Interaction  
+
+> Multi-view
+> Semantic Interaction
+> Semantic-Spatial
+> Token Interaction
+
+Evaluation Tasks 
+
+Guided Metric Depth Repair 
+
+> Attention Block
+> MLP/Conv Block
+> Semantic Token
+> Spatial Token
+> Proprioception Token
+> Language Token
+> Left / Right
+> Noised trajectory tokens
+
+Figure 2: MV-Actor overview. Given multi-view RGB-D observations, MV-Actor first repairs degraded sensor depth by combining RGB texture and a Pi3X feed-forward depth prior, producing metric depth that can be back-projected into the robot frame. CLIP features provide semantic scene tokens, while Pi3X [16] provides feed-forward spatial tokens. Multi-view Semantic Interaction exchanges semantic evidence across physically corresponding regions, and Semantic-Spatial Token Interaction enables semantic tokens to acquire spatial awareness from the feed-forward spatial tokens. The Head-Aware Routing Gate forms enhanced scene tokens and routes them to position and rotation/gripper prediction streams before action decoding. 
+
+itly shares semantic perception at calibrated physically cor-responding regions and uses feed-forward reconstruction fea-tures to build reliable spatial awareness, and repairing de-graded sensor depth to provide reliable geometric support. 
+
+# 3 Method 
+
+## 3.1 Problem Formulation 
+
+Let V = {1, . . . , V } denote the camera set. At time t, the policy receives multi-view RGB-D observations, a language instruction, and robot proprioception: 
+
+Ot =
+
+
+
+{I(v) 
+
+> t
+
+, D(v) 
+
+> t
+
+}v∈V , ℓ, qt
+
+
+
+, (1) where I(v) 
+
+> t
+
+and D(v) 
+
+> t
+
+denote the RGB image and depth map of view v, ℓ denotes the language instruction, and qt denotes proprioceptive state. For each view, frozen CLIP [38] features are extracted as a 32 × 32 semantic token grid. Each token is back-projected into the robot frame: 
+
+p(v) 
+
+> i
+
+= T (v) 
+
+> base ←cam
+
+· D(v)(ui) · K(v)−1 ˜ui, (2) where K(v) denotes camera intrinsics, T (v) 
+
+> base ←cam
+
+is the camera-to-base extrinsic transform, and ˜ ui is the homoge-neous pixel coordinate, forming a metric point cloud as the shared spatial carrier. In parallel, Pi3X [16] provides spatial tokens encoding multi-view geometric structure, and the lan-guage instruction is encoded by a frozen CLIP text encoder (Fig. 2). Based on these scene tokens, MV-Actor predicts an action chunk At = {aτ }t+H−1 
+
+> τ=t
+
+, where each bimanual action is 
+
+aτ =
+
+n
+
+(pleft  
+
+> τ
+
+, rleft  
+
+> τ
+
+, gleft  
+
+> τ
+
+), (pright  
+
+> τ
+
+, rright  
+
+> τ
+
+, gright  
+
+> τ
+
+)
+
+o
+
+. (3) Here p, r, and g denote end-effector position, rotation, and gripper state. 
+
+## 3.2 Multi-view and Semantic-Spatial Token Interaction 
+
+Environmental variations such as occlusion and viewpoint changes can cause multi-view observations to produce incon-sistent semantic responses across cameras, and 2D seman-tic tokens alone lack spatial awareness. MV-Actor therefore introduces two parallel interaction paths in the metric point-cloud space: Multi-view Semantic Interaction propagates semantic evidence across physically corresponding regions, while Semantic-Spatial Token Interaction enables seman-tic tokens to query feed-forward spatial tokens. These two paths produce semantic and spatial residuals, which are later routed to downstream action heads. 
+
+Multi-view Semantic Interaction When a target object is partially hidden by an arm or another object, the seman-tic token from a single view may miss crucial evidence. 3Clip-FPN Pi3X-Aggregator           
+
+> Left
+> Left
+> Front
+> Right
+> Front
+> Right
+> L
+> L
+> FFFRRR
+> L
+> L
+> F
+> F
+> R
+> R
+> LLFFRR
+> Multi-view Semantic-spatial
+> Depth
+> Reprojection
+> Multi-View
+> Semantic Interaction
+> K,V={S F,S R}
+> K,V={G L,G F,G R}
+> Q={S L}Q={S L,S F,S R}
+> Semantic-Spatial
+> Token Interaction
+> Fused tokens
+> CLIP semantic token
+> Pi3X spatial token
+> Depth reprojection
+> Robot-frame anchor
+> Matched token pair
+> Multi-view Semantic T oken
+> Semantic-Spatial Token
+
+Figure 3: Multi-view and semantic-spatial token interaction. 
+
+MV-Actor builds semantic tokens from CLIP-FPN and spatial to-kens from the Pi3X aggregator. The upper branch performs Multi-view Semantic Interaction: semantic queries retrieve key/value to-kens from reprojection-consistent regions in other calibrated views. The lower branch performs Semantic-Spatial Token Interaction: se-mantic queries attend to Pi3X spatial tokens to inject spatial aware-ness. The two residuals are fused into the final scene tokens. 
+
+Multi-view Semantic Interaction uses calibrated reprojection to search for evidence from other views. As shown by the upper branch in Fig. 3, it avoids direct 3D KNN aggregation over the entire point cloud, which can introduce neighbors from nearby but physically different surfaces. Instead, it es-tablishes reprojection-consistent correspondences so that se-mantic propagation happens only between regions that refer to the same physical location. 
+
+Locating multi-view correspondences. For a semantic to-ken in view v with 3D anchor p(v) 
+
+> i
+
+, we project the anchor into a target view u on the semantic-token grid: ˆxu = Ru p(v) 
+
+> i
+
++ tu, ˆzu = [ ˆxu]z, ˆcu = Π
+
+
+
+Kgrid  
+
+> u
+
+ˆxu
+
+
+
+, (4) where (Ru,tu) transforms robot-frame points into the cam-era frame of view u, Kgrid  
+
+> u
+
+is the camera intrinsic matrix scaled from image resolution to the 32 × 32 token grid, 
+
+Π([ x, y, z]⊤) = ( x/z, y/z) denotes perspective normalization, and ˆ zu is the camera-frame depth. 
+
+Spatially consistent candidate filtering. Candidate tokens are searched in a radius-one local window around ˆ cu on the 32 × 32 semantic-token grid. A candidate token j in view u is valid only if it satisfies both grid-plane alignment and depth consistency: 
+
+∥ ˆcu − c(u) 
+
+> j
+
+∥2 ≤ εreproj , (5) 
+
+|ˆzu − z(u) 
+
+> j
+
+| ≤ εdepth , (6) where c(u) 
+
+> j
+
+is the candidate center in token-grid coordinates, 
+
+εreproj is measured in token-grid cells, and z(u) 
+
+> j
+
+is the z co-ordinate of its repaired-depth 3D anchor after transformation into the camera frame of view u. Eq. (5) enforces local grid alignment, while Eq. (6) rejects perspective-overlap artifacts where two different 3D surfaces project to a similar image location. Among the valid candidates in each target view, we retain the token with the smallest combined reprojection-and-depth error (Eqs. (5)–(6)); the retained matches form the correspon-dence set C (v) 
+
+> i
+
+. If no candidate satisfies the constraints in a target view, a validity mask removes that view from sub-sequent attention. This strict physical filtering is the key to stable Multi-view Semantic Interaction. 
+
+Local attention aggregation. Given C (v) 
+
+> i
+
+, Multi-view Se-mantic Interaction updates the current token with a masked local attention residual. Let dh = d/Nh be the per-head di-mension. We write the multi-head attention in compact form and omit the head index for readability: 
+
+αi,u j = softmax C (v)
+
+> i
+
+ (WQs(v) 
+
+> i
+
+)⊤WK s(u)
+
+> j
+
+√dh
+
+ , (7) 
+
+∆ssem  
+
+> i
+
+= λsWO ∑  
+
+> (u,j)∈C(v)
+> i
+
+αi,u j WV s(u) 
+
+> j
+
+. (8) The softmax is normalized only over valid candidates; a token with no valid match receives a zero residual. We apply this block twice with Nh = 8 heads and λs = 0.1. 
+
+Semantic-Spatial Token Interaction 2D semantic tokens alone cannot represent local 3D structure. As shown by the lower branch in Fig. 3, Semantic-Spatial Token Interaction enables each semantic token to attend to an aligned feed-forward spatial token for spatial awareness. Pi3X [16] spatial tokens from each view are projected to dimension d, layer-normalized, and resized to the 32 × 32 semantic-token grid via nearest-neighbor copying. For view 
+
+v, let U(v) denote its feed-forward spatial-token grid. The aligned spatial token for semantic token s(v) 
+
+> i
+
+at location c(v) 
+
+> i
+
+is ˜g(v) 
+
+> i
+
+= Align (LN (WSU(v)), c(v) 
+
+> i
+
+). Each semantic token then at-tends to its aligned spatial token through a per-head sigmoid-gated residual: 
+
+β (v) 
+
+> i,h
+
+= σ
+
+ (W spa  
+
+> Q,h
+
+s(v) 
+
+> i
+
+)⊤W spa  
+
+> K,h
+
+˜g(v)
+
+> i
+
+√dh
+
+ , (9) 
+
+∆sspa ,(v) 
+
+> i
+
+= λspa W spa  
+
+> O
+
+Concat h
+
+
+
+β (v) 
+
+> i,h
+
+W spa  
+
+> V,h
+
+˜g(v)
+
+> i
+
+
+
+, (10) where β (v) 
+
+> i,h
+
+is a scalar gate for head h, broadcast over the head dimension, and λspa = 0.1. 
+
+Parallel residual fusion Multi-view Semantic Interaction and Semantic-Spatial Token Interaction act in parallel on the shared base scene tokens s = {si}. They produce comple-mentary residuals: ∆ssem from multi-view semantic propa-gation and ∆sspa from local spatial querying. Keeping these residuals separate is important because position and rotation heads may prefer different mixtures of semantic and spatial evidence. The next subsection describes how this mixture is controlled. 43.3 Head-Aware Routing Gate 
+
+Position and rotation predictions depend on the semantic and spatial residuals to different degrees. We introduce a lightweight Head-Aware Routing Gate that adaptively con-trols the mixture. The Head-Aware Routing Gate takes as input the base scene tokens s, instruction tokens eℓ, proprioception qt , and the two residuals ∆ssem , ∆sspa . It forms a context vector: 
+
+zroute =
+
+h
+
+Pool (s), Pool (eℓ), ψ(qt ),
+
+Pool (∆ssem ), Pool (∆sspa )
+
+i
+
+,
+
+(11) where Pool (·) denotes mean pooling and ψ projects propri-oception to the latent dimension. A two-layer MLP predicts four sigmoid gates: 
+
+γ = σ (MLP route (zroute )) , (12) 
+
+sh = s + γh
+
+> sem
+
+∆ssem + γh
+
+> spa
+
+∆sspa , h ∈ { pos , rot }. (13) Here γ = ( γpos sem , γpos spa , γrot sem , γrot spa ) are scalar gates broadcast over tokens and channels. The gripper head shares the rotation-routed representation. 
+
+## 3.4 Guided Metric Depth Repair 
+
+The policy backbone encodes spatial structure via 3D Rotary Position Encoding (RoPE), which requires a metric 3D coor-dinate for every visual token. We obtain this coordinate by back-projecting through the repaired depth: ˆp(v) 
+
+> i
+
+= T (v)
+
+> base ←cam
+
+d(v)
+
+> out
+
+(ui)K(v)−1 ˜ui. (14) Consumer-grade depth sensors produce holes and noisy boundaries on reflective or transparent surfaces, yielding in-correct 3D positions that distort the positional encoding and corrupt spatial reasoning. We therefore repair the sensor depth before back-projection. The repair module fuses three complementary inputs: (i) the raw sensor depth d(v)
+
+> noisy
+
+, which preserves metric scale; (ii) the RGB image I(v), which provides sharp boundary cues; and (iii) a Pi3X feed-forward depth prior, which fills missing regions with cross-view consistent geometry: 
+
+
+
+P(v) 
+
+> π3
+
+, d(v)
+
+> π3
+
+
+
+= Gπ3
+
+
+
+{I(u)}u∈V
+
+(v)
+
+. (15) Since d(v) 
+
+> π3
+
+may exhibit scale drift, it serves as geometric guid-ance rather than the final output. We adopt a three-branch U-Net [39] encoder–decoder. At scale l, each branch encodes one input, and a fusion block merges them with the coarser-scale decoder feature: 
+
+Fl = Φl
+
+
+
+Edl (d(v)
+
+> noisy
+
+), EIl (I(v)), Eπ 
+
+> l
+
+(d(v) 
+
+> π3
+
+), Fl+1
+
+
+
+. (16) The decoder produces a non-negative repaired depth: 
+
+d(v) 
+
+> out
+
+= max  0, Hdepth (F0) . (17) The resulting depth retains the sensor’s metric scale, recovers missing geometry from the feed-forward depth prior, and pre-serves object boundaries via RGB guidance. It is then used in Eq. (14) to build the robot-frame point cloud for all subse-quent token interactions and action prediction. 
+
+## 3.5 Policy Backbone and Training Objective 
+
+MV-Actor uses a 3D denoising policy backbone conditioned on scene tokens, instruction tokens, proprioception, and noisy action trajectories. The action decoder predicts bimanual end-effector pose updates and gripper states from noisy action inputs. The scene encoder described above supplies routed scene tokens for position and rotation prediction streams. Positions are represented as workspace-normalized 3D co-ordinates, rotations are converted from quaternions to a con-tinuous 6D representation [40], and gripper states are super-vised as binary open/close labels. For the denoising targets, we use element-wise mean L1 losses for position and rotation and binary cross-entropy for the gripper state: 
+
+Lpos = mean ˆεpos − ε⋆ 
+
+> pos
+
+, (18) 
+
+Lrot = mean |ˆεrot − ε⋆
+
+> rot
+
+| , (19) 
+
+Lgrip = BCEWithLogits ( ˆg, g⋆) . (20) Here ε denotes the flow/denoising target rather than the action itself. The total objective is 
+
+L = λpos Lpos + λrot Lrot + Lgrip . (21) We set the loss weights to λpos = 30 and λrot = 10. 
+
+# 4 Experiments 
+
+We evaluate MV-Actor in simulation on the PerAct2 biman-ual benchmark. PerAct2 contains 13 bimanual manipulation tasks requiring coordination, contact reasoning, and spatial precision. We use three calibrated RGB-D views: front, left wrist, and right wrist. Unless otherwise noted, images and depth maps are resized to 256 × 256. 
+
+## 4.1 Simulation Experiments 
+
+4.1.1 Simulation Environment Setup Metrics For simulation, we report online task success rate and offline action prediction metrics, including position er-ror, position accuracy, rotation error, rotation accuracy, and gripper accuracy. 
+
+Implementation details Ablation experiments are trained for 200k updates, while the full MV-Actor is trained for 400k updates, taking about 20 hours on eight A100 GPUs. 
+
+Baselines We compare against explicit 3D RGB-D policies, RGB-only policies, and our repaired-depth RGB-D setting. 5Table 1: Main PerAct2 comparison. Except for Ours, results are organized from the 3DFA Table 1 [12]. Bold and underline denote the best and second-best result in each task column. Gray background marks MV-Actor. Missing entries indicate unreported results.                                                                                                                                                                             
+
+> Method Category Avg. PB LB DB PP ID BF RVT-LF [20] RGB-D explicit 3D 10.5 52.0 17.0 39.0 3.0 10.0 0.0 PerAct-LF [9] 17.5 57.0 40.0 10.0 2.0 27.0 0.0 PerAct2 [26] 16.8 6.0 50.0 47.0 4.0 10.0 3.0 DP3 [41] 25.6 56.0 64.0 ————KStarDiffuser [42] 68.3 83.0 98.7 ————PPI [43] 80.8 96.7 89.3 ——79.7 —AnyBimanual [44] 32.0 46.0 36.0 73.0 8.0 —26.0 3DFA [12] 85.1 92.7 99.7 92.7 69.7 93.0 89.3 ACT [4] RGB-only 5.9 0.0 36.0 4.0 0.0 13.0 0.0
+> π0-keypose [7] 43.7 93.0 97.0 38.0 41.0 40.0 22.0
+> Ours RGB-D repaired depth 87.8 89.0 100.0 93.0 89.0 95.0 90.0
+> Method Category HO PL SR SW LT HE TO RVT-LF [20] RGB-D explicit 3D 0.0 3.0 3.0 0.0 6.0 0.0 3.0 PerAct-LF [9] 0.0 11.0 21.0 28.0 14.0 9.0 8.0 PerAct2 [26] 11.0 12.0 24.0 0.0 1.0 41.0 9.0 DP3 [41] —6.3 —1.7 —0.0 —KStarDiffuser [42] —43.7 —89.0 —27.0 —PPI [43] —46.3 —98.7 92.0 62.7 —AnyBimanual [44] 15.0 7.0 24.0 67.0 14.0 44.0 24.0 3DFA [12] 89.0 74.0 40.7 99.3 94.7 96.0 94.7
+> ACT [4] RGB-only 0.0 0.0 16.0 0.0 6.0 0.0 2.0
+> π0-keypose [7] 2.0 27.0 7.0 2.0 72.0 59.0 68.0
+> Ours RGB-D repaired depth 92.0 64.0 55.0 95.0 93.0 94.0 93.0
+
+4.1.2 Simulation Results 
+
+Table 1 compares MV-Actor with prior methods on PerAct2. We group methods by representation form: RGB-only im-plicit multi-view fusion, explicit RGB-D 3D policies, and our metric-space semantic-spatial scene-token representation. Baseline results are cited from 3DFA [12]. Bold and under-line denote best and second-best. MV-Actor achieves an average success rate of 87.8%, sub-stantially outperforming the RGB-only baselines ACT and 
+
+π0-keypose and exceeding the strongest RGB-D method, 3DFA (85.1%). Unlike other methods that process each view indepen-dently, MV-Actor explicitly aggregates complementary se-mantic evidence across views at physically corresponding re-gions. On tasks such as lift_ball and push_buttons , where three calibrated views share substantial spatial overlap, more physically corresponding regions are available for Multi-view Semantic Interaction; the aggregated multi-angle semantic cues form a richer and more consistent target representation, leading to near-perfect success rates. On tasks demanding high spatial precision, such as 
+
+pick_plate (+19.3% over 3DFA) and straighten_rope 
+
+(+14.3%), Semantic-Spatial Token Interaction injects geo-metric awareness from feed-forward reconstruction features into semantic tokens; the enriched tokens encode not only what the target object is but also where it is in metric 3D space, enabling the policy to position end-effectors with higher accuracy. This observation is consistent with recent evidence that view-invariant robot representations improve spatial reasoning in manipulation [13]. In pick_plate , spatial awareness helps locate feasible grasp regions across different 
+
+Figure 4: ARK-Lift real-robot setup and tasks. The platform uses three calibrated RGB-D cameras. The task examples cover cooper-ative lifting, stick insertion, and contact-based handover. 
+
+edges captured by different cameras; in straighten_rope , it enables accurate endpoint reasoning along the full rope con-figuration observed from multiple angles. On long-horizon tasks such as sweep_dust , lift_tray ,
+
+handover_easy , take_tray_out_of_oven , and pick_up_laptop ,MV-Actor slightly underperforms 3DFA because extended manipulation introduces large viewpoint variation that re-duces multi-view overlap and degrades feed-forward recon-struction quality, weakening both Multi-view Semantic Inter-action and spatial awareness. 
+
+## 4.2 Real-Robot Experiments 
+
+4.2.1 Real-Robot Setup 
+
+We further evaluate MV-Actor on the ARK-Lift bimanual robot platform shown in Fig. 4 to test real-world deployment under depth degradation and arm occlusion. 6Table 2: REAL-WORLD STAGED SCORES (%) ON ARK-LIFT OVER 10 TRIALS PER TASK. BOLD DENOTES THE BEST RE-SULT.                    
+
+> Method Avg. Lift Plate Block Handover Stick Insertion PerAct2 [26] 16.6 9.9 20.0 19.8 3DFA [12] 58.1 43.0 75.0 56.2
+> π0[7] 52.5 43.0 55.0 59.4
+> MV-Actor (Ours) 63.1 49.7 80.0 59.6
+
+Hardware platform The real setup uses three Intel Re-alSense D405 RGB-D cameras mounted as front, left wrist, and right wrist views. Input images are resized to 256 × 256. All cameras are hand-eye calibrated and aligned with the robot base frame. Policy inference runs on a single RTX 4090 GPU. 
+
+Data collection and scoring We evaluate three representa-tive bimanual tasks: Lift Plate , Block Handover , and Stick Insertion . For each task, we collect 100 training demonstra-tions and evaluate 10 independent test trials. Two-stage tasks assign 0.50 to each stage; three-stage tasks use cumulative milestones of 0.33, 0.66, and 1.00. The scenes include reflec-tive tables, self-occlusion by both arms, tool occlusion, and local depth holes. 
+
+Compared methods We compare four representative poli-cies under the same task definitions and scoring protocol: Per-Act2 [26] as a voxel-based policy, 3DFA [12] as a point-cloud policy, π0 [7] as an RGB-only VLA model, and MV-Actor as a repaired-depth semantic-spatial policy. 
+
+4.2.2 Real-World Results 
+
+Table 2 compares four policies on the ARK-Lift platform across three bimanual tasks. Bold denotes the best result. MV-Actor obtains the highest average staged score of 63.1%, improving over 3DFA, π0, and PerAct2 by 5.0, 10.6, and 46.5 percentage points, respectively. On Block Handover, MV-Actor reaches 80.0%, outperforming 3DFA (75.0%) and 
+
+π0 (55.0%). In this task, the block is frequently occluded by grippers and moves between arms. Multi-view semantic con-sistency and the spatial awareness introduced by Semantic-Spatial Token Interaction are particularly effective in this set-ting. On Lift Plate, MV-Actor improves over both 3DFA and 
+
+π0 by 6.7 points. This task uses a metallic plate, whose re-flective surface introduces many noisy depth points and lo-cal holes in the D405 observations. Directly back-projecting such raw depth often yields an unstable point cloud around the plate boundary and feasible contact regions. The depth repair module combines RGB boundary cues with the Pi3X feed-forward depth prior to suppress depth noise and recover a more continuous metric spatial carrier, which helps esti-mate the two grippers’ support positions relative to the plate. On Stick Insertion, 3DFA, π0, and MV-Actor obtain similar scores because the task requires accurately grasping a thin Front Wrist1 Wrist2 Wrist1 Wrist2 ΔSemantic ΔSemantic Front       
+
+> Figure 5: Multi-view Semantic Interaction visualization.
+> Heatmaps show the magnitude of semantic feature updates af-ter Multi-view Semantic Interaction. High responses concentrate on task-relevant regions, indicating that semantic evidence is ex-changed around physically corresponding multi-view regions.
+
+stick and inserting it into a test-tube rack. The manipulation horizon is longer, multi-view overlap is limited, and success is highly sensitive to spatial precision. 
+
+## 4.3 Ablation Studies 
+
+We conduct two ablation studies. The first examines how Multi-view Semantic Interaction, Semantic-Spatial Token In-teraction, and the Head-Aware Routing Gate affect action pre-diction. The second analyzes how different depth guidance signals affect the repaired depth used for robot-frame 3D to-ken anchoring. 
+
+4.3.1 Cross-View and Semantic-Spatial Interaction 
+
+Table 3 compares five interaction configurations—baseline (no interaction), adding Multi-view Semantic Interaction alone, adding Semantic-Spatial Token Interaction alone, combining both without the Head-Aware Routing Gate, and the full design with the Head-Aware Routing Gate—on of-fline action prediction metrics at 50k, 100k, and 200k train-ing steps. Bold and underline denote best and second-best; colored parentheses show change relative to the baseline. Multi-view Semantic Interaction mainly improves rotation prediction. At 100k and 200k steps, rot_l1 drops to 0.053 and 0.045, the best at each step. Fig. 5 shows that feature updates concentrate on task-relevant regions, confirming that the gains come from stronger multi-view local semantic con-sistency. Semantic-Spatial Token Interaction mainly improves po-sition prediction. pos_acc@0 .01 rises from 35.8%, 60.6%, 81.0% (baseline) to 42.2%, 70.0%, 82.6% at the three check-points, with larger gains than Multi-view Semantic Interac-tion on all position metrics. Fig. 6 shows that the feature re-sponses become more concentrated around geometrically in-formative regions after semantic-spatial interaction, support-ing the improvement in position prediction. The “+ Both (no router)” setting directly merges the se-mantic and spatial residual streams, which causes interfer-ence; semantic and spatial residuals therefore need to be se-lectively routed according to the prediction head. 7Table 3: Interaction module ablation. We incrementally add each component and report offline metrics at 50k, 100k, and 200k steps. Bold/underline mark best/second-best, and colored parentheses show change from baseline. Configuration Multi-view Sem-spa Head-Aware Gate Step pos_l2 ↓ pos_acc (%) ↑ rot_l1 ↓ rot_acc (%) ↑ gripper (%) ↑
+
+Baseline ✗ ✗ ✗
+
+50k 0.021 35.8 0.072 35.3 98.0 100k 0.016 60.6 0.054 55.4 98.2 200k 0.012 81.0 0.046 70.2 98.3 
+
++ Multi-view ✓ ✗ ✗
+
+50k 0.020 (+0.001) 37.0 (+1.2) 0.069 (+0.003) 35.4 (+0.1) 98.1 (+0.1) 
+
+100k 0.017 (-0.001) 53.3 (-7.3) 0.053 (+0.001) 60.2 (+4.8) 98.1 (-0.1) 
+
+200k 0.012 (+0.000) 74.1 (-6.9) 0.045 (+0.001) 69.9 (-0.3) 98.2 (-0.1) 
+
++ Sem-spa ✗ ✓ ✗
+
+50k 0.020 (+0.001) 42.2 (+6.4) 0.073 (-0.001) 39.0 (+3.7) 98.0 (+0.0) 
+
+100k 0.015 (+0.001) 70.0 (+9.4) 0.056 (-0.002) 56.8 (+1.4) 98.0 (-0.2) 
+
+200k 0.012 (+0.000) 82.6 (+1.6) 0.050 (-0.004) 71.0 (+0.8) 97.9 (-0.4) 
+
++ Both (no router) ✓ ✓ ✗
+
+50k 0.021 (+0.000) 33.1 (-2.7) 0.067 (+0.005) 43.3 (+8.0) 98.0 (+0.0) 
+
+100k 0.016 (+0.000) 60.6 (+0.0) 0.053 (+0.001) 57.9 (+2.5) 98.2 (+0.0) 
+
+200k 0.013 (-0.001) 79.3 (-1.7) 0.046 (+0.000) 70.8 (+0.6) 98.2 (-0.1) 
+
+MV-Actor (full) ✓ ✓ ✓
+
+50k 0.015 (+0.006) 56.8 (+21.0) 0.063 (+0.009) 40.2 (+4.9) 98.2 (+0.2) 
+
+100k 0.012 (+0.004) 73.7 (+13.1) 0.052 (+0.002) 63.1 (+7.7) 98.3 (+0.1) 
+
+200k 0.009 (+0.003) 86.3 (+5.3) 0.045 (+0.001) 70.6 (+0.4) 98.3 (+0.0) Anchor Wrist1 Wrist2 Anchor Wrist1 Wrist2 
+
+Figure 6: Semantic-Spatial Token Interaction visualization. The figure compares feature responses before and after Semantic-Spatial Token Interaction from Anchor, Wrist1, and Wrist2 views. After attending to spatial tokens, responses concentrate on regions with strong geometric structure, indicating that the spatial stream pro-vides geometric awareness for semantic features. 
+
+With the Head-Aware Routing Gate, the full interaction de-sign achieves the best overall performance. At 50k and 100k it leads on all metrics; at 200k it further reduces pos_l2 to 0.009, raises pos_acc@0 .01 to 86.3%, and maintains rot_l1 =
+
+0.045 and gripper = 98 .3%. This shows that the two interac-tions are not simply accumulated. Instead, the Head-Aware Routing Gate adaptively routes the residuals for each predic-tion head: the position head can rely more on the local spatial residual from Semantic-Spatial Token Interaction, while the rotation head can retain the multi-view semantic-consistency residual from Multi-view Semantic Interaction. With this head-conditioned residual routing, semantic and spatial in-crements jointly optimize the scene tokens and remain com-plementary across training stages. 
+
+4.3.2 Metric Point-Cloud Construction Ablation 
+
+MV-Actor back-projects scene tokens into the robot-frame metric space using depth; depth quality therefore directly af-fects the reliability of all downstream interactions. Fig. 7 summarizes the degradation sources considered in this paper: the upper panels show typical holes and boundary artifacts in public depth datasets, while the lower panels show missing and noisy depth regions observed by the D405 cameras in our real-robot setup. We construct degraded depth by removing depth values with two masks: sparse random holes and con-tiguous block-missing masks. The block-missing masks sim-ulate large missing regions, while sparse holes simulate small invalid measurements. We report pixel-wise MAE over three regions: all for all pixels, miss for pixels inside the block-missing masks, and obs for valid pixels outside the block-missing masks, which measures whether the repair preserves observed depth outside large holes. Each row in Table 4 ab-lates a different combination of guidance inputs: sensor depth alone, adding RGB, adding feed-forward depth (FFD; Pi3X or MoGe2), or combining both. Bold marks the best result in each column. RGB+Pi3X achieves the lowest all and obs error, giv-ing the best overall metric point cloud quality, while RGB+MoGe2 achieves the lowest miss error for large-hole recovery. Both joint-guidance settings substantially outper-form single-guidance counterparts because RGB provides local boundary and texture cues, whereas FFD provides a global geometric prior for structurally coherent estimates in-side large holes. Qualitative results in Fig. 8 further visualize 8Transparent Edge Dark Figure 7: Typical depth failures. Public depth datasets [45–47] and depth artifact studies [48] show holes and boundary artifacts caused by transparent or reflective surfaces, low texture, and robot-arm occlusion. 
+
+Table 4: DEPTH REPAIR ABLATION WITH DIFFERENT GUIDANCE INPUTS. BOLD DENOTES THE BEST RESULT IN EACH COLUMN. Setting RGB FFD MAE (all) ↓
+
+MAE (miss.) ↓
+
+MAE (obs.) ↓
+
+Sensor only × × 0.150 1.146 0.010 + RGB ✓ × 0.014 0.049 0.009 + Pi3X × Pi3X [16] 0.030 0.160 0.012 + Both (Pi3X) ✓ Pi3X [16] 0.012 0.045 0.008 
+
++ MoGe2 × MoGe2 [49] 0.012 0.037 0.009 + Both (MoGe2) ✓ MoGe2 [49] 0.014 0.035 0.010 
+
+how joint guidance preserves object boundaries while recov-ering continuous depth in missing regions. The module also generalizes across different FFD sources (Pi3X and MoGe2), indicating that the repair design is not tied to a specific feed-forward depth model. 
+
+# 5 Conclusion 
+
+In this paper, we studied how bimanual manipulation policies can better use the rich information provided by multi-camera observations. We observed that existing policies either treat different views as independent visual inputs or depend on fragile sensor-depth alignment, which limits their ability to build a unified perception of the scene. To address this problem, we proposed MV-Actor, a multi-view perception framework that treats different camera views as related observations. MV-Actor unifies calibrated multi-GT Depth FFD Repair  
+
+> Ours RGB Repair
+> GT Depth FFD Repair
+> Ours RGB Repair
+
+Figure 8: Qualitative depth repair. Each example shows RGB, de-graded sensor depth, feed-forward depth (FFD), ground-truth depth, FFD-only repair, RGB-only repair, and RGB+FFD repair. Joint guidance better balances hole filling, boundary recovery, and global structure consistency. 
+
+view observations by sharing semantic perception across views and grounding it with reliable spatial awareness from feed-forward reconstruction model. Experiments on PerAct2 and real-robot tasks show that MV-Actor’s semantic-spatial representation improves biman-ual manipulation performance over RGB-only and explicit 3D baselines. Our investigation reveals that sharing seman-tic perception and building reliable spatial awareness across cameras is an effective way to turn multi-view observations into a stronger perceptual basis for bimanual manipulation. Future work will investigate adaptive view selection and tem-poral consistency to make multi-view semantic-spatial rep-resentations more robust under extended manipulation hori-zons. 
+
+# References 
+
+[1] Aude Billard and Danica Kragic. Trends and challenges in robot manipulation. Science , 364(6446):eaat8414, 2019. [2] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shu-ran Song. Diffusion policy: Visuomotor policy learn-ing via action diffusion. The International Journal of Robotics Research , 44(10-11):1684–1704, 2025. [3] Anthony Brohan, Noah Brown, Justice Carbajal, Yev-gen Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakrishnan, Karol Hausman, Alexander Herzog, Jasmine Hsu, et al. RT-1: Robotics Transformer for real-world control at scale. Robotics: Science and Systems XIX , pages 1–22, 2023. [4] Tony Z Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manip-ulation with low-cost hardware. In ICML Workshop on New Frontiers in Learning, Control, and Dynamical Systems , pages 1–22, 2023. [5] Zipeng Fu, Tony Z Zhao, and Chelsea Finn. Mobile ALOHA: Learning bimanual mobile manipulation us-ing low-cost whole-body teleoperation. In Proceedings 
+
+9of the Conference on Robot Learning (CoRL) , pages 4066–4083. PMLR, 2024. [6] Songming Liu, Lingxuan Wu, Bangguo Li, Hengkai Tan, Huayu Chen, Zhengyi Wang, Ke Xu, Hang Su, and Jun Zhu. RDT-1B: a diffusion foundation model for bi-manual manipulation. In Proceedings of the Interna-tional Conference on Learning Representations (ICLR) ,pages 29982–30009, 2025. [7] Kevin Black, Noah Brown, Danny Driess, Adnan Es-mail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. π0: AVision-Language-Action flow model for general robot control. arXiv preprint arXiv:2410.24164 , pages 1–17, 2024. [8] Zihan Lan, Weixin Mao, Haosheng Li, Le Wang, Tian-cai Wang, Haoqiang Fan, and Osamu Yoshie. BFA: Best-feature-aware fusion for multi-view fine-grained manipulation. IEEE Robotics and Automation Letters ,10(9):8930–8937, 2025. [9] Mohit Shridhar, Lucas Manuelli, and Dieter Fox. Perceiver-actor: A multi-task transformer for robotic manipulation. In Proceedings of the Conference on Robot Learning (CoRL) , pages 785–799. PMLR, 2023. [10] Theophile Gervet, Zhou Xian, Nikolaos Gkanatsios, and Katerina Fragkiadaki. Act3D: 3D feature field transformers for multi-task robotic manipulation. In 
+
+Proceedings of the Conference on Robot Learning (CoRL) , pages 3949–3965. PMLR, 2023. [11] Tsung-Wei Ke, Nikolaos Gkanatsios, and Katerina Fragkiadaki. 3D Diffuser Actor: Policy diffusion with 3D scene representations. In Proceedings of the Con-ference on Robot Learning (CoRL) , pages 1949–1974. PMLR, 2024. [12] Nikolaos Gkanatsios, Jiahe Xu, Matthew Bronars, Ar-salan Mousavian, Tsung-Wei Ke, and Katerina Fragki-adaki. 3D FlowMatch Actor: Unified 3D policy for single- and dual-arm manipulation. arXiv preprint arXiv:2508.11002 , pages 1–23, 2025. [13] Zheng Li, Pei Qu, Yufei Jia, Shihui Zhou, Haizhou Ge, Jiahang Cao, Jinni Zhou, Guyue Zhou, and Jun Ma. ManiVID-3D: Generalizable view-invariant reinforce-ment learning for robotic manipulation via disentangled 3D representations. IEEE Robotics and Automation Let-ters , 11(4):4235–4242, 2026. [14] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris Chidlovskii, and Jerome Revaud. DUSt3R: Geometric 3D vision made easy. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recogni-tion (CVPR) , pages 20697–20709, 2024. [15] Jiacheng Dong, Huan Li, Sicheng Zhou, Wenhao Hu, Weili Xu, and Yan Wang. MeMix: Writing less, remem-bering more for streaming 3D reconstruction. arXiv preprint arXiv:2603.15330 , pages 1–19, 2026. [16] Yifan Wang, Jianjun Zhou, Haoyi Zhu, Wenzheng Chang, Yang Zhou, Zizun Li, Junyi Chen, Jiangmiao Pang, Chunhua Shen, and Tong He. π3: Permutation-equivariant visual geometry learning. arXiv preprint arXiv:2507.13347 , pages 1–17, 2025. [17] Younggyo Seo, Junsu Kim, Stephen James, Kimin Lee, Jinwoo Shin, and Pieter Abbeel. Multi-view masked world models for visual robotic manipulation. In Pro-ceedings of the International Conference on Machine Learning (ICML) , pages 30613–30632. PMLR, 2023. [18] Jing-Cheng Pang, Nan Tang, Kaiyuan Li, Yuting Tang, Xin-Qiang Cai, Zhen-Yu Zhang, Gang Niu, Masashi Sugiyama, and Yang Yu. Learning view-invariant world models for visual robotic manipulation. In Proceedings of the International Conference on Learning Represen-tations (ICLR) , pages 1–24, 2025. [19] Shengyi Qian, Kaichun Mo, Valts Blukis, David F Fouhey, Dieter Fox, and Ankit Goyal. 3D-MVP: 3D multiview pretraining for manipulation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 22530–22539, 2025. [20] Ankit Goyal, Jie Xu, Yijie Guo, Valts Blukis, Yu-Wei Chao, and Dieter Fox. RVT: Robotic view transformer for 3D object manipulation. In Proceedings of the Conference on Robot Learning (CoRL) , pages 694–710. PMLR, 2023. [21] Ankit Goyal, Valts Blukis, Jie Xu, Yijie Guo, Yu-Wei Chao, and Dieter Fox. RVT-2: Learning precise ma-nipulation from few demonstrations. In RSS Workshop: Data Generation for Robotics , pages 1–11, 2024. [22] Qingyu Fan, Zhaoxiang Li, Yi Lu, Wang Chen, Qiu Shen, Xiao-xiao Long, Yinghao Cai, Tao Lu, Shuo Wang, and Xun Cao. PEAfowl: Perception-enhanced multi-view Vision-Language-Action for bimanual ma-nipulation. arXiv preprint arXiv:2601.17885 , pages 1– 11, 2026. [23] Wenbo Hu, Jingli Lin, Yilin Long, Yunlong Ran, Li-han Jiang, Yifan Wang, Chenming Zhu, Runsen Xu, Tai Wang, and Jiangmiao Pang. G2VLM: Geome-try grounded vision language model with unified 3D reconstruction and spatial reasoning. arXiv preprint arXiv:2511.21688 , pages 1–14, 2025. [24] Zihan Wang, Seungjun Lee, and Gim Hee Lee. Dy-nam3D: Dynamic layered 3D tokens empower VLM for vision-and-language navigation. Advances in Neural In-formation Processing Systems (NeurIPS) , 38:153522– 153544, 2026. 10 [25] Tao Lin, Gen Li, Yilei Zhong, Yanwen Zou, Yuxin Du, Jiting Liu, Encheng Gu, and Bo Zhao. Evo-0: Vision-Language-Action model with implicit spatial un-derstanding. arXiv preprint arXiv:2507.00416 , pages 1–9, 2025. [26] Markus Grotz, Mohit Shridhar, Yu-Wei Chao, Tamim Asfour, and Dieter Fox. PerAct2: Benchmarking and learning for robotic bimanual manipulation tasks. In 
+
+CoRL Workshop on Whole-body Control and Bimanual Manipulation: Applications in Humanoids and Beyond ,pages 1–18, 2024. [27] I-Chun Arthur Liu, Sicheng He, Daniel Seita, and Gau-rav S Sukhatme. VoxAct-B: Voxel-based acting and stabilizing policy for bimanual manipulation. In Pro-ceedings of the Conference on Robot Learning (CoRL) ,pages 4354–4370. PMLR, 2025. [28] Andrew Choong-Won Lee, Ian Chuang, Ling-Yuan Chen, and Iman Soltani. InterACT: Inter-dependency aware action chunking with hierarchical attention trans-formers for bimanual manipulation. In Proceedings of the Conference on Robot Learning (CoRL) , pages 1730– 1743. PMLR, 2025. [29] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denois-ing diffusion probabilistic models. Advances in Neural Information Processing Systems (NeurIPS) , 33:6840– 6851, 2020. [30] Jiaming Song, Chenlin Meng, and Stefano Ermon. De-noising Diffusion Implicit Models. In Proceedings of the International Conference on Learning Representa-tions (ICLR) , pages 1–20, 2021. [31] William Peebles and Saining Xie. Scalable diffu-sion models with transformers. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion (ICCV) , pages 4195–4205, 2023. [32] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker, Ayzaan Wahid, et al. RT-2: Vision-Language-Action models transfer web knowledge to robotic con-trol. In Proceedings of the Conference on Robot Learn-ing (CoRL) , pages 2165–2183. PMLR, 2023. [33] Oier Mees, Dibya Ghosh, Karl Pertsch, Kevin Black, Homer Rich Walke, Sudeep Dasari, Joey Hejna, Tobias Kreiman, Charles Xu, Jianlan Luo, et al. Octo: An open-source generalist robot policy. In ICRA Workshop on Vision-Language Models for Navigation and Manip-ulation , pages 1–17, 2024. [34] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan P Foster, Pannag R Sanketi, Quan Vuong, et al. OpenVLA: An open-source Vision-Language-Action model. In Proceedings of the Conference on Robot Learning (CoRL) , pages 2679–2713. PMLR, 2025. [35] Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Robert Equi, Chelsea Finn, Niccolo Fusai, Manuel Y Galliker, et al. π0.5: a Vision-Language-Action model with open-world generalization. In Proceedings of the Conference on Robot Learning (CoRL) , pages 17–40. PMLR, 2025. [36] Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maxi-milian Nickel, and Matthew Le. Flow Matching for gen-erative modeling. In Proceedings of the International Conference on Learning Representations (ICLR) , pages 1–28, 2023. [37] Xinyu Zhang, Yuhan Liu, Haonan Chang, Liam Schramm, and Abdeslam Boularias. Autoregressive ac-tion sequence learning for robotic manipulation. IEEE Robotics and Automation Letters , 10(5):4898–4905, 2025. [38] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sas-try, Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning transferable visual models from natural lan-guage supervision. In Proceedings of the International Conference on Machine Learning (ICML) , pages 8748– 8763. PMLR, 2021. [39] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-Net: Convolutional networks for biomedical im-age segmentation. In Proceedings of the Interna-tional Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI) , pages 234– 241. Springer, 2015. [40] Yi Zhou, Connelly Barnes, Jingwan Lu, Jimei Yang, and Hao Li. On the continuity of rotation representations in neural networks. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recogni-tion (CVPR) , pages 5745–5753, 2019. [41] Yanjie Ze, Gu Zhang, Kangning Zhang, Chenyuan Hu, Muhan Wang, and Huazhe Xu. 3D Diffusion Policy: Generalizable visuomotor policy learning via simple 3D representations. In RSS Workshop on Dexterous Manip-ulation: Design, Perception and Control , pages 1–17, 2024. [42] Qi Lv, Hao Li, Xiang Deng, Rui Shao, Yinchuan Li, Jianye Hao, Longxiang Gao, Michael Yu Wang, and Liqiang Nie. Spatial-temporal graph diffusion policy with kinematic modeling for bimanual robotic manip-ulation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) ,pages 17394–17404, 2025. [43] Yuyin Yang, Zetao Cai, Yang Tian, Jia Zeng, and Jiang-miao Pang. Gripper keypose and object pointflow as interfaces for bimanual robotic manipulation. arXiv preprint arXiv:2504.17784 , pages 1–20, 2025. 11 [44] Guanxing Lu, Tengbo Yu, Haoyuan Deng, Season Si Chen, Yansong Tang, and Ziwei Wang. Anybimanual: Transferring unimanual policy for general bimanual ma-nipulation. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision (ICCV) , pages 13662–13672, 2025. [45] Pierluigi Zama Ramirez, Alex Costanzino, Fabio Tosi, Matteo Poggi, Samuele Salti, Stefano Mattoccia, and Luigi Di Stefano. Booster: a benchmark for depth from images of specular and transparent surfaces. IEEE Transactions on Pattern Analysis and Machine Intelli-gence , 46(1):85–102, 2023. [46] Nathan Silberman, Derek Hoiem, Pushmeet Kohli, and Rob Fergus. Indoor segmentation and support inference from RGBD images. In Proceedings of the European Conference on Computer Vision (ECCV) , pages 746– 760. Springer, 2012. [47] Daniel Scharstein and Richard Szeliski. A taxonomy and evaluation of dense two-frame stereo correspon-dence algorithms. International Journal of Computer Vision , 47(1):7–42, 2002. [48] Mostafa Mahmoud Ibrahim, Qiong Liu, Rizwan Khan, Jingyu Yang, Ehsan Adeli, and You Yang. Depth map artefacts reduction: A review. IET Image Processing ,14(12):2630–2644, 2020. [49] Ruicheng Wang, Sicheng Xu, Cassie Dai, Jianfeng Xi-ang, Yu Deng, Xin Tong, and Jiaolong Yang. MoGe: Unlocking accurate monocular geometry estimation for open-domain images with optimal training supervision. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition (CVPR) , pages 5261–5271, 2025. [50] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 770– 778, 2016. [51] Tsung-Yi Lin, Piotr Dollár, Ross Girshick, Kaiming He, Bharath Hariharan, and Serge Belongie. Feature pyra-mid networks for object detection. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 2117–2125, 2017. 12 SUPPLEMENTARY MATERIAL 
+
+## A. Module-Level Implementation Details 
+
+Semantic tokens and anchors Frozen CLIP RN50 [50] features with an FPN [51] res3 readout form a 32 × 32 to-ken grid per camera; repaired depth back-projects each token to a robot-frame 3D anchor. 
+
+Cross-view Semantic Interaction We use 2 cross-attention layers with heads = 8. Physical matches are selected by calibrated reprojection with radius = 1, maximum repro-jection error = 1.5, and maximum depth error = 0.05 m. 
+
+Semantic-spatial interaction We use pointwise spatial readout with heads = 8. Pi3X spatial tokens are projected from 1024 dimensions to d, aligned to the 32 × 32 semantic-token locations, and injected through a sigmoid-gated spatial residual with residual scale = 0.1. 
+
+Head-aware routing A two-layer SiLU MLP predicts four sigmoid gates, sem_pos , spa_pos , sem_rot , and spa_rot ,to route semantic and spatial residuals to the position and ro-tation heads. 
+
+## B. Implementation Details 
+
+Unless otherwise specified, all simulation experiments use three calibrated views: front, left wrist, and right wrist. Ta-ble 5 lists the policy configuration used by the full MV-Actor model. Table 6 gives the depth-repair configuration. The repair model is pre-trained separately and frozen during policy train-ing. 
+
+## C. Depth Repair Network Architecture 
+
+The depth repair module is a three-branch U-Net [39] that jointly encodes RGB, degraded sensor depth, and Pi3X feed-forward depth. Each branch uses five encoder scales with channel widths 24, 48, 48, 96, and 96. At every scale, the three streams are fused by a multi-scale block using 1 × 1channel reduction and parallel 3 × 3, 5 × 5, and dilation-2 3 × 3 depthwise convolutions. A four-stage decoder with skip connections restores full resolution, and the output head pre-dicts a single-channel metric depth map supervised by an L1
+
+loss with higher weight on corrupted pixels. 
+
+## D. PerAct2 Task Abbreviations and Evaluation Scope 
+
+The main comparison table follows the task abbreviations used by prior PerAct2 and 3DFA comparisons. Table 7 expands each abbreviation and clarifies the main capability tested by each task. The task-level grouping is not used for metric computation; it is included only to make the compari-son table easier to read. Baseline results in Table 1 are cited from the 3DFA com-parison table. Some prior methods did not report every Per-Act2 task; those cells are marked with dashes rather than filled by interpolation. Best and second-best marks are com-puted independently for each task column among reported en-tries. 
+
+## E. VLA Baseline and Deployment Notes 
+
+All real-robot methods are evaluated on the ARK-Lift bi-manual robot with the same three RealSense D405 views, workspace, 100 training demonstrations, and 10 test trials per task. MV-Actor uses 256 × 256 calibrated RGB-D observa-tions with repaired depth, while the π0 baseline uses RGB-only head/left-wrist/right-wrist images resized to 224 × 224 and a 14-D bimanual end-effector state. This setup keeps task definitions and data budget fixed while varying only the pol-icy representation. 
+
+## F. Language Prompts for π0
+
+Language-conditioned policies use task-level natural-language commands rather than stage-by-stage scripts. In PerAct2 simulation, each episode is paired with a short in-struction describing the target bimanual task, following the benchmark protocol. For the real-robot π0 baseline, we use one fixed imperative instruction for each task to keep lan-guage conditioning consistent across all evaluation trials. The prompts used in our real-robot experiments are listed in Ta-ble 8. The prompts are intentionally short and task-level. They specify the intended manipulation goal without decompos-ing the task into intermediate stages, so that the real-robot comparison evaluates the policy and perception stack rather than hand-written procedural guidance. This is especially important for handover and insertion, where explicit stage instructions could otherwise encode additional task structure not available to the other baselines. 
+
+## G. Real-Robot Protocol and Staged Scoring 
+
+Real-robot evaluation is scored by task stages. For every trial, we keep synchronized video, stage screenshots, and a structured score record. Two-stage tasks use equal weights of 0.50 and 0.50. Three-stage tasks use cumulative milestone scores of 0.33, 0.66, and 1.00. Final real-robot results are averaged over 10 independent trials. For a method m and task τ, let rm,τ,n ∈ [0, 1] be the cumu-lative staged score of trial n. The percentage score reported in Table 2 is 
+
+Sm,τ = 100 · 110 
+
+> 10
+
+# ∑
+
+> n=1
+
+rm,τ,n. (22) The average score is the arithmetic mean over the three real-robot tasks: 
+
+Savg  
+
+> m
+
+= 13 ∑
+
+> τ∈Treal
+
+Sm,τ . (23) This staged protocol gives partial credit for meaningful progress while still reserving the full score for task com-pletion. It is especially useful for bimanual tasks, where a method may reliably complete the first arm-object contact but fail during cross-arm transfer or final insertion. The real-robot benchmark contains three tasks with the same data budget: 100 training demonstrations and 10 test 13 Table 5: Key hyperparameters for MV-Actor. Values correspond to the three-view training configuration used in this paper. Item Setting Dataset PerAct2 Cameras V = 3 views: front , wrist_left , wrist_right 
+
+Input resolution 256 × 256 RGB and depth History steps Hobs = 3Action chunk Single-step keypose-only action prediction Temporal subsampling factor 5Token embed dim d = 120 RGB encoder Frozen CLIP RN50, FPN readout at res3 
+
+Text encoder Frozen CLIP text encoder, instruction tokens pre-tokenized Semantic token grid 32 × 32 CLIP-FPN tokens per view Spatial token source Frozen Pi3X pointmap/decoder features Spatial token grid 18 × 18 Pi3X tokens per view, dspa = 1024 Policy backbone Denoising Transformer with bimanual action prediction; visual and language tokens are pre-extracted offline Vision-language attention 3 cross-attention layers, heads = 8, FFN width = 4d
+
+Cross-view semantic aggregation branch 2 cross-attention layers, heads = 8Cross-view semantic aggregation matching Reprojection matching on the 32 × 32 token grid with radius = 1, max reprojection error 
+
+= 1.5 grid cells, max depth error = 0.05 m Cross-view semantic aggregation resid-ual Residual scale = 0.1Semantic-spatial interaction branch Pointwise spatial readout, heads = 8Semantic-spatial interaction residual Spatial-awareness residual, residual scale = 0.1Spatial alignment Pi3X tokens are projected to d and resized from 18 × 18 to 32 × 32 by nearest-neighbor token copying before pointwise readout Router proprio projection Bimanual proprio history dimension = 48, linear projection 48 → d
+
+Router MLP 2 linear layers: (5d + 6) → d → 4, hidden activation SiLU Router output Separate semantic/spatial gates for position and rotation heads; output bias init = 0, weight std = 10 −3
+
+Trajectory-language attention 1 cross-attention layer, heads = 8, FFN width = 4d
+
+Trajectory-scene attention 2 cross-attention layers, heads = 8, FFN width = d, with AdaLN Shared action decoder 4 self-attention layers, heads = 8, FFN width = d, with AdaLN Position / rotation heads 2 self-attention layers per head, MLP predictor d → d → 3/6Gripper head MLP predictor d → d → 1Flow model Rectified flow, 5 denoising steps Rotation representation Quaternion (x, y, z, w)
+
+Optimizer AdamW, betas (0.9, 0.95 ), weight decay 1 × 10 −10 
+
+Learning rate Main lr 1 × 10 −4, backbone lr 1 × 10 −6, constant schedule Total batch size / val batch size 256 / 64 Max step 200k updates for ablations, 400k updates for the full MV-Actor Training hardware/time 8 × A100 GPUs; about 20h for the 400k full-model run Validation / checkpoint Validation every 10k updates, intermediate checkpoint every 20k updates 
+
+trials per task. The tasks cover cooperative lifting ( lift_plate ), contact handover ( handover_block ), and fine spatial align-ment ( insert_stick ), respectively stressing global support structure, cross-view target identity during transfer, and local insertion precision. Table 9 defines the milestones used during evaluation and follows the task order visualized in Fig. 9: handover, in-sertion, and lifting. Two-stage handover uses equal stage weights because the main progress points are grasping and transferring. Lifting and insertion use three milestones to reflect contact formation, intermediate stabilization or align-ment, and final task completion. 14 Table 6: Training settings for Pi3X-guided metric depth repair. The repair network is first pre-trained on PerAct2 simulation data and then frozen during joint policy training. Item Setting 
+
+Data & Input 
+
+Training data Depth repair data built from PerAct2 simulation Train/test split train:test = 90:10 Inputs RGB image, degraded sensor depth, Pi3X feed-forward depth Input mask policy Supervision weighting and region-wise evaluation only 
+
+Network Architecture 
+
+Overall structure Three-branch U-Net encoder–decoder Encoder 5 scales; two 3 × 3 Conv-BN-ReLU blocks per scale Channel width Base width 24; scale-wise channels are 24, 48, 48, 96, and 96 Downsampling Stride-2 convolution at scales 2–5 Multi-scale fusion 1 × 1 reduction + parallel 3 × 3, 5 × 5, and dilation-2 3 × 3 depthwise convolutions Decoder 4 bilinear upsampling blocks with skip connections and two 3 × 3 Conv-BN-ReLU blocks Output head 2 residual blocks + 3 × 3 convolution + ReLU 
+
+Training Settings 
+
+Optimizer AdamW Learning rate 8 × 10 −4
+
+Weight decay 1 × 10 −4
+
+Epochs 100 Batch size 8Random seed 42 Loss function Pixel-wise L1 depth loss with missing-pixel weight 1 + 4m
+
+Full guidance RGB texture guidance + Pi3X feed-forward depth guidance 
+
+Table 7: PerAct2 task abbreviations used in Table 1. Abbrev. Task name Main capability stressed PB push_box Contact-aware pushing and coarse spatial alignment LB lift_ball Coordinated grasping and lifting of a shared object DB push_buttons Two-arm coordination under separated target regions PP pick_plate Stable grasping around thin object boundaries ID put_item_into_drawer Object-part localization and drawer interaction BF put_bottle_into_fridge Object retrieval under constrained workspace geometry HO handover_item Cross-arm transfer and stable object identity tracking PL pick_up_laptop Long-horizon manipulation with changing visibility SR straighten_rope Deformable-object geometry and endpoint reasoning SW sweep_dust Long-horizon tool-object interaction LT lift_tray Bimanual support and global object stability HE handover_item_easy Simplified cross-arm handover TO take_tray_out_of_oven Long-horizon placement under occlusion and workspace constraints 
+
+Table 8: Language instructions used by the real-robot π0 baseline. Skill type Task Prompt for π0 Note Cooperative lifting lift_plate lift the plate Symmetric bimanual grasp and lift Contact handover handover_block hand over the cube from the right hand to the left hand Cross-arm handover with object identity preserva-tion Fine spatial alignment insert_stick grasp the stick and insert it into the test-tube rack Local geometry align-ment and insertion preci-sion 
+
+15 Table 9: Real-robot task setup and staged scoring protocol. Rows follow the example order shown in Fig. 9; all tasks use 100 training demonstrations and 10 test trials. 
+
+Task Evaluation focus Stages Cumulative scoring milestones 
+
+handover_block Contact handover 2 S1: the right gripper picks up the target block (0.50); S2: the left and right grippers complete the block handover without dropping it (1.00). 
+
+insert_stick Fine spatial alignment 3 S1: the left gripper secures the test tube rack (0.33); S2: the right gripper picks up the stick (0.66); S3: the right gripper inserts the stick into the test tube rack (1.00). 
+
+lift_plate Cooperative lifting 3 S1: one gripper grasps the plate (0.33); S2: both grippers grasp the plate (0.66); S3: both grippers lift the plate together (1.00). handover the block 
+
+insert the stick 
+
+lift the plate 
+
+Use the right gripper 
+
+to pick up the block 
+
+The left and right grippers successfully 
+
+complete the handover of the block 
+
+The left gripper closes to secure 
+
+the test tube rack 
+
+The right gripper 
+
+picks up the stick 
+
+The right gripper successfully inserts the 
+
+stick into the test tube rack 
+
+One gripper successfully 
+
+grasps the tray 
+
+Both grippers successfully 
+
+grasp the tray 
+
+Both grippers lift the 
+
+tray together 
+
+Figure 9: Examples of real-robot evaluation stages, ordered consistently with Table 9. The rows show handover, stick insertion, and cooper-ative lifting; the “tray” label in the lifting row refers to the plate object used in the lift_plate task. 
+
+16

@@ -1,0 +1,598 @@
+Title: ReGIL: Retrieval-Guided Imitation Learning from a Single Demonstration
+
+URL Source: https://arxiv.org/pdf/2606.09381v1
+
+Published Time: Tue, 09 Jun 2026 02:44:39 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# ReGIL: Retrieval-Guided Imitation Learning from a Single Demonstration 
+
+Yuying Zhang, Francesco Verdoja, Wenyan Yang, Ville Kyrki 
+
+School of Electrical Engineering Aalto University, Finland 
+
+{firstname.surname }@aalto.fi 
+
+Abstract: Learning robot manipulation policies with deep neural networks from a single demonstration remains highly challenging, as even small deviations from the demonstrated trajectory can quickly compound into failure, while collecting substantial online interaction data is costly. We propose ReGIL, a retrieval-guided imitation learning framework that treats a single demonstration as an external memory. ReGIL repeatedly queries this static memory throughout training to si-multaneously guide exploration, generate the regularization buffer, and construct rewards. Specifically, it computes rewards through local temporal alignment be-tween the current trajectory and the retrieved segment, providing step-wise and informative feedback for policy improvement. We evaluate ReGIL on robotic ma-nipulation tasks from the LIBERO and Meta-World benchmarks under the single demonstration setting. ReGIL outperforms prior baselines in both success rate and training efficiency. In real-robot experiments, using only one demonstration and less than one hour of online training, ReGIL achieves over 75% success rate across three manipulation tasks with randomness in both initial robot pose and tar-get position. These results demonstrate that leveraging the single demonstration as reusable memory can provide more than static supervision for efficient robot learning. More details can be found on our website: https://regil2026.github.io/ 
+
+Keywords: imitation learning, robot manipulation, one-shot imitation learning 
+
+## 1 Introduction 
+
+Learning complex manipulation skills from a single demonstration remains a fundamental challenge in robotics. However, pure offline learning is inherently challenging due to severe distribution shift, leading to compounding errors when the agent deviates from expert trajectories [1]. Recent retrieval-based approaches mitigate this issue by matching the current observation to the demonstrations and replaying the corresponding actions [2, 3, 4]. While effective in some settings, all of them either replay retrieved behaviors or use them as supervision without adaptation, limiting their robustness and generalization in real-world manipulation tasks. On the other hand, online learning allows a robot to adapt through interaction and recover from off-demonstration states, for example, through Reinforcement Learning (RL) [5]. However, standard RL methods are typically sample inefficient, especially for vision-based manipulation tasks [6]. With only sparse rewards and limited interaction time, uninformed exploration rarely discovers meaning-ful behaviors, making policy learning slow. In this work, we propose ReGIL (Retrieval-Guided Imitation Learning), a framework that uses a sin-gle demonstration as persistent external memory throughout learning to inherit the strengths of both offline non-parametric retrieval and online parametric learning. The framework is shown in Fig. 1. ReGIL continuously queries the single demonstration during interaction and leverages retrieval to support early exploration, collection of regularization data, and reward construction. 
+
+> arXiv:2606.09381v1 [cs.RO] 8 Jun 2026
+
+Figure 1: Overview of ReGIL. ReGIL treats a single demonstration as external memory for online robot learning. At each online interaction step, the agent retrieves a task-relevant expert segment conditioned on its current trajectory. The retrieved segment is used to guide exploration and con-struct dense segment-level rewards for policy optimization via local temporal alignment. Successful episodes during the retrieve-guided exploration phase are added to the success buffer to increase the diversity of regularization data. Specifically, ReGIL retrieves relevant expert segments to guide early exploration and generate mean-ingful trajectories. The successful rollouts obtained during this phase are stored as a success buffer, which enriches the diversity of solutions and mitigates the distribution shift introduced by online data. Leveraging regularization from the success buffer, the policy is further optimized using a retrieval-based reward proxy derived from local temporal alignment between the agent trajectory and the retrieved expert segment. This segment-level reward preserves temporal structure while providing dense and step-wise feedback during interaction. Our main contributions are: • A retrieval-guided one-shot imitation learning framework: ReGIL repeatedly queries the single demonstration during training to guide exploration and construct rewards, and incre-mentally builds a success buffer during guided exploration that increases the diversity of regularization data beyond the original demonstration and stabilizes policy optimization; • A retrieval-based segment reward proxy: ReGIL retrieves expert segments based on the current trajectory and computes rewards through local temporal alignment rather than full-trajectory matching, providing step-wise and data efficient feedback; • Empirical validation in simulation and real-world robotics: ReGIL outperforms prior base-lines on Meta-World and LIBERO, and learns real-world Franka Panda skills from a single demonstration with less than one hour of interaction. 
+
+## 2 Related Works 
+
+Retrieval-based Imitation Learning Retrieval-based imitation learning has shown strong perfor-mance in few-shot robotic manipulation by reusing expert demonstrations. Prior work uses retrieval for data augmentation [7, 8, 9, 10, 11], behavior replay [3, 12, 2], subgoal generation [4], or diffusion and value-based refinement [13, 14]. However, most methods treat retrieval as static su-pervision or directly behavior replay (e.g., VINN [12] and DinoBot [2]), limiting online adaptation under disturbances. In contrast, ReGIL uses retrieval throughout training, providing exploration priors in the early stage and calculating a reward proxy during online learning. 2Table 1: Comparison of trajectory alignment reward formulations. OT-based methods rely on global trajectory matching and require access to future trajectory information. In contrast, ReGIL performs local temporal alignment over retrieved segments, computing reward with only the trajectory history.                 
+
+> Methods Matching Scope Information Reward Granularity Matching Metric
+> OT-base[20, 24] Full global Full trajectory Trajectory-level Wasserstein TOT [23] Masked global Full trajectory Trajectory-level Wasserstein
+> ReGIL (Ours) Retrieved local Historical trajectory Segment-level S-DTW
+
+Expert Regularized Reinforcement Learning A common strategy for improving RL sample efficiency is to incorporate expert demonstrations through online regularization or offline pretraining [15, 16, 17, 18, 19, 20]. While effective, these approaches typically constrain the policy around a fixed offline demonstration dataset [21] or pretrained policies, making them sensitive to distribution shift when the agent encounters unseen states during interaction. RFCL [22] accelerates the training of the initial policy by building a reverse curriculum. In contrast, ReGIL adopts a training-free retrieval-guided exploration strategy and incrementally expands a success buffer collected online during exploration. This adaptive expanded memory increases the diversity of supervision beyond the original demonstration and mitigates the distribution shift between offline demonstrations and online interaction trajectories. 
+
+Trajectory Alignment and Reward Proxy Trajectory alignment has been widely used to con-struct reward proxies for imitation learning when task rewards are sparse or unavailable [20, 23, 24, 25, 26]. Many methods formulate alignment as an optimal transport (OT) problem [24, 25], computing Wasserstein distances across entire trajectories. While effective, these global matching approaches are computationally expensive and produce reward signals that depend on the access to future trajectories. Temporal variants such as Temporally Optimal Transport (TOT) [23] intro-duce masking to improve temporal consistency but still rely on global alignment. Dynamic Time Warping (DTW) and its variants explicitly model temporal correspondence and have also been used for trajectory comparison and imitation learning [27, 28, 29]. Recent work, such as STRAP [7], combines DTW with a visual foundation model (VFM) for offline retrieval-based imitation without online adaptation. Unlike OT-based rewards, which define divergences between trajectory distributions, ReGIL com-putes rewards from locally retrieved trajectory segments rather than globally matching complete trajectories (Tab. 1). This step-wise reward depends solely on past and current observations, pre-serving the benefits of temporal alignment while enabling efficient dense reward computation for online learning. 
+
+## 3 Retrieval Guided Imitation Learning 
+
+ReGIL addresses the limited supervision problem in one-shot robot learning by using the single expert demonstration as a queryable external memory to provide guidance throughout training. We consider a continuous-control Markov Decision Process defined by observation space O, action space A, and discount factor γ ∈ (0 , 1) . The agent receives only RGB image observations ot ∈ O .The single expert demonstration is denoted as τ e = {(oe
+
+> 0
+
+, a e
+
+> 0
+
+), (oe
+
+> 1
+
+, a e
+
+> 1
+
+), . . . , (oeNe , a eNe )}. A frozen visual foundation model (VFM) encoder Φ( ·) maps observations to an embedding space, and we denote the Euclidean distance in the embedding space by d(oi, o j ) = ∥Φ( oi) − Φ( oj )∥22.At each timestep, ReGIL retrieves a task-relevant expert segment based on the current observation and recent history. This retrieved segment is used to (i) guide early exploration through action replay, (ii) populate a success buffer for behavior regularization, and (iii) compute dense rewards via local temporal alignment. The retrieval process is performed once per timestep, and the retrieved information is subsequently used for both early exploration and reward calculation. ReGIL consists of three components: expert segment retrieval, retrieval-guided exploration, and retrieval-guided policy optimization. Full algorithmic details and pseudo-code are provided in Appendix A.1. 33.1 Expert Segment Retrieval 
+
+Given the current observation ot, ReGIL performs a coarse-to-fine retrieval process to identify the most relevant expert segment. Instead of directly matching against the entire demonstration trajec-tory, we first retrieve a set of visually similar states and then select the most temporally advanced state among them to balance retrieval efficiency and avoid local optima. The final retrieved ex-pert segment is obtained through local temporal alignment based on Subsequence Dynamic Time Warping (S-DTW) [30] distance. 
+
+Candidate selection Let Nk(ot) ⊆ { 0, . . . , N e} denote the set of indices of the k smallest values of d(ot, o ei ), i.e., the top-k visual nearest neighbors in the demonstration. We define the candidate segment endpoint as q∗ 
+
+> t
+
+= max Nk(ot). This criterion ensures that the retrieved states are both vi-sually similar and temporally progressive along the task, preventing the agent from matching locally similar but unproductive states. 
+
+Local temporal alignment To reduce ambiguity from single-frame matching, we incorporate tem-poral consistency by aligning the recent observation history τt−H:t = {ot−H , . . . , o t} with the expert trajectory segment τ e 
+
+> 0: q∗
+> t
+
+= {oe
+
+> 0
+
+, o e
+
+> 1
+
+, . . . , o eq∗ 
+
+> t
+
+} using S-DTW, where H is the history hori-zon. The local matching cost is defined as: c(i, j ) = d(ot−H+i−1, o ej−1), i ∈ { 1, . . . , H +1}, j ∈ { 1, . . . , q ∗ 
+
+> t
+
++ 1 }. Unlike standard DTW, S-DTW [30] allows the agent trajectory to align with an arbitrary segment of the expert trajectory. We compute the dynamic programming table 
+
+D ∈ R(H+2) ×(q∗ 
+
+> t+2)
+
+:
+
+D(i, j ) = 
+
+
+
+0, i = 0 
+
+∞, j = 0 , i > 0
+
+c(i, j ) + min {D(i − 1, j − 1) , D (i − 1, j ), D (i, j − 1) }, otherwise (1) The optimal alignment endpoint j∗ 
+
+> t
+
+is obtained by minimizing D(H + 1 , j ), yielding both the matched segment and the alignment cost. 
+
+j∗ 
+
+> t
+
+= arg min   
+
+> 1≤j≤q∗
+> t+1
+
+D(H + 1 , j ) ds-dtw (τt−H:t, τ e 
+
+> 0: q∗
+> t
+
+) = D(H + 1 , j ∗ 
+
+> t
+
+) (2) 
+
+3.2 Retrieval-Guided Exploration 
+
+Random exploration at the early stage is highly inefficient, leading to slow convergence. Inspired by the success of the retrieve and replay policy [12], we therefore query the demonstration and retrieve the relevant segment to guide early exploration by executing aligned expert actions for fixed steps. During this phase, the agent executes the aligned expert action at = aej∗  
+
+> t−1
+
+to guide exploration toward success. Successful episodes during early exploration are added to the success buffer Bsuc ,which later serves as a regularization dataset for policy learning to improve training stability, reduce distribution shift between the demonstration and online observation, and provide adaptive supervi-sion beyond the single expert demonstration. 
+
+3.3 Retrieval-Guided Policy Optimization 
+
+For policy optimization, ReGIL interacts with the environment to maximize the retrieval-based re-ward with a decaying regularization. 
+
+Retrieval-based segment-level Reward Proxy At each timestep, we compute a reward based on the alignment between the agent’s recent trajectory and the retrieved expert segment: 
+
+rt+1 = − 1
+
+H + 1 ds-dtw (τt−H+1: t+1 , τ e 
+
+> 0: q∗
+> t+1
+
+). (3) The reward is normalized by the agent window length, providing dense, step-wise feedback that preserving temporal consistency without access to future information. To stabilize reward estima-tion, we use a frozen visual encoder DINOv3 [31], thereby decoupling reward computation from representation learning and avoiding instability caused by shifting feature distributions. 40 50k 100k 150k 200k 250k 300k                                                                        
+
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Window_Open
+> 050k 100k 150k 200k 250k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Hammer
+> 050k 100k 150k 200k 250k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Drawer_Open
+> 050k 100k 150k 200k 250k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Drawer_Close
+> 050k 100k 150k 200k 250k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Button_Press
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Study4_Book_On_Shelf
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Living5_Mug_On_Plate
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Kitchen1_Bowl_On_Cabinet
+> ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU
+
+Figure 2: Comparison to Baselines in Simulation. All methods are trained with a single demonstra-tion on Meta-World and LIBERO. Curves show mean success rate, with shaded regions indicating 
+
+±1 standard deviation across five seeds, clipped to [0, 1]. 
+
+Optimize with Decaying Regularization We adopt a TD3-style actor-critic framework [32] for continuous control. The critic is trained with standard Bellman updates, maintaining two Q networks 
+
+Qϕ1 and Qϕ2 with definition Qmin (o, a ) = min {Qϕ1 (o, a ), Q ϕ2 (o, a )} and online replay buffer 
+
+B. The actor maximizes expected Q-values with an additional behavior cloning regularizer over trajectories in Bsuc :
+
+Lπ (θ) = −E(ot)∼B [Qmin (ot, π θ (ot))] + λ(t) · E(oi,a i)∼B suc [− log πθ (ai | oi)] (4) The Bsuc is initialized with τ e and the regularization weight λ(t) decays over time, allowing the policy to gradually shift from imitation to reinforcement learning and ultimately improve beyond the demonstration. 
+
+## 4 Experiments 
+
+We evaluate ReGIL to answer the following questions: • How does ReGIL compare to state-of-the-art methods? • What is the contribution of each main component? • How effective is the retrieval-based reward compared with alternative similarity rewards? • How does our method perform in real-world settings? Further details, including visual fundamental model selection, hyperparameter sensitivity study, computational efficiency, and success buffer analysis, are provided in the Appendix 6. 
+
+4.1 Experimental Setup Simulated Tasks We evaluate on Meta-World [33] and LIBERO [34], covering various ma-nipulation tasks. Policies are trained from a single demonstration per task using only RGB image observations. For Meta-World, we use the scripted expert demonstrations provided in the official benchmark implementation. For LIBERO, we use the publicly released demonstrations provided with the benchmark. Online methods are evaluated along with training over 10 rollouts, reporting the mean and standard deviation across 5 seeds. Offline methods are evaluated over 50 trials. 
+
+Real-world Tasks We deploy ReGIL on a Franka Panda robot across three tasks: (1) Reach (a fundamental positioning task), (2) Insert (requiring high precision), and (3) Open (involving rich-contact dynamics), illustrated in Fig. 5. Observations are 84 × 84 RGB images captured by a Re-50 100k 200k 300k                                  
+
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Drawer_Open
+> 0100k 200k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Button_Press
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Study4_Book_On_Shelf
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Kitchen1_Bowl_On_Cabinet
+> ReGIL RL BC_RL ReG_RL BC ReG_BC ReGIL RL BC_RL ReG_RL BC ReG_BC ReGIL RL BC_RL ReG_RL BC ReG_BC ReGIL RL BC_RL ReG_RL BC ReG_BC
+
+Figure 3: Ablation of Components. We compare ReGIL with four ablated variants, including ReGIL w/o Retrieval (BC RL), ReGIL w/o Regularization (ReG RL), RL with Random Exploration (RL), and ReGIL w/o Optimization (ReG BC). Results show the mean success rate across 5 random seeds, with the shaded region representing ±1 standard deviation, clipped to the range [0,1]. alsense camera and actions are 4D end-effector commands A = R4. Each task has a single teleop-erated demonstration, and online training is limited to less than one hour, including the manual reset movement. The experiments are designed with randomized initial states, while the single demon-stration only shows how to solve the task from one specific initial condition. We evaluate methods under both the fixed-target setting (the target is placed at the same position as in the demonstration) and the random-target setting (the target position is varied within a predefined range). Additional details of the task setup and success metrics are provided in Appendix B.2. 
+
+4.2 Results on the Simulated Tasks 4.2.1 Comparison to Baselines 
+
+We compare ReGIL against representative baselines, including the classical behavior cloning (BC), transformer-based imitation learning (BAKU) [35], trajectory-matching inverse reinforce-ment learning methods (IRL) with regularization (ROT) [20], and Temporal Trajectory-matching IRL (TOT) [23]. Additional implementation details, the baseline selection criteria, and more results are provided in Appendix B.1. Fig. 2 compares ReGIL with representative baselines on Meta-World and LIBERO. Overall, ReGIL learns faster and achieves higher final success rates on most tasks, except for the hammer task where the smaller success buffer (approximately one-third of the samples compared to other tasks) limits the diversity of successful experiences available for regularization. Compared with supervised learn-ing methods such as BC and BAKU, ReGIL shows clear improvements, particularly on long-horizon LIBERO tasks. This highlights the difficulty of learning robust policies from a single demonstra-tion by offline imitation learning. Compared with trajectory-matching methods such as ROT and TOT, ReGIL reaches higher success rates with fewer environment interactions, suggesting that the retrieval-based framework provides a stronger learning signal. 
+
+4.2.2 Ablation Studies Ablation study on each component ReGIL framework consists of three main components: (1) the retrieval exploration, (2) behavior regularization (BC) that keeps the learned policy close to the success buffer Bsuc , and (3) reinforcement learning (RL) further fine-tunes the policy. To better un-derstand the contribution of each component in ReGIL, we conduct ablation studies based on the following ablated variants: ReGIL w/o Retrieval (BC RL), ReGIL w/o Regularization (ReG RL), ReGIL w/o RL (ReG BC), and ReGIL w/o both Retrieval and Regularization (RL). The ablation experiments are conducted on four tasks, two from the Metaworld benchmark and two from the LIBERO task suite. The results are shown in Fig. 3. Overall, both retrieval and BC regularization significantly improve learning efficiency, with retrieval playing a more critical role in long-horizon LIBERO tasks. Without retrieval (BC RL), the policy fails on LIBERO and learns more slowly on MetaWorld, indicating that RL with a single demonstration provides an insufficient learning signal. Removing regularization (ReG RL) leads to slower convergence, suggesting it helps accelerate and 60 100k 200k 300k                      
+
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Drawer_Open
+> 0100k 200k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Button_Press
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Living5_Mug_On_Plate
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Kitchen1_Bowl_On_Cabinet
+> ReGIL_Reward COS_Reward TOT_Reward ReGIL_Reward COS_Reward TOT_Reward ReGIL_Reward COS_Reward TOT_Reward ReGIL_Reward COS_Reward TOT_Reward
+
+Figure 4: Ablation of Reward Mechanisms. We compare the proposed reward (ReGIL) against a single-state cosine similarity reward (COS) and the optimal transport-based reward (TOT). The result shows the mean success rate, with the shaded region representing ±1 standard deviation across 5 random seeds and clipped to [0,1]. stabilize the training process. Finally, while BC on the success buffer (ReG BC) achieves strong ini-tial performance, RL fine-tuning further improves results, with ReGIL attaining the highest success rates. This demonstrates that retrieval enables effective warm-up and RL refines the policy beyond retrieved trajectories. 
+
+Ablation study on reward ReGIL introduces an observation similarity-based reward derived from retrieved trajectory segments. To evaluate its effectiveness, we compare it with variants that use the same retrieval-based exploration strategy but differ in reward formulation: A state-level reward based on cosine similarity between the current state and a single retrieved state (COS Reward), and a trajectory-level reward based on temporally masked OT (TOT Reward) [23]. The results in Fig. 4 highlight the importance of segment-level structure. Both TOT Reward and the proposed reward significantly outperform COS Reward, indicating that state-level similarity is insufficient for guid-ing optimization. Meanwhile, while TOT Reward captures global trajectory alignment, it introduces additional computation complexity and is less responsive to local progress. The proposed retrieval-based reward achieves a better balance by leveraging aligned trajectory segments. Empirically, this advantage is more pronounced on MetaWorld tasks, while on the more complex LIBERO tasks, both methods achieve comparable performance. 
+
+4.3 Results on the Real Robot Tasks 
+
+We compare ReGIL against several baselines, including Behavior Cloning (BC), BC with Retrieval (ReG BC), and ReGIL w/o Retrieval (BC RL), to evaluate the contribution of the retrieval explo-ration and retrieve-based reward on the real-world tasks. Table 2: Performance comparison across settings. The aver-age success rates under fixed-target (SR fix ) and random-target settings (SR rand ) are reported. p-value is calculated under the random-target setting. 
+
+Method SR rand ↑ SR fix ↑ SR rand /SR fix ↑ p-value (rand) BC 40.0% 63.3% 63.2% < 0.001 
+
+BC-RL 45.0% 61.7% 72.9% < 0.001 
+
+ReG BC 68.3% 96.7% 70.6% 0.144 ReGIL 80.0% 96.7% 82.7% –
+
+Real-world results (Fig. 5) show that both retrieval guidance and online fine-tuning are important. While behavior cloning performs well on simple tasks such as Reach, its performance drops on more complex tasks and under target randomization. Retrieval-guided exploration improves per-formance by generating additional success trajectories beyond the original demonstration, while online fine-tuning further improves ro-bustness and precision. As shown in Tab. 2, ReGIL achieves the highest success rate in the random-target setting (80.0%) while maintaining strong fixed-target performance. Compared with Reg BC, ReGIL achieves a higher SR rand /SR fix ratio, indicating improved robustness beyond simply repro-ducing trajectories in the success buffer. Overall, these results demonstrate that ReGIL improves generalization and robustness in real-world scenarios. Importantly, the retrieval and reward compu-tation pipeline runs stably above 30Hz, satisfying real-time deployment requirements on real robots. 7Figure 5: Real robot task visualization and performance comparison. Success rates are reported over 20 trials under fixed-target (Fix), random-target (Random), and the average of both (Average). 
+
+## 5 Discussion 
+
+The experimental results suggest that retrieval can play a broader role in one-shot imitation learning. In simulation, ReGIL improves learning efficiency and final performance compared with state-of-the-art baselines. The ablation studies further clarify the contribution of each design choice. In particular, retrieval-guided exploration and the success replay buffer contribute significantly to sam-ple efficiency, especially on long-horizon LIBERO tasks where random exploration rarely reaches meaningful states. The reward ablations further highlight the effectiveness of the proposed reward design, which preserves temporal consistency while remaining efficient enough for online robot learning. Finally, the real-world experiments show that ReGIL enables a more structured and safer exploration strategy, making online adaptation practical in real-world robotic settings. 
+
+Limitations While effective, ReGIL has several important limitations. First, the method is sen-sitive to visual ambiguity, particularly in the Insert task, where similar visual patterns can cause retrieval failures and suboptimal guidance, leading to 4 observed failure cases. Performance is also affected by lighting changes, suggesting the need for more robust visual representations. A second limitation arises with non-rigid object manipulation, as in the Open task, where handle deformation causes the gripper to slip, resulting in failure. This highlights the limitation of relying solely on visual observations. Incorporating multimodal inputs, such as tactile or contact information, may improve robustness. In more complex environments, retrieval-guided replay alone could be insuffi-cient to bootstrap successful behavior, reducing the diversity benefit of the success buffer Bsuc . Com-bining retrieval with stronger priors, such as pretrained policies, could mitigate this issue. Future work will also explore adaptive retrieval strategies, further improve the generalization, and leverage action-free demonstrations (e.g., human videos). More details are provided in the Appendix F. 
+
+## 6 Conclusion 
+
+In this work, we presented ReGIL, a retrieval-guided online imitation learning framework for learn-ing visuomotor manipulation policies from a single demonstration. ReGIL treats the demonstration as an external memory during training, allowing retrieval to guide exploration, collect expanded regularization data, and provide dense reward signals. This pipeline improves both data efficiency and robustness under distribution shift. Experiments in both simulation and the real world show that ReGIL outperforms prior baselines in sample efficiency and final task success rate. Notably, ReGIL acquires effective real-world manipulation skills across three tasks using only one demonstration and less than one hour of online interaction. Overall, our results suggest that demonstrations can provide not only static supervision, but also serve as reusable memory throughout the online learn-ing process. We hope this perspective motivates future research on scalable and data-efficient robot learning from limited supervision. 8Acknowledgments 
+
+The authors acknowledge the use of the MIDAS infrastructure of Aalto School of Electrical En-gineering. V. Kyrki acknowledges the research environment provided by ELLIS Institute Finland. This research was supported by the European Union’s Horizon Europe research and innovation pro-gram under grant agreement No 101189836 (XSCAVE). This research was supported by Business Finland (Aurora, 2479/31/2024). 
+
+## References 
+
+[1] F. Torabi, G. Warnell, and P. Stone. Behavioral cloning from observation. arXiv preprint arXiv:1805.01954 , 2018. [2] N. Di Palo and E. Johns. Dinobot: Robot manipulation via retrieval and alignment with vi-sion foundation models. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 2798–2805. IEEE, 2024. [3] F. Malato, F. Leopold, A. Melnik, and V. Hautam¨ aki. Zero-shot imitation policy via search in demonstration dataset. In ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pages 7590–7594. IEEE, 2024. [4] N. Di Palo and E. Johns. On the effectiveness of retrieval, alignment, and replay in manipula-tion. IEEE Robotics and Automation Letters , 9(3):2032–2039, 2024. [5] R. S. Sutton, A. G. Barto, et al. Reinforcement learning: An introduction , volume 1. MIT press Cambridge, 1998. [6] O. Kroemer, S. Niekum, and G. Konidaris. A review of robot learning for manipulation: Challenges, representations, and algorithms. Journal of Machine Learning Research , 22(30): 1–82, 2021. URL http://jmlr.org/papers/v22/19-804.html .[7] M. Memmel, J. Berg, B. Chen, A. Gupta, and J. Francis. STRAP: Robot sub-trajectory re-trieval for augmented policy learning. In The Thirteenth International Conference on Learning Representations , 2025. URL https://openreview.net/forum?id=4VHiptx7xe .[8] M. Du, S. Nair, D. Sadigh, and C. Finn. Behavior retrieval: Few-shot imitation learning by querying unlabeled datasets. arXiv preprint arXiv:2304.08742 , 2023. [9] M. Hong, A. Liang, K. Kim, H. Rajaprakash, J. Thomason, E. Bıyık, and J. Zhang. Hand me the data: Fast robot adaptation via hand path retrieval. arXiv preprint arXiv:2505.20455 , 2025. [10] Y. Kuang, J. Ye, H. Geng, J. Mao, C. Deng, L. Guibas, H. Wang, and Y. Wang. Ram: Retrieval-based affordance transfer for generalizable zero-shot robotic manipulation. arXiv preprint arXiv:2407.04689 , 2024. [11] P. Yang, X. Wang, R. Zhang, C. Wang, F. A. Oliehoek, and J. Kober. Task-unaware life-long robot learning with retrieval-based weighted local adaptation, 2025. URL https: //openreview.net/forum?id=YR79EyejsG .[12] J. Pari, N. M. M. Shafiullah, S. P. Arunachalam, and L. Pinto. The surprising effectiveness of representation learning for visual imitation. In 18th Robotics: Science and Systems, RSS 2022 .MIT Press Journals, 2022. [13] T. Oba, M. Walter, and N. Ukita. Read: Retrieval-enhanced asymmetric diffusion for mo-tion planning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 17974–17984, June 2024. [14] Z.-H. Yin and P. Abbeel. Offline imitation learning through graph search and retrieval. arXiv preprint arXiv:2407.15403 , 2024. 9[15] S. Fujimoto and S. S. Gu. A minimalist approach to offline reinforcement learning. Advances in neural information processing systems , 34:20132–20145, 2021. [16] A. Ajay, A. Kumar, P. Agrawal, S. Levine, and O. Nachum. Opal: Offline primitive discov-ery for accelerating offline reinforcement learning. In International Conference on Learning Representations , 2021. [17] I. Uchendu, T. Xiao, Y. Lu, B. Zhu, M. Yan, J. Simon, M. Bennice, C. Fu, C. Ma, J. Jiao, S. Levine, and K. Hausman. Jump-start reinforcement learning. In Proceedings of the 40th International Conference on Machine Learning , Proceedings of Machine Learning Re-search, pages 34556–34583. PMLR, 2023. URL https://proceedings.mlr.press/ v202/uchendu23a.html .[18] A. Nair, B. McGrew, M. Andrychowicz, W. Zaremba, and P. Abbeel. Overcoming exploration in reinforcement learning with demonstrations. In 2018 IEEE international conference on robotics and automation (ICRA) , pages 6292–6299. IEEE, 2018. [19] J. Luo, C. Xu, J. Wu, and S. Levine. Precise and dexterous robotic manipulation via human-in-the-loop reinforcement learning. Science Robotics , 10(105):eads5033, 2025. [20] S. Haldar, V. Mathur, D. Yarats, and L. Pinto. Watch and match: Supercharging imitation with regularized optimal transport. CoRL , 2022. [21] P. J. Ball, L. Smith, I. Kostrikov, and S. Levine. Efficient online reinforcement learning with offline data. In Proceedings of the 40th International Conference on Machine Learning , vol-ume 202 of Proceedings of Machine Learning Research , pages 1577–1594. PMLR, 23–29 Jul 2023. URL https://proceedings.mlr.press/v202/ball23a.html .[22] S. Tao, A. Shukla, T. kai Chan, and H. Su. Reverse forward curriculum learning for extreme sample and demo efficiency. In The Twelfth International Conference on Learning Represen-tations , 2024. URL https://openreview.net/forum?id=w4rODxXsmM .[23] Y. Fu, H. Zhang, D. Wu, W. Xu, and B. Boulet. Robot policy learning with tempo-ral optimal transport reward. In A. Globerson, L. Mackey, D. Belgrave, A. Fan, U. Pa-quet, J. Tomczak, and C. Zhang, editors, Advances in Neural Information Processing Sys-tems , volume 37, pages 122078–122103. Curran Associates, Inc., 2024. doi:10.52202/ 079017-3879. URL https://proceedings.neurips.cc/paper_files/paper/2024/ file/dcd297696d0bb304ba426b3c5a679c37-Paper-Conference.pdf .[24] R. Dadashi, L. Hussenot, M. Geist, and O. Pietquin. Primal wasserstein imitation learning. 
+
+arXiv preprint arXiv:2006.04678 , 2020. [25] G. Papagiannis and Y. Li. Imitation learning with sinkhorn distances. In Joint European Conference on Machine Learning and Knowledge Discovery in Databases , pages 116–131. Springer, 2022. [26] Y. Luo, S. Cohen, E. Grefenstette, M. P. Deisenroth, et al. Optimal transport for offline imita-tion learning. In The Eleventh International Conference on Learning Representations .[27] P. Senin. Dynamic time warping algorithm review. Information and Computer Science De-partment University of Hawaii at Manoa Honolulu, USA , 855(1-23):40, 2008. [28] S. Cohen, G. Luise, A. Terenin, B. Amos, and M. Deisenroth. Aligning time series on in-comparable spaces. In International conference on artificial intelligence and statistics , pages 1036–1044. PMLR, 2021. [29] A. Fickinger, S. Cohen, S. Russell, and B. Amos. Cross-domain imitation learning via optimal transport. arXiv preprint arXiv:2110.03684 , 2021. 10 [30] M. M¨ uller. Fundamentals of music processing: Using Python and Jupyter notebooks , vol-ume 2. Springer, 2021. [31] O. Sim´ eoni, H. V. Vo, M. Seitzer, F. Baldassarre, M. Oquab, C. Jose, V. Khalidov, M. Szafraniec, S. Yi, M. Ramamonjisoa, F. Massa, D. Haziza, L. Wehrstedt, J. Wang, T. Darcet, T. Moutakanni, L. Sentana, C. Roberts, A. Vedaldi, J. Tolan, J. Brandt, C. Cou-prie, J. Mairal, H. J´ egou, P. Labatut, and P. Bojanowski. DINOv3, 2025. URL https: //arxiv.org/abs/2508.10104 .[32] S. Fujimoto, H. Hoof, and D. Meger. Addressing function approximation error in actor-critic methods. In International Conference on Machine Learning , pages 1582–1591, 2018. [33] R. McLean, E. Chatzaroulas, L. McCutcheon, F. R¨ oder, T. Yu, Z. He, K. Zentner, R. Julian, J. K. Terry, I. Woungang, N. Farsad, and P. S. Castro. Meta-world+: An improved, stan-dardized, RL benchmark. In The Thirty-ninth Annual Conference on Neural Information Pro-cessing Systems Datasets and Benchmarks Track , 2025. URL https://openreview.net/ forum?id=1de3azE606 .[34] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone. Libero: Benchmarking knowl-edge transfer for lifelong robot learning. arXiv preprint arXiv:2306.03310 , 2023. [35] S. Haldar, Z. Peng, and L. Pinto. Baku: An efficient transformer for multi-task policy learning. 
+
+Advances in Neural Information Processing Systems , 37:141208–141239, 2024. [36] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark, et al. Learning transferable visual models from natural language supervi-sion. In International conference on machine learning , pages 8748–8763. PmLR, 2021. [37] S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta. R3m: A universal visual represen-tation for robot manipulation. arXiv preprint arXiv:2203.12601 , 2022. 
+
+## Appendices 
+
+A ReGIL Algorithm Detail A.1 Overall Algorithm Detail 
+
+ReGIL is an online imitation learning method that leverages retrieval-guided exploration and op-timization from demonstrations. At each timestep, the current observation history is temporally aligned with the demonstration trajectory to retrieve the most relevant expert segment. During an initial exploration phase, the agent follows retrieved expert actions to efficiently discover successful behaviors. Successful trajectories collected during this phase are stored as an expanded memory buffer, which provides additional regularization data beyond the original demonstrations. After warm-up, the learned policy takes control while retrieval continues to provide dense supervision through trajectory alignment. To improve efficiency, retrieval is performed only once after observ-ing the next state, and the resulting alignment is reused for both reward computation and subsequent action selection. At the beginning, the history window H gradually grows. We initialize Bsuc with the original demonstration τ e so that the BC regularizer in Eq. 4 is well-defined throughout train-ing. Successful trajectories collected during the retrieval-guided warm-up are then appended to Bsuc ,progressively enriching the regularization data with online experience. In the worst case where no warm-up trajectory succeeds, the method reduces to TD3 with the retrieval-based reward and BC regularization on the single demonstration. Moreover, the reward proxy admits a basic consistency with the exploration phrase. The expert trajectory is a fixed point of the reward signal: an agent that perfectly replays the demonstration receives the maximum reward at every step. The overall training procedure is summarized in Algo-rithm 1, and the hyperparameters are listed in Tab. 3. 11 Algorithm 1 ReGIL: Retrieval-Guided Imitation Learning 
+
+Require: Demonstration τ e, Warm-up steps Tw, total training steps T
+
+1: Initialize policy πθ , Q-functions Qϕ1 , Q ϕ2 ,empty buffers B
+
+2: Initialize Bsuc with τ e
+
+3: Environment reset o0 = env.reset() 
+
+4: Retrieve demonstration segment τ ejstart  
+
+> 0:j∗
+> 0
+
+by local temporal alignment 
+
+5: for t = 1 to T do 
+
+6: if t < T w then 
+
+7: at ← aej∗  
+
+> t−1
+
+▷ Retrieval-guided exploration 
+
+8: else 
+
+9: Sample at ∼ πθ (· | ot) ▷ Policy action 
+
+10: end if 
+
+11: ot+1 , done , success = env.step (at) ▷ Execute action 
+
+12: Align τt−H+1: t+1 with τ e 
+
+> 0: q∗
+> t+1
+
+to obtain j∗ 
+
+> t+1
+
+▷ Reuse j∗ 
+
+> t+1
+
+for next-step action at
+
+13: Compute reward rt+1 according to Eq.3 
+
+14: Store (ot, a t, r t+1 , o t+1 , done ) in B
+
+15: if done then 
+
+16: Environment reset o0 = env.reset() 
+
+17: Retrieve demonstration segment τ ejstart  
+
+> 0:j∗
+> 0
+
+by local temporal alignment 
+
+18: if success and t < T w then 
+
+19: Store trajectory in Bsuc 
+
+20: end if 
+
+21: end if 
+
+22: Sample batch from B and Bsuc 
+
+23: Update Qϕ1 , Q ϕ2 and πθ according to Eq.4 ▷ Update critic and actor 
+
+24: end for 
+
+25: return policy πθ
+
+A.2 Reward Design Comparison 
+
+We compare the proposed reward with the other two rewards based on the observation alignment principle, including optimal transport (OT) alignment and temporally masked OT. Fig.6 highlights the fundamental differences between global OT-based rewards and our proposed local retrieval-based formulation. We emphasize that this is a trade-off rather than a strict improvement. In addi-tion, although we do not evaluate multiple demonstration settings in the present work, we note that the local-alignment formulation in principle can extend to this setting without any modification or easily use Faiss to enable retrieval in seconds. The 1/(H+1) factor in Eq. (3) normalizes by the agent window length, not by the alignment path length (which depends on the warping). This keeps rt+1 on a comparable scale across timesteps once H is fixed and encourages the shortest path selection. 
+
+A.3 TD3 Algorithm Detail 
+
+We employ an adapted TD3 algorithm for policy optimization. The actor predicts the mean ac-tion μθ (o), while fixed Gaussian noise is used during training for exploration and likelihood-based imitation regularization πθ (at | ot) = N  μθ (ot), δ 2I, where δ is a predefined constant. During evaluation, we execute the mean action μθ (ot), yielding deterministic behavior. We maintain two Q networks Qϕ1 and Qϕ2 , and define Qmin (o, a ) = min {Qϕ1 (o, a ), Q ϕ2 (o, a )}
+
+and online replay buffer B. The Q function objective is: 
+
+LQ(ϕi) = E(ot,a t,r t+1 ,o t+1 )∼B 
+
+(Qϕi (ot, a t) − (rt+1 + γQ min 
+
+ ot+1 , π ¯θ (ot+1 )))) 2. (5) The actor is optimized using Eq.4 with a linear decay schedule λ(t) = λ0 max(1 − t/T bc , 0) which decays over training steps t. We note that once λ(t) = 0 , the actor objective reduces to pure Q-maximization under the retrieval-based reward, so the policy depends on the fidelity of that reward signal. 12 Figure 6: Comparison of trajectory alignment reward formulations. We compare three classes of reward design: (left) global optimal transport (OT) alignment, (middle) temporally masked OT (TOT), and (right) our proposed local retrieval-based temporal alignment. Table 3: Hyperparameters for ReGIL                                  
+
+> Hyperparameter Value Description
+> lr 0.00005 Learning rate
+> gamma 0.99 Reward discount horizon factor
+> policy freq 2Delayed actor update frequency
+> encoder type resnet Visual backbone
+> obs shape 84 ×84 for real world Input dimensions
+> action shape 4for real world Dimension of action space
+> batch size 128 for libero , 64 for metaworld Mini-batch size for optimization updates
+> warm-up 20 kfor libero , 5kfor metaworld The retrieve-guided exploration step number
+> suc buff size 10 kfor libero , 5kfor metaworld The capability of success buffer
+
+B Experimental Details B.1 Simulation Experimental Details Data processing For data processing, we limited all tasks in Metaworld to the first 300k training steps and tasks in Libero to the first 500k steps with a 10k rolling window for the online learning methods. Both behavior cloning and BAKU are trained for 100k steps. 
+
+Baseline selection and additional Result ReGIL is a retrieval-based imitation learning method. Therefore, we compare it against several representative imitation and trajectory-matching ap-proaches under the same single-demonstration setting. The selected baselines cover both standard offline imitation learning and state-of-the-art reward-based online imitation frameworks, as listed below: • Behavior Cloning (BC) : A standard imitation learning method that directly learns a policy by supervised learning on expert state–action pairs. • BAKU : A transformer-based behavior cloning method that models sequential dependencies using an action-chunking strategy [35]. • Regularized Trajectory-matching IRL (ROT) : A method that combines trajectory-matching rewards with behavior cloning pre-training and regularization to accelerate imi-tation learning in the low-demonstration regime [20]. 13 0 50k 100k 150k 200k 250k 300k                        
+
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Window_Close
+> 050k 100k 150k 200k 250k 300k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Metaworld_Door_Open
+> 0100k 200k 300k 400k 500k
+> Steps
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Success Rate
+> Libero_Kitchen1_Drawer
+> ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU ReGIL(Ours) TOT ROT BC BAKU
+
+Figure 7: Additional Baseline Comparison in Simulation. All methods are trained with a single demonstration on Meta-World and LIBERO. Curves show mean success rate, with shaded regions indicating ±1 standard deviation across five seeds, clipped to [0, 1]. • Temporal Trajectory-matching IRL (TOT) : A state-of-the-art trajectory-matching method that incorporates temporal mask and context information to learn a more accurate optimal-transport-based proxy reward [23]. The additional baseline comparison is shown in Fig. 7. ReGIL consistently outperforms all baselines across both Meta-World and LIBERO benchmarks, demonstrating improved sample efficiency and stronger final performance under the single-demonstration setting. 
+
+Ablation study details To better understand the contribution of each component in ReGIL, we conduct ablation studies based on the following ablated variants: • ReGIL w/o Retrieval (BC RL) : RL with BC regularization using only the single expert demonstration, without retrieval-based exploration. This variant evaluates the importance of the retrieval mechanism. • ReGIL w/o Regularization (ReG RL) : RL with retrieval-based data collection but with-out BC regularization on success buffer Bsuc . This variant tests whether BC regularization is necessary to stabilize policy learning. • RL with Random Exploration (RL) : A standard RL baseline with random exploration, in other words, ReGIL w/o both Retrieval and Regularization. This evaluates the benefit of guided exploration and bc regularization. • ReGIL w/o Optimization (ReG BC) : Behavior cloning trained on the success buffer with-out RL fine-tuning. This variant evaluates whether reinforcement learning further improves the performance. 
+
+B.2 Real-World Experimental details 
+
+Figure 8: Real-world experimental setup. Real-World Environment Setup We evaluate ReGIL on a Franka Emika Panda robot equipped with an Intel RealSense D435 RGB camera. The robot is controlled via Cartesian delta actions 
+
+(dx, dy, dz ) with a binary gripper command at a nominal frequency of approximately 1 kHz. Visual observations consist of 84 × 84 RGB images cap-tured at 30 Hz from a fixed external viewpoint. Asingle demonstration is collected via a 3D connexion SpaceMouse through manually teleoperation. Al-though low-level control runs at 1 kHz, the closed-loop system is constrained by the 30 Hz RGB cam-era stream. Retrieval and reward computation are executed above 30 Hz( shown in Table 6), ensuring real-time performance for robotic deployment. 14 Fig.8 illustrates our real-world experimental setup. The robot receives only RGB observations from a fixed external camera, without access to depth, proprioceptive state estimation, or privileged infor-mation. Actions are specified in Cartesian space through delta end-effector commands, making the control problem continuous. 
+
+Real World Task Descriptions We design three distinct tasks to evaluate the performance of approaches and use a single RGB as input, therefore we limited the changes along with the camera direction. 
+
+Reach : The robot must move its end effector to contact the black target region before the maximum episode length is reached. Two online agents are trained for 8k training steps, with 1000 guided exploration steps, around 40 minutes wall clock. For this task, the max step is 125. For the random target evaluation, the position of the target will move in [-14cm,8cm] in left and right direction, given the fix-target position as the original point. 
+
+Insert : The robot must insert the black rigid plug attached to the end of a cable into the red cup. A trajectory is considered successful when the bottom of the plug is inside the cup. For this task, the max step is 150. Two online agents are trained for 10k training steps, with 1300 guided exploration steps, around 1 hours wall clock. For the random target evaluation, the position of the cup will move in [-4.5cm,4.5cm] in left and right direction, given the fix-target position as the original point. 
+
+Open : The robot must open the black box while keeping its base approximately stationary. The robot’s end-effector must establish and maintain specific contact with the box lid to overcome fric-tion and hinge constraints. For this task, the max step is 175. Two online agents are trained for 8k training steps, with 1300 guided exploration steps, around 40 mins wall clock each. For the random target evaluation, the position of the cup will move in [-4.0cm,7.0cm], given the fix-target position as the original point. 
+
+C Sensitivity Study on Retrieval Parameters                                           
+
+> History Length (H) [k=5] Candidate size (k) [H=4] Encoder [k=5, H=4] Benchmark H=9 H=4 H=2 k=10 k=5 k=3 k=1 CLIP DINO R3M
+> MetaWorld 0.48 0.53 0.46 0.53 0.53 0.50 0.48 0.475 0.53 0.45 LIBERO 0.50 0.47 0.42 0.47 0.47 0.50 0.37 0.017 0.47 0.17
+> Mean 0.49 0.50 0.44 0.50 0.50 0.50 0.425 0.246 0.50 0.31
+
+Table 4: Sensitivity analysis of retrieval design choices. We evaluate the impact of history length 
+
+H, candidate size k, and visual encoder selection on MetaWorld and LIBERO. We study the impact of three key design choices for the retrieval process, including history length H,candidate size k, and visual encoder selection. Notably, when a history window of length H is used, retrieval is conditioned on H + 1 consecutive states, including the current timestep. Experiments are conducted on MetaWorld and the LIBERO task suite, reporting the average success rate on 50 trials each. The result is shown in Tab.4. In general, the visual encoder choice has a substantial impact. DINOv3 [31] consistently outperforms CLIP[36] and R3M [37] across both benchmarks. For the history length, using a moderate history ( H = 4 ) yields the best overall performance, while shorter histories ( H = 2 ) lack sufficient temporal context. Finally, we observe that performance is stable for k ∈ 3, 5, 10 , indicating robustness to this hyperparameter. However, using only a single nearest neighbor ( k = 1 ) significantly degrades performance, suggesting that multiple candidates are necessary to avoid incorrect retrievals. Overall, these results suggest that ReGIL is robust to moderate variations in retrieval parameters, while benefiting from temporally aware alignment and strong visual representations. For the experiment in this work, we use H = 4 , k = 5 and the frozen DINOv3 encoder for all experiments. 15 Figure 9: Task trajectory visualization and training performance comparison across three similar kitchen manipulation tasks. Left: Representative task execution trajectories from three long-horizon robotic manipulation tasks. Middle: Success rates across 5 runs, and the shaded regions indicate the standard deviation. Right: Average success buffer size collected during training. Table 5: Success buffer size across tasks. We report the mean and standard deviation of successful trajectories collected in the success buffer Bsuc for each task across simulation and real-world envi-ronments. The maximum buffer capacity is indicated for each environment suite. 
+
+Environment Suite Task Name Success Buffer Size 
+
+(Maximum) (Mean ± Std) 
+
+Simulation 
+
+MetaWorld button press 1716.00 ± 266.17 door open 2841.50 ± 674.94 drawer close 3222.80 ± 244.98 drawer open 2301.00 ± 243.07 (5000) hammer 455.83 ± 146.58 window close 3031.20 ± 544.19 window open 1807.60 ± 500.73 LIBERO kitchen1 bowl on cabinet 9897.83 ± 34.32 kitchen1 drawer 9915.80 ± 22.56 kitchen1 bowl on plate 3023.83 ± 973.09 kitchen2 bowl on plate 7505.67 ± 959.24 (10000) living5 mug on plate 6228.40 ± 765.61 study4 9961.17 ± 25.16 
+
+Real World 
+
+1000 reach 814.00 1300 insert 961.00 1300 open 947.00 
+
+D Success buffer Analysis D.1 Diversity Analysis 
+
+To illustrate the diversity of successful trajectories stored in the success buffer, we visualize the end-effector trajectories of the expert demonstration, the success buffer, and the final ReGIL policy in Fig. 10. During evaluation, the initial end-effector pose is randomized for each episode. For visualization purposes, all trajectories are translated to a common starting position, allowing a direct comparison of their geometric structures. The expert data contains only a single trajectory corresponding to one specific execution strategy. In contrast, the retrieval-guided exploration phase collects multiple successful trajectories that exhibit substantial variation in their motion patterns. This indicates that retrieval enables structured explo-ration and allows the agent to discover successful behaviors beyond those covered by the original demonstration distribution. 16 Figure 10: End-effector trajectory comparison on the Open task. We visualize the expert demon-stration (blue), trajectories stored in the success buffer (green), and trajectories generated by the final ReGIL policy (red). The expert dataset contains a single trajectory corresponding to a fixed execution strategy. In contrast, retrieval-guided exploration produces a diverse set of successful trajectories that significantly expands coverage of the state space. The final learned policy further refines these behaviors, generating smoother and more consistent trajectories that generalize across varying initial conditions. Furthermore, the trajectories generated by the final ReGIL policy differ from both the original demonstration and the retrieved trajectories. These results suggest that reinforcement learning, combined with retrieval-extended regularization, enables the policy to exploit the diverse successful experiences stored in the buffer and learn a more generalizable solution. 
+
+D.2 Quality Analysis 
+
+We analyze the number of successful samples collected during the retrieval-guided exploration phase, as summarized in Tab 5. Across most tasks, ReGIL accumulates a substantial number of successful samples. However, the hammer task stands out with a markedly reduced number of successful trajectories (455.83 ± 146.58), indicating that this task is significantly more difficult for retrieval-guided exploration. This aligns with the observed performance gap in the main experi-ments, suggesting a correlation between success buffer size and downstream policy performance. To further investigate this effect, we compare three semantically similar tasks from the LIBERO benchmark, shown in Fig. 9: kitchen1 put bowl on cabinet, kitchen1 put bowl on plate, and kitchen2 put bowl on plate. While all tasks require similar manipulation skills, the successful tra-jectories collected during exploration are different. Consistent with this observation, the correspond-ing environment with fewer samples exhibits slower performance improvement throughout training. This trend suggests that the quantity of successful trajectories in Bsuc influences the effectiveness of retrieval-based regularization. A larger and more diverse success buffer provides richer supervision signals, facilitating faster policy improvement, whereas limited successful experience can reduce the benefit of retrieval guidance and slow convergence. These results highlight the importance of retrieval quality for ReGIL. Accurate retrieval facilitates the discovery of successful trajectories during exploration, resulting in a larger and more informa-tive success buffer. The retrieved experiences subsequently provide stronger guidance for reward computation and policy regularization during policy optimization. 
+
+E Computational Efficiency Analysis 
+
+To isolate the computational bottlenecks of our framework, we conduct a latency profiling. The evaluation benchmarks our pipeline across two simulation suites (window close in MetaWorld and bowl on the cabinet for LIBERO) and three real robot tasks (Insert, Reach, and Open) with 150 steps. All trials are executed under identical hyperparameters ( H = 4 , k = 5 ). As comprehensively compiled in Table 6, the total end-to-end processing pipeline exhibits tight numerical convergence across all evaluation tokens, consistently falling within the narrow range 17 Table 6: Latency Breakdown and Computational Efficiency 
+
+Task Total Pipeline Cost (ms) Pure DINO Encoding (ms) Pure Search + S-DTW (ms) Max Control Freq. (Hz) 
+
+MetaWorld 31 .61 ± 2.17 30 .30 ± 1.84 (95.9%) 1.29 ± 0.43 (4.1%) 31 .64 
+
+LIBERO 31 .07 ± 1.04 29 .61 ± 1.02 (95.3%) 1.44 ± 0.05 (4.6%) 32 .18 
+
+Real Insert 32 .85 ± 4.64 30 .56 ± 3.22 (93.0%) 2.26 ± 2.38 (6.9%) 30 .45 
+
+Real Reach 31 .94 ± 3.92 30 .09 ± 3.82 (94.2%) 1.83 ± 0.21 (5.7%) 31 .31 
+
+Real Open 31 .44 ± 1.32 29 .32 ± 1.29 (93.3%) 2.09 ± 0.21 (6.7%) 31 .81 
+
+Figure 11: Expert Execution versus a typical Failure Case. We visualize the expert trajectory and failed executions for both the Insert task (top) and the Open task (bottom). of 31 .07 ∼ 32 .85 ms per step. This translates to an empirical operational speed of over 30 Hz (∼ 31 .5 Hz on average), which satisfies the real-time closed-loop requirement of high-frequency visual imitation learning. Crucially, our structured time breakdown explicitly delineates the source of computational overhead. Visual feature extraction through the pre-trained DINOv3 backbone dominates the processing cycle, consuming 93 .0% ∼ 95 .9% of the entire pipeline latency. In contrast, our key algorithmic contribu-tion proves to be lightweight. Across both simulated benchmarks and empirical real-world setups, the pure search and alignment phase requires an average of merely 1.29 ∼ 2.26 ms, accounting for a negligible fraction ( 4.1% ∼ 6.9% ) of the computational budget. 
+
+F Failure Cases Analysis 
+
+While ReGIL achieves strong performance across diverse manipulation tasks, our real-world ex-periments reveal several representative failure modes: (i) visual ambiguity in the Insert task, where visually similar configurations confuse retrieval and control, resulting in 4/4 failures; (ii) limita-tions in non-rigid object manipulation, where vision-only input makes it difficult to maintain stable contact and apply appropriate forces to deformable handles which is a common constraint of vision-only policies, leading to failures in all Open-task trials(shown in Fig. 11).; and (iii) policy errors in the Reach task, where failures stem primarily from control, indicating headroom to further improve generalization. 18
