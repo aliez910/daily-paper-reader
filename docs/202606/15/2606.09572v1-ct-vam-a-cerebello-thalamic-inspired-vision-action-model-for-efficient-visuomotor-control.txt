@@ -1,0 +1,791 @@
+Title: CT-VAM: A Cerebello-Thalamic-Inspired Vision-Action Model for Efficient Visuomotor Control
+
+URL Source: https://arxiv.org/pdf/2606.09572v1
+
+Published Time: Tue, 09 Jun 2026 02:48:13 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# CT-VAM: A Cerebello-Thalamic-Inspired Vision-Action Model for Efficient Visuomotor Control 
+
+Jiacheng Li ∗ Yize Guo ∗ Jiabin Guo ∗ Qingchen Liu Jiahu Qin †
+
+AIRLab, Department of Automation University of Science and Technology of China Hefei, China 
+
+Abstract: Vision-language-action models have shown strong promise for robot manipulation, yet raw language is primarily needed to specify task intent rather than to be repeatedly processed during high-frequency low-level execution. Mo-tivated by this separation, we propose a cerebello-thalamic-inspired vision-action model (CT-VAM) for efficient task-conditioned visuomotor control. CT-VAM acts as a compact local execution policy that predicts action chunks from dual-view visual observations, proprioception, and a lightweight task condition, po-tentially enabling a practical cloud-edge paradigm in which high-level semantic reasoning can be handled by large models while fast closed-loop control runs on local hardware. To fuse heterogeneous inputs effectively, CT-VAM intro-duces TARS (Thalamic Action Routing Stream), a stream-separated conditional attention decoder that independently routes action, visual and task streams, pre-venting dense sensory tokens from overwhelming compact task-relevant condi-tions. With only 68M parameters, CT-VAM achieves LIBERO success rates competitive with substantially larger VLA models, while reducing inference la-tency. Together with flow-consistent inpainting for asynchronous chunk exe-cution, CT-VAM supports high-frequency control and demonstrates robust real-world deployment on resource-constrained robotic platforms. Project page: 
+
+https://embodied-ai-research.github.io/ct-vam/ 
+
+Keywords: Visuomotor Policy; Stream-Separated Attention; Real-Time Action Generation 
+
+# 1 Introduction 
+
+Recent progress in robot learning has increasingly moved toward generalist policies that combine visual perception, language understanding, and action generation. Early language-based robotic sys-tems showed that large language models can provide useful high-level task knowledge or planning priors when grounded by affordances or executable skills [1, 2, 3]. More recent vision-language-action (VLA) models further integrate visual observations, language instructions, and robot actions into a unified policy, enabling broad generalization across tasks and embodiments [4, 5, 6, 7]. These advances suggest that language is highly valuable for task specification, semantic reasoning, and generalization. However, deploying language-conditioned policies directly in the low-level control loop introduces a practical tension. Recent VLA models connect pretrained vision-language backbones to robot ac-tion generation, enabling strong semantic generalization but also retaining substantial inference and memory costs during execution [8]. In many manipulation tasks, the raw instruction mainly spec-ifies the task intent, whereas fine-grained motor commands are governed by visual feedback, pro-prioceptive state, and the procedural dynamics learned by the policy [9, 10]. Repeatedly processing language-conditioned representations during receding-horizon control can therefore increase latency 
+
+> ∗
+
+Equal contribution. 
+
+> †
+
+Corresponding author. 
+
+> arXiv:2606.09572v1 [cs.RO] 8 Jun 2026 TARS
+
+## ... Noisy action 
+
+> patch  AQ.
+> DINOv3 backbone
+> Cross-View
+> Fusion
+> Primary
+> High-level decision
+> Proprioception
+> Task Encoder
+
+## ...
+
+> Predicted
+> Velocity
+> FCI Inference Acceleration
+> cons. Vel.
+> OpenArm
+> Real Scene
+> LIBERO
+> Wrist
+> Transformer
+> Flow matching
+
+Figure 1: Overview of CT-VAM. Left: parameter–performance comparison on LIBERO. Middle: CT-VAM architecture. Right: real-world deployment. The dashed high-level decision module indi-cates a compatible upstream module for future integration, but it is not introduced or evaluated in this work. “AQ.” denotes the action query. We use an explicit task encoder to isolate and assess the effectiveness of the low-level visuomotor policy. and hardware requirements, especially for real-world deployment on resource-constrained robotic platforms [11, 12]. This observation suggests an alternative organization for visuomotor control, one that echoes bi-ological skilled manipulation: humans typically do not reinterpret a linguistic command at every motor step, but execute under sparse high-level intent through rapid sensorimotor feedback and learned motor dynamics. Motivated by this separation between intent-level guidance and fast motor execution, we decouple high-level language grounding from high-frequency visual feedback con-trol. Language is therefore not discarded; it is used to establish or update a compact task condition when the instruction, correction, or subtask changes. Once this action-relevant condition is formed, low-level control can remain visually closed-loop without repeatedly parsing the raw instruction. Based on this principle, we propose a cerebello-thalamic-inspired vision-action model (CT-VAM) for efficient visuomotor control. Given dual-view visual observations, proprioception, and the task condition, CT-VAM predicts action chunks for closed-loop execution. Unlike billion-scale VLA policies that retain a full language-conditioned backbone during action prediction, CT-VAM targets low-level visuomotor execution and is designed for efficient closed-loop, onboard deployment. The main contributions are summarized as follows. • We formulate grounded visuomotor execution, which separates semantic language ground-ing from high-frequency visual feedback control. Raw language is converted into an intent representation, while the low-level policy still uses visual-proprioceptive observations for closed-loop action generation, avoiding repeated language processing during execution. • We introduce TARS, a stream-separated conditional attention module that routes and gates action, visual, proprioceptive, and task streams, preventing dense visual tokens from over-whelming compact but task-relevant conditions. • We introduce flow-consistent inpainting for asynchronous chunk execution, enabling next-chunk inference to overlap with current execution while preserving action continuity. CT-VAM achieves strong simulation and real-world performance, and supports efficient fully onboard deployment on Jetson Orin NX. 
+
+# 2 Related Work 
+
+Vision-Language-Action Models . Vision-language-action (VLA) models have become a dominant direction for building generalist robot policies. Early language-conditioned robotic systems used large language models to provide task-level knowledge, planning priors, or affordance-grounded decisions [1, 2, 3]. More recent VLA models integrate visual observations, language instructions, and robot actions into a unified policy, enabling broad generalization across tasks, scenes, and robot embodiments [4, 5, 6, 8, 7]. This formulation is attractive because it can exploit large-scale vision-2language pretraining and robot datasets, while using language as a flexible interface for task spec-ification. Recent works further improve VLA pretraining, spatial representation, and action tok-enization [13, 14, 15]. However, deploying a full language-conditioned policy inside the low-level control loop remains computationally expensive. Since raw instructions often mainly specify task intent, repeatedly processing language during receding-horizon execution can increase inference la-tency, memory consumption, and hardware requirements, especially on resource-constrained edge devices. 
+
+Visuomotor Policies for Action Generation . Visuomotor imitation policies offer an efficient route to low-level robot control. Action Chunking Transformer (ACT) predicts short action sequences for fine-grained manipulation [9], while Diffusion Policy formulates visuomotor control as condi-tional denoising over action trajectories [10]. Subsequent transformer-based diffusion and goal-conditioned policies extend this paradigm to longer-horizon and more diverse manipulation set-tings [16, 17], and flow matching or rectified flow provides efficient alternatives for continuous action generation [18, 19]. However, these policies typically fuse visual, proprioceptive, task, and action-related signals through concatenation, pooling, or shared attention, with limited explicit con-trol over their relative contributions. Since these signals play different roles in visuomotor control, such implicit fusion may be suboptimal for action prediction. 
+
+# 3 From Raw Language to Grounded Visuomotor Execution 
+
+This section formalizes the role of language in visuomotor control. We consider a common execu-tion setting where a raw instruction is first grounded into an internal intent representation, and the subsequent low-level control is carried out by a learned visuomotor policy. In this setting, language is needed to form or update the intent, but it does not need to be repeatedly parsed at each control step. Let L denote a raw natural-language instruction, and let X0 denote the context available at the grounding stage, such as the initial visual observation or scene context. A grounding process maps the instruction and context into a grounded intent representation: G ∼ qϕ(· | L, X 0). Here, G de-notes a control-relevant intent representation, such as the one-hot task identifier used in our imple-mentation. More detailed interpretations of G are provided in Appendix A. At time t, the controller observes the recent visual-proprioceptive history Ot ≜ (Vt−th:t, P t−th:t), where Vt denotes the vi-sual observation, Pt denotes the proprioceptive observation, and th is a finite history horizon. The low-level controller is represented by a learned visuomotor policy At ∼ πθ (· | G, O t), where θ de-notes the learned parameters of the policy. In this work, we treat θ as an implicit procedural memory acquired from visuomotor training. The key question is whether the raw language instruction still provides additional action-relevant information after the grounded intent is available. We quantify this by the residual raw-language influence: 
+
+∆t ≜ I(At; L | G, O t). (1) This quantity measures the information about the next action that remains in the raw instruction after conditioning on both the grounded intent G and the execution context Ot.
+
+Definition 1. A grounded intent representation G is ϵt-control-sufficient for the raw instruction L
+
+at time t if 
+
+I(At; L | G, O t) ≤ ϵt. (2) 
+
+When ϵt = 0 , G is exactly control-sufficient, and the next action is conditionally independent of the raw instruction. 
+
+Assumption 1. The grounded intent G approximately preserves the action-relevant information in the raw instruction L. Specifically, after conditioning on G and the execution context Ot, replacing the raw instruction by the grounded intent induces only a small change in the next-action distribu-tion: 
+
+DKL (p(At | l, g, o t) ∥ p(At | g, o t)) ≤ ϵt, ∀(l, g, o t) ∈ supp( L, G, O t), (3) 
+
+where supp( ·) denotes the support of a distribution. 
+
+3Proposition 1. Under Assumption 1, the grounded intent G is ϵt-control-sufficient for the raw in-struction L at time t, i.e., 
+
+I(At; L | G, O t) ≤ ϵt. (4) The proof and the scope of Assumption 1 are provided in Appendix A. Proposition 1 formalizes the role of grounding as a control-sufficient representation: once the action-relevant intent has been captured by G, the low-level policy can condition on G and Ot without repeatedly processing the raw instruction L. If a new instruction is issued or the current subtask changes, G can be updated accordingly; the key point is that within a subtask, G can serve as a stable task condition for closed-loop visuomotor execution. 
+
+# 4 Method 
+
+We study task-conditioned visuomotor policy learning from synchronized dual-view observations. At each control step, the policy receives a primary camera history Ipri 1: To , a wrist camera history Iwri 1: To ,proprioceptive states s1: To , and a task identifier y ∈ { 0, 1}Ntask . It predicts an action chunk a1: H
+
+through 
+
+πθ
+
+
+
+a1: H Ipri 1: To , I wri 1: To , s 1: To , y 
+
+
+
+, ah ∈ Rda , (5) where H is the action chunk length, To is the observation history length, and da is the action dimen-sion. We denote the flattened action chunk by 
+
+A = vec( a1: H ) ∈ RHd a . (6) As illustrated in Figure 1, CT-VAM consists of three main components. First, synchronized dual-view observations are encoded into layer-wise visual memories for action generation. Second, Thalamic Action Routing Stream (TARS) performs stream-separated conditional attention to reg-ulate the interaction among action, visual, proprioceptive, and task streams. Third, flow-consistent inpainting (FCI) enables asynchronous chunk prediction during robot execution while preserving boundary consistency between consecutive action chunks. Detailed visual conditioning, rectified-flow training, and the functional cerebello-thalamic analogy are provided in Appendix B.2, Ap-pendix B.3, and Appendix B.1, respectively. Transformer Flow Matching      
+
+> Noisy action
+> TARS
+> Action Enc. Prop. Task
+> Norm & FFN
+> KV
+> QKV Patches
+> Action Query
+> M ×
+> TARS
+> Action Enc. Prop.
+> Norm & FFN
+> M × ...
+> KV
+> QKV
+> Predicted Velocity
+> Patches
+> Action Query
+> Layer-wise
+> Vision Feature
+> TARS
+> QKV
+> Q
+> Self
+> MHA
+> Score Cross MHA S.
+> Task
+> KV KV
+> P
+> Cross MHA S.
+> Cross MHA S.
+> KV
+> softmax
+> gate
+> softmax
+> gate soft
+> max
+> Linear
+
+Figure 2: Overview of the proposed TARS. TARS updates action tokens by attending to four sep-arated streams: the current action tokens, action query, dense visual-proprioceptive memories, and the task token. Each stream is normalized independently before gated aggregation. 
+
+4.1 Thalamic Action Routing Stream 
+
+The action decoder is a transformer-based rectified-flow model. At flow time τ ∈ [0 , 1] , TARS operates on a noised action state Aτ , which is embedded into the initial action tokens before the first decoder layer 
+
+X0 = ϕa(reshape( Aτ )) + Eact ∈ RH×d, (7) where ϕa is the action encoder, Eact is a learnable action positional embedding, H is the action chunk length, and d is the decoder hidden dimension. 4TARS also maintains a set of learnable action queries Eaq ∈ RNq ×d. These action queries are initialized from the register tokens of the pretrained visual backbone [20] and are then optimized jointly with the policy. They serve as decoder-side action refinement slots for organizing action-chunk generation. The detailed initialization and expansion rule is provided in Appendix B.4. For each layer ℓ, the dual-view encoder provides a dense spatial memory Dℓ, which is constructed from fused patch tokens. The proprioceptive history is encoded as 
+
+S = ϕs(s1: To ) ∈ RTo×d, (8) where ϕs(·) is the proprioceptive encoder. The task identifier is embedded into a task token: 
+
+r = yW task , Wtask ∈ RNtask ×d. (9) At decoder layer ℓ, TARS conditions the action tokens on four separated streams: 
+
+Mself  
+
+> ℓ
+
+= Xℓ, Maq  
+
+> ℓ
+
+= Eaq , Mdense  
+
+> ℓ
+
+= [ Dℓ; S], Mtask  
+
+> ℓ
+
+= {r}. (10) The self stream represents the current action tokens, the action-query stream provides learnable register-initialized action refinement slots, the dense stream provides patch-level visual evidence and proprioceptive information, and the task stream provides the compact task condition. Queries are produced from the action tokens, while each memory stream has its own key-value projection: 
+
+Qaℓ = LN( Xℓ)Wq ,Kbℓ = LN( Mbℓ)W bk ,V bℓ = LN( Mbℓ)W bv .
+
+(11) Here b ∈ B , with B = {self , aq , dense , task }. For each stream b, we compute the stream-specific attention output: 
+
+Ab = Softmax 
+
+ Qaℓ (Kbℓ )⊤
+
+√dh
+
+
+
+V bℓ , (12) where dh is the attention head dimension. The stream outputs are aggregated by explicit stream gates: 
+
+ˆXℓ = Xℓ + X
+
+> b∈B
+
+γbAb
+
+!
+
+Wo, (13) where γself = γtask = 1 , Wo is the output projection matrix, and γaq and γdense are learned gates. The layer output is then updated by a time-conditioned feed-forward block: 
+
+Xℓ+1 = ˆXℓ + FFN 
+
+
+
+LN( ˆXℓ) + e(τ )
+
+
+
+, (14) where Xℓ denotes the action tokens at decoder layer ℓ.Unlike shared-softmax attention in [21], TARS normalizes each stream independently before ag-gregation. This prevents dense visual-proprioceptive memories from dominating compact but task-relevant streams simply due to their larger token count. A detailed comparison between shared-softmax attention and stream-separated normalization is provided in Appendix B.5. 
+
+4.2 Efficient On-Device Inference and Real-Time Execution 
+
+By removing raw language from the low-level execution loop and conditioning the policy only on visual observations, proprioception, and a compact task representation, CT-VAM keeps the model lightweight with only 68M parameters when using the DINOv3-S+ visual backbone [20]). This compact design significantly reduces the per-chunk inference latency. Detailed latency comparisons are provided in Appendix B.6. Nevertheless, this latency still cannot be ignored in real-time robot execution. Since executing an action chunk already consumes physical time, synchronous chunk 5generation adds inference latency on top of the action execution time, thereby slowing down closed-loop control. Therefore, the remaining inference time should be overlapped with action execution rather than be-ing paid sequentially. Since CT-VAM has a low memory footprint, it supports an asynchronous inference pipeline that predicts the next action chunk while the current chunk is still being exe-cuted. The remaining challenge is that independently generated chunks may be inconsistent at their boundary. We therefore introduce flow-consistent inpainting (FCI), which imposes rectified-flow-consistent overlap constraints to ensure smooth transitions between consecutive chunks. To quantify the benefit of asynchronous execution, we use a real-time equivalent execution metric that separates physical action execution from inference latency exposed on the control path. For one episode executed at a target control period ∆t, we define 
+
+T = Nactions ∆t + Smethod , (15) where T is the real-time equivalent episode duration, Nactions is the total number of low-level actions executed in the episode, and Smethod is the exposed stall , i.e., the portion of inference latency that cannot be hidden by action execution and must still be paid sequentially. This metric excludes simulator-specific overheads such as rendering or physics stepping. For the proposed FCI scheme, the first action chunk is generated synchronously. The robot then starts executing this chunk, while the next inference is launched in parallel, as illustrated in Fig-ure 3. When the current chunk has Kov actions remaining, these remaining actions define an overlap segment 
+
+Yov ∈ RKov ×da . (16) The new chunk should match this segment at its beginning so that switching from the current chunk to the new chunk does not introduce a discontinuity in the executed action stream. 
+
+Figure 3: Illustration of the proposed flow-consistent inpainting scheme under the maximum (left) and minimum (right) Kov settings. The next action chunk is predicted before the current chunk is exhausted, and its overlap region is constrained to follow the rectified-flow trajectory toward the remaining actions of the current chunk. This ensures boundary continuity while keeping the decoder input consistent with the training distribution. A direct hard clamp of the overlap actions would satisfy boundary continuity but would break the rectified-flow noise-to-data trajectory used during training. Instead, FCI constrains the overlap re-gion to follow the same interpolation form as rectified-flow training. For each new chunk, we sample a fixed overlap noise: 
+
+ϵov ∼ U [−1, 1] Kov ×da . (17) At flow step i, with 
+
+τi = iNFE 
+
+, (18) where NFE is the number of rectified-flow integration steps. The first Kov actions of the new chunk are constrained as 
+
+A(i)1: Kov = (1 − τi)ϵov + τiYov , (19) where A(i) denotes the new chunk state at flow step i. The remaining free actions are updated by the standard rectified-flow integration, while the overlap constraint in Eq. (19) is re-applied after each flow step. The detailed update rule and comparison with hard inpainting, together with its advantages, are provided in Appendix B.6. 65 Experiments 
+
+5.1 Experiments on LIBERO Benchmark 
+
+We evaluate CT-VAM on the LIBERO benchmark, including LIBERO-Spatial, LIBERO-Object, LIBERO-Goal, and LIBERO-Long, which cover spatial reasoning, object-centric manipulation, goal-conditioned execution, and long-horizon task completion. We follow the standard LIBERO protocol and report task success rate, averaged over 50 rollouts per task. The policy takes two visual observations, proprioceptive states, and a one-hot task identifier as input, without invoking a large VLM during low-level execution. Unless otherwise stated, CT-VAM uses TARS with 32 learnable action queries, as detailed in Appendix B.4. Table 1: Performance comparison on the LIBERO benchmark across VLM-based and non-VLM visuomotor policies. 
+
+LIBERO Params Spatial Object Goal Long Avg. 
+
+Policy With VLM 
+
+OpenVLA [8] (CoRL) 7000M 84.7 88.4 79.2 53.7 76.5 SpatialVLA [14] (RSS) 4000M 88.2 89.9 78.6 55.5 78.1 
+
+π0-FAST [15] (RSS) 3300M 96.4 96.8 88.6 60.2 85.5 
+
+π0 [7] (RSS) 3300M 90.0 86.0 95.0 73.0 86.0 
+
+Policy Without VLM 
+
+Diffusion Policy [10] (IJRR) – 78.3 92.5 68.3 50.5 72.4 MDT [16] (RSS) ∼225M 78.5 87.5 73.5 64.8 76.1 
+
+CT-VAM (Ours) 68M 89.0 94.6 78.4 66.2 82.1 
+
+Table 1 compares CT-VAM with representative VLM-based and non-VLM visuomotor policies. With only 68M parameters, CT-VAM achieves competitive overall performance and outperforms existing non-VLM baselines on average, while remaining much smaller than billion-scale VLM policies. These results support our central claim that, once task intent is grounded, strong closed-loop visuomotor execution can be achieved by a compact vision-action policy without repeatedly using a large language-conditioned controller. We further conduct two diagnostic studies on LIBERO, with detailed results reported in Ap-pendix C.1 and C.2. First, we ablate the number and learnability of TARS action queries, show-ing that 32 learnable queries provide the best balance between action representation capacity and optimization stability. Second, we study scaling behavior across flow-matching policies with differ-ent overall model sizes. The small, base, and large variants achieve average success rates of 65.8%, 76.9%, and 77.3%, respectively, while CT-VAM reaches 82.1%, outperforming even the largest vari-ant. This indicates that CT-VAM’s gain does not come from model size alone, but from the proposed stream-routing and action-query design. 
+
+5.2 Real-World Experiments Real-World Deployment . We conduct real-world experiments on the OpenArm platform to eval-uate the closed-loop manipulation performance of CT-VAM. The hardware setup, camera configu-ration, teleoperation device, and computing platforms are detailed in Appendix C.3, and the Jetson Orin NX deployment with TensorRT optimization is described in Appendix C.4. During deploy-ment, CT-VAM is integrated into the OpenArm control framework as a left-arm joint-space con-troller. The policy takes third-person RGB observations, wrist RGB observations, and robot propri-oceptive states as inputs, and predicts short-horizon joint commands together with gripper actions in a closed-loop receding-horizon manner. For data collection, we collect 30 demonstration episodes for each task using teleoperation and train all models with a batch size of 32. To ensure a fair comparison, all methods use the same demonstration data, observation-action space, and evalua-tion protocol. During evaluation, object and target configurations are varied within the reachable workspace of the active arm. We conduct 20 trials for each task and report the task success rate and 7Figure 4: Real-world experimental setup and task workflow. Left: the OpenArm platform. Middle: inference devices used for deployment, including Jetson Orin NX and NVIDIA RTX 4080. Right: representative execution sequences of the real-world manipulation tasks, including box opening and object placement, and bottle pouring into a target bowl. Table 2: Real-world performance on the Ball Pouring task across different methods and deployment platforms. Each method-platform setting is evaluated over 20 trials. We report the task success rate, execution time, and average inference time. Method RTX 4080 Jetson Orin NX Success Rate (%) ↑ Exec. Time (s) ↓ Infer. Time (ms) ↓ Success Rate (%) ↑ Exec. Time (s) ↓ Infer. Time (ms) ↓                        
+
+> Diffusion Policy 70.0 27.21 303.27 N.T. N.T. N.T.
+> π095.0 7.82 117.24 N.D. N.D. N.D. CT-VAM w/o FCI 100 8.33 56.32 85 10.24 256.24 CT-VAM w/ FCI 95 6.41 56.84 90 7.23 200.60
+
+Note: N.T. indicates that the method was not tested on Jetson Orin NX. N.D. indicates that the method could not be deployed due to memory constraints. 
+
+average task execution time as the primary evaluation metrics. A trial is considered successful only if the robot completes the task without human intervention. Following Sec. 4.2, CT-VAM executes actions in a closed-loop receding-horizon manner. When FCI is enabled, the next action chunk is generated asynchronously while the current chunk is being executed, and the overlapping actions are constrained to ensure smooth transitions between consecutive chunks. The predicted commands are then sent to the low-level OpenArm controller for execution. 
+
+Real-World Results . We evaluate CT-VAM on two real-world tabletop manipulation tasks. Ball Pouring is used for quantitative comparison with baseline methods and ablated variants, while Box Opening and Placement is used to examine long-horizon task-conditioned execution under subtask switching. Table 2 reports the Ball Pouring results across two deployment platforms. Each method-platform setting is evaluated over 20 trials, and we report task success rate, execution time, and inference latency. Following the reference configurations, π0 is executed with 50 inference steps, while CT-VAM and Diffusion Policy use 8 inference steps. On the RTX 4080 platform, CT-VAM achieves a success rate comparable to π0 and clearly higher than Diffusion Policy. The compari-son between CT-VAM variants shows that FCI maintains comparable task success while reducing execution time by overlapping next-chunk inference with current action execution. Under a 20 Hz low-level control frequency, FCI further allows the real-time-equivalent deployment frequency to approach the target 20 Hz control rate by hiding most inference latency inside physical action execution; the detailed calculation is provided in Appendix C.5. The Jetson Orin NX results fur-ther demonstrate that CT-VAM can be deployed on a resource-constrained edge platform, with the TensorRT-optimized inference backend detailed in Appendix C.4. 
+
+# 6 Limitations 
+
+This work has several limitations. First, CT-VAM currently uses one-hot task tokens as compact intent representations and does not yet include a full language grounding module. This design isolates the evaluation of the low-level visuomotor policy, but does not address open-ended instruc-8tion grounding. Future work will integrate a dedicated grounding module that maps raw language and scene context into task-relevant intent representations, following recent progress in language-conditioned manipulation and language-to-spatial grounding for robot control [22, 23, 24]. Second, our real-world evaluation is limited to tabletop tasks and uses manual task switching in the long-horizon experiment. Extending CT-VAM to automatic subtask recognition, broader task distribu-tions, and more diverse robot embodiments remains an important direction. 
+
+# 7 Conclusion 
+
+We presented CT-VAM, a compact vision-action model for efficient visuomotor control. By separat-ing language grounding from low-level visual feedback control, CT-VAM avoids repeated language-conditioned inference during execution. The proposed TARS module improves heterogeneous stream fusion, while FCI enables asynchronous chunk execution with smooth action transitions. Experiments on LIBERO and real-world manipulation tasks show that CT-VAM achieves competi-tive performance with low inference cost, supporting practical deployment on resource-constrained robotic platforms. 
+
+# References 
+
+[1] W. Huang, P. Abbeel, D. Pathak, and I. Mordatch. Language models as zero-shot planners: Extracting actionable knowledge for embodied agents. In International conference on machine learning , pages 9118–9147. PMLR, 2022. [2] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, B. David, C. Finn, C. Fu, K. Gopalakr-ishnan, K. Hausman, et al. Do As I Can, Not As I Say: Grounding language in robotic affor-dances. arXiv preprint arXiv:2204.01691 , 2022. [3] D. Driess, F. Xia, M. S. Sajjadi, C. Lynch, A. Chowdhery, B. Ichter, A. Wahid, J. Tompson, Q. Vuong, T. Yu, et al. PaLM-E: An embodied multimodal language model. arXiv preprint arXiv:2303.03378 , 2023. [4] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn, K. Gopalakrishnan, K. Haus-man, A. Herzog, J. Hsu, et al. RT-1: Robotics transformer for real-world control at scale. arXiv preprint arXiv:2212.06817 , 2022. [5] B. Zitkovich, T. Yu, S. Xu, P. Xu, T. Xiao, F. Xia, J. Wu, P. Wohlhart, S. Welker, A. Wahid, et al. RT-2: Vision-language-action models transfer web knowledge to robotic control. In 
+
+Conference on Robot Learning , pages 2165–2183. PMLR, 2023. [6] A. O’Neill, A. Rehman, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee, A. Pooley, A. Gupta, A. Mandlekar, A. Jain, et al. Open X-Embodiment: Robotic learning datasets and RT-X mod-els: Open x-embodiment collaboration 0. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 6892–6903. IEEE, 2024. [7] K. Black, N. Brown, D. Driess, A. Esmail, M. R. Equi, C. Finn, N. Fusai, L. Groom, K. Haus-man, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. X. Shi, L. Smith, J. Tanner, Q. Vuong, A. Walling, H. Wang, and U. Zhilinsky. 
+
+π0: A vision-language-action flow model for general robot control. In Proceedings of Robotics: Science and Systems , Los Angeles, CA, USA, June 2025. doi:10.15607/RSS.2025.XXI.010. [8] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. P. Foster, P. R. Sanketi, Q. Vuong, et al. OpenVLA: An open-source vision-language-action model. In Conference on Robot Learning , pages 2679–2713. PMLR, 2025. [9] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn. Learning fine-grained bimanual manipulation with low-cost hardware. In Robotics: Science and Systems , 2023. 9[10] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song. Diffusion policy: Visuomotor policy learning via action diffusion. The International Journal of Robotics Research , 44(10-11):1684–1704, 2025. [11] J. Wen, Y. Zhu, J. Li, M. Zhu, Z. Tang, K. Wu, Z. Xu, N. Liu, R. Cheng, C. Shen, et al. Tinyvla: Towards fast, data-efficient vision-language-action models for robotic manipulation. 
+
+IEEE Robotics and Automation Letters , 2025. [12] H. Wang, C. Xiong, R. Wang, and X. Chen. Bitvla: 1-bit vision-language-action models for robotics manipulation. arXiv preprint arXiv:2506.07530 , 2025. [13] S. Ye, J. Jang, B. Jeon, S. J. Joo, J. Yang, B. Peng, A. Mandlekar, R. Tan, Y.-W. Chao, B. Y. Lin, et al. Latent action pretraining from videos. In International Conference on Learning Representations , volume 2025, pages 28213–28239, 2025. [14] D. Qu, H. Song, Q. Chen, Y. Yao, X. Ye, Y. Ding, Z. Wang, J. Gu, B. Zhao, D. Wang, et al. Spa-tialVLA: Exploring spatial representations for visual-language-action model. arXiv preprint arXiv:2501.15830 , 2025. [15] K. Pertsch, K. Stachowicz, B. Ichter, D. Driess, S. Nair, Q. Vuong, O. Mees, C. Finn, and S. Levine. Fast: Efficient action tokenization for vision-language-action models. In Robotics: Science and Systems , 2025. [16] M. Reuss, ¨ O. E. Ya˘ gmurlu, F. Wenzel, and R. Lioutikov. Multimodal diffusion transformer: Learning versatile behavior from multimodal goals. In Robotics: Science and Systems , 2024. [17] Y. Guo, J. Li, Q. Liu, W. Fu, J. Qin, and Y. Kang. DG-ACMP: Deformation-guided motion planning with acceptable contacts for manipulators in cluttered environments. IEEE Robotics and Automation Letters , 2026. [18] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling. In International Conference on Learning Representations , 2023. [19] X. Liu, C. Gong, and Q. Liu. Flow straight and fast: Learning to generate and transfer data with rectified flow. In International Conference on Learning Representations , 2023. [20] O. Sim´ eoni, H. V. Vo, M. Seitzer, F. Baldassarre, M. Oquab, C. Jose, V. Khalidov, M. Szafraniec, S. Yi, M. Ramamonjisoa, et al. DINOv3. arXiv preprint arXiv:2508.10104 ,2025. [21] Y. Wang, P. Ding, L. Li, C. Cui, Z. Ge, X. Tong, W. Song, H. Zhao, W. Zhao, P. Hou, et al. VLA-Adapter: An effective paradigm for tiny-scale vision-language-action model. In Pro-ceedings of the AAAI conference on artificial intelligence , volume 40, pages 18638–18646, 2026. [22] M. Shridhar, L. Manuelli, and D. Fox. Cliport: What and where pathways for robotic manipu-lation. In Conference on robot learning , pages 894–906. PMLR, 2022. [23] M. Shridhar, L. Manuelli, and D. Fox. Perceiver-actor: A multi-task transformer for robotic manipulation. In Conference on Robot Learning , pages 785–799. PMLR, 2023. [24] W. Huang, C. Wang, R. Zhang, Y. Li, J. Wu, and L. Fei-Fei. Voxposer: Composable 3d value maps for robotic manipulation with language models. arXiv preprint arXiv:2307.05973 , 2023. [25] R. A. Fisher. On the mathematical foundations of theoretical statistics. Philosophical Trans-actions of the Royal Society of London. Series A , 222:309–368, 1922. [26] T. M. Cover and J. A. Thomas. Elements of Information Theory . Wiley-Interscience, 2 edition, 2006. 10 [27] N. Tishby, F. C. Pereira, and W. Bialek. The information bottleneck method. arXiv preprint physics/0004057 , 2000. [28] T. Darcet, M. Oquab, J. Mairal, and P. Bojanowski. Vision transformers need registers. In 
+
+International conference on learning representations , volume 2024, pages 2632–2652, 2024. [29] NVIDIA. NVIDIA Jetson Orin Series. https://www.nvidia.com/en-us/ autonomous-machines/embedded-systems/jetson-orin/ , 2025. Accessed: 2026-06-07. [30] NVIDIA. NVIDIA TensorRT Documentation. https://docs.nvidia.com/ deeplearning/tensorrt/latest/ , 2025. Accessed: 2026-06-07. [31] ONNX Community. Open Neural Network Exchange. https://onnx.ai/ , 2025. Accessed: 2026-06-07. 11 A Theoretical Details 
+
+A.1 Interpretation of Grounded Intent 
+
+The grounded intent G is not assumed to be a language string. It may be an explicit task identifier, a latent instruction feature, a goal-like representation, or a structured state that encodes the task-relevant information required for control. In our implementation, the one-hot task identifier follows this setting and serves as a compact intent representation for the considered task family. Importantly, G does not need to be semantically equivalent to the original language instruction L.Different surface forms of language may correspond to the same grounded intent if they imply the same robot behavior. Conversely, language-specific details such as politeness, surface wording, syntactic form, and other redundant expressions may be discarded as long as they do not affect the required control behavior. The residual influence ∆t = I(At; L | G, O t) is different from I(At; L | Ot). The latter mea-sures whether language provides additional information about the action when only the visual-proprioceptive history is given. In general, I(At; L | Ot) can remain large, because the same observation history may be compatible with multiple task goals. In contrast, ∆t asks whether the raw instruction still matters after the grounded intent G has already been formed. 
+
+A.2 Rationale and Scope of Assumption 1 
+
+Assumption 1 is based on the classical idea of sufficient statistics: a representation can replace the original input for a downstream decision if it retains the information in the input that is relevant to that decision [25, 26]. In our setting, the original input is the raw instruction L, the learned representation is the grounded intent G, and the downstream decision is the next action At under the execution context Ot. Therefore, if the grounding process is accurate enough, G should preserve the action-relevant content of L, while discarding language details that do not affect control. This is also consistent with the information bottleneck view, where a useful representation compresses the input while preserving information relevant to the target variable [27]. This assumption is not meant to hold for an arbitrary encoded feature. It only holds when the ground-ing module has learned an intent representation that is sufficient for the considered task family. In particular, the tuple (l, g, o t) in Eq. (3) is not an arbitrary combination of language and intent; g is the grounded representation induced by l and the initial context through the grounding process. If the instruction contains object bindings, constraints, subgoals, or execution preferences that are not encoded in G, then the KL divergence in Eq. (3) may be large, and the raw instruction may still pro-vide additional information for action generation. Thus, Assumption 1 should be read as a condition on the quality of grounding rather than as a universal property of all language encoders. 
+
+A.3 Proof of Proposition 1 
+
+Proof. By the KL-divergence form of conditional mutual information, 
+
+I(At; L | G, O t) = Ep(l,g,o t) [DKL (p(At | l, g, o t) ∥ p(At | g, o t))] . (20) Assumption 1 bounds each KL term inside the expectation by ϵt. Therefore, 
+
+I(At; L | G, O t) ≤ Ep(l,g,o t)[ϵt] = ϵt. (21) This is exactly the condition in Definition 1. Hence, G is ϵt-control-sufficient for L at time t.
+
+# B Details of Proposed Method 
+
+B.1 Functional Analogy 
+
+The term cerebello-thalamic-inspired denotes a functional analogy rather than a literal biological model. CT-VAM is motivated by a modular separation between high-level intent processing and 12 low-level visuomotor execution. In this view, VAM serves as a compact cerebellum-like visuomotor module that stores learned procedural control knowledge and generates low-level action chunks from visual-proprioceptive observations and task conditions. A high-level VLM can be attached above it as a brain-like module for language understanding, reasoning, and subtask-level intent updates. This separation keeps costly language processing outside the high-frequency control loop while preserving closed-loop visuomotor control. Within VAM, TARS provides the thalamic part of the analogy by routing and gating heterogeneous action, visual, proprioceptive, and task streams through stream-separated attention, thereby regulating how different information pathways contribute to the action update. 
+
+B.2 Dual-View Visual Conditioning Details 
+
+We encode both camera streams using a frozen ViT backbone [20]. For view v ∈ { pri , wri },observation step t, and visual layer ℓ, the backbone outputs 
+
+Zvℓ,t = [ cvℓ,t ; Rvℓ,t ; P vℓ,t ] ∈ R(1+ R+N )×db , (22) where cvℓ,t , Rvℓ,t , and P vℓ,t denote the class, register, and patch tokens, respectively. Here R is the number of register tokens, N is the number of patch tokens, and db is the backbone feature dimen-sion. All tokens are projected to the policy width d:
+
+ˆZvℓ,t = Zvℓ,t Wvis , Wvis ∈ Rdb×d. (23) To combine the two views, we use wrist-query cross-attention. Starting from 
+
+F (0)  
+
+> ℓ,t
+
+= ˆZwri  
+
+> ℓ,t
+
+, (24) each fusion block updates 
+
+¯F (m+1)  
+
+> ℓ,t
+
+= F (m) 
+
+> ℓ,t
+
++ MHA 
+
+
+
+LN( F (m) 
+
+> ℓ,t
+
+), LN( ˆZpri  
+
+> ℓ,t
+
+), LN( ˆZpri  
+
+> ℓ,t
+
+)
+
+
+
+,F (m+1)  
+
+> ℓ,t
+
+= ¯F (m+1)  
+
+> ℓ,t
+
++ MLP 
+
+
+
+LN( ¯F (m+1)  
+
+> ℓ,t
+
+)
+
+
+
+.
+
+(25) After Mf fusion blocks, the fused token bank is 
+
+˜Zℓ,t = F (Mf ) 
+
+> ℓ,t
+
+= [˜ cℓ,t ; ˜Rℓ,t ; ˜Pℓ,t ] ∈ R(1+ R+N )×d. (26) From the fused token bank, we construct the dense spatial memory using the patch tokens: 
+
+Dℓ = Concat To 
+
+> t=1
+
+˜Pℓ,t ∈ RToN ×d. (27) Here Dℓ denotes the patch-token-based dense spatial memory at visual layer ℓ. The class/register tokens are not used as an additional observation-dependent memory stream in TARS; instead, the decoder-side action queries are initialized from the pretrained class/register global tokens and then optimized jointly with the policy, as described in Appendix B.4. The task identifier y ∈ { 0, 1}Ntask is embedded as 
+
+r = yW task , Wtask ∈ RNtask ×d. (28) Keeping r separate from dense visual tokens allows the decoder to access task information without mixing it into the patch-level spatial memory. 
+
+B.3 Rectified-Flow Training and Inference Details 
+
+We train the decoder to predict the velocity field between a base action sample and the expert action chunk. For an expert chunk a1: H , we use its flattened representation 
+
+A = vec( a1: H ) ∈ RHd a . (29) 13 During training, we sample 
+
+τ ∼ Beta(2 , 2) , τ ← clip( τ, τ min , τ max ), ϵ ∼ U [−1, 1] Hd a , (30) and construct the linear interpolation 
+
+Aτ = (1 − τ )ϵ + τ A. (31) The target velocity is therefore 
+
+v⋆ = A − ϵ. (32) The decoder predicts a conditional velocity field: 
+
+vθ (Aτ , τ, C), C = Maq  
+
+> ℓ
+
+, Mdense  
+
+> ℓ
+
+, Mtask  
+
+> ℓ
+> Lℓ=1
+
+, (33) where C denotes the layer-wise conditioning streams used by TARS. Specifically, Maq  
+
+> ℓ
+
+is the learnable action-query stream, Mdense  
+
+> ℓ
+
+= [ Dℓ; S] is the dense visual-proprioceptive stream, and 
+
+Mtask  
+
+> ℓ
+
+= {r} is the task stream. The self stream is not included in C, because it is produced from the noised action state Aτ , which is already an explicit input to the velocity field. After the final decoder layer, we regress the velocity from the action tokens: 
+
+vθ (Aτ , τ, C) = Wout vec (LN( XL)) + bout . (34) where Wout and bout are the output projection matrix and bias. The training objective is the masked element-wise mean squared error: 
+
+LRF = 1
+
+P 
+
+> j
+
+mjHd aX
+
+> j=1
+
+mj
+
+ vθ,j (Aτ , τ, C) − v⋆j
+
+2 . (35) At inference time, we initialize A(0) ∼ U [−1, 1] Hd a and integrate 
+
+A(n+1) = A(n) + ∆ τ v θ
+
+
+
+A(n), τ n, C
+
+
+
+, τn = nNFE 
+
+, ∆τ = 1
+
+NFE 
+
+. (36) The final vector is reshaped into the predicted action chunk a1: H .
+
+B.4 Action-Query Initialization and Expansion 
+
+The action-query stream in CT-VAM is initialized from the register tokens of the pretrained DINOv3 visual backbone [20], rather than from purely random latent slots. Specifically, for the ViT-S+ backbone, DINOv3 provides four register tokens. Let N0 = 4 denote the number of register tokens, and let db denote the backbone feature dimension. The pretrained register-token embeddings are written as 
+
+Eglob =
+
+
+
+ereg 1
+
+...
+
+ereg 
+
+> N0
+
+ ∈ RN0×db . (37) These tokens are first projected to the policy hidden dimension: 
+
+Qproto = Eglob Wvis ∈ RN0×d, (38) where Wvis ∈ Rdb×d is the visual projection matrix. The projected register tokens are used as action-query prototypes. When the number of action queries satisfies Nq = N0, we directly use these projected register tokens as the initial action queries. When a larger number of action queries is required, such as 
+
+Nq = 32 , we expand the query set by duplicating the pretrained prototypes and adding small random perturbations: 
+
+Qact  
+
+> j
+
+= Qproto 1+(( j−1) mod N0) + σq ξj , j = 1 , . . . , N q , (39) 14 where ξj ∈ Rd is a zero-mean random perturbation and σq controls the perturbation scale. This gives 
+
+Qact ∈ RNq ×d. (40) The expansion preserves the pretrained register-token prior while providing more query slots for organizing action-chunk generation. After initialization, the expanded action-query tensor is used to initialize the learnable action-query parameter: 
+
+Eaq ← Qact , Eaq ∈ RNq ×d. (41) At decoder layer ℓ, this parameter forms the action-query memory stream in TARS: 
+
+M aq  
+
+> ℓ
+
+= Eaq . (42) The current action tokens Xℓ produce the attention queries, while the action-query stream provides its own keys and values: 
+
+Qaℓ = LN( Xℓ)Wq , Kaq  
+
+> ℓ
+
+= LN( M aq  
+
+> ℓ
+
+)W aq  
+
+> k
+
+, V aq  
+
+> ℓ
+
+= LN( M aq  
+
+> ℓ
+
+)W aq  
+
+> v
+
+. (43) The action-query attention output is then computed as one stream-specific TARS output: 
+
+Aaq  
+
+> ℓ
+
+= Softmax Qaℓ (Kaq  
+
+> ℓ
+
+)⊤
+
+√dh
+
+!
+
+V aq  
+
+> ℓ
+
+, (44) where dh is the attention head dimension. Together with the self, dense, and task streams, the action-query stream is aggregated by the stream-separated attention rule: 
+
+bXℓ = Xℓ + X
+
+> b∈B
+
+γbAbℓ
+
+!
+
+Wo, B = {self , aq , dense , task }. (45) Here, γself = γtask = 1 , while γaq and γdense are learned gates, as defined in the main TARS formu-lation. The dense stream M dense  
+
+> ℓ
+
+= [ Dℓ; S] and the task stream M task  
+
+> ℓ
+
+= {r} remain unchanged. Thus, the action-query stream introduces a lightweight pretrained register-token prior into the action decoder without changing the external visual, proprioceptive, or task-conditioning streams. In the fixed-query ablation, Eaq is kept frozen after initialization. In the default setting, it is optimized jointly with the rest of the policy. 
+
+B.5 Stream-Separated Normalization in TARS 
+
+Unlike the shared-softmax Bridge Attention used in VLA-Adapter [21], a central design choice in TARS is that heterogeneous conditioning streams are not normalized within a single shared attention distribution. Instead, TARS performs stream-wise normalization and then aggregates the resulting stream outputs. This design is motivated by the fact that the conditioning memories in our decoder are heterogeneous both semantically and structurally: the self stream contains action tokens, the action query stream, the dense stream contains many patches and proprioceptive tokens, and the task stream contains a compact task token. A shared softmax over all these tokens would therefore entangle two distinct questions: which token is important within a stream, and which stream should contribute more to the action update. We formalize this distinction for a single query. Let B denote the set of conditioning streams. Stream 
+
+b ∈ B contains Mb key-value tokens, with attention score sb,j and value vb,j for j = 1 , . . . , M b. A shared-softmax attention first pools all tokens from all streams into one normalization set: 
+
+αb,j = exp( sb,j )
+
+P
+
+> b′∈B
+
+PMb′ 
+
+> m=1
+
+exp( sb′,m ) , oshared = X
+
+> b∈B
+> Mb
+
+X
+
+> j=1
+
+αb,j vb,j . (46) 15 In this formulation, tokens from all streams directly compete for the same probability mass. Conse-quently, the total contribution assigned to a stream is implicitly affected by its token count. In the degenerate case sb,j = c for all b, j , the total attention mass of stream b becomes 
+
+> Mb
+
+X
+
+> j=1
+
+αb,j = Mb
+
+P 
+
+> b′∈B
+
+Mb′
+
+. (47) Thus, a stream with more tokens receives a larger total mass even when its individual tokens are not more informative. This induces a structural length bias: dense visual patch streams can dominate compact streams such as task or action-query tokens simply because they contain more candidates. TARS avoids this bias by normalizing each stream independently: 
+
+eαb,j = exp( sb,j )
+
+PMb 
+
+> m=1
+
+exp( sb,m ) , ob =
+
+> Mb
+
+X
+
+> j=1
+
+eαb,j vb,j . (48) This guarantees MbX
+
+> j=1
+
+eαb,j = 1 , ∀b ∈ B , (49) independent of the number of tokens in the stream. The stream-wise softmax therefore assigns probability mass only within each representation type. The relative strength of different streams is then controlled explicitly by aggregation coefficients rather than implicitly by representation length: 
+
+oTARS = X
+
+> b∈B
+
+γbob, (50) where γb is either fixed or learned. In our implementation, γself = γtask = 1 , while γlat and γdense 
+
+are learned gates. This separation has three practical benefits. First, it removes the structural advantage of long mem-ory streams, making the decoder more robust to changes in the number of visual patches, observation steps, or auxiliary tokens. Second, it protects compact but semantically important conditions, such as task identifiers, from being diluted by dense visual memories. Third, it improves interpretability: the stream-wise attention weights describe which tokens are selected within each source, while the gates describe how strongly each source contributes to the action update. In this sense, TARS treats heterogeneous streams as parallel information providers rather than forcing them to compete inside a single attention pool. 
+
+B.6 Flow-Consistent Inpainting and Real-Time Equivalent Execution Analysis 
+
+We provide the detailed update rule of flow-consistent inpainting and analyze its exposed stall under the real-time equivalent execution metric. 
+
+Flow-consistent overlap constraint. Assume that the current action chunk has Kov actions re-maining. These actions define the overlap segment 
+
+Yov ∈ RKov ×da . (51) The next chunk should start with this segment so that the executed action stream remains continuous when the controller switches from the current chunk to the new chunk. A naive solution is to directly clamp the first Kov actions of the new chunk to Yov at every flow step. However, this is inconsistent with the rectified-flow training distribution. During training, the intermediate action state follows 
+
+Aτ = (1 − τ )ϵ + τ A, (52) where ϵ is the initial noise and A is the target action chunk. Therefore, at early flow times, the overlap region should still be close to noise rather than being directly fixed to the final action value. Hard 16 clamping would query the decoder on out-of-distribution inputs and may also disturb the generation of the remaining free actions through self-attention. Flow-consistent inpainting avoids this issue by constraining the overlap region to follow the same noise-to-data interpolation as in training. For each new chunk, we sample a fixed overlap noise 
+
+ϵov ∼ U [−1, 1] Kov ×da . (53) Let 
+
+τi = iNFE 
+
+, i = 0 , . . . , N FE . (54) At each flow time, the overlap region is constrained as 
+
+A(i)1: Kov = (1 − τi)ϵov + τiYov . (55) For 
+
+i = 0 , . . . , N FE − 1, (56) the full action chunk is first updated by the standard rectified-flow step: 
+
+eA(i+1) = A(i) + 1
+
+NFE 
+
+vθ
+
+ A(i), τ i, C. (57) The free region is kept from this update, while the overlap region is projected back to the flow-consistent path: 
+
+A(i+1) 1: Kov = (1 − τi+1 )ϵov + τi+1 Yov , (58) 
+
+A(i+1)   
+
+> Kov +1: H
+
+= eA(i+1)   
+
+> Kov +1: H
+
+. (59) By construction, the final overlap satisfies 
+
+A(NFE )1: Kov = Yov , (60) which guarantees boundary consistency. At the same time, for every intermediate flow time, the overlap region remains on the same linear interpolation path as the rectified-flow training distribu-tion. This is the key difference between flow-consistent inpainting and hard inpainting: hard in-painting enforces only the final boundary value, whereas flow-consistent inpainting preserves both boundary continuity and in-distribution decoder inputs. The computational overhead of Eq. (58) is only an element-wise update over Kov × da entries per flow step, which is negligible compared with evaluating the velocity network vθ .
+
+Exposed stall under real-time equivalent execution. Recall the real-time equivalent execution metric: 
+
+T = Nactions ∆t + Smethod , (61) where Nactions ∆t is the nominal physical execution time under the target control period ∆t, and 
+
+Smethod is the inference latency that remains exposed on the control path. For a synchronous chunk-based policy, each inference call must finish before the corresponding chunk can be executed. If the policy performs n inference calls in one episode and each call takes latency L, the exposed stall is 
+
+Ssync method = nL. (62) For asynchronous flow-consistent inpainting, only the first chunk requires a cold-start inference before execution starts. After that, each new inference is launched while the remaining Kov actions of the current chunk are still being executed. These Kov actions provide an execution window of length Kov ∆t. Therefore, only the part of the inference latency that exceeds this window remains exposed: 
+
+SFCI method = L0 + ( n − 1) max(0 , L − Kov ∆t), (63) where L0 is the cold-start latency, L is the per-chunk inference latency after execution starts, Kov 
+
+is the overlap length, ∆t is the target control period, and n is the number of inference calls in the episode. 17 Eq. (63) shows that the asynchronous stall collapses to the cold-start term whenever 
+
+L ≤ Kov ∆t. (64) Equivalently, the critical control period is 
+
+∆t⋆ = LKov 
+
+. (65) For any target control period satisfying 
+
+∆t ≥ ∆t⋆, (66) all inference calls after the first chunk can be hidden inside action execution, and the effective episode duration approaches 
+
+T ≈ Nactions ∆t + L0. (67) 
+
+Implementation-specific latency. In our implementation on the workspace with RTX 4080, the average rectified-flow inference latency is 
+
+L = 56 .32 ms . (68) With an overlap length of 
+
+Kov = 4 , (69) the critical control period is 
+
+∆t⋆ = 56 .32 ms 4 = 14 .08 ms , (70) which corresponds to approximately 71 .0 Hz . Therefore, for a target control rate of 20 Hz , i.e., 
+
+∆t = 50 ms , (71) the condition L ≤ Kov ∆t is satisfied. The inference latency after the first chunk is fully hidden by action execution, and the exposed stall becomes 
+
+SFCI method = L0. (72) Using the same average inference latency for the cold start gives 
+
+L0 = 56 .32 ms . (73) Thus, the effective episode duration approaches 
+
+T ≈ Nactions ∆t + 56 .32 ms , (74) instead of accumulating inference latency at every chunk boundary as in synchronous execution. 
+
+Properties of FCI . This design has two important properties. First, it guarantees the boundary con-sistency: when i = NFE , we have τi = 1 , and Eq. (19) gives A(NFE )1: Kov = Yov , so the new chunk exactly matches the remaining part of the current chunk. Second, it keeps the decoder input in distribution: throughout the flow trajectory, the constrained overlap region follows the same linear noise-to-data path as in training. Under the metric in Eq. (15), synchronous execution accumu-lates inference latency at every chunk boundary, whereas FCI can hide subsequent inference calls whenever the overlap execution window is long enough. 
+
+# C Experimental Details 
+
+C.1 Ablation on Action Queries in LIBERO Benchmark 
+
+We ablate the number and learnability of action queries in the TARS decoder, as shown in Table 3. Action queries serve as latent conditioning slots for action-chunk generation, and their number and adaptability affect how the decoder refines future actions from visual-proprioceptive evidence. Using only 4 learnable action queries achieves an average success rate of 73.2%, indicating insuf-ficient conditioning capacity. Increasing the number to 32 gives the best average performance of 18 Table 3: Ablation results of action-query number and learnability in the TARS decoder on the LIBERO benchmark. 
+
+Arch. Action Query Spatial Object Goal Long Avg. Num. Learnable 
+
+TARS 4 ✓ 90.0 66.0 79.6 57.0 73.2 TARS 32 ✓ 89.0 94.6 78.4 66.2 82.1 
+
+TARS 32 ✗ 84.0 73.6 82.2 69.0 77.2 TARS 64 ✓ 87.8 75.2 74.4 54.4 73.0 82.1%, with a particularly strong improvement on LIBERO-Object. When the 32 queries are fixed rather than learnable, the average success rate drops to 77.2%, suggesting that learnability helps adapt these slots to task- and object-dependent action structure. Further increasing the number to 64 reduces the average success rate to 73.0%, implying that excessive queries may introduce redundant slots and optimization difficulty. We also observe that the learned gate associated with the action-query pathway remains small during training, typically around 0.02. This indicates that action queries do not dominate the decoder, but instead act as a weak yet useful action-refinement condition. The main action generation is still driven by visual, proprioceptive, task, and flow-state information, while learnable queries provide a small adaptive bias for organizing action slots. A possible interpretation is that these queries play a role analogous to register tokens in vision transformers, which have been shown to absorb artifact-like or non-local computational components and thereby protect patch tokens from being repurposed for such internal computations [28]. In this sense, learnable action queries may help buffer nuisance variation in the conditioning stream and allow dense visual tokens to preserve cleaner action-relevant spatial information. Overall, the ablation shows that action-query design is a nontrivial factor in TARS. Too few queries limit refinement capacity, fixed queries reduce adaptability, and too many queries can hurt optimiza-tion. We therefore use 32 learnable action queries as the default configuration in CT-VAM. 
+
+C.2 Scaling Behavior of Flow-matching Policy in LIBERO Benchmark 
+
+We study the scaling behavior of flow-matching policies with different overall model sizes, as shown in Table 4. The three variants, FM-S, FM-B, and FM-L, increase both trainable and total parameter counts, allowing us to examine whether larger model capacity alone leads to better visuomotor performance under the same LIBERO evaluation protocol. These flow-matching baselines use the same dual-view visual encoder and rectified-flow action head as CT-VAM, but do not introduce the proposed TARS module. Table 4: Scaling behavior of flow-matching policies with different overall model sizes on the LIBERO benchmark. The three variants increase both trainable and total parameter counts while following the same evaluation protocol. 
+
+LIBERO Trainable / Total Params Spatial Object Goal Long Avg. 
+
+FM-S 35M / 68M 87.0 64.2 59.6 52.4 65.8 FM-B 141M / 227M 89.2 93.0 71.0 54.2 76.9 FM-L 455M / 758M 89.2 93.4 70.6 56.0 77.3 
+
+Scaling from FM-S to FM-B improves the average success rate from 65.8% to 76.9%, indicating that increasing model capacity can substantially benefit flow-matching visuomotor policies when moving from a small to a base-size model. The largest improvement appears on LIBERO-Object, suggesting that object-centric manipulation benefits from stronger visual and action-generation ca-pacity. However, further scaling from FM-B to FM-L only increases the average success rate from 76.9% to 77.3%, despite a much larger parameter count. This indicates a clear diminishing-return effect: after a certain capacity, simply enlarging the model provides only marginal gains on LIBERO. 19 Notably, CT-VAM achieves 82.1% average success with only 68M parameters, outperforming the largest FM-L variant with 758M total parameters. This result suggests that the performance of CT-VAM is not explained by model size alone. Instead, the proposed TARS stream routing and learnable action-query design provide a more effective way to use visual, proprioceptive, task, and action information for closed-loop visuomotor control. These results support our design choice of pursuing a compact but structured vision-action model rather than relying solely on brute-force scaling. 
+
+Figure 5: Key frames of the ball pouring task. The robot is required to grasp a bottle from the tabletop, adjust its pose, and pour the contained balls into the target tray. This task evaluates whether CT-VAM can perform stable grasping and fine-grained pouring control under visual feedback. The red inset shows the wrist-camera observation during execution. 
+
+C.3 Real-World Experiments Hardware config . Real-world experiments are conducted on the OpenArm platform. We use one of its 7-DoF arms equipped with a gripper for the evaluated tabletop manipulation tasks. The perception setup includes an Intel RealSense D435 camera as the third-person camera and an Intel RealSense D405 camera mounted on the wrist of the active arm. The D435 provides the external RGB ob-servation, while the D405 provides the wrist-view RGB observation. Demonstrations are collected using a PICO 4 Ultra teleoperation device. For real-robot execution, experiments are conducted on a workstation equipped with an NVIDIA RTX 4080. In addition, we evaluate the inference efficiency of CT-VAM on an NVIDIA Jetson Orin NX platform to assess its edge deployment capability. 
+
+Data Collection and Training Protocol. For each task, we collect 30 demonstration episodes using a PICO 4 Ultra teleoperation device. Each episode is recorded at 30 Hz and contains synchronized RGB observations from both the D435 third-person camera ( 640 ×480 ) and the D405 wrist-mounted camera ( 424 × 240 ), along with the 7-DoF joint positions and a continuous gripper state. The action space consists of 7-dimensional joint position targets and a continuous 1-dimensional gripper command, yielding da = 8 per step. The average episode length is approximately 236 steps for the ball pouring task and 433 steps for the box opening and placement task. All models are trained with a batch size of 32 for 100000 steps. 
+
+Evaluation Protocol. Each method–platform configuration is evaluated over 20 independent trials. At the start of each trial, the bottle, the box, or the object is placed at a random position within the robot’s reachable tabletop workspace, introducing variation in the initial conditions across trials. A trial is considered successful only if the robot completes the full task without human intervention. For the box opening and placement task, the one-hot task label is switched manually by an operator when the current subtask is visually judged to be complete. No automatic subtask recognition mod-ule is used. A trial is counted as successful only if all three subtasks are completed consecutively. 
+
+Ball Pouring: Result Analysis. Figure 5 shows representative key frames of a successful ball pouring trial. Across trials, CT-VAM reliably localizes the bottle under varying initial placements, executes stable grasping, and completes the pouring motion without manual intervention in most cases. We observe that the only failure case of CT-VAM with FCI occurs during bottle grasping, where a slightly tilted grasp pose leads to an unstable grasp before pouring. A similar failure mode 20 Figure 6: Key frames of the long-horizon box opening and placement task. The task is divided into three manually labeled subtasks during data collection: Subtask 1 opens the box, Subtask 2 grasps the target object, and Subtask 3 places the object into the box. During evaluation, the corresponding one-hot task label is manually switched at subtask boundaries to test whether CT-VAM can execute consecutive subtasks under task-conditioned control. is also observed for π0, suggesting that this error mainly comes from the sensitivity of the bottle grasping stage to small pose deviations, rather than from the flow-consistent inpainting mechanism itself. In contrast, diffusion policy more often fails due to timeout, where the robot makes little or no progress after task initialization. We attribute this behavior to insufficiently consistent and goal-directed action predictions under real-world visual perturbations. In such cases, the predicted joint updates tend to be too small or unstable to drive effective motion through the low-level controller, causing the execution to stall until timeout. 
+
+Box Opening and Placement. We further evaluate CT-VAM on a long-horizon box opening and placement task to examine whether the policy can execute multiple consecutive subtasks under task-condition switching. During data collection, each demonstration is segmented into subtask-level trajectories and assigned a corresponding task label, which is encoded using the same one-hot task representation as in the main policy. During evaluation, we manually switch the task label at subtask boundaries, rather than using an automatic subtask recognition module, because subtask segmenta-tion and online task inference are outside the scope of this paper. The policy is required to sequentially open the box, grasp the target object, and place it into the box within a single execution episode. This task therefore evaluates whether the task-conditioning branch can effectively guide action generation through TARS, and whether the proposed stream-separated routing mechanism can balance task information with visual and proprioceptive observa-tions during long-horizon execution. Figure 6 shows the key frames of a representative successful trial. In particular, when the task condition is switched at a subtask boundary, CT-VAM is able to redirect the policy toward the next subtask while preserving visually grounded closed-loop control. These results suggest that TARS can effectively coordinate task-level intent with visual and propri-oceptive evidence, making CT-VAM compatible with long-horizon manipulation tasks that require sequential task-conditioned execution. 21 C.4 Jetson Orin NX Deployment and TensorRT Optimization 
+
+For edge deployment, we run CT-VAM fully onboard on an NVIDIA Jetson Orin NX platform. This platform is designed for embedded AI and robotics applications with constrained power, memory, and compute budgets [29]. Since Jetson Orin NX has more limited compute and memory resources than a desktop GPU, directly executing the PyTorch model introduces non-negligible runtime over-head. To better match the intended edge-deployment setting, we convert the trained CT-VAM check-point into TensorRT engines for accelerated on-device inference. TensorRT is NVIDIA’s inference optimization and runtime SDK for high-performance deep neural network deployment on NVIDIA GPUs, supporting model import from frameworks and intermediate formats such as PyTorch and ONNX [30, 31]. The TensorRT conversion only changes the inference backend. It does not modify the model architecture, training data, learned parameters, observation-action space, action horizon, number of flow inference steps, or low-level OpenArm controller. The same trained checkpoint is used for both desktop-GPU and Jetson deployment. In our implementation, the PyTorch checkpoint 
+
+step 00100000.pt , trained for 100k steps, is exported through the PyTorch → ONNX → Ten-sorRT pipeline. To simplify runtime execution, the policy is decomposed into two TensorRT sub-graphs: a vision–proprioception encoder and a single flow-matching denoiser step. During one action-chunk generation, the encoder is executed once, and the denoiser-step engine is repeatedly invoked for the prescribed number of flow inference steps. We use TensorRT mixed precision with BF16 enabled and FP32 fallback for layers that are not supported in BF16. The Jetson software stack is JetPack 6.2 (L4T R36.4.3), CUDA 12.6, Ten-sorRT 10.3.0, and cuDNN 9.3.0. The TensorRT engines are built with batch size 1, static input shapes, and a 4 GiB workspace. All latency numbers are measured after runtime warm-up. The reported inference time corresponds to one complete action-chunk generation, including the vision– proprioception encoder and all flow-matching denoising steps. It excludes camera image acquisition, robot communication, and low-level controller execution, which are not part of the neural policy in-ference time. We also verify that the TensorRT backend preserves the numerical behavior of the policy. On 50 observation samples drawn from the evaluation dataset, the difference between the PyTorch and TensorRT action outputs is 3.9 × 10 −3 rad in mean absolute error, corresponding to 0.26% of the mean per-joint action range. The maximum absolute error is 5.9 × 10 −2 rad. This comparison is performed in joint-angle space with the flow-matching noise fixed across the two backends. These results indicate that the TensorRT conversion primarily improves deployment efficiency rather than changing the learned control policy. The reduced inference latency is particularly important for the Ball Pouring task. This task requires the robot to grasp the bottle, adjust its pose, and pour small balls into the target tray under continu-ous visual feedback. Excessive inference latency can lead to stale observations, delayed corrective actions, and less stable pouring behavior. Therefore, improving the onboard inference speed not only reduces execution time but can also improve the stability of closed-loop manipulation under the same evaluation protocol. 
+
+C.5 Real-Time-Equivalent Execution Frequency 
+
+We provide a concise calculation of the real-time-equivalent execution frequency under FCI. The detailed exposed-stall formulation has been introduced in Appendix B.6; here we only convert it into an effective low-level action frequency for the real-world deployment setting. Let the low-level controller run at a target control period ∆t. In our real-world experiments, the target control frequency is 20 Hz , so 
+
+∆t = 50 ms . (75) CT-VAM predicts action chunks of length 
+
+H = 8 , (76) 22 and FCI uses an overlap length of 
+
+Kov = 4 . (77) The overlap actions are not executed twice. They are used to enforce boundary consistency between the tail of the current chunk and the beginning of the next chunk. When the new chunk becomes active, its first Kov actions correspond to the overlap segment and are not counted as newly executed actions. Therefore, each subsequent FCI chunk advances the executed action sequence by 
+
+Hnew = H − Kov = 4 (78) new low-level actions. The physical time required to execute these new actions is 
+
+Hnew ∆t = 4 × 50 ms = 200 ms . (79) The overlap execution window available for hiding the next inference call is 
+
+Kov ∆t = 4 × 50 ms = 200 ms . (80) Let L denote the measured per-chunk inference latency after execution has started. The latency that remains exposed on the control path is 
+
+Lexposed = max (0 , L − Kov ∆t) . (81) Accordingly, the steady-state real-time-equivalent execution frequency under FCI is 
+
+f FCI eq = Hnew 
+
+Hnew ∆t + max (0 , L − Kov ∆t) . (82) This expression counts only the newly executed actions and therefore avoids double-counting the overlap region. On the RTX 4080 platform, the measured inference latency of CT-VAM with FCI is 
+
+LRTX = 56 .84 ms . (83) Since LRTX < K ov ∆t, the exposed latency is 
+
+LRTX exposed = max (0 , 56 .84 ms − 200 ms) = 0 . (84) Therefore, the real-time-equivalent execution frequency is 
+
+f FCI eq ,RTX = 4200 ms = 20 .0 Hz . (85) On Jetson Orin NX with the TensorRT-optimized backend, the measured inference latency of CT-VAM with FCI is 
+
+LJetson = 200 .60 ms . (86) The exposed latency is 
+
+LJetson exposed = max (0 , 200 .60 ms − 200 ms) = 0 .60 ms . (87) Thus, the real-time-equivalent execution frequency is 
+
+f FCI eq ,Jetson = 4200 ms + 0 .60 ms ≈ 19 .94 Hz . (88) These results show that FCI hides most of the neural inference latency inside physical action execu-tion. On RTX 4080, the inference latency is fully hidden in the steady state, and the effective exe-cution frequency reaches the target 20 Hz low-level control rate. On Jetson Orin NX, only 0.60 ms 
+
+remains exposed per FCI stride, so the effective execution frequency remains close to 20 Hz .23
