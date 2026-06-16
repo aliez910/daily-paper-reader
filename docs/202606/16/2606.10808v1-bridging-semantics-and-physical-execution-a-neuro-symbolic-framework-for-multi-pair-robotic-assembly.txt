@@ -1,0 +1,1126 @@
+Title: Bridging Semantics and Physical Execution: A Neuro-Symbolic Framework for Multi-Pair Robotic Assembly
+
+URL Source: https://arxiv.org/pdf/2606.10808v1
+
+Published Time: Wed, 10 Jun 2026 01:11:42 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+> 1
+
+# Bridging Semantics and Physical Execution: A Neuro-Symbolic Framework for Multi-Pair Robotic Assembly 
+
+Xinyi Li, Aiguo Song *, Linhu Wei, and Huijun Li 
+
+Abstract —Multi-pair robotic assembly in unstructured envi-ronments faces spatial interference and contact uncertainties. Existing paradigms fail to bridge cognitive decision-making and physical execution, as they either encounter state-space explosion and knowledge bottlenecks or suffer from logical hallucinations and topological conflicts. We propose an end-to-end neuro-symbolic framework that solves the challenge hierarchically: generating optimal subgraphs for each pair, decoupling generality from edge cases, and then resolving cross-pair interferences. Given an eye-on-hand RGB-D assembly scene, the framework extracts semantic instance identity and state while quantifying the scene for divergence calculation. For each pair, optimal subgraph is generated via LLM using barely basic actions to mitigate hallucinations. Supportive actions for edge cases are reasoned and inserted with a lightweight discriminator. Driven by the divergence between the quantified baseline and current scene, it is easily extensible at low cost. Augmented subgraphs are topolog-ically coordinated into global sequences while preserving internal behavioral coherence. Dynamic behavior trees embedding atomic skills close the force-aware execution loop. Offline evaluation on 100 real-world scenes achieves 97.00% global executability, outperforming classical and state-of-the-art planners. Real-robot deployment on a UR3 arm attains 90% success rate with 0.5 mm tolerance under strong interference, demonstrating a unified and verifiable solution for complex autonomous assembly. 
+
+Index Terms —Robotic assembly, neuro-symbolic planning, vision-language models, topological sorting, force feedback. 
+
+I. I NTRODUCTION 
+
+# ROBOTIC assembly has long been a cornerstone of intel-ligent manufacturing and flexible automation. However, scaling from single-object rigid scripted operations to long-horizon multi-pair assembly in unstructured environments remains a significant open challenge [1]–[4]. The system must accommodate varying initial states, workspace physical constraints, and contact uncertainties inherent in tightly-fitting tasks such as gear-on-shaft and peg-in-hole assembly, as high-lighted by standardized benchmarking studies [5]. Reliable and efficient execution demands three core capabilities: (i) a robust perception layer that explicitly quantifies semantic uncertainty; (ii) a high-level planner that suppresses logical hallucinations while preserving commonsense flexibility and global assembly efficiency; and (iii) a force-aware execution layer that grounds symbolic plans in physical reality. Moreover, for complex geometric dependencies such as object stacking, globally valid 
+
+School of Instrument Science and Engineering, Southeast University, Nan-jing 210096, China. *Corresponding author: Aiguo Song. Email: a.g.song@seu.edu.cn 
+
+assembly sequence planning is essential not only for efficiency but also for physical reachability. Existing methods exhibit a clear gap in bridging cognition and execution. Classical symbolic planners deliver strictly ver-ifiable topological correctness in purely symbolic logic spaces. However, in complex stacking scenarios, PDDL [6] suffers from state-space explosion, while HTN [7] is constrained by expert-rule knowledge acquisition bottlenecks. Even recent hy-brid task and motion planning (TAMP) architectures mitigate grounding gaps via execution-time closed-loop behaviors [8], yet it still limits commonsense adaptability in unstructured environments. In contrast, end-to-end large language models (LLMs) excel at commonsense decomposition for open-world tasks yet remain prone to logical hallucinations and topological conflicts in long-horizon multi-action planning [9]. Gener-ated instructions often lack physical grounding verification. Even logically feasible plans prove fragile for contact-rich insertion operations with millimeter-level tolerances, owing to the absence of a closed-loop bridge between discrete symbolic sequences and continuous force-control feedback. Consequently, the field is forced to compromise between generalization capability and verifiability [10], with no reliable neuro-symbolic closed-loop architecture available for long-horizon multi-pair robotic assembly. To fill this gap, we propose a novel neuro-symbolic frame-work with a local-global hierarchical design, illustrated in Fig. 1. The framework systematically bridges semantic prob-ability distributions, topological planning, and force-aware execution, forming a complete perception-planning-execution physical closed loop. Leveraging a highly modular alge-braic information flow that supports algebraic verification, the perception-planning architecture generates executable global planning sequences. Physical execution is realized through dynamic behavior trees (BTs), force-feedback reinforcement learning (RL) policies for contact-rich processes, and other low-level skills. In real-world assembly scenes covering vari-ous multi-pair types, different initial states, and diverse stack-ing dependencies, our framework outperforms classical [6], [7] and state-of-the-art (SOTA) [11], [12] methods. Specifically, our framework decouples long-horizon assem-bly logic into an extensible hierarchy of basic actions and supportive actions. Common assembly logic is abstracted as basic actions, which the LLM generates directly from struc-tured states. Sparse yet critical cases—such as occlusion clear-ance, occupancy release, and pose alignment—are modeled as pluggable supportive actions. These actions are dynamically  
+
+> arXiv:2606.10808v1 [cs.RO] 9 Jun 2026 2
+> Fig. 1. The end-to-end neuro-symbolic pipeline and SOTA replacement points (C1–C4). This figure demonstrates the workflow from pixel-level observation
+> Itto force-aware execution, with dashed lines indicating the substitution locations of comparative methods within the baseline pipeline.
+
+triggered and structurally augmented by a lightweight Jensen-Shannon divergence-driven discriminator (JS-Trans) based on semantic distribution differences between baseline and variant scenes, in line with recent findings that information-theoretic measures effectively capture implicit task topologies [13]. This decoupling preserves task generality and LLM flexibility while isolating topological conflicts induced by hallucinations. Consequently, the system gains an extensible assembly re-quirement reasoner. The core contributions of this paper are fourfold: 1) We propose a neuro-symbolic framework that converts visual assembly scenes into global execution sequences 
+
+σt. By integrating force-aware execution, the framework closes the physically grounded perception-planning-execution loop for multi-pair robotic assembly. 2) We design a local-global hierarchical graph method that leverages an LLM to construct local minimal-action subgraphs, topologically resolves global geometric de-pendencies such as object stacking, and preserves local assembly logic continuity. 3) We devise a lightweight Transformer discriminator termed JS-Trans, decouples supportive action reasoning for edge cases from LLM basic-action generation. The discriminator is driven by a quantized representation of the divergence between the standard and current scenes, which ablation studies demonstrate outperforms several alternative feature variants. 4) We assign each action a corresponding atomic skill equipped with self-validation and local corrective ca-pabilities. In particular, force-aware skills employ impedance control and RL policies. The execution is managed by a dynamic BT scheduler. II. R ELATED WORK 
+
+Robotic assembly, particularly long-horizon tasks with multi-object topological constraints, geometric dependencies, and contact-rich interactions, is shifting from rigid scripted pipelines toward hybrid intelligent systems. Nevertheless, re-liable autonomous execution in unstructured environments continues to face cross-level challenges spanning high-level semantic understanding to low-level physical execution. 
+
+A. Multi-pair Robotic Assembly 
+
+Multi-pair assembly tasks, such as aircraft panel docking and multi-component disassembly of retired products, require coordinated execution of peg-in-hole, gear-shaft, and nut-bolt operations under stacking dependencies, shared resources, and dynamic disturbances. Recent reviews [1], [2] indicate that existing solutions, largely limited to single-object or rigidly structured scenarios, struggle to scale amid the stochasticity of sustainable manufacturing environments and human behavioral variability, underscoring the need for proactive multi-pair adaptation. Recent efforts address these challenges along three di-mensions. In high-level task planning, LLM-based multi-agent frameworks [3], [14] leverage genetic algorithms or decentralized oracles to decompose natural-language intents while balancing operator experience and efficiency. However, these approaches rely heavily on implicit LLM reasoning and lack explicit topological validation of cross-pair dependencies, rendering them vulnerable to logical hallucinations in long-horizon sequences. In contrast, symbolic planners such as HAD-TAMP [15] guarantee logical correctness and support dynamic replanning, yet incur high computational cost and remain sensitive to semantic uncertainty from perception. For multi-pair topological coordination, surrogate-model-driven MARL frameworks [4] effectively co-optimize compo-nent deformation and inter-panel clearances in large-scale par-allel assembly. Nevertheless, these methods depend primarily on offline approximations and offer limited integration with real-time contact-rich perceptual states, constraining robust-ness under visual occlusions or disturbances. At the force-aware execution layer, meta-RL approaches [16] achieve rapid parameter adaptation via PEARL-SAC under environmental interference. While effective for local closed-loop control, their validation remains confined to single-pair scenarios and does not readily scale to resolve topological conflicts or execution interdependencies across multiple pairs. In summary, current methods either suffer from pure LLM hallucinations or rely on computationally intensive symbolic planning, while low-level force-aware loops remain largely isolated from high-level topological reasoning. 
+
+B. Instance Perception and VLM in Robotic Manipulation 
+
+Reliable instance-level perception is a prerequisite for multi-pair assembly, since low-level semantic uncertainties (e.g., physical occlusions, rotational ambiguity, and grasping states) readily propagate errors into high-level planning. Recent works [17]–[19] in vision-language models (VLMs/VLAs) collectively demonstrate effective semantic understanding, in-ference efficiency through temporal-aware visual token prun-ing, and natural human-robot interaction via augmented-reality frameworks for long-horizon assembly tasks. However, they still suffer from stateless operation and remain sensitive to perception noise. 3
+
+To address stateless limitations of standard VLM/VLA pipelines, researchers have introduced external memory struc-tures and adaptive strategies. VLM-DEWM [20] decouples VLM reasoning from persistent state tracking to handle out-of-view objects and state drift, while [21] combines LLM-guided ontology with geometric similarity matching for generalizable task-oriented grasping on novel objects. Complementary ef-forts address error mitigation through closed-loop correction and human-in-the-loop feedback [22], [23]. Collectively, these studies significantly advance semantic grounding and robustness in robotic manipulation. Neverthe-less, they predominantly treat visual perception as a determin-istic or implicitly corrected feedforward process and address uncertainty only reactively. In unstructured environments, vi-sual observations frequently exhibit high semantic ambiguity. 
+
+C. The Spectrum of Neuro-Symbolic Planning 
+
+Traditional TAMP relies on symbolic solvers, which provide rigorous logical guarantees but struggle with generalization to unstructured, long-horizon assembly tasks. To enhance flex-ibility and reactivity, recent neuro-symbolic approaches fuse LLM semantic reasoning with BTs and hierarchical structures. Works such as [11], [24]–[26] leverage LLMs for direct BT generation or dynamic expansion, enabling adaptive task execution in response to environmental changes. Comple-mentary efforts introduce heuristic and hierarchical mech-anisms to improve efficiency and robustness: HBTP [27] introduces heuristic BT planning guided by LLM reasoning, while Kwon et al. [28] employs multi-level goal decomposition and GRHP [12] uses graph-fused architectures to bridge high-level semantics with low-level execution. To address persistent limitations in LLM planning, sev-eral studies investigate verification and grounding strategies. Mendez-Mendez et al. [29] systematically demonstrate that pure LLM planners exhibit lower success rates than classi-cal symbolic methods in complex TAMP, while works such as [30]–[33] introduce symbolic verifiers, closed-loop feed-back, deliberative layered BTs, and abductive reasoning to mitigate hallucinations and constraint violations. Overall, these neuro-symbolic methods enriched the TAMP spectrum through heuristic expansion, symbolic fallbacks, and closed-loop feedback. However, they predominantly rely on implicit or post-hoc correction of logical inconsistencies. 
+
+D. Force-Aware Control in Contact-Rich Manipulation 
+
+Contact-rich manipulation, particularly high-precision peg-in-hole and connector insertion, remains a core challenge in robotic assembly due to complex frictional dynamics, pose uncertainty, and tight clearances. Recent surveys [34], [35] highlight the promise and persistent cost and safety barriers of learning-based methods for such tasks. Several works advance low-level force modeling and sensor configurations. Liao et al. [36] develop friction-aware strate-gies via real-time contact wrench measurement, while Tracy et al. [37] propose efficient online learning of quasi-static contact force models for connector insertion. Works as [38], [39] further demonstrate effective off-robot force sensing and time-series force-based state recognition for inclined-hole and large-scale assembly. Complementary efforts focus on adaptive RL policies. Ding et al. [40] combine imitation learning with ensemble RL to achieve robust sim-to-real transfer in high-precision peg-in-hole tasks. Shirai et al. [41] integrate contact-implicit trajec-tory optimization with RL for pivoting manipulation, while SHaRe-RL [42] employs structured primitives with human-in-the-loop corrections for industrial assembly. These studies achieve strong performance in force-aware execution and contact-rich skills. However, in multi-pair as-sembly scenarios, any deviation in visual perception or logical hallucination produces physically infeasible plans, rendering low-level force controllers prone to deadlocks in the absence of global topological awareness. III. P ROBLEM FORMULATION 
+
+This section formalizes the multi-pair assembly problem and presents the algebraic information flow of the proposed neuro-symbolic framework. A unified mathematical notation is used throughout this paper. 
+
+A. Notation and Problem Statement 
+
+At time t, the robot acquires an RGB-D observation image 
+
+It from an Eye-on-Hand camera. A detection and segmentation frontend extracts Nt regions of interest (ROIs) from image It,forming an instance set: 
+
+Rt = {rt,i }Nt
+
+> i=1
+
+. (1) Each instance rt,i map to an scene object i, containg ROI, category, and geometric information. The unstructured nature of the assembly scene arises from (i) diversity in component types, quantities, and initial workspace states; (ii) complex spatial dependencies (e.g., stacking dependencies and physical occlusions) and contact uncertainties among components; and (iii) concurrent execu-tion conflicts induced by shared resources (a single gripper and restricted workspace). Task objectives are issued in natural language and may specify attribute-paired assemblies (e.g., smallest circle peg-in-hole), same-category assemblies (e.g., square peg-in-hole), or macroscopic tasks (e.g., assembly). A multi-pair assembly task comprises Mt local sub-task assembly pairs indexed by j ∈ {1, . . . , M t}. Each pair j
+
+is formalized as a triplet ⟨mj , f j , tools j ⟩, where the male operative component mj (e.g., peg, gear) and female reference component fj (e.g., hole, shaft) are dynamically matched from the instance set Rt according to geometric and semantic compatibility constraints. For each pair j, the LLM first generates a local task DAG: 
+
+πj = ( Vj , E j ), (2) where each node v ∈ Vj is an action step of the form (id , action , target , params) and directed edges Ej
+
+represent precedence dependencies within the pair. The candidate action set consists of basic actions Abase =
+
+{localize , pick , insert } and supportive actions Asupp =
+
+{release , remove , align }, extendable on demand. 4
+
+> Fig. 2. Schematic of the system’s algebraic information flow and token state transitions in multi-pair assembly scenes. The figure shows the complete pipeline from pixel observation and semantic probability distribution modeling through local DAG generation and augmentation to global token-based topological constraints.
+
+The core system objective is to compute a globally exe-cutable discrete sequence σt that satisfies (i) all internal and cross-pair topological precedence constraints, (ii) proactive elimination of semantic uncertainty in the physical scene via supportive actions, and (iii) grounding into a dynamic behavior tree while maintaining control robustness against millimeter-level contact uncertainties in the real world. 
+
+B. Formal Objective and Algebraic Flow 
+
+To achieve the above objective, we construct an end-to-end neuro-symbolic pipeline. The information flow is illustrated in Fig. 2, described as algebraic mapping: 
+
+qt = BTExec 
+
+
+
+Topo  σt
+
+
+
+,σt =
+
+> Mt
+
+[
+
+> j=1
+
+Aug j
+
+
+
+LLM  CLIP(Det( It)) 
+
+.
+
+(3) In the early stages of the information flow Det → CLIP →
+
+LLM → Aug , the system performs local computations over individual ROIs or independent assembly pairs, progressively converting pixel-level uncertainty into ambiguity-resistant lo-cal symbolic DAGs. The TOPO stage is the first global operator; it aggregates token-level precondition and effect constraints across all Mt pairs and algebraically resolves con-current conflicts over physical resources. Finally, the BTExec module grounds the abstract global symbolic sequence σt
+
+into continuous physical trajectories qt of the robotic arm, completing the full perception-planning-execution closed loop. IV. N EURO -S YMBOLIC PERCEPTION AND PLANNING 
+
+A. Semantic State Graph Construction 
+
+In long-horizon robotic assembly tasks, high-dimensional noisy raw images It are transformed into logically consis-tent symbolic facts for high-level planners. The perception frontend uses a deep cascade of Mask R-CNN and CLIP to model physical states from pixel observations and converts visual ambiguity and uncertainty into structured probability distributions serving as a unified interface for world-state construction wt,j , local task graph generation, and global topological coordination. 
+
+1) Instance Extraction and Context-Aware Encoding: Mask R-CNN discretizes the input image to extract the instance set 
+
+Rt = {rt,i }Nt
+
+> i=1
+
+. Each instance contains a pixel-wise mask 
+
+mt,i , bounding box bt,i , and initial detection category prior 
+
+ct,i .For each instance rt,i , adaptive ROI cropping expands the detection box of mask into a square input for the vision-language encoder, yielding crop( It, m t,i ). The vision encoder 
+
+fθ maps the processed ROI to a normalized image embedding: 
+
+ut,i = normalize  fθ (crop( It, m t,i ))  (4) On the text side, prompts are partitioned into Identity 
+
+prompts directly injected from ct,i and State labels char-acterizing assembly-related attributes. Template ensembling generates multiple templated variants {τ (m) 
+
+> ℓ
+
+}Mℓ 
+
+> m=1
+
+for each candidate label ℓ. The text encoder extracts and normalizes each variant; the mean is taken and normalized again to obtain the aggregated text embedding: 
+
+¯vℓ = normalize 
+
+ 1
+
+> Mℓ
+> Mℓ
+
+X
+
+> m=1
+
+gθ (τ (m) 
+
+> ℓ
+
+)
+
+
+
+. (5) The cosine similarity between instance rt,i and label ℓ in the shared latent space, scaled by a learnable logit scale τ :
+
+zt,i,ℓ = exp( τ ) ⟨ut,i , ¯vℓ⟩. (6) 
+
+2) Structured Prompt Engineering and Probabilistic Con-straint Modeling: Mutually exclusive semantic groups G ad-dress probability dispersion and logical conflicts in multimodal 5                                                                                                                       
+
+> TABLE I CLIP P ROMPT CLASSIFICATION AND CRITICAL MUTUALLY EXCLUSIVE SEMANTIC GROUPS
+> Prompt Semantic Filtered Group Candidate Type Group gby ct,i Value Prompts
+> peg identity peg —a{peg_type }peg
+> hole identity hole —a{hole_type }hole
+> Identity gear identity gear —a{gear_type }
+> gripper identity gripper —agripper ;two-finger gripper ;parallel gripper
+> visibility peg 1/0 1: single object ;one object visible ;isolated object .0: occluded object ;blocked object ;covered object ;obscured object
+> graspable peg 0/1 0: grasped ;held by gripper ;picked up .1: free ;loose ;unattached ;not held
+> State gear shaft exist circle peg 1/0 1: with gear shaft .0: no gear shaft
+> rotation hole 0/1 0: aligned ;axis-aligned orientation ;horizontal/vertical .1: misaligned ;rotated in-plane ;turned within the image plane ;
+> rotated Xdegrees
+> occupancy gripper 1/0 1: grasping acomponent ;with object between the jaws .0: grasping nothing ;with empty jaws ;with space between the jaws
+
+reasoning. Using the detection category prior ct,i , domain-knowledge filtering removes labels inconsistent with the en-tity’s physical properties (e.g., pose alignment is evaluated only for “hole” entities). For each group g ∈ G and its active candidate label subset Lg , the intra-group conditional probability distribution pt,i,g (ℓ) is computed: 
+
+pt,i,g (ℓ) = exp( zt,i,ℓ )
+
+P 
+
+> ℓ′∈L g
+
+exp( zt,i,ℓ ′ ) , (7) The detector prior ct,i filters the prompt set to retain only category-consistent active labels. Normalization is performed exclusively within these active labels. This converts similarity scores into physical-state probabilities. Discretized group-value encodings are provided for critical mutually exclusive groups (e.g., visibility state, grasping state) to support downstream planning and verifiable execution. This yields the discrete semantic state ℓ∗ 
+
+> i,g
+
+= arg max ℓ∈L g pt,i,g (ℓ)
+
+for each group. Classification criteria are detailed in Table I. 
+
+3) Domain Adaptation Fine-Tuning: Category-agnostic do-main adaptation fine-tuning on collected structured annotation data addresses low confidence of pre-trained CLIP models on assembly-specific features. Training employs a contrastive filtering mechanism and a balanced batch sampler to maintain mutual exclusivity of positive and negative samples from the same image within each batch and ensure balanced exposure to low-frequency physical states such as visibility and rotation. An AdamW optimizer is used: the first stage freezes the vision encoder backbone to stabilize multimodal mappings and mitigate catas-trophic forgetting; the second stage unfreezes all parameters for semantic boundary calibration. The standard CLIP contrastive learning loss with symmet-ric InfoNCE objective is adopted. The fine-tuned perception network converts low-level continuous visual information into discretized semantic distributions {pt,i,g (ℓ)}g∈G , supplying instance-level low-entropy category priors ct,i at the percep-tion frontend. Local joint probability normalization decouples orthogonal physical attributes of objects and enables precise quantification of semantic uncertainty to bridge raw pixels to cognitive logic for downstream symbolic planning. 
+
+B. LLM-Driven Local Task Graph Generation 
+
+Given the discrete instance set Rt and group-level semantic probability distributions {pt,i,g (ℓ)}, high-level assembly inten-tions are instantiated as structured physically executable local DAGs. The Mt candidate assembly pairs pj = ( mj , f j , tools j ) are identified from Rt according to the task objective. Selection relies on geometric compatibility of shape and size, guided by the Mask R-CNN category prior ct,i and RGB-D scale in-formation. Discrete semantic states (mutually exclusive group features such as visibility, graspable, and rotation) and relative occlusion relations organize the output sequence of selected pairs without affecting execution ordering. For each pair pj ,a highly abstracted structured world state wt,j is constructed. This state integrates component geometric attributes, discrete states from mutually exclusive semantic groups, end-effector pose, and task goal description. Conditioned on wt,j and the planning history ht,j , the LLM autoregressively generates an initial step sequence πj ∼ Pϕ(π | wt,j , h t,j ) and parses it into a preliminary chain-like directed graph, as in Algorithm 1. A two-stage plan sanity check combined with history back-injection closed-loop mechanism alleviates logical hallucina-tions and physical unreachability of LLMs in long-horizon spatial reasoning:  
+
+> •
+
+Rule-based redundancy elimination : Domain expert rules automatically remove invalid actions such as con-secutive localization or repeated pick-ups and generate soft guidance suggestions ( GUIDE: ) for optimizing plan-ning topology.  
+
+> •
+
+Dry-run simulation : State-machine-style precondition verification is performed sequentially for each action in topological order, identifying logical and physical con-flicts and generating hard constraints ( FAIL: ) to avoid. If the preliminary sequence fails the sanity check, a con-straint set with one tried plan, all FAIL: , and all GUIDE: is extracted and injected into the planning history ht,j to trigger replanning. This closed-loop iteration runs at most five rounds using a sliding window of the three most recent histories to limit context length, as in Algorithm 2. 6                                                           
+
+> TABLE II TWO -S TAGE PLAN SANITY CHECK AND HISTORY BACK -I NJECTION MECHANISM FOR LLM L OCAL PLANNING
+> Stage Rule / Action Trigger Condition / Precondition Output Format
+> align prune peg or pair already aligned GUIDE: unnecessary align pick prune male obj. already grasped GUIDE: avoid repetitive picking Rule-based Layer localize prune consecutive localize GUIDE: remove redundant localization supportive prune release when gripper is empty; remove when no blocker GUIDE: supportive action redundancy remove parallelization ≥2independent remove Fan-out/fan-in structural rewiring localize check Missing/out-of-bounds/inconsistent parameters FAIL: Invalid parameters pick check Not localized/already grasped/tool conflict FAIL: Preconditions unmet release check Male component still grasped/release meaningless FAIL: Release invalid/wasteful Dry-run Layer remove check Gripper not empty/missing blocker ROI id FAIL: Remove preconditions unmet align check Incorrect target type/not picked/repetitive alignment FAIL: Alignment sequence error insert check Not grasped/not aligned/female not localized FAIL: Insert preconditions unmet Back-Injection Minimal Constraint Set Any failure occurs tried plan: +FAIL: +GUIDE:
+
+Algorithm 1 LLM-Driven Local Task Graph Generation 
+
+Require: Instance Rt, semantic distributions {pt,i,g (ℓ)}g∈G ,task mode 
+
+Ensure: Set of validated local task DAGs {πj = ( Vj , E j )}Mt 
+
+> j=1
+> 1:
+
+P ← SelectPairs( Rt, {pt,i,g }, task mode ) 
+
+> 2:
+
+Π ← ∅  
+
+> 3:
+
+for each pair pj = ( mj , f j , tools j ) ∈ P do  
+
+> 4:
+
+wt,j ← ConstructWorldState( pj , Rt, {pt,i,g }) 
+
+> 5:
+
+πj ← GenerateAndValidate( wt,j ) {Algorithm 2 } 
+
+> 6:
+
+Π ← Π ∪ { πj } 
+
+> 7:
+
+end for  
+
+> 8:
+
+return Π
+
+Algorithm 2 Validation and Planning History Back-Injection 
+
+Require: World state wt,j , iteration limit K
+
+Ensure: Validated local DAG πj = ( Vj , E j ) 
+
+> 1:
+
+ht,j ← ∅ { Planning history } 
+
+> 2:
+
+for k = 1 to K do  
+
+> 3:
+
+π ← LLM( wt,j , h t,j ) 
+
+> 4:
+
+G′ ← BuildInitialChainGraph( π) 
+
+> 5:
+
+(G′, GUIDE) ← RulePrune( G′, w t,j ) 
+
+> 6:
+
+(valid , FAIL) ← DryRun( G′, w t,j ) 
+
+> 7:
+
+if valid then  
+
+> 8:
+
+return G′ 
+
+> 9:
+
+end if  
+
+> 10:
+
+ht,j ← UpdateHistory( ht,j , π, GUIDE , FAIL)  
+
+> 11:
+
+end for  
+
+> 12:
+
+return FallbackPlan( wt,j )
+
+The validated sequence is encapsulated as the local task DAG πj = ( Vj , E j ) for downstream supportive action dis-crimination and global topological coordination. The rules and convergence workflow are presented in Table II and Fig. 3. 
+
+C. JS-Trans: Divergence-Driven Supportive Action Reasoning and Local Graph Augmentation 
+
+Operation sequences in complex multi-pair assembly tasks exhibit strong structural commonality. The framework decou-ples assembly logic into basic actions and supportive actions. The LLM generates local DAGs πj composed solely of basic actions localize , pick , insert from structured  
+
+> Fig. 3. LLM local plan generation coupled with the two-stage sanity check and the convergence closed-loop of planning history minimal constraint set back-injection.
+
+world states. Supportive actions that resolve environmental deviations—such as occlusion clearance, occupancy release, and pose alignment—are decoupled from LLM planning and handled by the JS-Trans module. Representative baseline and variant scenes appear in Fig. 4. The independent circular peg-in-hole assembly under stan-dard initial conditions serves as the canonical baseline refer-ence scene Sref 0 . This baseline requires no supportive actions due to absent physical occlusions, gripper occupancy, and rotational misalignment, providing a stable reference for quan-tifying scene deviations. JS-Trans, a lightweight Transformer-based discriminator, performs divergence-driven supportive action reasoning by measuring semantic probability distribu-tion divergences from this baseline. The overall input-output pathway and graph augmentation logic are illustrated in Fig. 5. 
+
+1) Difference Feature Construction: JS-Trans constructs baseline-variant difference features directly at the mutually exclusive semantic group level without additional text fine-tuning. For each candidate pair j, given the current scene distributions {qg } and baseline distributions {p0 
+
+> g
+
+}, L1 normal-ization is applied: 
+
+p0 
+
+> g
+
+← p0
+
+> g
+
+P 
+
+> i
+
+p0 
+
+> g,i
+
++ ε , qg ← qg
+
+P 
+
+> i
+
+qg,i + ε . (8) 7
+
+(a) (b) (c) 
+
+(d) (e) (f)          
+
+> Fig. 4. Examples of baseline and variant scenes: (a) baseline (standard initial state for independent circular peg-in-hole assembly, no supportive actions required); (b) non-standard initial state (minimal LLM plan, no supportive actions); (c) non-circular peg-in-hole (minimal LLM plan, no supportive actions); (d) gear occupying the gripper (requires release); (e) stacking dependency (upper object must be removed before lower-object assembly); (f) misalignment (requires additional alignment).
+
+The JSD between the distributions is computed: 
+
+JS( p0 
+
+> g
+
+, q g ) = 12 KL( p0 
+
+> g
+
+∥mg ) + 12 KL( qg ∥mg ), (9) where KL( a∥b) = P 
+
+> i
+
+ai log 2 ai 
+
+> bi
+
+, mg = 12 (p0 
+
+> g
+
++ qg ).Mutually exclusive groups are aggregated by object type: peg : {visibility , graspable },
+
+hole : {rotation },
+
+tool : {occupancy }.
+
+(10) Averaging the JS divergence within each object type yields a 3-D summary vector ∆JS = [JS peg , JS hole , JS tool ]. The probability difference features ∆prob = concat g (qg − p0 
+
+> g
+
+)
+
+are retained. Baseline and current distributions share identical intra-group label-key ordering. These difference features are mapped to a fixed-dimensional input vector xj via padding and truncation. 
+
+2) Single-Token Reasoning and Structured Graph Augmen-tation: The vector xj is fed to a single-token Transformer encoder that predicts supportive-action trigger probabilities 
+
+ˆy ∈ [0 , 1] |A supp |. Independent decision thresholds binarize the outputs to produce trigger flags flag k. When flag k = 1 ,corresponding node and edge is added, as in Algorithm 3. After topological augmentation, self-loops, duplicate edges, and invalid terminal edges are removed from the edge set. For nodes resolvable to valid ROIs, parameter binding overwrites node parameters with real-time geometric information (target position and orientation) from the current frame to align the local plan graph with low-level physical observations. 
+
+D. TOPO: Token Precondition/Effect Projection and Global Topological Coordination 
+
+The set of augmented local task graphs {π′ 
+
+> j
+
+}Mt 
+
+> j=1
+
+is converted into a single global execution sequence σt acceptable by                                
+
+> TABLE III GRAPH AUGMENTATION RULES FOR SUPPORTIVE ACTIONS
+> Action Graph Editing
+> align Insert valign before vhole ;replace all (u, v hole )with
+> (u, v align )and append (valign , v hole )
+> remove Insert vrem ,i for each blocker iand append (vrem ,i , v peg );keep remove nodes independent
+> release Insert vrel at the root; append (vrel , r )for all r∈Roots( G′)
+
+Algorithm 3 Divergence-Driven Local Task Augmentation 
+
+Require: Local DAG πj , current distributions {qg }, baseline distributions {p0 
+
+> g
+
+}
+
+Ensure: Augmented local DAG π′ 
+
+> j
+> 1:
+
+Normalization: qg ← qg /(P qg +ε); p0 
+
+> g
+
+← p0 
+
+> g
+
+/(P p0 
+
+> g
+
++ε) 
+
+> 2:
+
+for each group g do  
+
+> 3:
+
+Compute JS( p0 
+
+> g
+
+, q g ) (base 2)  
+
+> 4:
+
+end for  
+
+> 5:
+
+∆JS ← average JS divergence by object type  
+
+> 6:
+
+∆prob ← concat g (qg − p0 
+
+> g
+
+) (fixed key order)  
+
+> 7:
+
+xj ← pad /trunc(concat(∆ JS , ∆prob ))  
+
+> 8:
+
+ˆy ← Transformer( xj ) 
+
+> 9:
+
+for k ∈ A supp do  
+
+> 10:
+
+flag k ← 1{ˆyk > τ k} 
+
+> 11:
+
+end for  
+
+> 12:
+
+if gear-on-shaft task then  
+
+> 13:
+
+flag align ← 0 
+
+> 14:
+
+end if  
+
+> 15:
+
+Locate anchor nodes vpeg , v hole in πj 
+
+> 16:
+
+π′ 
+
+> j
+
+← AugmentGraph( πj , {flag k}) {see Table III } 
+
+> 17:
+
+Sanitize edges (self-loops, duplicates, invalid terminals) and bind node parameters with current geometric infor-mation  
+
+> 18:
+
+return π′ 
+
+> j
+> Fig. 5. JS-Trans pipeline: difference features constructed from baseline and current distributions, supportive action trigger flags predicted, and structured augmentation performed on the local DAG.
+
+the physical execution system through the TOPO module. 8  
+
+> Fig. 6. TOPO overview: tokenized semantic extraction, cross-pair dependency inference, internal redundancy pruning, and staged topological sorting that preserves local behavioral chains.
+> Fig. 7. Global topological coordination example.
+
+The module abstracts dependency reasoning from symbolic planning into pure token-algebraic operations. It follows a pipeline of global graph construction, cross-pair dependency inference, internal redundancy pruning, and staged topological sorting. This eliminates global topological conflicts that may arise from the LLM. The overall workflow and visualization examples are shown in Fig. 6 and Fig. 7. 
+
+1) Global Directed Graph Construction: Nodes in each augmented local task graph π′ 
+
+> j
+
+= ( V ′ 
+
+> j
+
+, E ′ 
+
+> j
+
+) are mapped to globally unique identifiers to eliminate namespace collisions among pairs: 
+
+gid( j, v ) = j :: v, j = 1 , . . . , M t, v ∈ V ′ 
+
+> j
+
+. (11) The initial global directed graph is constructed: 
+
+G =  V = [
+
+> j
+
+V ′ 
+
+> j
+
+, E = [
+
+> j
+
+E′
+
+> j
+
+, (12) where the initial edge set E preserves all intra-pair depen-dencies, with local graphs without explicit topological edges defaulting to implicit chain dependencies. 
+
+2) Tokenized Semantic Extraction and Cross-Pair Depen-dency Inference: A discrete global token universe T includes atomic propositions such as ROI existence, gripper state, and pair-local semantics. For any global node v ∈ V , precondition and effect sets are extracted: 
+
+Φ( v) =  Eff( v), Pre( v), Eff( v), Pre( v) ⊆ T . (13) Given the initial global token state Sinit 0 = ( R0, g 0, {si}), the set of unmet preconditions for node x relative to the initial state is 
+
+U (x) = {t ∈ Pre( x) | Sinit 0̸ |= t}. (14) Cross-pair dependency inference relies on algebraic projection, as in Algorithm 4. The terminal action node Fi (typically 
+
+insert ) of pair i serves as the dependency provider. Its deterministic net change to the global state is extracted: 
+
+∆( Fi) ⊆ T global , (15) where no-operation effects relative to Sinit 0 are pre-filtered. For any node y ∈ V ′ 
+
+> j
+
+(j̸ = i), the cross-pair effect projection subset is: 
+
+Πy (∆( Fi)) = {t ∈ ∆( Fi) | key( t) ∈ Keys(Pre( y)) }. (16) A cross-pair directed edge Fi → y is added to G if and only if the projection is nonempty and fully covers the unmet preconditions of y:
+
+Πy (∆( Fi)) ̸ = ∅ ∧ Πy (∆( Fi)) ⊆ U (y). (17) This algebraic criterion enforces ordering constraints where ef-fects cover unmet preconditions, ensuring logical consistency for shared resources such as gripper occupancy and spatial interference. For multi-solution states, two deterministic safeguards are applied: (i) when Mt > 1 and no cross-pair edges are inferred, minimal sequential constraints (e.g., Fik → Root( ik+1 )) are added according to input order to prevent interleaving of unre-lated pairs; (ii) if the global graph consists of multiple weakly 9
+
+connected components, topological sorting is performed per component and the components are concatenated globally according to state transition cost (e.g., minimizing gripper state switches). 
+
+3) Effect Intersection and Redundancy Pruning: Predeces-sors of any node v are partitioned into external and internal sets, and their effect sets are aggregated: 
+
+Eext (v) = [
+
+> u∈ExtPred( v)
+
+Eff( u),Eint (v) = [
+
+> u∈IntPred( v)
+
+Eff( u). (18) The effect intersection is defined as I(v) = Eext (v) ∩ Eint (v).An internal directed edge u → v with Eff( u) ⊆ I(v) is removed, as its state contribution to v is fully covered by external constraints. A bypass edge is added if needed to preserve local reachability, as in Algorithm 5. 
+
+4) Staged Topological Sorting: A conventional single-stage topological sort on the global graph G can disrupt behavioral logic chains within each local DAG, thus a staged topological sorting algorithm is applied as in Algorithm 6. For each pair j, external contacts are cut from the internal subgraph Gint ,j to isolate nodes connected to cross-pair edges. The remaining strongly connected blocks are decomposed into non-overlapping internal atomic chains: 
+
+Cj = {Cj,k }Kj
+
+> k=1
+
+, (19) where each chain Cj,k preserves its strict internal execution order. Each chain is contracted into a global virtual super-node 
+
+vsuper  
+
+> j,k
+
+, forming a coarse-grained graph: 
+
+Gcoarse =  Vcoarse ∪ { vsuper  
+
+> j,k
+
+}, E coarse 
+
+. (20) Topological sorting is performed on the coarse-grained graph: 
+
+σcoarse ← TopoSort( Gcoarse ). (21) The final sequence σt is obtained by expanding each super-node according to the internal topological order of its atomic chain: 
+
+σt = Expand  σcoarse ; {σ(Cj,k )}. (22) This internal-chain-packing strategy satisfies all global partial-order constraints while isolating cross-pair actions from inter-nal behavioral chains, thereby preserving semantic integrity from the LLM. V. BT M ANAGEMENT AND FORCE -A WARE EXECUTION 
+
+The BT management and force-aware execution module of the neuro-symbolic framework receives the globally consistent discrete sequence σt from the TOPO module and compiles it at runtime into an interpretable behavior tree. The BT asynchronously schedules low-level atomic action skills while monitoring 6-D Force/Torque (F/T) signals in real time. Each action node includes self-check and fine-tuning cycles to form a closed loop between symbolic logic and physical execution. Detected contact anomalies or skill failures trigger safety interruption and recovery for long-horizon assembly. 
+
+Algorithm 4 Cross-Pair Dependency Inference 
+
+Require: Global graph G = ( V, E ), initial state Sinit 0 , termi-nal node set {Fi}
+
+Ensure: Cross-pair edge set Ecross  
+
+> 1:
+
+Ecross ← ∅  
+
+> 2:
+
+for each pair i do  
+
+> 3:
+
+∆( Fi) ← ExtractGlobalEffects( Fi, S init 0 ) 
+
+> 4:
+
+for each j̸ = i, each node y ∈ V ′ 
+
+> j
+
+do  
+
+> 5:
+
+U (y) ← { t ∈ Pre( y) | Sinit 0̸ |= t} 
+
+> 6:
+
+Πy (∆( Fi)) ← {t ∈ ∆( Fi) | key( t) ∈
+
+Keys(Pre( y)) } 
+
+> 7:
+
+if Πy (∆( Fi)) ̸ = ∅ and Πy (∆( Fi)) ⊆ U (y) then  
+
+> 8:
+
+Ecross ← Ecross ∪ { Fi → y} 
+
+> 9:
+
+end if  
+
+> 10:
+
+end for  
+
+> 11:
+
+end for  
+
+> 12:
+
+return Ecross 
+
+Algorithm 5 Internal Redundancy Pruning 
+
+Require: Global graph G = ( V, E )
+
+Ensure: Pruned graph G′ 
+
+> 1:
+
+for each node v ∈ V do  
+
+> 2:
+
+Eext (v) ← S 
+
+> u∈ExtPred( v)
+
+Eff( u) 
+
+> 3:
+
+Eint (v) ← S 
+
+> u∈IntPred( v)
+
+Eff( u) 
+
+> 4:
+
+I(v) ← Eext (v) ∩ Eint (v) 
+
+> 5:
+
+for each internal predecessor u of v do  
+
+> 6:
+
+if Eff( u) ⊆ I(v) then  
+
+> 7:
+
+remove edge u → v {add bypass edge if needed } 
+
+> 8:
+
+end if  
+
+> 9:
+
+end for  
+
+> 10:
+
+end for  
+
+> 11:
+
+return G′
+
+Algorithm 6 Staged Topological Sorting 
+
+Require: Global graph G = ( V, E )
+
+Ensure: Global sequence σt 
+
+> 1:
+
+if G contains a directed cycle then  
+
+> 2:
+
+return failure  
+
+> 3:
+
+end if  
+
+> 4:
+
+for each pair j do  
+
+> 5:
+
+cut external contacts and decompose internal subgraph into chain set Cj = {Cj,k }k 
+
+> 6:
+
+contract each chain Cj,k into super-node vsuper  
+
+> j,k
+> 7:
+
+end for  
+
+> 8:
+
+construct coarse-grained graph Gcoarse  
+
+> 9:
+
+σcoarse ← TopoSort( Gcoarse ) 
+
+> 10:
+
+σt ← Expand( σcoarse ; {σ(Cj,k )}) 
+
+> 11:
+
+return σt
+
+A. BT-Based Skill Scheduling and Local Self-Check Mecha-nisms 
+
+Given the global sequence σt, the BT manager normalizes each step through a structured interface (action type, target ROI identifier, geometric and pose parameters) to ensure consistency between high-level semantics and low-level con-trollers. The sequence is mapped to a behavior tree, with 10 
+
+discrete steps instantiated as atomic action nodes that adhere to standard BT return semantics. Each action node encapsulates closed-loop verification and local correction:  
+
+> •
+
+localize : The end-effector is coarsely positioned to a predefined safe grasping height, then enters a high-precision visual servoing loop driven by the Eye-on-Hand camera. The system iteratively adjusts the pose to center the target feature strictly within the gripper base coordinate frame.  
+
+> •
+
+pick : After execution, the system parses low-level grip-per register feedback (e.g., motor current thresholds and 
+
+gOBJ state bit from Robotiq) for deterministic grasp suc-cess verification. If current is too low or gOBJ indicates no object, the node suspends and triggers up to three local retries. After successful pick, drop-guard monitoring is activated; a sudden current drop or gOBJ state flip returns 
+
+FAILURE , prompting the BT root to initiate high-level recovery.  
+
+> •
+
+insert : The system invokes a dedicated high-precision insertion skill node that employs a hybrid force-control strategy combining Archimedean spiral blind search and Proximal Policy Optimization (PPO) RL impedance con-trol.  
+
+> •
+
+release : Geometric collision constraints and semantic cues from the frontend CLIP are used to compute a safe placement zone. The occupied object is transferred smoothly to this zone and released, clearing spatial inter-ference and restoring gripper availability.  
+
+> •
+
+remove : This action reuses the localize → pick →
+
+release behavioral subtree. After localizing the blocker ROI, the object is grasped, transported to a safe isolation area, and released.  
+
+> •
+
+align : The minimal equivalent correction angle is computed from the geometric symmetry of the target component. Circular targets require no alignment due to rotational invariance. 
+
+B. Hybrid Insertion Skill via Spiral Search and RL Impedance Control 
+
+For the precision insertion phase, a dedicated hybrid force-control skill server combines Archimedean spiral blind search for eliminating macroscopic pose errors with a PPO RL impedance control policy for fine-tuning during the contact-rich phase. 
+
+1) Safe Approach: The end-effector approaches along the designated insertion axis at constant downward velocity while performing coarse XY-plane pose correction in free space. 
+
+2) Contact Blind Search: Upon detection of initial rigid contact by the Robotiq F/T sensor, a constant-force down-ward Archimedean spiral trajectory search of maximum radius 
+
+10 mm originates from the contact point to locate the chamfer entrance. A significant depth drop along the Z-axis relative to the initial contact plane indicates successful capture of the hole feature. 
+
+3) Fine-Tuning Insertion: Once inside the restricted hole space, control authority transitions to the PPO policy. The pol-icy outputs a fine-tuning vector at ∈ [−1, 1] 7 in a continuous 7-dimensional action space. Small planar displacements and axis-angle rotations are mapped as: 
+
+∆x = 0 .001 at[0] , ∆y = 0 .001 at[1] ,θ = at[3] · π
+
+180 , ω = θ u, u = at[4:6] . (23) Pose updates employ exponential mapping and composition in SO(3): 
+
+Rt+1 = Rt ◦ exp( ω). (24) The RL policy employs two mechanisms:  
+
+> •
+
+Multi-Frame Observation Fusion: Up to 20 con-trol cycles of raw 6-D wrench vectors w =[fx, f y , f z , τ x, τ y , τ z ] = [ f , τ ] are sampled per RL de-cision step. The moving average w and absolute instan-taneous peak wmax form a low-noise 12-D observation: 
+
+ot = [ w; wmax ] ∈ R12 . (25)  
+
+> •
+
+Reward Function Shaping: Policy inputs are restricted to F/T proprioceptive features to enable zero-shot sim-to-real transfer. During training, the reward function uses privileged simulation states for shaping: 
+
+r = w1 ∆zinsert + w2 Kxy 
+
+− w3
+
+ β1∥f ∥22 + β2∥τ ∥22 + η∥wmax ∥∞
+
+
+
++ w4 I(|pz − phole  
+
+> z
+
+| < ϵ ),
+
+(26) where w∗ balances each term, ∆zinsert = zt−1 − zt is the actual insertion depth increment, Kxy = exp( −α∥pxy −
+
+phole  
+
+> xy
+
+∥22) rewards XY-plane concentric alignment, the penalty term suppresses excessive average forces and de-structive instantaneous peaks, and the final term provides a sparse task-completion reward. 
+
+C. F/T Monitoring and Global Anomaly Recovery 
+
+The BT manager continuously subscribes to the low-level force-control data stream throughout the control cycle. Ex-ecution is interrupted and the exception-handling branch is activated when any downstream action node returns FAILURE 
+
+or the real-time wrench signal exceeds preset safety contact thresholds. Upon triggering recovery, a retreat procedure is executed: vertical lift along the Z-axis to a safe withdrawal plane, retraction to a predefined retreat observation pose, gripper state reset, and a limited number of attempts to re-enter the task sequence. The hybrid insertion skill incorporates microsecond-level hard-interrupt monitoring of F/T peaks. On irreversible contact collisions, the skill aborts, propagates the FAILURE 
+
+flag upward through the tree, and enables unified closed-loop safety scheduling from high-level cognition to low-level physical hardware. VI. E XPERIMENTAL SETUP AND EVALUATION PROTOCOL 
+
+To validate the proposed neuro-symbolic framework, quan-titative evaluations were performed on 100 sampled real-world multi-pair assembly scenes as in Fig. 8. The scenes include three types of peg-in-hole assemblies (circle, hexagon, square) 11  
+
+> Fig. 8. Examples of multi-pair assembly scenes.
+
+and two types of gear assemblies (gear-on-shaft, gear-on-mounted-gear). All scenes were collected in a controlled lab-oratory environment and replicate core challenges of contact-rich assembly tasks, including semantic ambiguity, arbitrary initial states, and complex spatial interference such as stacking dependencies. To enable precise attribution analysis and fair benchmarking of the perception, planning, and coordination modules, we introduce a modular decoupled evaluation protocol based on cache-replay of intermediate representations. The end-to-end neuro-symbolic pipeline defined in (3) is decoupled into four independent reasoning stages with standardized interfaces and cacheable outputs. By replaying upstream cached intermediate representations in ablation studies, cross-module error propa-gation is isolated, ensuring that performance differences can be uniquely attributed to changes in the targeted operator. 
+
+A. Hardware and Software Platforms 
+
+The robotic platform consists of a Universal Robots UR3 CB-series 6-DOF collaborative manipulator equipped with a Robotiq 2F-85 parallel servo gripper and a Robotiq FT 300-S 6-D F/T sensor, as shown in Fig. 9a. The visual perception system uses an end-effector-mounted Intel RealSense D435i RGB-D Eye-on-Hand camera that synchronously outputs RGB images and depth point clouds at 30 Hz. All high-level cognitive planning and low-level control algorithms run on a standard Linux workstation (Ubuntu 22.04, ROS 2 Humble). The system interfaces with the robot controller via URScript and integrates gripper and F/T data streams through the ROS 2 ecosystem. Physical execution employs a hybrid force-control skill combining Archimedean spiral blind search with PPO-based impedance control trained in MuJoCo 3.3.2 [43], as shown in Fig. 9b. A dynamic BT executor compiles the global discrete plan σt into an asyn-chronous skill tree with embedded safety recovery primitives based on F/T threshold blocking and precondition verification. 
+
+B. Modular Decoupled and Cache-Replay Protocol 
+
+The evaluation protocol relies on absolute modular isolation of the pipeline. Outputs from each independent stage follow strict standardized schemas and are persistently cached. Under the baseline configuration A0, the pipeline is de-vided into P0 →D0 →S0 →T0, corresponding to 4 stages: (i) Perception frontend; (ii) local task Decomposition; (iii) 
+
+(a) (b)  
+
+> Fig. 9. Robotic platform. (a) Real world execution. (b) Physics simulation.
+
+Supportive action augmentation; (iv) global Topological sort-ing. Ablation variants are summarized in Table IV, reusing upstream caches from the A0 baseline for zero-contamination comparison. The proposed neuro-symbolic framework (redenote A0 as C0) is horizontally benchmarked against four representative SOTA planners:  
+
+> •
+
+C1. HTN Decomposer [7]: SHOP-style totally-ordered hierarchical task network with predefined methods and DFS backtracking;  
+
+> •
+
+C2. PDDL Planner [6]: classical global state-space solver based on STRIPS/PDDL;  
+
+> •
+
+C3. LLM-as-BT [11]: end-to-end LLM-driven planner generating local DAGs, BTs, and cross-pair sequencing with symbolic simulation feedback;  
+
+> •
+
+C4. GRHP [12]: graph-fused hierarchical planner that decodes topologies via GNNs on fused visual scene and task graphs. All methods share identical Stage 1 perception outputs across the 100 multi-pair assembly scenes with 510 assembly pairs. VII. E XPERIMENTAL RESULTS 
+
+A. Horizontal Benchmarking with SOTA Planners 
+
+The test scenes is partitioned into “Independent” and “De-pendent”, the latters contain significant cross-pair interference. Results are summarized in Table V and Table VI. Experimental results show that the proposed framework C0 achieves the highest global executability success rate of 97.00%, with mean unmet preconditions approaching zero and the most compact execution sequence. At the local pair level, C0 attains 100% convergence with optimal pruning quality and a first-try zero-shot success rate of 91.18%. The pure LLM-driven paradigm C3 reaches a pair success rate of 483/510, but global success rate drops to 54.00% with a first-try success rate of only 29.94%. This reflects the ten-dency of LLMs to produce logical hallucinations under cross-pair spatial dependencies and weak perceptual supervision, requiring an average of 1.39 extra simulation-based retries to converge. The proposed framework avoids these issues by constraining LLM responsibilities. The classical symbolic solver PDDL C2 achieves 100% local pair solvability and compact outputs but exhibits the rigidity of discrete fluents when handling global dependencies. 12                                                                                 
+
+> TABLE IV ABLATION STUDY CONFIGURATIONS AND ALGORITHM ARCHITECTURE RECONSTRUCTIONS
+> Exp ID Core Ablation Dimension Involved Stage Exp ID Algorithm Architecture Reconstruction Notes A0 Baseline Neuro-Symbolic Archi-tecture
+> Stage 1 (P0), Stage 2 (D0), Stage 3 (S0), Stage 4 (T0) Standard configuration: fused features ∆JS ,d + ∆ pdrive JS-Trans; complete algebraic projection Proj( I, K )with staged chain packing and redundancy intersection pruning.
+> A1 Perception model degradation Stage 1 (P1) isolated evalu-ation Fine-tuned CLIP model degraded to pretrained model prior to LLM context construction.
+> A2 Action space expansion and rea-soning degradation Stage 2 (D1), Stage 3 (S3), Stage 4 (T0 (poor)) LLM action domain expanded to Abase ∪ A supp ; Stage 3 discriminator bypassed and reduced to identity function Aug( π)≡π(full reliance on LLM for global supportive logic).
+> A3.1 Augmentation driver feature abla-tion (latent space features) Stage 3 (S1) mounted on D0 Divergence-driven features removed; reduced to L2 difference of raw 512-D latent embeddings: x= [( ev−e0)peg ∥. . . ∥(ev−e0)gripper ].
+> A3.2 Augmentation driver feature abla-tion (logit scores) Stage 3 (S2) mounted on D0 JS divergence and local softmax removed; raw unnormalized CLIP prompt cosine similarity logit differences used directly.
+> A4 Topological sorting mechanism re-structuring Stage 4 independent analysis A0 mechanism compared against degraded variants w.o. cross ,
+> w.o. prune ,w.o. stage to verify necessity of internal functions. TABLE V COMPARISON OF GLOBAL EXECUTABILITY (100 A SSEMBLY SCENES )
+> Method Success Rate (%) ↑
+> Avg. Un-met ↓
+> Avg. Out Steps ↓
+> Success Rate (%) ↑
+> Success Rate (%) ↑
+> (Global) (Indep.) (Dep.)
+> C0 97.00 0.03 20.59 97.40 95.65
+> C1 73.00 1.33 21.12 74.03 69.57 C2 65.00 0.99 20.89 84.42 0.00 C3 54.00 1.69 24.95 68.83 4.35 C4 65.00 2.13 20.89 84.42 0.00
+
+Its global success rate of 65.00% falls to 0.00% in dependent scenes, primarily because physical stacking introduces implicit sequential constraints that predefined Boolean states and ex-pert rules struggle to capture dynamically, leading to global logical deadlocks under complex interference. The rule-based system HTN C1 and GRHP C4 also show clear limitations. HTN provides transparent rule interpretabil-ity but depends on manually predefined rules that cannot fully adapt to implicit stacking constraints in dependent scenes, resulting in limited pruning and reduced reliability under strong interference. GRHP performs adequately in independent scenes but achieves only 65.00% global success rate and fails completely in strongly dependent scenes, indicating limited generalization under complex dependencies. Overall, C0 demonstrates superior performance across high success rate, low unmet preconditions, short sequence length, strong recovery capability, and stability in difficult scenes. These results highlight balance between neural generative flexibility with symbolic logical rigor. 
+
+B. Mechanistic Attribution: Core Ablation Study 
+
+This subsection identifies which architectural designs con-tribute most to performance gains. Using the stage-wise cache-replay protocol, controlled ablations are performed on the baseline architecture A0. Results consistently show that any deprivation or degradation—whether in perception calibration, feature divergence, or topological projection—leads to trace-able degradation in global executability and system stability. 
+
+1) Perception Model Degradation (A1): The upper bound of high-level symbolic reasoning is determined by the low-entropy quality of low-level semantic tokens. The baseline A0  
+
+> Fig. 10. Confusion matrices comparing fine-tuned baseline A0 (top) and pretrained ablation A1 (bottom) across four semantic groups.
+
+uses the fine-tuned CLIP model to produce structured mutually exclusive group probabilities pt,i,g (ℓ). Fine-tuning employs a low-cost dataset of 133 specifically sampled assembly scenes. In ablation A1, semantic anchors in the world state wt,j are replaced with outputs from the pretrained CLIP model. Table VII reports classification accuracy across the four mutually exclusive physical groups (visibility, graspable, rota-tion, occupancy) for the fine-tuned model versus the pretrained variant in A1. Corresponding confusion matrices appear in Fig. 10. In the challenging fine-grained pose determination (rota-tion) and gripper occupancy determination (occupancy), the pretrained model exhibits poor performance. However, after separating object categories, low-level fine-tuning alone yields highly effective results. The t-SNE visualizations in Fig. 11 further demonstrate that fine-tuning produces highly cohesive and linearly separable clusters in latent space, whereas the pretrained model suffers from severe feature aliasing. 
+
+2) LLM Action Space Expansion (A2): Ablation A2 eval-uates the impact of expanding the LLM action vocabulary from the basic set Abase to the full supportive set Asupp while bypassing the JS-Trans mapper, i.e., Aug j (πj ) ≡ πj . In this setting, the LLM handles both basic and supportive actions in an end-to-end manner. Compared with baseline A0, A2 exhibits a significant drop in first-try success rate, although retry feedback recovers most 13 
+
+TABLE VI COMPARISON OF PAIR -L EVEL PLANNING PERFORMANCE (510 A SSEMBLY PAIRS )Method Succeeded/Total First-Try Success Recovery Avg. Extra Optimal Prune Avg. Over-Pruned Avg. Under-Pruned Pairs ↑ Rate (%) ↑ Rate (%) ↑ Attempts ↓ Rate (%) ↑ Steps ↓ Steps ↓
+
+C0 510/510 91.18 100.00 0.18 100.00 0.00 0.00 
+
+C1 487/510 — — — 66.86 3.21 1.01 C2 510/510 — — — 80.00 1.94 1.00 C3 483/510 29.94 92.18 1.39 3.91 3.43 1.30 C4 510/510 — — — 83.33 0.00 1.00 
+
+Note : Iterative recovery metrics (first-try success rate, recovery rate, extra attempts) evaluate the LLM-driven feedback loop (C0, C3). C1, C2, and C4 are deterministic and therefore marked as “—”. TABLE VII ABLATION A1: C LASSIFICATION ACCURACY ON MUTUALLY EXCLUSIVE SEMANTIC GROUPS USING FINE -TUNED VERSUS PRETRAINED CLIP LABELS 
+
+Group n acc ↑ (fine-tune) acc ↑ (pretrained) ∆acc ↑ ∆nll ↓ ∆Brier ↓ GT-signed margin ↑ (fine-tune / pretrained) 
+
+visibility 578 0.995 0.863 +0.132 -0.375 -0.240 3.642 / 0.827 graspable 578 1.000 0.730 +0.270 -0.581 -0.402 4.821 / 0.257 rotation 841 0.966 0.137 +0.829 -0.967 -0.814 3.554 / -0.692 occupancy 100 1.000 0.200 +0.800 -1.867 -1.293 4.885 / -1.332 
+
+Fig. 11. t-SNE latent space visualizations of the occupancy semantic group for the fine-tuned baseline A0 (left) and pretrained ablation A1 (right). TABLE VIII ABLATION A2: I MPACT OF LLM HANDLING SUPPORTIVE ACTIONS WITHOUT DECOUPLING 
+
+Metric A0 A2 ∆
+
+First-try Success Rate (%) ↑ 91.18 37.26 +53 .92 
+
+Recovery Rate (%) ↑ 100.00 99.37 + 0 .63 
+
+Avg. Extra Attempts ↓ 0.18 1.16 − 0.98 
+
+Under-prune Rate (%) ↓ 0.00 95.69 −95 .69 
+
+Mean prune gap ↓ 0.00 1.28 − 1.28 
+
+Avg. Redundant Rate (%) ↓ 0.00 78.46 −78 .46 
+
+failures, with the average number of extra attempts increasing from 0.18 to 1.16. Failure modes shift systematically: without explicit divergence guidance, the LLM generates a large pro-portion of redundant supportive actions, resulting in bloated plans prone to physical collisions and markedly degraded pruning quality. Statistics are summarized in Table VIII. Retry convergence and shape-size grouped success rates are shown in Fig. 12 and Fig. 13, respectively. Feasibility failure heatmaps and pruning distribution are presented in Fig. 14 and Fig. 15. These results indicate that purely LLM-driven supportive action generation suffers from structural inefficiencies in the absence of symbolic divergence guidance ( ∆JS and ∆p). Limiting the LLM to genetic logic and delegating supportive-
+
+(a) 
+
+(b) 
+
+Fig. 12. Retry dynamics comparing baseline A0 and ablation A2: (a) attempt success/failure counts; (b) cumulative success rates. 
+
+action reasoning to the JS-Trans module significantly improves first-try stability and planning compactness without sacrificing executability. The shape-size structural disparities observed in A2 further demonstrate the limited generalization capability of end-to-end generation under complex geometric interference. 14   
+
+> Fig. 13. Success rate evolution across shape-size combinations for baseline A0 (left) and ablation A2 (right). Baseline A0 maintains uniformly high performance across all geometries. Forcing the LLM to process supportive actions (A2) induces structural heterogeneity, struggling initially with non-circle geometries.
+> Fig. 14. Feasibility failure heatmap by error type and step comparing A0 (left) and A2 (right).
+> Fig. 15. Pruning quality distribution comparing baseline A0 (solid) and ablation A2 (hatched) over successive attempts.
+
+3) Feature Ablation in Supportive Action Augmentation (A3.1 and A3.2): Under the fixed upstream D0 cache, the standard JS-Trans mapper S0 (A0) is compared with two alter-native feature configurations: S1 (A3.1) using raw 512-D CLIP embedding differences and S2 (A3.2) using raw prompt cosine similarity logit differences. Each discriminator is trained via a cross-pairing data augmentation strategy on 8 non-interfering baseline scenes and 45 variant scenes, generating 4848 valid samples with corresponding features. For the most visually ambiguous and challenging action 
+
+align , linear-probe learning curves are shown in Fig. 16. As Table IX reported, S0 achieves the highest F1 scores with the lowest sample budget and rapidly approaches its AUPRC upper bound at N ≤ 30 . In contrast, S1 and S2 require more samples to reach comparable performance. S2 exhibits instability at small sample sizes and remains inferior even at 
+
+N = 200 .A zero-shot mapping from semantic distributions to action    
+
+> Fig. 16. Linear-probe learning curves comparing feature variants. Baseline S0 reaches near-optimal AUPRC with low labeling budgets ( N≤30 ).
+
+demand probabilities quantifies the uncertainty of low-level visual priors for specific supportive actions. For any supportive action a ∈ A supp , the action demand probability based on pure visual priors is: 
+
+pclip  
+
+> a
+
+= X
+
+> ℓ∈L +
+> a
+
+pt,i,g (ℓ), (27) where L+ 
+
+> a
+
+denotes the set of positive semantic evidence for that action. A CLIP-only baseline bypasses the mapper and uses pclip  
+
+> a
+
+directly as the output of a binary classifier (default threshold τ = 0.5). The semantic margin is defined as 
+
+ma = 2 pclip  
+
+> a
+
+− 1, and the confusion degree as χa = 1 − | ma|.These quantities serve as standardized coordinates to assess robustness in perceptual boundary regions. The safety and predictive performance of the three variants are evaluated in the high-confusion region of CLIP perception (χa > 0.6), shown in Fig. 17. Validation best thresholds 
+
+τ ∗ 
+
+> val
+
+are computed on the validation set after each epoch; the final threshold is the median of τ ∗ 
+
+> val
+
+over the five consecutive epochs after macro-F1 stabilization. S0 achieves higher recall while maintaining conservatism that reduces system risk and demonstrates effective feature isolation in low-confusion re-gions. Although advantages exist on some metrics, S1 exhibits higher rates of high-confidence false positives due to its high-dimensional latent space, while S2 shows greater stochasticity. In the high-confusion region of the align action (contain-ing only positive samples), all three variants exhibit minor recall omissions. S1 and S2 aggressively elevate boundary positive samples to minimize false negatives. In contrast, S0 employs a more conservative elevation strategy for these boundary samples, reducing the risk of erroneous alignment 15                                           
+
+> TABLE IX ABLATION A3: D ISCRIMINATIVE POWER OF DIFFERENT INPUT FEATURES TO THE JS-T RANS MAPPER ON SUPPORTIVE ACTION PREDICTION
+> Variant Feature Representation micro-F1 ↑macro-F1 ↑TP/TN/FP/FN release remove align S0 (A0) JS divergence + group-prob diffs 0.935 0.926 78 /432/ 0/050 /454/ 6/046 /446/ 0/ 18 S1 (A3.1) Raw 512-D CLIP embedding deltas 0.879 0.867 78 /432/ 0/050 /436/ 24/ 048 /438/ 8 / 16 S2 (A3.2) Raw prompt-score diffs 0.877 0.878 78 /430/ 2 / 049 /453/ 7 / 1 53 /417/ 29/ 11
+
+actions under high uncertainty. Due to inherent visual am-biguity of align -related semantic features at small rotation angles, false negatives also appear in the low-confusion region for CLIP and all three variants. S0 uniformly attempts to elevate confidence of these false negatives, S1 shows virtually no elevation, and S2 elevates only a minority while leaving others unaddressed and introducing false positives in the extremely low-confusion region. In the high-confusion region of the remove action (con-taining both positive and negative samples), all three variants achieve perfect recall with Recall=1 and FN=0. False-positive confidence is critical for system fault tolerance. S1 produces high-confidence false alarms with many predictions in the 0.7–0.8 interval. S0 and S2 suppress false alarms to lower confidence intervals. S2 shows limited positive-sample eleva-tion and contains boundary positives indistinguishable from boundary false alarms. Overall, S1 has 24 false positives with many higher-confidence non-boundary false alarms in the low-confusion region, while S0 and S2 limit total false alarms to low levels, 6 and 7 respectively. For the release action, the least ambiguous for CLIP perception, all three variants achieve high accuracy and low false alarm rates. S2 produces a small number of false positives in the extremely low-confusion region. Overall, S0 processes low-confusion samples while compen-sating for perceptual ambiguity in boundary regions without introducing overconfidence, making it the most suitable feature design for real-world deployment. The output probabilities of the three variants exhibit distinct patterns relative to the CLIP margin, shown in Fig. 18. Base-line S0 exhibits regular probability reshaping across the margin spectrum: positive samples are pushed into high-probability intervals while negative samples are suppressed into low-probability regions. S1 produces high-confidence false posi-tive outliers near the boundary, and S2 displays a dispersed distribution. In summary, S0 provides a balance trade-off among calibra-tion stability, threshold deployment readiness, FP risk control, and sample efficiency under low labeling budgets. It also achieves probability calibration in perceptual limit regions. By decoupling supportive action reasoning from the LLM and using explicit symbolic distribution differences, JS-Trans improves the structural rationality and robustness of generated plans for downstream TOPO coordination. 
+
+4) Global TOPO Mechanism Restructuring (A4): The de-fault operator T0 (A0) is compared against three internal isolations: removal of cross-pair dependency inference, re-moval of internal redundancy pruning, and removal of the staged strategy. The first two isolations produce consistent    
+
+> Fig. 17. Thresholded performance versus CLIP confusion. Columns cor-respond to release /remove /align actions; rows compare the CLIP-only baseline and three feature variants.
+
+effects and are grouped as without cross-pair projection ( w.o. cross ). Experiments on T0 use both high-quality inputs (S0 augmented plans) and low-quality inputs (S3 pass-through plans) denoted T0 (poor). In Table X, with high-quality S0 inputs, T0 achieves a global executability success rate of 97.00%. Removing cross-pair projection drops the success rate to 66.00%. Removing the staged strategy disrupts local semantic coherence from the LLM, increasing average unmet preconditions from 0.03 to 2.52, particularly in scenes with high spatial coupling. Under low-quality S3 inputs, all variants degrade markedly, confirm-ing that upstream plan quality remains a key determinant of the system upper bound. Nevertheless, T0 (poor) still yields a success rate of 63.00%. With failures confined to dependent scenes, independent scenes retain 81.82% success. Failure mechanisms are examined along two dimensions: 16                        
+
+> Fig. 18. Predictive performance versus CLIP margin. Columns correspond to
+> release /remove /align actions; rows compare the three feature variants. TABLE X ABLATION A4: C ONTRIBUTION OF TOPOLOGICAL COORDINATION OPERATORS TO GLOBAL EXECUTABILITY
+> Input Variant Success Rate(%) ↑
+> Avg. Un-met ↓
+> Avg. Steps ↓
+> Reduction Ratio(%) ↑
+> T0 97.00 0.03 20.59 4.34
+> S0 w.o. cross 66.00 1.34 21.95 0.00 w.o. stage 66.00 2.52 20.62 4.10 S3 T0 (poor) 63.00 1.22 25.71 1.67
+
+fragmentation of execution sequences and severity distribution of errors. In strongly coupled dependent scenes, removing the staged strategy ( w.o. stage ) results in frequent ineffective pair switching, continuous chunk length dropping to near 1, indicating loss of local action coherence. The default operator T0 maintains low switch rates and high continuous chunk lengths even under complex dependencies. Differences are milder in independent scenes, yet T0 preserves most stable sequence morphology, shown in Fig. 19. The ECDF of unmet precondition tokens is shown in Fig. 20. T0 exhibits strong error blocking: its curve rises nearly vertically at 0, keeping most cases within a zero-defect envelope. Removing cross-pair projection ( w.o. cross ) or staged constraints produces lower intercepts at 0 and long-tail distributions, with some failures accumulating up to 14 unmet preconditions. Even under low-quality S3 inputs, T0 limits errors to low levels in most scenes, demonstrating robust resilience. These results confirm that cross-pair algebraic projection and staged topological sorting in the TOPO module reduce re-source contention and improve sequence compactness, thereby 
+
+(a) 
+
+(b)   
+
+> Fig. 19. Execution morphology of baseline T0 versus topological ablations: (a) switch and unmet token rates; (b) chunk lengths.
+> Fig. 20. ECDF of unmet tokens comparing T0 and ablations.
+
+supporting high success rates in multi-pair assembly. 
+
+5) Summary of Ablation Insights: The complete baseline A0 outperforms any single ablation in first-try stability, prun-ing efficiency, calibration quality, and strict executability. Removing symbolic supportive action reasoning, weakening perception priors, or simplifying topological coordination in-troduces distinct failure modes—excessive retries, calibration drift, and cascading unmet preconditions—that cannot be fully recovered by downstream mechanisms. These experiments demonstrate that the synergistic integration of fine-tuned se-mantic distributions, divergence-guided JS-Trans augmenta-17 
+
+tion, and algebraic topological coordination is essential for robust multi-pair robotic assembly under realistic perceptual and physical uncertainties. 
+
+C. End-to-End Closed-Loop Validation on a Real Robot 
+
+Closed-loop performance was evaluated on a physical UR3 collaborative platform with a RealSense vision testbed. Thirty challenging assembly trials incorporating occlusion and pose deviation interference were conducted for two groups: scenes without significant cross-pair dependencies and scenes with significant cross-pair dependencies. Each group was parti-tioned into three equal subgroups (10 trials LLM-pruning dominant, 10 trials supportive-action dominant, and 10 edge cases mixed trials) to assess stability under varying task structures and interference types. The system achieved 30/30 success in independent scenes and 27/30 success in dependent scenes. The latter subgroup results were 10/10, 8/10, and 9/10, respectively. All three failures occurred at the BT execution layer rather than the upstream neuro-symbolic planning layer. Analysis of low-level anomaly logs reveals:  
+
+> •
+
+Physical jamming and wedging: Two failures occurred during precision insertion, caused by sim-to-real friction cone discrepancies: the PPO policy exploits idealized fric-tion surfaces in simulator, while local surface roughness on real components narrows the friction cone, leading to lodged states that trigger torque-threshold safety inter-rupts.  
+
+> •
+
+Environmental topological mutation: In a dependent scene, removal of a stacked interfering part caused the underlying workpiece to topple an adjacent component, inducing a global topological mutation that exceeds the local correction range of atomic skills, which highlights the architectural limitation of single RGB-D snapshot planning without real-time perceptual feedback. Real-robot results align with offline trends: the system main-tains high success rates as scene dependencies and execution difficulty increase, with failures confined to the diagnosable BT execution layer. This confirms the logical robustness of the high-level cognitive pipeline, demonstrating practical deployability in real precision assembly tasks, as shown in Fig. 21. VIII. D ISCUSSION 
+
+The neuro-symbolic framework integrates perception, plan-ning, and execution for multi-pair assembly tasks. 
+
+Multidimensional Reasoning and Extensible Potential: JS-Trans functions as a data-driven assembly requirement rea-soner. It decouples basic assembly logic and supportive actions required to resolve environmental deviations. It handles sup-portive actions of varying complexity, from single supplemen-tary actions to complex sub-process augmentations reuse basic action primitives. This design enables logical nesting, showing potential of multi-layer nested planning pipelines, or extend to open scenarios such as human-robot collaboration and shared control by discriminating environmental differences to trigger human intervention or auxiliary behaviors. 
+
+> Fig. 21. The complete physical closed loop. Given a one-shot assembly scene, the perception layer (yellow) extracts semantic information. The planning layer (blue) generates basic local DAGs and then augments them for edge cases. Topological sorting yields a global sequence for real-world execution (green).
+
+Generality and Feasibility in Heterogeneous Scenes: The framework demonstrates strong generality when handling as-sembly pairs with varying geometric appearances, such as shape diverse pegs and structurally diverse gears. By aligning visual features into a unified semantic space via the CLIP frontend, the planning layer focuses exclusively on topological logic. In scenes with physical stacking or sequential depen-dencies, algebraic projection in the TOPO module ensures execution efficiency and physical feasibility. Integration with the low-level force-aware execution layer enables closed-loop assembly under millimeter-level tolerances. 
+
+Flexible Planning Modes and Prototype Assembly Logic: 
+
+The framework performs planning according to semantic instructions. This enables both the execution of predefined precision tasks and autonomous sequencing in unknown en-vironments. It also lays the groundwork for a closed-loop long-horizon assembly logic: after completing global planning and execution, if the system resamples the updated scene and performs augmented replanning, a continuous perception-planning-execution-resampling cycle is formed. This proto-type provides a foundation for future development of deeper, temporally-aware long-horizon assembly logic. IX. C ONCLUSION 
+
+We presents and validates a neuro-symbolic framework for multi-pair robotic assembly. This hierarchical design achieves high executability and robustness under complex spatial inter-ference and severe contact uncertainties. Comparative eval-uations demonstrate that the proposed method consistently outperforms classical symbolic planners as well as end-to-end LLM-based approaches in strict executability, constraint sat-isfaction, and sequence compactness. Real-robot experiments further confirm that the system generates global plans in one shot, maintains high success rates even in dependent scenes, confining failures to the diagnosable BT execution layer. The framework effectively bridges the gap between sym-bolic and LLM planning paradigms by enhancing adaptability 18 
+
+to open scenes relative to pure symbolic methods and suppress-ing logical hallucinations and topological conflicts relative to pure LLM approaches. Coupled with a modular cache-replay evaluation protocol, it establishes a reproducible and attributable benchmark for future neuro-symbolic assembly research, providing a foundation for building reliable and flexible autonomous industrial assembly systems. REFERENCES [1] A. Ranjan Das and M. Koskinopoulou, “Toward sustainable manufac-turing: A review on innovations in robotic assembly and disassembly,” 
+
+IEEE Access , vol. 13, pp. 100 149–100 166, 2025. [2] B. Karbouj, R. Garha, K. KeßLer, and J. Kr¨ uger, “Adaptive robotic behavior in industrial human–robot collaboration: A systematic review of taxonomies, enabling mechanisms, and research frontiers,” IEEE Access , vol. 14, pp. 1398–1422, 2026. [3] B. Wang, L. Zheng, Y. Wang, and Z. Qi, “LLM-based multi-agent task planning for human-robot collaborative assembly balancing operator experience and efficiency,” Journal of Manufacturing Systems , vol. 82, pp. 1020–1045, Oct. 2025. [4] Y. Zhang, W. Luo, Y. Hu, Q. Wang, L. Cheng, and Y. Ke, “A surrogate model-driven assembly coordination framework for aircraft components based on cooperative multi-agent deep reinforcement learning,” Journal of Manufacturing Systems , vol. 83, pp. 46–64, Dec. 2025. [5] K. Van Wyk, M. Culleton, J. Falco, and K. Kelly, “Comparative peg-in-hole testing of a force-based manipulation controlled robotic hand,” 
+
+IEEE Transactions on Robotics , vol. 34, no. 2, pp. 542–549, Apr. 2018. [6] M. Fox and D. Long, “PDDL2.1: An extension to PDDL for expressing temporal planning domains,” Journal of Artificial Intelligence Research ,vol. 20, pp. 61–124, Dec. 2003. [7] D. S. Nau, T. C. Au, O. Ilghami, U. Kuter, J. W. Murdock, D. Wu, and F. Yaman, “SHOP2: An HTN planning system,” Journal of Artificial Intelligence Research , vol. 20, pp. 379–404, Dec. 2003. [8] T. Pan, R. Shome, and L. E. Kavraki, “Task and motion planning for execution in the real,” IEEE Transactions on Robotics , vol. 40, pp. 3356– 3371, 2024. [9] Y. Liu, L. Palmieri, S. Koch, I. Georgievski, and M. Aiello, “DELTA: Decomposed efficient long-term robot task planning using large lan-guage models,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 10 995–11 001. [10] X. Sun and Y. Shoukry, “Neurosymbolic motion and task planning for linear temporal logic tasks,” IEEE Transactions on Robotics , vol. 40, pp. 2749–2768, 2024. [11] J. Ao, F. Wu, Y. Wu, A. Swiki, and S. Haddadin, “LLM-as-BT-planner: Leveraging LLMs for behavior tree generation in robot task planning,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 1233–1239. [12] X. Li, G. Tian, Y. Cui, X. Shao, and Z. Wang, “GRHP: Graph-fused hierarchical planning for embodied long-horizon robotic task,” 
+
+Engineering Applications of Artificial Intelligence , vol. 165, p. 113413, Feb. 2026. [13] E. Merlo, M. Lagomarsino, E. Lamon, and A. Ajoudani, “Exploiting information theory for intuitive robot programming of manual activities,” 
+
+IEEE Transactions on Robotics , vol. 41, pp. 1245–1262, 2025. [14] F. Keramat, S. Salimi, and T. Westerlund, “Decentralized intent-based multi-robot task planner with LLM oracles on hyperledger fabric,” Feb. 2026. [15] A. Gottardi, M. Terreran, E. Pagello, and E. Menegatti, “HAD-TAMP: Human adaptive task and motion planning for human–robot collabora-tion in industrial scenario,” Robotics and Autonomous Systems , vol. 198, p. 105318, Apr. 2026. [16] B. Chen, G. Xu, L. Wang, C. Jiang, Z. Zhang, Z. Wang, and X. Xia, “Behavioral planning and parameter meta learning for embodied intel-ligence robots in adaptive assembly,” Journal of Industrial Information Integration , vol. 49, p. 100995, Jan. 2026. [17] K. Kawaharazuka, J. Oh, J. Yamada, I. Posner, and Y. Zhu, “Vision-language-action models for robotics: A review towards real-world ap-plications,” IEEE Access , vol. 13, pp. 162 467–162 504, 2025. [18] Z. Liu, Y. Chen, H. Cai, T. Lin, S. Yang, Z. Liu, and B. Zhao, “VLA-pruner: Temporal-aware dual-level visual token pruning for efficient vision-language-action inference,” Feb. 2026. [19] X. Wang, X. Dengxiong, S. Bai, P. Zheng, and Y. Zhang, “VLAbot: A human vision–language–action models interaction framework for robotic assembly,” Robotics and Computer-Integrated Manufacturing , vol. 100, p. 103268, Aug. 2026. [20] G. Tang, Q. Jia, G. Chen, T. Li, Z. Huang, Z. Lv, and N. Ji, “VLM-DEWM: Dynamic external world model for verifiable and resilient vision-language planning in manufacturing,” Feb. 2026. [21] H. Chen, T. Kiyokawa, W. Wan, and K. Harada, “Generalizable task-oriented object grasping through LLM-guided ontology and similarity-based planning,” Robotics and Autonomous Systems , vol. 201, p. 105442, Jul. 2026. [22] Z. Zhou, S. Veeramani, H. Fakhruldeen, S. Uyanik, and A. I. Cooper, “GenCo: A dual VLM generate-correct framework for adaptive peg-in-hole robotics,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 16 744–16 751. [23] H. Zhou, Y. Lin, L. Yan, and H. Min, “Human-in-the-loop learning for adaptive robot manipulation using large language models and behavior trees,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Oct. 2025, pp. 19 039–19 046. [24] H. Zhou, Y. Lin, L. Yan, J. Zhu, and H. Min, “LLM-BT: Performing robotic adaptive tasks based on large language models and behavior trees,” in 2024 IEEE International Conference on Robotics and Au-tomation (ICRA) , May 2024, pp. 16 655–16 661. [25] J. Styrud, M. Iovino, M. Norrl¨ of, M. Bj¨ orkman, and C. Smith, “Au-tomatic behavior tree expansion with LLMs for robotic manipulation,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 1225–1232. [26] R. A. Izzo, G. Bardaro, and M. Matteucci, “BTGenBot: Behavior tree generation for robotic tasks with lightweight LLMs,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , Oct. 2024, pp. 9684–9690. [27] Y. Cai, X. Chen, Y. Mao, M. Li, S. Yang, W. Yang, and J. Wang, “HBTP: Heuristic behavior tree planning with large language model reasoning,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 13 706–13 713. [28] M. Kwon, Y. Kim, and Y. J. Kim, “Fast and accurate task planning using neuro-symbolic language models and multi-level goal decomposition,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 16 195–16 201. [29] J. Mendez-Mendez, “A systematic study of large language models for task and motion planning with PDDLStream,” Sep. 2025. [30] J.-J. Shao, H.-J. You, G. Cai, Q. Dai, Z. Dong, and L.-Z. Guo, “Breaking the self-evaluation barrier: Reinforced neuro-symbolic planning with large language models,” in Thirty-Fourth International Joint Conference on Artificial Intelligence , vol. 1, Sep. 2025, pp. 6129–6137. [31] V. Bhat, A. U. Kaypak, P. Krishnamurthy, R. Karri, and F. Khorrami, “Grounding large language models for robot task planning using closed-loop state feedback,” Advanced Robotics Research , vol. n/a, no. n/a, p. e202500072. [32] D. Rodriguez-Guerra, O. Avram, S. Baraldo, M. Zamboni, and A. Va-lente, “Deliberative layered behavior tree approach for real-time concur-rent decision-making in human-robot interaction for assembly,” in 2025 34th IEEE International Conference on Robot and Human Interactive Communication (RO-MAN) , Aug. 2025, pp. 231–236. [33] B. Galitsky and A. Rybalov, “Neuro-symbolic verification for preventing LLM hallucinations in process control,” Processes , vol. 14, no. 2, p. 322, Jan. 2026. [34] A. Parnada, M. Qu, M. Castellani, H. Jin Chang, and Y. Wang, “Towards cost-effective and safe contact-rich robotic manipulation with reinforcement learning: A review of techniques for future industrial automation,” Proceedings of the Institution of Mechanical Engineers, Part I: Journal of Systems and Control Engineering , vol. 240, no. 1, pp. 3–35, Jan. 2026. [35] W. Xie and N. Correll, “Towards forceful robotic foundation models: A literature survey,” Apr. 2025. [36] Z. Liao, C. Gong, F. Zhao, and X. Mei, “Friction-aware robotic peg-in-hole assembly via contact wrench measurement,” Measurement , vol. 257, p. 118781, Jan. 2026. [37] K. Tracy, Z. Manchester, A. Jain, K. Go, S. Schaal, T. Erez, and Y. Tassa, “Efficient online learning of contact force models for connector insertion,” in 2025 IEEE International Conference on Robotics and Automation (ICRA) , May 2025, pp. 10 944–10 950. [38] J. Hou, S. Xing, Y. Ma, and F. Jing, “Force-based cabin insertion assem-bly with an off-robot force sensing configuration*,” IFAC-PapersOnLine ,vol. 59, no. 35, pp. 472–477, Jan. 2025. [39] Z. Shen, Z. Jiang, J. Zhang, J. Wu, and Q. Zhu, “Learning-based robot assembly method for peg insertion tasks on inclined hole using time-19 
+
+series force information,” Biomimetic Intelligence and Robotics , vol. 5, no. 1, p. 100209, Mar. 2025. [40] G. Ding, X. Zang, P. Wang, X. Zhang, Y. Zhu, and J. Zhao, “An ensemble reinforcement learning framework for robotic high-precision peg-in-hole assembly via human demonstrations,” Robotics and Computer-Integrated Manufacturing , vol. 100, p. 103279, Aug. 2026. [41] Y. Shirai, K. Ota, D. K. Jha, and D. Romeres, “Sim-to-real contact-rich pivoting via optimization-guided RL with vision and touch,” in NeurIPS 2025 Workshop on Embodied World Models for Decision Making , Sep. 2025. [42] J. Strangh¨ oner, P. Hartmann, M. Braun, S. Wrede, and K. Neumann, “SHaRe-RL: Structured, interactive reinforcement learning for contact-rich industrial assembly tasks,” Mar. 2026. [43] E. Todorov, T. Erez, and Y. Tassa, “MuJoCo: A physics engine for model-based control,” in 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems , Oct. 2012, pp. 5026–5033.
