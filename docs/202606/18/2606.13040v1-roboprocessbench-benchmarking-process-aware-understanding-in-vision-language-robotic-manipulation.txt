@@ -1,0 +1,615 @@
+Title: RoboProcessBench: Benchmarking Process-Aware Understanding in Vision-Language Robotic Manipulation
+
+URL Source: https://arxiv.org/pdf/2606.13040v1
+
+Published Time: Fri, 12 Jun 2026 00:39:29 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+# RoboProcessBench: Benchmarking Process-Aware Understanding in Vision-Language Robotic Manipulation 
+
+Dayu Xia 1,2,∗ Yue Shi 1,∗,† Yao Mu 1,3,† Huiting Ji 5 Chaofan Ma 3
+
+Yingjie Zhou 3 Hua Chen 2 Yang Liu 4 Jiezhang Cao 3 Guangtao Zhai 1,3,†
+
+> 1
+
+Shanghai AI Laboratory 2Zhejiang University 3Shanghai Jiao Tong University 
+
+> 4
+
+Tsinghua University 5China University of Mining Technology 
+
+> ∗
+
+Equal contribution †Corresponding author 
+
+## Abstract 
+
+Vision-language models (VLMs) are increasingly explored as visual critics, reward generators, and failure detectors in robotic manipulation. These roles implicitly require models to judge not only final task success, but also how a manipulation execution is physically and temporally progressing. However, existing evalua-tions fail to test whether VLMs possess fine-grained process understanding. To address this gap, we present RoboProcessBench, a benchmark for process-aware understanding in vision-language robotic manipulation. RoboProcessBench de-composes such capability into two complementary dimensions, static monitoring 
+
+and dynamic reasoning , instantiated as 12 diagnostic question families covering phase, contact, motion, coordination, primitive-local progress, temporal order, outcome, and primitive-level transitions. Built from physically grounded execution traces, the curated benchmark corpus ProcessData contains ~58k question-answer pairs across 260 manipulation tasks, which is further split into ProcessData-SFT and ProcessData-Eval for post-training and evaluation purposes. Extensive eval-uation of various VLMs on ProcessData-Eval reveals broad limitations across 12 diagnostic task families, suggesting current models still lack robust process-aware understanding of manipulation executions. But with ProcessData-SFT, the post-trained Qwen2.5-VL-7B and InternVL-3-8B exhibit consistent gains on local state, motion, progress, and primitive-aware cues. These results demonstrate that RoboProcessBench serves as both an evaluation benchmark and a learnable super-vision source for developing VLMs capable of monitoring and evaluating robotic manipulation processes. Project webpage: https://processbench-2026.github.io. 
+
+## 1 Introduction 
+
+Vision-language models (VLMs) are increasingly becoming judge-like components in robotic manip-ulation systems. Beyond open-world perception and language-conditioned reasoning, they are used as visual critics, online reward generators, and failure-reasoning models [ 1–6 ]. These developments suggest that VLMs are no longer merely passive captioners or planners; they are increasingly expected to evaluate whether an ongoing manipulation process is unfolding correctly. Such judge-like use cases place a stronger requirement on the visual-language module than con-ventional recognition or planning [ 2, 3, 6]. To provide a useful reward, progress signal, or failure explanation, a model must recognize whether task-relevant contact has been established, whether mo-tion is still active, whether a local primitive is early or nearly complete, whether temporal evidence is consistent with forward progress, and whether the current state supports the next primitive. These are 
+
+> arXiv:2606.13040v1 [cs.RO] 11 Jun 2026
+
+process-understanding problems grounded in physical state evolution instead of merely object-centric recognition problems. Recent work has begun to address outcome-only evaluation by introducing subgoal-level evaluation, PRM-based dense auditing, progress-aware critics, and failure-reasoning models [ 2– 5, 7]. However, these works largely assume or instantiate a judge, and then evaluate its use for policy auditing, reward generation, or failure analysis. They do not systematically decompose the underlying VLM-side process understanding abilities that such judges require. We therefore present RoboProcessBench, a benchmark for process-aware understanding in vision-language robotic manipulation. RoboProcessBench evaluates the VLM-side abilities required for process judging rather than action generation or closed-loop policy success. It decomposes manipu-lation execution into 12 trainable process signals across static monitoring and dynamic reasoning, covering phase, contact, motion, bimanual coordination, primitive-local progress, temporal order, outcome, and primitive-level transitions. The resulting ProcessData contains ~58k process-aware QA items across 260 manipulation tasks, constructed from physically grounded execution traces [ 8– 11 ]. ProcessData is further split into ProcessData-SFT and ProcessData-Eval for downstream post-training and evaluation, following strict episode and recording isolation. Extensive evaluation of various VLMs on ProcessData-Eval reveals broad limitations across 12 diagnostic task families, suggesting current models still lack robust process-aware understanding of manipulation executions. Using structured signals from ProcessData-SFT, we separately train 
+
+Qwen2.5-VL-7B and InternVL-3-8B . The results on ProcessData-Eval shows that both models ex-hibit consistent gains on local state, motion, progress, and primitive-aware cues after post-training. Despite the remaining bottleneck on temporal-related questions, we believe RoboProcessBench can comprehensively diagnose the process understanding, as well as providing a learnable substrate for such capability in robotic manipulation. This paper makes the following contributions: (1) RoboProcessBench, a benchmark that decomposes process-aware robotic manipulation understanding into 12 VLM-evaluable and trainable dimensions. (2) ProcessData, a curated corpus of ~58k physically grounded QA items across 260 manipulation tasks, providing learnale structured supervision. (3) A comprehensive diagnostic evaluation of open-and closed-source VLMs, revealing systematic weaknesses in primitive-local progress estimation and temporal process reasoning. (4) ProcessData-SFT-Qwen and ProcessData-SFT-Intern , VLM-based process evaluators trained from RoboProcessBench supervision on most-common VLM backbones, demonstrating that process-understanding signals are learnable and establishing a foundation for futural PRM-style progress and failure judgment development. 
+
+## 2 Related Work 
+
+Robot Data and Benchmarks. Large-scale robot datasets and embodied benchmarks have substan-tially advanced manipulation research by providing diverse trajectories, tasks, embodiments, and environments [ 8– 15 ]. Existing benchmarks evaluate broad embodied capabilities such as visual-spatial reasoning, planning, language-conditioned manipulation, low-level action reasoning, and trajectory-conditioned question answering [ 16 – 24 ]. These resources are essential for policy learning and embodied evaluation, but they usually treat manipulation process structure as auxiliary infor-mation rather than the central evaluation target. In contrast, RoboProcessBench converts physically grounded execution traces into a VLM-side benchmark for process-aware understanding, covering contact, phase, motion, local progress, temporal relation, outcome, and primitive-level cues. 
+
+Process and Reward Signals. A growing line of work argues that final success rates are insufficient for understanding how a robot policy executes a task. Step-level and subgoal-level evaluation exposes partial competence that binary outcomes hide [ 7], while execution monitoring and precondition– effect modeling study whether intermediate action states are valid or anomalous [ 25 ]. Recent process reward and progress-aware methods further use intermediate execution signals for policy evaluation, reward generation, or control [ 2 , 4, 6 , 26 , 27 ]. Closely related resources also provide intermediate representations, primitive-level annotations, or hierarchical manipulation structure for fine-grained reasoning [ 10 , 28 – 31 ]. These works motivate the importance of process signals, but their primary focus is typically reward modeling, monitoring, control, or representation learning. RoboProcessBench instead uses process signals as diagnostic and trainable supervision for evaluating whether VLMs understand the physical and temporal evolution of manipulation. 2Static Monitoring           
+
+> （Observe the Current Process State ）
+> Dynamic Reasoning
+> (Reason about Process Evolution)
+> T1: Phase Recognition
+> T10: Primitive Recognition
+> T5: Process T6: Motion
+> T8: Temporal T9: Priority
+> …which
+> phase?
+> Answer: Hold & carry
+> …in contact
+> (with button)
+> ?
+> …which active? …which primitive?
+> …at
+> what
+> stage?
+> Answer: Late
+> …is moving?
+> Answer: Yes
+> …what’s the order?
+> Answer: XZY
+> …which first?
+> Answer: Right
+> …
+> Approach
+> --> ? -->
+> Twist?
+> Answer: Align
+> Answer: No
+> Answer: Left Answer: Release
+> T7: Outcome
+> …will succeed?
+> Answer: No
+> T3: Direction
+> …which direction?
+> Answer: Right
+> T4: Bi -Arm Coordination
+> T2: Contact Detection
+> Process Data -58k
+> T12: Restoration T11: Prediction
+> …what’s
+> next?
+> Answer: Lift
+> LPU 1 LPU 2 LPU N Start End
+> Manipulation
+> Videos
+> Physical
+> Signals
+> Process Units Segmentation
+> MANIPULATION EPISODE: Several Local Process Units ( LPUs) 12 Tasks
+> 260 Questions
+> Finetune
+> Monitoring
+> Capability
+
+Figure 1: Overview of RoboProcessBench. RoboProcessBench evaluates process-aware manipula-tion understanding by decomposing manipulation episodes from ProcessData into local process units and instantiating 12 question families across static monitoring and dynamic reasoning. All questions are multiple-choice with 2~6 options depending on the task type. 
+
+VLMs as Robotic Judges. VLMs are increasingly used as active feedback modules in robotic systems. VLMPC uses VLM-based evaluation for action selection and future-state assessment [ 1 ]; VLAC learns a vision-language-action critic that predicts progress deltas and completion signals [ 2]; Large Reward Models adapt foundation VLMs into online reward generators [ 4]; and AHA detects and reasons over manipulation failures to support downstream robotic frameworks [ 5]. Most directly related, PRM-as-a-Judge formulates dense robotic auditing with process reward models, introduces OPD metrics for outcome, process, and diagnosis-level evaluation, and uses RoboPulse to test fine-grained progress discrimination [ 3]. These works show that VLMs and PRMs can serve as critics, reward models, progress monitors, and failure detectors. However, they usually instantiate or evaluate a judge within a downstream pipeline. RoboProcessBench addresses the complementary prerequisite: it decomposes the VLM-side process understanding needed by such judges into explicit benchmark tasks and trainable supervision signals. 
+
+## 3 RoboProcessBench 
+
+RoboProcessBench evaluates process-aware robotic manipulation understanding : whether a VLM can infer how a manipulation execution is unfolding from visual observations and optional task context. As shown in Figure 1, RoboProcessBench is built around local process units inside a manipulation episode. Each unit provides a localized decision context from which we instantiate question-answer items about current state, contact, motion, progress, temporal order, outcome, and primitive-level process cues. The resulting benchmark contains 12 question families grouped into 
+
+static monitoring and dynamic reasoning .
+
+3.1 Overview and Evaluation Target 
+
+Given a manipulation episode, RoboProcessBench does not focus only on final task success. Instead, it asks whether a VLM can recognize and reason about the intermediate process structure of the execution. Formally, let a manipulation episode be 
+
+e = {(It, z t)}Tt=1 , (1) where It denotes the visual observation at time t, and zt denotes source-native episode execution information available at the same instant, such as task metadata, segment annotations, force/torque signals, gripper state, joint motion, velocity statistics, timestamps, or success/failure records. For a task family m, let z⋆t denote the task-relevant latent process state and let 
+
+y = ϕm(z⋆t ) (2) 3be the corresponding benchmark target, such as phase, contact status, motion state, local progress, temporal relation, or primitive-level state. A model fθ is evaluated by predicting 
+
+ˆy = fθ (x, c ), (3) where x is the visual input and c is optional task context. The target y is therefore a structured prediction about the ongoing manipulation process rather than a generic scene description. Overall, RoboProcessBench evaluates the perceptual and temporal process variables that a PRM-style judge must implicitly estimate. For example, progress rewards require sensitivity to local subprogress, regression, and temporal direction; failure detectors require contact, phase, and outcome cues; and primitive-level critics require knowledge of current and next local actions. Thus, RoboProcessBench treats process-aware QA not as an end in itself, but as a structured supervision interface for training VLM-based process evaluators. 
+
+Intended use. RoboProcessBench is intended for diagnosing and training VLM-side process under-standing in robotic manipulation. It should be used to compare models across process-aware subskills and to study whether structured process supervision improves held-out process QA performance. It should not be used as a direct proxy for closed-loop VLA policy success, as a general-purpose VLM leaderboard, or as evidence of safe deployment without downstream robot validation. 
+
+3.2 Anchored Local Process Units 
+
+A key design choice of RoboProcessBench is that long manipulation episodes are decomposed into 
+
+local process units (LPUs): 
+
+U(e) = {uj }Ne
+
+> j=1
+
+, uj = [ tsj , t ej ], tsj < t ej . (4) Each LPU is a temporally localized decision unit corresponding to a coherent manipulation sub-progress. In contact-rich sources, LPUs are contact-anchored and derived from contact onset, contact persistence, release, or stable interaction regimes. In sources with explicit low-level action annota-tions, LPUs can additionally be primitive-anchored and aligned with native primitive intervals. This abstraction converts long manipulation episodes into auditable process-aware units, allowing the benchmark to evaluate local state, subprogress, and action-chain reasoning rather than only global episode completion. A benchmark item for task family m is defined as 
+
+x(m) 
+
+> i
+
+=
+
+
+
+gi, oi, q (m) 
+
+> i
+
+, y (m)
+
+> i
+
+
+
+, (5) where gi is the task context, oi is the extracted visual input, q(m) 
+
+> i
+
+is the task-specific question, and 
+
+y(m) 
+
+> i
+
+is the ground-truth answer. The full benchmark is 
+
+B =
+
+> 12
+
+[
+
+> m=1
+
+Bm, Bm = {x(m) 
+
+> i
+
+}Nm
+
+> i=1
+
+. (6) 
+
+3.3 Question Taxonomy 
+
+RoboProcessBench organizes 12 question families into two complementary categories, as summarized in Table 1. Static Monitoring evaluates whether a VLM can identify the current local process state, while Dynamic Reasoning evaluates whether it can infer motion, progress, temporal relation, outcome, or primitive-level continuation. 
+
+Static process monitoring. Static monitoring families ask the model to identify the current local process state from a single frame or a short ordered clip. These include phase recognition ( T1 ), contact detection ( T2 ), bimanual coordination state recognition ( T4 ), and current primitive recognition ( T10 ). Although these tasks may appear visually local, they are process-aware rather than object-centric: the VLM must infer which manipulation-relevant state has already been reached. 
+
+Dynamic process reasoning. Dynamic reasoning families require temporal, predictive, progress-centric, or chain-level inference. These include motion direction prediction ( T3 ), primitive-local progress recognition ( T5 ), motion state recognition ( T6 ), operation outcome prediction ( T7 ), temporal ordering ( T8 ), temporal priority prediction ( T9 ), next primitive prediction ( T11 ), and primitive chain restoration ( T12 ). Together, these families test whether a VLM can infer how the current state is evolving and how the local process should continue. 4Table 1: RoboProcessBench task taxonomy. The 12 tasks cover current-state monitoring, temporal reasoning, and primitive-aware extensions. Under the Input Frame column, blocks with differed colors indicate disorded frames, while the timely ordered ones are annotated with numbers.                                                             
+
+> ID Task Question Input Frame
+> T1 Phase Recognition What coarse process phase is the manipulation cur-rently in? T2 Contact Detection Has effective task-relevant contact been estab-lished? T4 Bimanual Coordination State How are the two arms currently coordinating? 1234
+> T10 †Current Primitive Recognition What low-level primitive is being executed now? 1234
+> T3 Motion Direction Prediction What is the dominant motion direction? 1234
+> T5 Primitive-local Progress Is the current local step early, middle, or late? 1234
+> T6 Motion State Recognition Is the manipulator actively moving or effectively stationary?
+> 1234
+> T7 Operation Outcome Prediction Will the ongoing attempt eventually succeed? 1234
+> T8 Temporal Ordering What is the correct chronological order of the three frames? T9 Temporal Priority Prediction Which of the two frames happened earlier? T11 †Next Primitive Prediction What low-level primitive should happen next? 1234
+> T12 †Primitive Chain Restoration Which primitive best fills the masked slot in the local action chain?
+> 1234
+> †Primitive-aware extension tasks grounded in explicit REASSEMBLE annotations.
+
+We treat T10 –T12 as primitive-aware extensions in the current release, because they rely on explicit native primitive annotations. The remaining families are cross-dataset process families constructed from source-native physical, temporal, or outcome signals. 
+
+3.4 Benchmark Construction 
+
+Top of Figure 1 illustrates the construction pipeline. Ground-truth construction follows three princi-ples: source-native supervision is preferred over free-form manual annotation; labels are constructed only after identifying task-relevant LPUs; and human intervention is used for calibration and audit rather than exhaustive relabeling. For a task family m, let Πm denote the task-specific visual extractor and Γm the corresponding label constructor. Each item is instantiated as 
+
+oi = Π m(ei, u i), y(m) 
+
+> i
+
+= Γ m(ei, u i, g i), (7) where ui is the associated local process unit. The extractor Πm determines whether the visual input is a single frame, an ordered clip, a shuffled frame set, or a pairwise comparison. The constructor Γm
+
+maps source-native signals and metadata to a discrete answer. RoboProcessBench does not impose a single universal frame rule. Instead, each task family uses the minimal temporal context required by its decision scale. T1 and T2 use single frames; T3 , T4 , T5 , T6 , T7 , T10 , T11 , and T12 use short ordered clips; T8 uses three shuffled frames; and T9 uses a two-frame comparison. This design avoids making process reasoning artificially easy by overexposing context or artificially hard by removing all temporal evidence. At a high level, the 12 task families follow four construction regimes. T1 , T2 , T4 , and T6 are built from stable state, contact, or motion regimes; T3 , T8 , and T9 are built from motion and timestamp structure; T5 and T7 are built from local subprogress and eventual outcome signals; and T10 –T12 are instantiated from explicit primitive annotations when available. Detailed family-specific GT rules are deferred to Appendix A.3. 
+
+3.5 Manual audit 
+
+Manual effort is intentionally limited and high-leverage. RoboProcessBench does not rely on full frame-wise manual labeling. Instead, human effort is concentrated on auditing a small portion of ProcessData-Eval to provide validity check as well as human baselines. Detailed audit procedures are provided in Appendix B. 5(c) Primitive -Family Composition 
+
+> (b) Primitive Verb Coverage
+> (a) Process -Aware Understanding Profile
+
+Figure 2: RoboProcessBench understanding profile and primitive coverage. Left: task-wise performance across 12 process-aware diagnostic probes. Right: primitive verb coverage and family-level composition in ProcessData-58k. 
+
+## 4 ProcessData 
+
+ProcessData is the data substrate of RoboProcessBench. It aggregates four complementary robotic manipulation sources [ 8– 11 ], yielding ~58k process-aware QA items across 260 manipulation tasks. Rather than treating all sources as a homogeneous pool, we use each dataset for the type of process supervision it supports best: GM-100 provides long-tail goal-conditioned manipulation tasks, RH20T 
+
+contributes contact-rich multimodal traces, REASSEMBLE provides explicit primitive-level action chains, and AIST-Bimanual supplies bimanual motion and coordination patterns. ProcessData is further split into ProcessData-SFT and ProcessData-Eval for downstream post-training and evaluation, following strict episode and recording isolation with a split ratio of 15% .This source design is essential for process-aware evaluation. RoboProcessBench requires labels tied to local execution structure, such as contact, motion state, local progress, temporal order, outcome, and primitive transitions, which may be non-uniform across sources. We therefore apply a unified trace-driven construction pipeline over heterogeneous native signals and annotations: visual observations are aligned with execution traces, contact- or primitive-anchored local process units are extracted, and task-specific QA items are instantiated. Table 2 summarizes how the four sources jointly support the 12-task taxonomy. The goal of this aggregation is to combine complementary forms of supervision into a unified benchmark-ready corpus for process-aware manipulation understanding. Complementing the source-level view in Table 2, the right panels of Figure 2 summarize the primitive-level semantic coverage of ProcessData, including both frequent primitive verbs and their aggregated family-level composition. This visualization shows that ProcessData spans a diverse set of reusable local process units. 
+
+## 5 Experiments 
+
+We evaluate RoboProcessBench with two goals. First, we use ProcessData-Eval as a diagnostic evaluation suite to measure whether current VLMs can understand the fine-grained intermediate process structure of robotic manipulation. Second, we test whether ProcessData-SFT provides a learnable supervision signal for held-out process-aware VLM adaptation. We therefore report task-level results rather than only aggregate scores, since the central purpose of RoboProcessBench is 6Table 2: Source contribution to ProcessData. Each source is used only for the RoboProcessBench task families supported by its native signals or annotations, yielding complementary coverage across the 12-task taxonomy.                                                                                
+
+> Source Main Role Static Monitoring Dynamic Reasoning
+> T1 T2 T4 T10 T3 T5 T6 T7 T8 T9 T11 T12 GM-100 Long-tail goal-conditioned manipulation ✓✓✓–✓✓✓–✓✓––
+> RH20T Contact-rich multimodal traces ✓✓––✓✓✓✓✓✓––
+> REASSEMBLE Primitive-level action chains ✓✓–✓–✓✓✓✓✓✓✓
+> AIST-Bimanual Bimanual motion and coordination ––✓–✓–✓–✓✓––
+> ProcessData Unified process-aware QA corpus ✓✓✓✓✓✓✓✓✓✓✓✓
+
+to expose capability boundaries across local state grounding, primitive-local progress estimation, temporal reasoning, outcome prediction, and primitive-level reasoning. 
+
+5.1 Experimental Protocol 
+
+We evaluate a broad set of open-source and closed-source VLMs. The open-source baselines include QwenVL-family models [ 32 , 33 ], InternVL-family models [ 34 , 35 ], RoboBrain [ 23 ], and GLM [ 36 ]. The closed-source baselines include Gemini [ 37 ], GPT variants [ 38 , 39 ], and Claude variants [ 40 , 41 ]. We also report two post-trained VLMs, ProcessData-SFT-Qwen and ProcessData-SFT-Intern , obtained by supervised fine-tuning on ProcessData-SFT. All tasks are formulated as multiple-choice visual question answering, and results are reported as accuracy on ProcessData-Eval. RoboProcessBench uses strict episode / recording isolation between ProcessData-SFT and ProcessData-Eval to reduce leakage from near-duplicate trajectories and to ensure that evaluation reflects generalization across execution instances rather than memorization of specific recordings. For post-training, we fine-tune Qwen2.5-VL-7B and InternVL-3-8B with LoRA using rank 8 and alpha 16. The language model is fine-tuned while the vision encoder is kept frozen. Fine-tuning uses 4 NVIDIA H200 GPUs, and all evaluations are run on 1 NVIDIA H200 GPU. We use temperature 0.01 and a maximum output length of 32 tokens for all evaluated models. 
+
+5.2 Diagnostic Results on ProcessData-Eval 
+
+Table 3 reports the full 12-task evaluation on ProcessData-Eval, and the left of Figure 2 provides a compact visualization of the resulting task-wise understanding profile. Together, it can be observed that performance is highly uneven across the 12 diagnostic families: models are stronger on several local state and primitive-aware cues, while progress-centric and temporal reasoning tasks remain substantially harder.The zero-shot baseline results show that current VLMs remain far from saturated on process-aware robotic manipulation understanding. Even strong open- and closed-source models exhibit highly non-uniform performance across the taxonomy: they can sometimes recognize local process states, but remain much weaker on progress-centric and temporal tasks. This supports the central motivation of RoboProcessBench: process-aware manipulation understanding is not a single generic VLM capability, but a structured set of subskills that should be evaluated separately. 
+
+Zero-shot strengths are fragmented across task families. No zero-shot model dominates all task families. The strongest baseline differs across temporal ordering ( T8 ), temporal-priority prediction (T9 ), next primitive prediction ( T11 ), outcome prediction ( T7 ), and motion direction prediction (T3 ). This fragmented pattern indicates that RoboProcessBench reveals model-specific process-understanding profiles: different VLM families capture different subsets of local state, motion, temporal, and primitive-level cues. 
+
+Local process-state grounding is easier than local progress estimation. Tasks grounded in relatively visible local states, such as contact detection ( T2 ), motion-state recognition ( T6 ), and primitive-chain restoration ( T12 ), are more accessible to zero-shot VLMs than tasks requiring explicit estimation of process evolution. In contrast, primitive-local progress recognition ( T5 ) remains difficult: the strongest zero-shot result reaches only 34 .4% , close to the 33 .3% random baseline. This gap is central to the benchmark objective. T5 asks whether a model can judge how far a local manipulation step has advanced, rather than merely identify what state is currently visible. 7Table 3: Comprehensive evaluation on RoboProcessBench. Results are reported as accuracy (%) on ProcessData-Eval. Among zero-shot baselines, blue and light-blue cells mark the best and second-best results within each task family. Post-trained model scores are highlighted in light orange.                                                                                                                                                                                                              
+
+> Model Static Monitoring Dynamic Reasoning
+> T1 T2 T4 T10 T3 T5 T6 T7 T8 T9 T11 T12
+> Open-Source VLMs
+> Qwen2.5-VL-7B 26.6 41.9 36.4 33.1 35.5 32.2 58.0 54.6 17.9 50.9 33.1 80.4 Qwen3-VL-8B 34.1 42.3 37.5 32.9 30.1 32.7 64.7 60.7 15.9 52.2 59.0 84.8 Qwen3-VL-32B 28.4 53.5 41.9 28.1 50.7 32.4 69.2 50.6 19.7 53.4 47.0 76.1 InternVL-3-8B 31.3 45.6 22.9 31.2 31.1 34.1 54.0 61.9 17.3 48.7 46.5 91.3 InternVL-3.5-8B 37.4 44.3 26.5 36.8 27.7 34.3 53.8 61.9 17.5 50.7 53.5 80.4 InternVL-3-38B 24.6 44.0 25.1 26.2 33.2 34.4 58.1 55.9 17.1 50.6 63.5 82.6 InternVL-3.5-38B 22.4 46.6 29.5 32.6 33.1 34.1 53.1 49.6 15.3 51.0 61.5 80.4 RoboBrain-2.0-7B 29.8 44.0 26.6 32.6 44.4 33.8 51.2 62.5 15.8 49.4 32.6 91.3 GLM-5.1 21.1 37.0 26.0 34.0 42.7 24.0 48.9 53.0 16.5 49.3 60.0 76.7
+> Closed-Source VLMs
+> Gemini-3.1-Flash 31.4 47.8 37.3 38.4 33.0 30.5 63.5 48.3 21.8 53.2 67.5 84.8 GPT-4o 29.0 46.1 40.0 32.0 26.1 32.1 68.4 41.1 20.4 49.5 44.5 76.1 GPT-5.4-mini 30.9 49.9 38.1 32.1 46.2 33.0 67.0 56.1 18.9 51.6 45.5 87.0 Claude-Haiku-4.5 24.8 40.7 39.5 23.4 27.1 29.6 61.3 46.2 22.3 52.7 56.0 67.4 Claude-Sonnet-4.6 31.9 52.6 36.3 27.3 54.5 30.8 68.1 49.7 20.2 47.1 44.8 65.2
+> Post-trained VLMs
+> ProcessData-SFT-Qwen 58.5 82.7 75.0 92.5 87.7 45.4 92.4 63.4 17.0 51.0 96.5 97.8 ProcessData-SFT-Intern 56.8 81.9 77.3 92.8 88.2 45.3 91.5 66.3 16.3 55.4 97.0 95.7
+
+Temporal reconstruction remains the hardest regime. Temporal ordering ( T8 ) and temporal-priority prediction ( T9 ) remain close to chance for most zero-shot models. The best zero-shot score on T8 is only 22 .3% , and T9 remains near the 50% random baseline. These results indicate that short visual context does not automatically yield reliable temporal reasoning in robotic manipulation. The weakness is therefore not just a low-score artifact; it identifies a key missing capability for VLMs expected to serve as progress monitors or process judges. Taken together, these diagnostic results show that RoboProcessBench should be interpreted at the task-family level rather than through a single aggregate score. Different VLM families capture different subsets of process cues, while primitive-local progress and temporal reasoning remain persistent weaknesses. This fragmented profile supports the benchmark premise: process-aware manipulation understanding is a structured capability composed of separable local-state, progress-centric, temporal, outcome-oriented, and primitive-level subskills. 
+
+5.3 Effect of ProcessData-SFT Supervision 
+
+ProcessData-SFT provides a broadly learnable supervision signal across model backbones. Both 
+
+ProcessData-SFT-Qwen and ProcessData-SFT-Intern substantially improve over their corresponding zero-shot backbones and achieve strong performance on most local state, motion, and primitive-aware tasks. The gains are especially consistent on phase recognition ( T1 ), contact detection ( T2 ), bimanual coordination ( T4 ), motion direction prediction ( T3 ), motion-state recognition ( T6 ), current primitive recognition ( T10 ), next primitive prediction ( T11 ), and primitive-chain restoration ( T12 ). The fact that two different VLM backbones show similar improvement patterns suggests that the supervision is not tied to a single model family, but reflects visually learnable process cues constructed from physically grounded traces and primitive annotations. This is important for RoboProcessBench because it indicates that ProcessData-SFT is not merely an evaluation split with manually designed labels, but can also function as a training signal that transfers across different model architectures. SFT improves both benchmark dimensions. Following the taxonomy of RoboProcessBench, we further summarize the effect of ProcessData-SFT under the two primary dimensions: static monitoring 
+
+and dynamic reasoning . Compared with their corresponding base backbones, ProcessData-SFT-Qwen 
+
+and ProcessData-SFT-Intern improve static monitoring by 42.7 and 44.4 points, respectively, reaching 77.2% for both models. Dynamic reasoning also improves substantially, by 23.6 and 21.4 points, reaching 68.9% and 69.5%. This shows that ProcessData-SFT provides learnable supervision for both 8static interaction states and dynamic process cues. At the same time, the smaller gains on dynamic reasoning indicate that process evolution remains harder than recognizing local interaction states. This gap is expected because dynamic reasoning requires the model to infer motion, progress, temporal consistency, and primitive-level continuation from visual evidence, rather than only grounding visible interaction states in a single frame or local observation. Therefore, the static–dynamic comparison further supports the need for evaluating process-aware manipulation understanding at the task-family level instead of relying only on an aggregate score. The improvement on primitive progress recognition ( T5 ) is particularly important. ProcessData-SFT-Qwen reaches 45 .4% and ProcessData-SFT-Intern reaches 45 .3% , improving by roughly 11 points over the strongest zero-shot baseline. This result suggests that local subprogress is not purely inaccessible to VLMs: structured process supervision can teach models to recognize some visual evidence of advancement within a manipulation primitive. At the same time, T5 is far from saturated, indicating that progress estimation remains substantially harder than local state recognition. The gains are not universal. Temporal ordering ( T8 ) remains close to chance after post-training for both backbones, and temporal-priority prediction ( T9 ) improves only for the InternVL-based model while remaining weak overall. Outcome prediction ( T7 ) also improves less consistently than local state and primitive-aware tasks. This asymmetry clarifies what ProcessData-SFT currently teaches well: local process states, short-horizon motion cues, primitive transitions, and partial local progress. It does not yet solve robust temporal reconstruction or reliable outcome prediction. These remaining bottlenecks suggest that future VLM-based process evaluators may require stronger video modeling, explicit temporal objectives, memory over longer execution windows, or downstream progress-ranking validation. Overall, these results show that ProcessData-SFT is a learnable substrate for process-aware under-standing in robotic manipulation. It consistently improves two different VLM backbones on local state, motion, progress, and primitive-aware cues, indicating that many process labels derived from physically grounded traces correspond to visually learnable signals. At the same time, the remaining weakness on temporal ordering, temporal priority, and outcome prediction clarifies what current process supervision does not yet solve. This makes RoboProcessBench useful both for supervised adaptation and for diagnosing unresolved temporal and outcome-oriented reasoning bottlenecks. 
+
+## 6 Limitations 
+
+We acknowledge that RoboProcessBench has several limitations. RoboProcessBench is a diagnostic benchmark and learnable substrate for fine-grained process-aware understanding, not a closed-loop policy benchmark. Its multiple-choice QA scores should not be interpreted as direct evidence of downstream policy success or deployable reward quality. In addition, the benchmark evaluates structured visual QA rather than open-ended reasoning or long-horizon video memory. Future work should extend RoboProcessBench to richer video inputs, more embodiments and viewpoints, failure-rich trajectories, external progress-ranking validation, and closed-loop robotic evaluation. 
+
+## 7 Conclusion 
+
+We introduced RoboProcessBench, a benchmark and supervision substrate for process-aware under-standing in vision-language robotic manipulation. RoboProcessBench decomposes the VLM-side abilities needed by judge-like robotic modules into 12 diagnostic task families across static mon-itoring and dynamic reasoning, and instantiates them as ProcessData, a physically grounded QA corpus for both evaluation and post-training. Our experiments show that current VLMs remain far from uniformly process-aware: zero-shot performance is fragmented across task families, primitive-local progress and temporal reasoning remain difficult, and no single model solves the benchmark. At the same time, post-training on ProcessData-SFT yields consistent gains across Qwen- and InternVL-based models on local state, motion, progress, and primitive-aware cues, showing that many process signals are learnable from structured execution traces. RoboProcessBench provides not a replacement for closed-loop policy evaluation, but a capability substrate for developing VLM-based progress-aware critics and process evaluators that can better monitor whether robotic manipulation is unfolding correctly, locally progressing, temporally consistent, and compatible with primitive-level continuation. 9References 
+
+[1] Wentao Zhao, Jiaming Chen, Ziyu Meng, Donghui Mao, Ran Song, and Wei Zhang. VLMPC: Vision-language model predictive control for robotic manipulation. In Robotics: Science and Systems (RSS) , 2024. [2] Shaopeng Zhai, Qi Zhang, Tianyi Zhang, Fuxian Huang, Haoran Zhang, Ming Zhou, Shengzhe Zhang, Litao Liu, Sixu Lin, and Jiangmiao Pang. A vision-language-action-critic model for robotic real-world reinforcement learning. arXiv preprint arXiv:2509.15937 , 2025. [3] Yuheng Ji, Yuyang Liu, Huajie Tan, Xuchuan Huang, Fanding Huang, Yijie Xu, et al. PRM-as-a-judge: A dense evaluation paradigm for fine-grained robotic auditing. arXiv preprint arXiv:2603.21669 , 2026. [4] Yanru Wu, Weiduo Yuan, Ang Qi, Vitor Guizilini, Jiageng Mao, and Yue Wang. Large reward models: Generalizable online robot reward generation with vision-language models. arXiv preprint arXiv:2603.16065 , 2026. [5] Jiafei Duan, Wilbert Pumacay, Nishanth Kumar, Yi Ru Wang, Shulin Tian, Wentao Yuan, Ranjay Krishna, Dieter Fox, Ajay Mandlekar, and Yijie Guo. AHA: A vision-language-model for detecting and reasoning over failures in robotic manipulation. In International Conference on Learning Representations (ICLR) , 2025. [6] Huajie Tan, Sixiang Chen, Yijie Xu, Zixiao Wang, Yuheng Ji, Cheng Chi, Yaoxu Lyu, Zhongxia Zhao, Xiansheng Chen, Peterson Co, Shaoxuan Xie, Guocai Yao, Pengwei Wang, Zhongyuan Wang, and Shanghang Zhang. Robo-Dopamine: General process reward modeling for high-precision robotic manipulation. arXiv preprint arXiv:2512.23703 , 2025. [7] Ramy ElMallah, Krish Chhajer, and Chi-Guhn Lee. Score the steps, not just the goal: VLM-based subgoal evaluation for robotic manipulation. arXiv preprint arXiv:2509.19524 , 2025. [8] Tomohiro Motoda, Masaki Murooka, Ryoichi Nakajo, Muhammad A. Muttaqien, Koshi Maki-hara, Hanbit Oh, Keisuke Shirai, Floris Erich, Ryo Hanai, and Yukiyasu Domae. AIST bimanual manipulation dataset. https://aistairc.github.io/aist_bimanip_site/ , 2025. [9] Ziyu Wang, Chenyuan Liu, Yushun Xiang, Runhao Zhang, Qingbo Hao, Hongliang Lu, Houyu Chen, Zhizhong Feng, Kaiyue Zheng, Dehao Ye, et al. The great march 100: 100 detail-oriented tasks for evaluating embodied AI agents. arXiv preprint arXiv:2601.11421 , 2026. [10] Zeren Chen, Zhelun Shi, Xiaoya Lu, Lehan He, Sucheng Qian, Zhenfei Yin, Wanli Ouyang, Jing Shao, Yu Qiao, Cewu Lu, and Lu Sheng. RH20T-P: A primitive-level robotic dataset towards composable generalization agents. In IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2025. [11] Daniel Sliwowski, Shail Jadav, Sergej Stanovcic, Jedrzej Orbik, Johannes Heidersberger, and Dongheui Lee. REASSEMBLE: A multimodal dataset for contact-rich robotic assembly and disassembly. arXiv preprint arXiv:2502.05086 , 2025. [12] Anthony Brohan et al. Open X-Embodiment: Robotic learning datasets and RT-X models. arXiv preprint arXiv:2310.08864 , 2023. [13] Alexander Khazatsky et al. DROID: A large-scale in-the-wild robot manipulation dataset. arXiv preprint arXiv:2403.12945 , 2024. [14] Qingwen Bu et al. AgiBot World colosseo: A large-scale manipulation platform for scalable and intelligent embodied systems. arXiv preprint arXiv:2503.06669 , 2025. [15] Kun Wu, Chengkai Hou, Jiaming Liu, Zhengping Che, Xiaozhu Ju, Zhuqin Yang, et al. Robo-MIND: Benchmark on multi-embodiment intelligence normative data for robot manipulation. 
+
+arXiv preprint arXiv:2412.13877 , 2024. [16] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu, Yuke Zhu, and Peter Stone. LIBERO: Benchmarking knowledge transfer for lifelong robot learning. arXiv preprint arXiv:2306.03310 , 2023. 10 [17] Sanjay Haresh, Daniel Dijkman, Apratim Bhattacharyya, and Roland Memisevic. ClevrSkills: Compositional language and visual reasoning in robotics. In Advances in Neural Information Processing Systems (NeurIPS) , 2024. [18] Shiduo Zhang, Zhe Xu, Peiju Liu, Xiaopeng Yu, Yuan Li, Qinghui Gao, Zhaoye Fei, Zhangyue Yin, Zuxuan Wu, Yu-Gang Jiang, and Xipeng Qiu. Vlabench: A large-scale benchmark for language-conditioned robotics manipulation with long-horizon reasoning tasks. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , 2025. [19] Jihan Yang, Shusheng Yang, Anjali Gupta, Rilyn Han, Li Fei-Fei, and Saining Xie. Thinking in space: How multimodal large language models see, remember, and recall spaces. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2025. [20] Rui Yang, Hanyang Chen, Junyu Zhang, Mark Zhao, Cheng Qian, Kangrui Wang, Qineng Wang, Teja Venkat Koripella, Marziyeh Movahedi, Manling Li, Heng Ji, Huan Zhang, and Tong Zhang. EmbodiedBench: Comprehensive benchmarking multi-modal large language models for vision-driven embodied agents. In Proceedings of the 42nd International Conference on Machine Learning (PMLR) , 2025. [21] Enyu Zhao, Vedant Raval, Hejia Zhang, Jiageng Mao, Zeyu Shangguan, Stefanos Nikolaidis, Yue Wang, and Daniel Seita. ManipBench: Benchmarking vision-language models for low-level robot manipulation. In Proceedings of The 9th Conference on Robot Learning (CoRL) , 2025. [22] Kaiyuan Chen, Shuangyu Xie, Zehan Ma, Pannag R. Sanketi, and Ken Goldberg. Robo2VLM: Visual question answering from large-scale in-the-wild robot manipulation datasets. arXiv preprint arXiv:2505.15517 , 2025. [23] BAAI RoboBrain Team, Mingyu Cao, Huajie Tan, Yuheng Ji, Minglan Lin, Zhiyu Li, Zhou Cao, Pengwei Wang, Enshen Zhou, Yi Han, et al. RoboBrain 2.0 technical report. arXiv preprint arXiv:2507.02029 , 2025. [24] Gen Luo, Ganlin Yang, Ziyang Gong, Guanzhou Chen, Haonan Duan, Erfei Cui, Ronglei Tong, Zhi Hou, Tianyi Zhang, Zhe Chen, Shenglong Ye, Lewei Lu, Jingbo Wang, Wenhai Wang, Jifeng Dai, Yu Qiao, Rongrong Ji, and Xizhou Zhu. Visual embodied brain: Let multimodal large language models see, think, and control in spaces. arXiv preprint arXiv:2506.00123 , 2025. [25] Daniel Sliwowski and Dongheui Lee. ConditionNET: Learning preconditions and effects for execution monitoring. IEEE Robotics and Automation Letters (RA-L) , 2025. [26] Hongyu Yan, Qiwei Li, Jiaolong Yang, and Yadong Mu. ProgressVLA: Progress-guided diffusion policy for vision-language robotic manipulation. arXiv preprint arXiv:2603.27670 ,2026. [27] Tingjun Dai, Mingfei Han, Tingwen Du, Zhiheng Liu, Zhihui Li, Salman Khan, Jun Yu, and Xiaojun Chang. See, plan, rewind: Progress-aware vision-language-action models for robust robotic manipulation. arXiv preprint arXiv:2603.09292 , 2026. [28] Hao Li, Ziqin Wang, Zi-han Ding, Shuai Yang, Yilun Chen, Yang Tian, Xiaolin Hu, Tai Wang, Dahua Lin, Feng Zhao, Si Liu, and Jiangmiao Pang. RoboInter: A holistic intermediate representation suite towards robotic manipulation. arXiv preprint arXiv:2602.09973 , 2026. [29] Yangtao Chen, Zixuan Chen, Nga Teng Chan, Junting Chen, Junhui Yin, Jieqi Shi, Yang Gao, Yong-Lu Li, and Jing Huo. RoboHiMan: A hierarchical evaluation paradigm for compositional generalization in long-horizon manipulation. arXiv preprint arXiv:2510.13149 , 2025. [30] Yi Ru Wang, Carter Ung, Grant Tannert, Jiafei Duan, Josephine Li, Amy Le, Rishabh Oswal, Markus Grotz, Wilbert Pumacay, Yuquan Deng, Ranjay Krishna, Dieter Fox, and Siddhartha Srinivasa. RoboEval: Where robotic manipulation meets structured and scalable evaluation. 
+
+arXiv preprint arXiv:2507.00435 , 2025. [31] Yibin Liu, Yaxing Lyu, Daqi Gao, Zhixuan Liang, Weiliang Tang, Shilong Mu, Xiaokang Yang, and Yao Mu. From passive observer to active critic: Reinforcement learning elicits process reasoning for robotic manipulation. arXiv preprint arXiv:2603.15600 , 2026. 11 [32] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Tang, Zhenyu Wang, Peng Wang, Jinze Bai, et al. Qwen2.5-VL technical report. arXiv preprint arXiv:2502.13923 , 2025. [33] Qwen Team. Qwen3-VL technical report. arXiv preprint arXiv:2511.21631 , 2025. [34] Jinguo Zhu, Weiyun Wang, Zhe Chen, Yue Cao, Yangzhou Liu, Zhaoyang Hou, Zizhen Zhu, Lewei Wang, Tao Xiong, Weike Chen, et al. InternVL3: Exploring advanced training and test-time recipes for open-source multimodal models. arXiv preprint arXiv:2504.10479 , 2025. [35] Weiyun Wang, Zhangwei Gao, Lixin Gu, Hengjun Pu, Long Cui, Xingguang Wei, Zhaoyang Liu, Linglin Jing, Shenglong Ye, Jie Shao, et al. InternVL3.5: Advancing open-source multimodal models in versatility, reasoning, and efficiency. arXiv preprint arXiv:2508.18265 , 2025. [36] Z.AI. GLM-5.1: Towards long-horizon tasks. https://z.ai/blog/glm-5.1 , 2026. [37] Google. Gemini 3 Flash: Frontier intelligence built for speed. https://blog.google/ products/gemini/gemini-3-flash/ , 2025. [38] OpenAI. System card: GPT-4o. https://openai.com/index/gpt-4o-system-card/ ,2024. [39] OpenAI. Introducing GPT-5.4 mini and nano. https://openai.com/index/ introducing-gpt-5-4-mini-and-nano/ , 2026. [40] Anthropic. System card: Claude Haiku 4.5. https://assets.anthropic.com/m/ 99128ddd009bdcb/Claude-Haiku-4-5-System-Card.pdf , 2025. [41] Anthropic. System card: Claude Sonnet 4.6. https://www-cdn.anthropic.com/ 78073f739564e986ff3e28522761a7a0b4484f84.pdf , 2026. 12 A Benchmark Specification 
+
+This appendix provides implementation-level details for RoboProcessBench. We keep the appendix compact and focus on the information needed to verify the benchmark definition, reproduce the evaluation protocol, interpret human reliability, and understand responsible release boundaries. 
+
+A.1 Prompt and Input Format 
+
+RoboProcessBench is evaluated as multiple-choice visual question answering. Each item contains visual input, a task-specific question, answer options, and a strict output instruction. The same task-level prompt format is used for SFT and evaluation, except that SFT examples additionally include the ground-truth answer as the supervised target. Source-native signals used to construct ground truth, such as timestamps, force/torque, gripper state, robot velocity, primitive annotations, and success flags, are not exposed to the model input. 
+
+Evaluation prompt. The prompt template for RoboProcessBench is presented below. For binary tasks, the choices are reduced to two options. For T8 temporal ordering, the output space is a permutation over the displayed labels, e.g., X/Y/Z. For T9 temporal priority, the model chooses which displayed observation, X or Y, occurred earlier. 
+
+Prompt Template for Evaluation 
+
+> You are a helpful assistant for process evaluation. <image><image><image> Given the above image(s) from a robot manipulation episode, answer the question below: <QUESTION> Here are the available Choices: (A) <CHOICE_A> (B) <CHOICE_B> (C) <CHOICE_C> (D) <CHOICE_D> Return ONLY the final option or temporal label wrapped in <answer>...</answer>. Example: <answer>A</answer>, <answer>Y</answer>, etc.
+
+SFT target format. For ProcessEval-SFT post-training, each SFT example uses the same visual input and prompt body as the evaluation item. The supervised target is the ground-truth option letter or temporal label. We do not expose the source-native signals used by the GT builder in the prompt. 
+
+A.2 Representative Task Cards 
+
+To make the benchmark interface concrete, we show one representative rendered task card for each RoboProcessBench task family. Each card corresponds to the model-visible input format used in the benchmark: the visual observation(s), the task-specific question, the answer choices, and the required answer format. These cards are illustrative examples from the released benchmark; the full ProcessData-SFT and ProcessData-Eval splits follow the same task-family prompt and choice conventions. Source-native execution signals used for ground-truth construction remain hidden from the model and are used only by the deterministic builders described in Appendix A.3. 13 Figure 3: Representative task card for T1 Phase Recognition. The model identifies the coarse process phase from a single observation, testing whether it can localize the current execution stage. 
+
+Figure 4: Representative task card for T2 Contact Detection. The model determines whether effective task-relevant contact has been established, using only the rendered visual input rather than hidden contact signals. 14 Figure 5: Representative task card for T3 Motion Direction Prediction. The model infers the dominant motion direction from a short ordered visual context. 
+
+Figure 6: Representative task card for T4 Bimanual Coordination State. The model recognizes how the two arms are coordinating, distinguishing joint activity, single-arm activity, and idle states. 15 Figure 7: Representative task card for T5 Primitive-local Progress. The model estimates whether the current local manipulation step is early, middle, or late, testing local subprogress understanding rather than global task completion. 
+
+Figure 8: Representative task card for T6 Motion State Recognition. The model distinguishes active movement from an effectively stationary state over a short visual window. 16 Figure 9: Representative task card for T7 Operation Outcome Prediction. The model predicts whether an ongoing attempt will eventually succeed or fail from partial execution evidence, without seeing the terminal outcome. 
+
+Figure 10: Representative task card for T8 Temporal Ordering. The model restores the chrono-logical order of shuffled observations, testing temporal reconstruction from visual state change. 17 Figure 11: Representative task card for T9 Temporal Priority Prediction. The model decides which of two observations occurred earlier, providing a pairwise probe of temporal reasoning. 
+
+Figure 12: Representative task card for T10 Current Primitive Recognition. The model identifies the low-level primitive currently being executed from local visual context. 18 Figure 13: Representative task card for T11 Next Primitive Prediction. The model infers the next low-level primitive from the current local process state, testing primitive-level process continuation. 
+
+Figure 14: Representative task card for T12 Primitive Chain Restoration. The model restores a masked primitive in a local action chain, testing whether it can reason over primitive-level sequence consistency. The task cards are provided to illustrate visual answerability and task diversity. They do not introduce additional evaluation rules; all benchmark items follow the prompt format in Appendix A.1 and the deterministic construction rules in Appendix A.3. 
+
+A.3 Ground-truth Builders 
+
+RoboProcessBench uses deterministic, source-aware GT builders. The central design is to define a local decision unit before sampling visual observations. Let an episode be e, an observation at time or frame index t be xt, and a local process unit be 
+
+uj = [ tsj , t ej ],
+
+19 where tsj and tej denote the start and end of a stable process segment. Depending on the source dataset, uj is obtained from contact-aware intervals, force/torque and gripper-state changes, official segment annotations, or primitive-chain annotations. The model input contains only rendered image observations and answer choices; source-native signals used by the GT builders are never exposed at inference time. 
+
+General construction rule. Each benchmark item is generated by a builder 
+
+bk : ( e, x 1: T , s 1: T ) → (I, q, A, y ),
+
+where k is the task family, s1: T denotes hidden source-native signals, I is the rendered visual input, 
+
+q is the question, A is the answer set, and y ∈ A is the GT answer. We use source-native signals only to determine y, not as model-visible input. Ambiguous samples near transition boundaries, weak-motion intervals, or unstable contact/release states are filtered by task-specific guard margins. 
+
+T1: Phase Recognition. T1 asks which coarse process phase the current observation belongs to. For an episode partitioned into phase intervals 
+
+Pe = {(pm, t sm, t em)}Mm=1 ,
+
+a sampled frame xt receives the label 
+
+yT1 (t) = pm if tsm + δp ≤ t ≤ tem − δp,
+
+where δp is a boundary guard. Frames too close to phase transitions are excluded because adjacent phases may be visually similar. 
+
+T2: Contact Detection. T2 asks whether effective task-relevant contact has already occurred. Contact labels are derived from source-native contact evidence such as force/torque, gripper state, end-effector state, or contact-aware metadata. Abstractly, we compute 
+
+ct = ⊮ Ft > θ F ∨ Gt > θ G ∨ M contact  
+
+> t
+
+= 1  ,
+
+where Ft is force/torque evidence, Gt is gripper/contact evidence, and M contact  
+
+> t
+
+is source metadata when available. The GT label is 
+
+yT2 (t) ∈ { contact , no_contact }.
+
+Samples near contact onset or release are filtered using a temporal margin so that the visual state corresponds to a stable contact regime. 
+
+T3: Motion Direction Prediction. T3 asks for the dominant motion direction over a short ordered context. For a frame window [t − a, t + b], we estimate displacement 
+
+∆rt = rt+b − rt−a,
+
+where rt is a source-native end-effector, object, or motion proxy. The label is selected by the dominant calibrated direction: 
+
+yT3 (t) = arg max 
+
+> d∈D
+
+ ∆rt
+
+∥∆rt∥2
+
+, vd
+
+
+
+,
+
+where D is the discrete direction set and vd is the calibrated direction vector. Windows with motion magnitude below a source-specific threshold are removed. 
+
+T4: Bimanual Coordination State. T4 asks how the two arms are coordinating. We compute smoothed activity indicators for the left and right arms: 
+
+aLt = ⊮ EMA( ∥˙rLt ∥2) > θ L
+
+ , aRt = ⊮ EMA( ∥˙rRt ∥2) > θ R
+
+ .
+
+The label is determined by the pair (aLt , a Rt ):
+
+yT4 (t) = 
+
+
+
+both_active , aLt = 1 , a Rt = 1 ,
+
+left_only , aLt = 1 , a Rt = 0 ,
+
+right_only , aLt = 0 , a Rt = 1 ,
+
+both_idle , aLt = 0 , a Rt = 0 .
+
+Transient switches are excluded with short temporal guards. 20 T5: Primitive-local Progress. T5 measures progress within a local process unit rather than global task completion. For a sampled time t ∈ uj , normalized local progress is 
+
+ρ(t; uj ) = t − tsj
+
+tej − tsj
+
+.
+
+We discretize ρ into early, middle, and late labels: 
+
+yT5 (t) = 
+
+
+
+early , ρ(t; uj ) ∈ B early ,
+
+middle , ρ(t; uj ) ∈ B middle ,
+
+late , ρ(t; uj ) ∈ B late .
+
+The bin intervals Bearly , Bmiddle , Blate use guard margins and are source-specific in the released manifests. Samples close to bin boundaries are avoided to reduce label ambiguity. 
+
+T6: Motion State Recognition. T6 asks whether the scene is actively moving or stationary. We compute a normalized motion score mt from object, end-effector, or visual-motion proxies: 
+
+mt = Norm 1
+
+|W t|
+
+X 
+
+> τ∈W t
+
+∥∆rτ ∥2
+
+!
+
+,
+
+where Wt is a short temporal window. The binary label is 
+
+yT6 (t) = 
+
+stationary , mt ≤ θstill ,
+
+actively_moving , mt ≥ θmove .
+
+The middle band θstill < m t < θ move is discarded. 
+
+T7: Operation Outcome Prediction. T7 asks whether an early partial execution will eventually succeed or fail. For an episode-level outcome variable ze ∈ { success , failure }, we sample a non-terminal prefix window 
+
+It = {xt1 , . . . , x tK }, tK < t terminal  
+
+> e
+
+− δo,
+
+and set 
+
+yT7 (It) = ze.
+
+The terminal frame and post-hoc success/failure state are not shown to the model. This task tests whether early visual evidence is predictive of the eventual outcome. 
+
+T8: Temporal Ordering. T8 asks the model to recover the true order of three shuffled observations. We sample three times from the same episode, 
+
+t1 < t 2 < t 3,
+
+apply a random permutation π, and display 
+
+IT8 = ( xtπ(1) , x tπ(2) , x tπ(3) ).
+
+The answer is the inverse permutation that restores chronological order: 
+
+yT8 = π−1.
+
+Frame gaps are constrained by source-specific minimum and maximum margins so that the ordering is visually decidable while avoiding trivially distant states. 
+
+T9: Temporal Priority Prediction. T9 is the pairwise version of temporal reasoning. Given two observations from the same episode, displayed as X and Y , the GT is 
+
+yT9 =
+
+X, tX < t Y ,
+
+Y, tY < t X .
+
+As in T8, timestamps are used only by the GT builder and are hidden from the model. The sampled pairs use temporal-gap guards to ensure that human annotators can infer priority from physical state change. 21 T10: Current Primitive Recognition. T10 is instantiated on sources with explicit primitive annotations. Let a primitive chain be 
+
+Ce = ( g1, g 2, . . . , g N ), gn = ( pn, t sn, t en),
+
+where pn is a primitive label. For a sampled t, the current primitive label is 
+
+yT10 (t) = pn if tsn + δg ≤ t ≤ ten − δg .
+
+Only sources with stable primitive chains are used for this task. 
+
+T11: Next Primitive Prediction. T11 asks what primitive should happen next given the current local process state. For the same chain Ce, if t ∈ [tsn, t en], the answer is 
+
+yT11 (t) = pn+1 .
+
+Samples are excluded when n = N , when the next primitive is undefined, or when the chain transition is ambiguous. This task tests whether the model can infer local process continuity rather than only recognize the current state. 
+
+T12: Primitive Chain Restoration. T12 masks one element in a local primitive chain and asks the model to restore it. For a short subsequence 
+
+(pn−r , . . . , p n−1, p n, p n+1 , . . . , p n+r ),
+
+we hide pn and construct the query 
+
+(pn−r , . . . , p n−1, [MASK] , p n+1 , . . . , p n+r ).
+
+The GT is 
+
+yT12 = pn.
+
+Distractors are sampled from the same primitive vocabulary so that the model must reason about chain consistency instead of relying on surface frequency. 
+
+Shared primitive vocabulary. For primitive-aware tasks, we use a compact process-level vocabu-lary: 
+
+Vprim = {align , push , nudge , release , twist , lift , grasp , pull }.
+
+The vocabulary is intentionally coarse. It captures reusable process roles rather than dense motor commands. Pre-contact reaching is not promoted to a unified primitive class because it is often visually weak, task-dependent, and less informative for process evaluation. 
+
+Manual annotation boundary. Manual annotation is restricted to task-level primitive chains, object slots, and reliability audit. It is not used to create dense frame-level labels for every visual observation. This keeps the benchmark scalable while preserving a clear distinction between deterministic GT construction and human validity checking. 
+
+## B Data Splits and Reliability Audit 
+
+B.1 Dataset Composition and Splits 
+
+ProcessData aggregates four complementary robotic manipulation sources. Each source contributes only to task families that are stable under its native signals or annotations. The split uses an 85/15 target ratio with random seed 42. Table 4: Source-level composition and split statistics. The frozen split uses strict group-level isolation: the same episode, recording, or scene does not appear in both SFT and evaluation.                               
+
+> Source Total SFT Eval Group unit Supported tasks
+> GM-100 15,500 12,857 2,643 task-episode T1–T5,T6,T8,T9 RH20T 15,800 13,378 2,422 recording T1–T3,T5–T9 REASSEMBLE 17,165 14,603 2,562 recording T1,T2,T5,T6–T12 AIST-Bimanual 9,427 8,003 1,424 recording T3,T4,T6,T8,T9
+> Total 57,892 48,841 9,051 –T1–T12
+
+22 B.2 Task Distribution and Evaluation Statistics 
+
+Table 5 reports per-task evaluation statistics for the evaluation split. The majority baseline is included to test whether high scores could be obtained by exploiting answer imbalance. This is important for multiple-choice benchmarks: the random baseline reflects the number of choices, while the majority baseline reflects the strongest label-prior-only strategy. A model should be compared against both. Additionally, we conduct a compact human reliability check to test whether RoboProcessBench items are visually answerable. For each task family, 50 items are sampled and independently answered by two annotators. Both annotators achieve average accuracy above 90% across the sampled task families, indicating that the tasks are not uniformly ambiguous for humans. In particular, T8 and T9 are answerable by human annotators, so low VLM performance on temporal reasoning should be interpreted as a model-side temporal reconstruction bottleneck. Table 5: Task-level evaluation distribution. We report the number of evaluation items, number of choices, random accuracy, majority-option accuracy, and human average accuracy for each task family. Ran. Acc. is 1/|A| . Maj. Acc. is the accuracy of always predicting the most frequent correct option on the frozen evaluation split. Human Avg. is averaged over two annotators on 50 sampled items per task.                                                                  
+
+> Task #Eval Items #Choices ( |A| )Ran. Acc. (%) Maj. Acc. (%) Human Avg. (%)
+> T1 1274 425.0 26.1 93.0 T2 747 250.0 51.1 91.0 T3 1207 425.0 26.6 91.0 T4 533 425.0 27.8 94.0 T5 1222 333.3 34.3 93.0 T6 896 250.0 50.4 91.0 T7 793 250.0 50.2 94.0 T8 964 616.7 17.4 92.0 T9 810 250.0 50.6 95.0 T10 359 425.0 27.6 97.0 T11 200 425.0 28.5 97.0 T12 46 425.0 32.6 98.0
+
+## C Experimental Details 
+
+C.1 Evaluation Protocol 
+
+All models are evaluated on the same evaluation split with the same task-specific prompts. The benchmark suite keeps source-specific visual assets and metadata separate, and uses a unified evaluation interface to dispatch examples, parse model outputs, and aggregate scores across sources and task families. Unless otherwise stated, malformed outputs and missing-frame cases are recorded but excluded from valid-only accuracy. Table 6: Default evaluation protocol.             
+
+> Setting Specification
+> Split 9051 items of evaluation split with strict episode / recording / scene isolation. Input format Single-frame, multi-frame, shuffled-frame, or pairwise visual input, depending on the task family. Prompting Default MCQA prompt. Task-meta prompting is treated as a separate diagnostic variant. Decoding Temperature 0.01 ; maximum output length 512 tokens. Scoring Parsed option letter or temporal label compared with benchmark GT. Invalid outputs INVALID ,ERROR , and MISSING_FRAME are recorded; valid-only accuracy excludes them by default. Aggregation We report task-level, source-level, and overall scores. Main results emphasize task-level accuracy.
+
+23 C.2 Post-training Details 
+
+We train two post-trained VLM evaluators from ProcessData-SFT: ProcessData-SFT-Qwen , initialized from Qwen2.5-VL-7B , and ProcessData-SFT-Intern , initialized from InternVL-3-8B . Both models are evaluated on ProcessData-Eval. The purpose of these training experiments is to test whether structured process-understanding signals are learnable across different VLM backbones. Table 7: Post-training configuration for ProcessData-SFT models.                
+
+> Hyperparameter Value
+> Post-trained models ProcessData-SFT-Qwen; ProcessData-SFT-Intern Backbones Qwen2.5-VL-7B; InternVL-3-8B Training split ProcessData-SFT Evaluation split ProcessData-Eval Fine-tuning method LoRA LoRA rank / alpha 8 / 16 Target modules Attention and MLP projection layers Vision encoder Frozen Optimizer Adam Learning rate 0.0001 Scheduler Cosine Batch size 16 Epochs / steps 3.0 Random seed 42
+
+C.3 Compute 
+
+Table 8: Compute resources. GPU-hours are reported for the final reported runs; preliminary experiments are not included.                
+
+> Experiment Hardware Approx. cost Notes
+> Open-source VLM Eval 1×NVIDIA H200 5.22 Inference over the Eval split. ProcessData-SFT models 4×NVIDIA H200 33.98 LoRA on the SFT split. Post-trained model Eval 1×NVIDIA H200 0.56 Inference over the Eval split.
+
+C.4 Bootstrap Confidence Intervals 
+
+We estimate uncertainty over the evaluation split with non-parametric bootstrap confidence intervals. For each task, we resample evaluation examples with replacement for B = 1000 replicates and report the 2.5th and 97.5th percentiles as a 95% percentile confidence interval. Since decoding is fixed under the evaluation protocol, these intervals capture uncertainty over the evaluation set. Table 9: Bootstrap confidence intervals for ProcessData-SFT-Qwen. Values are reported as accuracy in % with 95% percentile confidence intervals.                          
+
+> Task Acc. [95% CI] Task Acc. [95% CI] Task Acc. [95% CI]
+> T1 58.5 [55.7, 61.2] T5 45.4 [42.5, 48.0] T9 51.0 [47.7, 54.4] T2 82.7 [80.1, 85.4] T6 92.4 [90.5, 94.2] T10 92.5 [90.0, 95.0] T3 87.7 [85.7, 89.6] T7 63.4 [60.2, 66.8] T11 96.5 [94.0, 98.5] T4 75.0 [71.3, 78.6] T8 17.0 [14.7, 19.5] T12 97.8 [93.5, 100.0]
+
+ProcessData-SFT-Qwen achieves stable high performance on phase, contact, motion, and primitive-level tasks, with especially tight intervals on T2, T3, T6, and T10–T12. In contrast, T5, T8, and T9 remain substantially harder, indicating that primitive-local progress estimation and temporal reconstruction are still the main bottlenecks after process-supervised post-training. 24 D Release, Assets, and Responsible Use 
+
+D.1 Reproducibility 
+
+The benchmark suite is hosted as code on GitHub, and the dataset artifacts are hosted on Hugging Face. The code release includes benchmark construction utilities, split generation, evaluation, scoring, and documentation. The dataset release includes benchmark manifests, QA items, split metadata, rendered examples, and Croissant metadata. Raw videos or frames are not redistributed, but we provide manifests and reconstruction instructions. Table 10: Released components. We describe components rather than internal file paths to keep the release interface stable. 
+
+Component Content 
+
+Benchmark suite Construction utilities, split generation, inference wrappers, scoring, and documentation. Dataset artifacts QA manifests, SFT/Eval split metadata, rendered task cards, dataset card, Croissant metadata, and release notes. Model artifacts ProcessData-SFT-Qwen adapters, training configurations, intended-use notes, and evaluation configurations. Reproduction guide Instructions for rebuilding splits, running model evaluation, and aggregating scores. 
+
+D.2 Assets and Licenses 
+
+All source datasets and model backbones are credited to their original creators. Derived RoboPro-cessBench assets will be released under terms compatible with upstream licenses. When upstream restrictions prevent redistribution of raw videos or frames, the release will provide metadata and reconstruction instructions rather than repackaging restricted assets. Table 11: Existing assets used in RoboProcessBench. Licenses and access dates will be finalized before submission.               
+
+> Asset Role License / citation
+> GM-100 Goal-conditioned manipulation source and process signals. [9]; MIT RH20T Contact-rich manipulation traces. [10]; CC BY-SA 4.0 & CC BY-NC 4.0 REASSEMBLE Primitive and action-chain reasoning source. [11]; CC BY 4.0 AIST-Bimanual Bimanual kinematics source. [8]; CC BY 4.0 Qwen2.5-VL-7B Backbone for ProcessData-SFT-Qwen. [32]; Apache-2.0 InternVL-3-8B Backbone for ProcessData-SFT-Intern. [34]; Apache-2.0 RoboProcessBench Derived benchmark manifests, QA items, scripts, and documentation. Code: MIT; data: subject to upstream terms.
+
+D.3 Responsible Release and Broader Impacts 
+
+RoboProcessBench is intended for diagnostic evaluation of VLM-side process understanding in robotic manipulation. It should not be used as a direct certificate of closed-loop robot safety, deployment readiness, or general-purpose VLM quality. The main risk is over-interpretation: a high benchmark score does not imply that a model can safely control a robot. We mitigate this risk by reporting task-level scores, human reliability checks, random and majority baselines, limitations, and explicit out-of-scope uses. 25 Table 12: Responsible release card.          
+
+> Field Description
+> Intended use Diagnose VLM process understanding, compare process subskills, and study structured process supervision. Out-of-scope use Robot safety certification, closed-loop deployment claims, generic VLM leaderboard ranking, or causal claims about VLA improvement without downstream validation. Positive impact Makes process-level robotic weaknesses visible, including contact, progress, temporal order, and primitive-chain reasoning. Potential risk Benchmark scores may be over-interpreted as evidence of safe or reliable robot behavior. Mitigation Report per-task results, majority baselines, human audit, limitations, and intended-use boundaries. Personal data The benchmark is derived from robotic manipulation trajectories and does not intentionally include personally identifiable information. Maintenance The GitHub repository and Hugging Face dataset page provide versioned releases, issue tracking, and documentation updates. Croissant metadata The Hugging Face dataset release includes Croissant metadata with core and Responsible AI fields.
+
+D.4 LLM Usage 
+
+LLMs are used only for limited natural-language template drafting and writing assistance. They are not used to infer ground-truth labels, replace source-native robotic signals, score model outputs, or adjudicate benchmark correctness. Ground-truth labels are produced by deterministic builders from dataset-native signals and annotations, followed by human audit for reliability checking. 
+
+D.5 Release Status 
+
+For review, we provide an anonymized benchmark suite and dataset release. The code release includes construction utilities, split generation, inference wrappers, scoring, bootstrap confidence intervals, and documentation. The dataset release includes RoboProcessBench manifests, SFT/Eval split metadata, rendered task cards, the benchmark card, and Croissant metadata with core and Responsible AI fields. The release includes ProcessData-SFT-Qwen model artifacts and the training/evaluation configuration for both post-trained backbones. Additional adapters are released subject to compatibility with upstream model licenses. 26
