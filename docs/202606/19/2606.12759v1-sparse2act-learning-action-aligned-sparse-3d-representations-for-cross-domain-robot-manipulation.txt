@@ -1,0 +1,526 @@
+Title: Sparse2Act: Learning Action-Aligned Sparse 3D Representations for Cross-Domain Robot Manipulation
+
+URL Source: https://arxiv.org/pdf/2606.12759v1
+
+Published Time: Fri, 12 Jun 2026 00:23:07 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# Sparse2Act: Learning Action-Aligned Sparse 3D Representations for Cross-Domain Robot Manipulation 
+
+Yu Guo 1,∗, Chang Yu 1,∗, Siyu Ma 1,2,∗,Yunuo Chen 1, Yin Yang 3, Ying Nian Wu 1, Chenfanfu Jiang 11University of California, Los Angeles, 
+
+> 2
+
+University of California, San Diego, 
+
+> 3
+
+University of Utah 
+
+* Equal contributions. 
+
+Abstract: Explicit 3D representations are attractive for manipulation because they expose object shape, workspace geometry, and robot–object relations in met-ric coordinates. However, sparse 3D encoders are often learned through down-stream task objectives, tying the representation to a particular data distribution, policy architecture, and action parameterization. We introduce Sparse2Act , an observation–action alignment framework for pretraining sparse point-cloud en-coders. The key idea is to use task-space end-effector actions as geometric su-pervision: masked sparse 3D tokens are trained to organize scene features around the workspace motion paired with the observation. After pretraining, only the en-coder initialization is reused by downstream policies, allowing them to retain their own architectures and action spaces, including joint-space commands. On the LIBERO-10 benchmark, our method achieves 86 .9% average success after 500 fine-tuning steps. The same pretrained encoder supports LIBERO-to-Meta-World cross-domain transfer, achieving 73 .4% average success on the Meta-World-5 benchmark. Ablations on the objective and decoder capacity show that the gains come from the masked action-alignment signal and remain useful across down-stream action decoders. In real-world experiments, simulation pretraining fol-lowed by limited real-data fine-tuning achieves an average success rate of 72 .5% 
+
+across four tasks, demonstrating effective sim-to-real transfer. These results sug-gest that robot actions can provide compact geometric supervision for reusable sparse 3D representations. Project page: https://sparse2act.github.io/ Sparse2Act/ .
+
+Keywords: Representation Learning, Robot Manipulation, Point Cloud, Sim-to-Real Transfer 
+
+## 1 Introduction 
+
+Explicit 3D representations give manipulation policies direct access to metric object shape, spatial relations, and robot-object geometry. Recent sparse 3D policies realize this advantage using point-based [1, 2], voxel-based [3, 4], or sparse-token-based [5, 6] encoders whose features are consumed by downstream action models. In most policy-learning pipelines, these encoders are co-trained through the downstream task objective, so control-relevant 3D features are learned under the same data distribution, controller, and action parameterization used for the final policy. A natural comple-ment is to shape the encoder before this downstream coupling, as prior work on robot representation learning has shown that pretrained features can provide a strong initialization that improves data efficiency and transfer [7, 8, 9, 10, 11]. The pretraining objective therefore matters because it determines which features the encoder learns. Existing objectives induce different useful structures: masked reconstruction empha-sizes recoverable 3D content [12, 13], dynamics and future prediction emphasize temporal evo-lution [14, 15, 16, 17, 18], and contrastive, value-based, semantic, or multimodal signals emphasize invariance, alignment, and consistency [7, 8, 19, 20, 11, 21]. These targets can all support control                  
+
+> arXiv:2606.12759v1 [cs.RO] 10 Jun 2026 Overview
+> LIBERO
+> Meta -World
+> Real
+> Demonstrations
+> Real2Sim Demos
+> Action Regression
+> Point Cloud
+> Encoder
+> Masked 3D Tokens
+> Pretraining
+> Downstream Policy
+> Point Cloud
+> Encoder
+> Sparse 3D Tokens
+> Finetuning
+> Initialize
+> with
+> Pretrained
+> Encoder
+> Cropped FPS Sampled
+> Mug &Plate
+> Cube Stacking
+> Mug &Toy
+> End -Effector
+> Action Spaces
+> SE(3) Pose +
+> Gripper States
+> Mixed
+> Pretraining Data
+> Real
+> Deployment
+> FPS Sampled & KNN Grouped
+> Bin Picking
+> Single -Step EEF Action Masked 3D Tokens
+> Alignment
+
+Figure 1: Observation–action space alignment for sparse 3D policy pretraining. Sparse 3D observations and end-effector motions share a metric workspace, enabling task-space actions to su-pervise geometric feature learning. Left: mixed sim and real-to-sim data provide point-cloud–action pairs. Middle: masked sparse 3D tokens are encoded with action supervision, yielding an encoder reused by downstream policies. Right: the pretrained encoder enables cross-domain and sim-to-real transfer for manipulation tasks. in different ways, but they leave open a broader representation question: whether 3D end-effector-space actions can be used during pretraining to shape a sparse 3D encoder that operates in the same 3D workspace. The key observation follows from this shared 3D workspace : task-space actions provide the encoder with a geometric alignment signal between the current 3D state and robot motion [5, 1, 18]. With masked sparse tokens, this supervision is applied through the encoded scene representation, en-couraging features that organize visible geometry in relation to controllable motion. We instantiate this idea as Sparse2Act , an encoder-level pretraining framework for observation–action alignment. During pretraining, our encoder learns from masked point-cloud observations and task-space action supervision; during downstream learning, policies reuse the pretrained encoder weights as initial-ization while retaining their own action parameterizations. Our contributions are threefold: (1) an observation–action alignment objective for native sparse 3D encoder pretraining, where masked point-cloud features are supervised by task-space actions to ac-quire an action-aligned geometric prior; (2) an encoder-transfer pipeline that uses the pretrained sparse 3D encoder to bootstrap downstream policy learning across changes in task, domain, and action space; and (3) evaluations spanning in-domain adaptation, LIBERO-to-Meta-World transfer, data-efficient fine-tuning, and real-robot deployment. Our pretraining framework achieves an av-erage success rate of 86 .9% on LIBERO-10 and 73 .4% in LIBERO-10-to-Meta-World-5 transfer. Furthermore, simulation pretraining enhances sim-to-real performance when combined with real-data fine-tuning, yielding an average success rate of 72 .5% across four real-world tasks. 
+
+## 2 Related Work 
+
+3D Manipulation Policies. Image-based policies typically learn task-relevant geometry implicitly from camera-view observations [22, 23, 24]. 3D representations expose workspace coordinates, ob-2ject shape, and contact geometry more explicitly. This has made 3D perception useful for grasping and geometry-driven action proposals [25, 26, 27, 28], articulated-object interaction and object-centric manipulation [29, 30, 31], as well as reinforcement learning (RL) and sim-to-real manipula-tion [32, 33, 34, 35, 36]. Other point-cloud manipulation methods use motion-centric targets such as tool flow or point trajectories to derive actions [37, 38]. Imitation work uses the same geomet-ric prior for action prediction with voxel, multi-view, or action-map policies [3, 39, 5], and sparse point-cloud policies [1, 4, 6, 2, 40]. Foundation-policy work likewise injects 3D structure into larger or vision-language-action (VLA) policies [41, 42, 43]. These works mainly evaluate 3D encoders inside the final policy; we instead study how to efficiently pretrain the sparse 3D encoder before downstream control. 
+
+Pretraining 3D Representations for Control. Representation pretraining for robot policies spans several related lines. Generic 3D methods such as Point-BERT [12] and Point-MAE [13] learn ge-ometric features through recognition or reconstruction objectives. Robotics-oriented 3D pretraining adds scene- and action-relevant supervision, with SUGAR [19] and SPA [20] using semantic or spa-tial objectives, 3D-MVP [11] using multi-view geometry, CLAMP [21] using action-conditioned contrast, and FVP [15] and AFRO [16] using future prediction or dynamics. Closely related 3D world-modeling work, such as PointWorld [18], scales action-conditioned scene prediction through point-flow modeling. In parallel, control-oriented visual and sensorimotor pretraining uses time-contrastive, masked, and value-based visual objectives [7, 8, 9], proprioceptive, dynamics, and ac-tion objectives [10, 44, 14], and video or world-action objectives [45, 46, 17]. These works suggest that control-relevant pretraining can benefit manipulation policies; however, they typically rely on indirect objectives such as reconstruction, semantic or geometric prediction, dynamics modeling, value learning, or multimodal sensorimotor prediction. In contrast, we investigate whether robot actions can serve as direct, control-grounded supervision for pretraining native sparse 3D encoders. 
+
+## 3 Method 
+
+Our framework uses 3D-aligned action supervision to pretrain the sparse 3D encoder before down-stream policy learning (Figure 2). The key design is to apply this supervision at the encoder level: masked point-cloud tokens are supervised by task-space actions, and the resulting encoder initial-ization is then reused inside downstream policies. This separation allows pretraining to exploit the geometric alignment between point clouds and task-space motion, while the deployed policy re-mains free to use the controller action space preferred for control stability [47]. Details of the 3D encoder, masking scheme, positional encoding, and pretraining setup are provided in Appendix A.1; fine-tuning hyperparameters are provided in Appendix A.2. 
+
+3.1 Two-Stage Training Decomposition 
+
+Let P be a point cloud, T (P) its sparse 3D token set constructed below, and ˜T (P) the masked token set. We first train an encoder Eϕ and auxiliary alignment head hψ on point-cloud–action pairs 
+
+Dpre = {(P, aalign )}, where aalign denotes the pretraining alignment action: 
+
+(ϕ⋆, ψ ⋆) = arg min  
+
+> ϕ,ψ
+
+E(P,aalign )∼D pre 
+
+h
+
+∥hψ (Eϕ( ˜T (P))) − aalign ∥22
+
+i
+
+. (1) After pretraining, Eϕ⋆ is used to initialize the point-cloud encoder in a downstream policy. The downstream policy head πθ , with parameters θ, maps the encoded point-cloud latent and propri-oception s to the deployed action a. The policy is then trained on Ddown = {(P, s, a)} with a behavior-cloning loss LBC :
+
+min  
+
+> ϕ,θ
+
+E(P,s,a)∼D down 
+
+LBC 
+
+ πθ (Eϕ(T (P)) , s), a , ϕ ← ϕ⋆. (2) Thus, aalign supervises encoder pretraining, while a serves as the downstream control target. The two stages share only the sparse 3D encoder, allowing the pretraining data and action space to differ from those used for downstream control. 3Point Cloud Encoder              
+
+> Transformer
+> Blocks
+> Linear
+> 3D Token
+> Encoder
+> Patch  Embedding
+> Network
+> MLP
+> Max Pooling
+> Coordinate
+> Normalization
+> Transformer
+> Blocks
+> Sparse 3D Tokens
+> Local Point Patches
+> Compact 3D Features
+> Learned
+> Attention Pooling
+> Group Center
+> Data Preprocessing
+> Point
+> Cloud
+> Pre -
+> process
+> Predicted
+> Action
+> Chunk
+> Predicted
+> One -Step
+> Action
+> Point
+> Cloud
+> Pre -
+> process
+> Sparse  3D Tokens  Masked 3D  Tokens
+> Point Token
+> Init Init
+> MSE loss
+> Cropped
+> FPS Sampled
+> FPS Sampled &
+> KNN Grouped
+> Action
+> Regression
+> Head
+> (0.1M)
+> Expert
+> One -Step
+> Action
+> Patch
+> Embedding
+> Net
+> Diffusion
+> Policy
+> Head
+> (0.26B)
+> 3D Token
+> Encoder
+> (10M )
+> 3D Token
+> Encoder
+> Patch
+> Embedding
+> Net
+> (0.1M)
+> Single
+> Task
+> Demos
+> Masked Token
+> Pretraining Finetuning
+> 3D -RoPE
+> Mixed
+> Task
+> Demos
+
+Figure 2: Framework overview. Left: raw point clouds are cropped, sampled, and grouped into local point patches. Middle: local patches are embedded as sparse 3D tokens and processed by a 3D token encoder with 3D RoPE. Right-top: masked sparse 3D tokens are trained with task-space alignment actions, shaping the encoder around geometry–motion structure in the shared workspace. 
+
+Right-bottom: the pretrained encoder initializes the point-cloud branch of a downstream policy, which learns its own deployed action parameterization. 
+
+3.2 Sparse 3D Encoder Sparse 3D tokens. Each observation is a sparse point cloud of N points, P = {pi}Ni=1 , where 
+
+pi ∈ R3 denotes an xyz coordinate. We restrict inputs to xyz -only point clouds to center pretraining on the shared 3D workspace in which both object geometry and end-effector motion are expressed. This compact observation interface encourages the encoder to focus on geometry–action alignment rather than appearance-specific cues. Following the DP3 point-cloud preprocessing pipeline [1], we first crop the raw 3D point cloud by a scene bounding box and downsample it to a fixed number of points. To convert the unordered cloud into structured local geometric units, we adopt the Point-BERT patch construction design [12]: patch centers are selected by farthest point sampling and local patches are formed using k-nearest-neighbor search. A shared point-patch embedding network then maps each patch to a continuous embedding. The resulting patches {P j }Mj=1 define sparse 3D tokens T (P) = {(tj , cj )}Mj=1 , where 
+
+tj is the patch embedding and cj ∈ R3 its center. A Transformer encoder Eϕ maps these tokens to an observation latent z = Eϕ(T (P)) .
+
+3D rotary encoding. While patch embeddings encode local geometry, 3D Rotary Positional Em-beddings (3D RoPE) inject patch workspace coordinates into the attention mechanism [48]. Let 
+
+¯cj = (¯ xj , ¯yj , ¯zj ) denote the normalized center of patch Pj . For each attention head, the query and key channels are partitioned into three coordinate-aligned groups, qj = [qxj ; qyj ; qzj ] and 
+
+kj = [ kxj ; kyj ; kzj ]. For v = [ vx; vy ; vz ], the axis-wise RoPE transform is defined as 
+
+ρ(v, ¯cj ) = [ R(¯ xj )vx; R(¯ yj )vy ; R(¯ zj )vz ] . (3) Here, R(u) applies the standard RoPE rotation to channel pair r,
+
+ v′
+
+2r
+
+v′
+
+2r+1 
+
+
+
+=
+
+cos( uω r ) − sin( uω r )sin( uω r ) cos( uω r )
+
+  v2r
+
+v2r+1 
+
+
+
+, (4) where {ωr } denotes the standard frequency schedule. Attention uses the rotated queries and keys: 
+
+αij = softmax j
+
+ ρ(qi, ¯ci)⊤ρ(kj , ¯cj )
+
+√dh
+
+
+
+, (5) where dh is the per-head feature dimension. 4Figure 3: Real-robot settings and real-to-sim simulation digital twins for our tasks. 
+
+3.3 3D Action-Aligned Masked Pretraining 
+
+Pretraining aligns masked sparse 3D observations with task-space motion in the shared workspace. We randomly mask a subset of token embeddings before the Transformer encoder. Unlike masked autoencoding objectives that reconstruct visual or point-cloud content [49, 13], the masked tokens are not treated as reconstruction targets; instead, the alignment loss is applied to the encoded visible geometry. Let mj ∈ { 0, 1} denote the binary mask for token tj , where mj = 1 indicates a visible token and mj = 0 a masked token. We define ˜tj = mj tj and write the masked token set as 
+
+˜T (P) = {(˜ tj , cj )}Mj=1 . The alignment head predicts the task-space alignment action from the masked scene representation: 
+
+ˆaalign = hψ (Eϕ( ˜T (P))) . (6) The model is trained with the objective Lpretrain = ∥ˆaalign −aalign ∥22. Masking forces the alignment problem to depend on scene-level spatial relations among visible tokens, encouraging the encoder to organize sparse geometric structure around 3D end-effector motion within the shared workspace. 
+
+3.4 Downstream Policy Initialization 
+
+For downstream learning, we initialize the point-cloud encoder with Eϕ⋆ and attach a task-specific policy head that fuses the encoded latent z with proprioceptive input s to produce the control action 
+
+a. The 3D alignment head has already fulfilled its role by injecting task-space alignment signals into 
+
+Eϕ; leaving it out keeps the controller interface and action parameterization native for control. 
+
+## 4 Experiments 
+
+Our experiments evaluate whether the pretrained sparse 3D encoder improves downstream policy learning, supports cross-domain transfer beyond the pretraining domain, and remains effective under limited data, simplified action decoders, and sim-to-real fine-tuning. We first assess in-domain adap-tation on LIBERO-10 [50] and cross-domain transfer from LIBERO to Meta-World-5 [51] (Sec. 4.2). We then perform ablations on data efficiency (Sec. 4.3), training objective (Sec. 4.4), and decoder capacity (Sec. 4.5) to attribute performance gains to the pretrained representation. We then evaluate sim-to-real transfer by fine-tuning sim-pretrained encoders with limited real-robot data (Sec. 4.6). 
+
+4.1 Experimental Setup 
+
+We evaluate on LIBERO-10 and Meta-World-5, a five-task subset of Meta-World consisting of Bin Picking , Pick Out of Hole , Push , Soccer , and Stick Pull . For consistency, all sparse 3D policy experiments use the same DP3 point-cloud preprocessing pipeline [1]: depth observations are unprojected to point clouds, cropped to the task workspace, and downsampled to 1024 points via farthest point sampling. Checkpoint selection, evaluation protocols, and sources of reported numbers are detailed in Appendix A.2. We compare against DP3 [1] as the primary sparse point-cloud policy baseline; 50   
+
+> 50
+> 100
+> Success Rate  (%)
+> LIBERO-10
+> 29.1
+> 50.5 55.5
+> 85.2 86.9
+> DP3
+> DP
+> SpatialVLA
+> π0
+> Ours
+> Meta-World-5
+> 28.4
+> 42.4 48.8
+> 73.4
+> 85.6
+> FVP
+> DP3
+> AFRO
+> LIBERO pretrain
+> MW pretrain
+
+Figure 4: Success rates on LIBERO-10 [50] and Meta-World-5 [51]. Our approach improves in-domain adaptation and enables LIBERO-10-to-Meta-World-5 cross-domain transfer. 3D pretraining methods FVP [15] and AFRO [16]; and vision-language-action (VLA) approaches SpatialVLA [42] and π0 [52]. 
+
+4.2 Main Benchmark Results 
+
+Figure 4 evaluates our method under both in-domain and cross-domain settings. On LIBERO-10, the in-domain pretrained encoder achieves an average success rate of 86.9%, compared to 29.1% for DP3 trained from scratch under the same point-cloud interface. It also matches the reported performance of π0 (85.2%) and surpasses SpatialVLA (55.5%), while relying on a sparse 3D policy rather than a large VLA backbone. On Meta-World-5, the in-domain pretrained encoder achieves 85.6%, outperforming FVP’s future-prediction pretraining (28.4%), DP3 trained from scratch (42.4%), and AFRO’s dynamics-aware 3D pretraining (48.8%). These comparisons isolate the effect of pretraining from the choice of objective: while predictive and dynamics-based 3D objectives provide useful structure, they do not explicitly align current sparse geometry with task-space motion for downstream control. When pretrained on LIBERO-10 and fine-tuned on Meta-World-5, our encoder still achieves 73.4% success, retaining much of its in-domain performance despite the shift in task suite and scene distribution. Full per-task statistics are provided in Table 8 and Table 9. 
+
+4.3 Data Efficiency and Scaling Demonstration-budget scaling. Figure 5(a) evaluates downstream demonstration budgets on rep-resentative LIBERO-10 and Meta-World-5 tasks. Pretraining is already usable with 10 demonstra-tions and continues to improve as more task-specific data is added on the harder tasks. On easier tasks, performance saturates early, suggesting that the pretrained encoder mainly reduces the amount of downstream data needed to reach high success. 
+
+Pretraining data scaling. Figure 5(b) varies the pretraining data ratio under two schedules: one scales pretraining steps with the amount of data, and the other keeps the step count fixed (Ap-pendix A.3). Performance improves in both schedules, indicating that additional pretraining cover-age helps beyond simply running more pretraining steps. 
+
+Learning curves. Figure 5(c) shows that in-domain pretraining reaches strong performance within a few hundred fine-tuning steps and is saturated by 600 steps. Cross-domain initialization from LIBERO improves over scratch but requires longer fine-tuning to approach the in-domain curves. The DP3-style scratch baseline remains low after 1,000 training steps, suggesting that the down-stream data budget alone is insufficient to shape a comparable sparse 3D representation from scratch. 
+
+4.4 Pretraining Objective Ablations 
+
+We ablate the pretraining signal to separate the value of initialization from the value of 3D action alignment. On Meta-World-5, all variants use 50 downstream demonstrations per task and the same 2,000-step fine-tuning schedule. We compare training from scratch, unmasked action alignment, masked reconstruction, and masked action alignment. 610 25 50                                                
+
+> Number of Demos
+> 0
+> 25
+> 50
+> 75
+> 100
+> Success Rate (%)  Soup &Sauce to Basket
+> Ours
+> DP3
+> 10 25 50
+> Number of Demos
+> Stove & Moka Pot
+> 10 25 50
+> Number of Demos
+> Bin Picking
+> 10 25 50
+> Number of Demos
+> Soccer
+> 10% 30% 50% 70% 100%
+> Pretrain Data Fraction
+> 0
+> 25
+> 50
+> 75
+> 100
+> Success Rate (%)  Meta-World-5 Avg.
+> Matched epochs
+> Matched steps
+> 0200 400 600 800 1000
+> Steps
+> Bin Picking
+> 0200 400 600 800 1000
+> Steps
+> Soccer
+> 0200 400 600 800 1000
+> Steps
+> Stick Pull
+> (a) Demo Scaling
+> (b) Pretrain Data Scaling (c) Learning Curves
+> DP3 Scratch LIBERO pretrain MW pretrain
+
+Figure 5: Data efficiency and scaling behavior. (a) Pretraining improves success across down-stream demonstration budgets, with the largest gains on harder tasks. (b) Performance increases with pretraining coverage under both matched- step and epoch schedules. (c) In-domain pretraining converges fastest, while LIBERO-to-Meta-World transfer remains consistently above scratch. Table 1: Pretraining objective ablation on Meta-World-5. 
+
+Pretraining objective Success None 19.0 ± 4.6 Action only 50.7 ± 5.5 Reconstruction only 55.3 ± 8.0 Masked input + action 82.0 ± 3.5 
+
+Table 2: Action-decoder capacity ablation on Meta-World-5 at 2,000 training steps. 
+
+Action decoder Scratch Pretrained DP3 18.0 ± 4.6 82.0 ± 3.5 
+
+SimpleDP3 13.0 ± 3.6 75.0 ± 8.9 MLP 12.3 ± 5.7 74.7 ± 3.5 
+
+Table 3: Single-arm AgileX PiPER real-robot deployment results. Training protocols and data sources are detailed in Table 14. 
+
+Method Bin Picking Cube Stacking Mug & Plate Mug & Toy Avg. DP3 3/10 0/10 5/10 0/10 20% Ours from scratch 2/10 0/10 6/10 2/10 25% Ours 8/10 5/10 9/10 7/10 72.5% 
+
+Table 1 shows that both components matter. Unmasked action alignment and masked reconstruction each improve over scratch, while masked action alignment offers the largest gain. This suggests that the benefit is not simply from using actions as labels or from masking as a regularizer; the combined objective encourages the encoder to connect 3D visible scene context with task-space 3D motion. Extending the scratch baseline training to 16,000 steps raises success from 19.0% to 28.3%, still far below the pretraining variants, suggesting that the gap is not explained by training budget alone. Full per-task results are in Table 11. 
+
+4.5 Attribution to the Encoder 
+
+If our method makes the 3D latent more directly usable for control, the benefit should persist when the downstream action decoder is simplified. We test this by replacing the standard DP3 decoder with SimpleDP3 and an MLP under the same fixed 2,000-step training schedule. Table 2 shows that the pretrained encoder improves all three decoders, and that the simplified decoders retain most of the gain. Because lower-capacity decoders have less room to compensate for a weak encoder, their strong performance suggests that most of the improvement is carried by the pretrained representa-tion rather than the decoder architecture: SimpleDP3 reaches 75.0% and the MLP reaches 74.7%, compared with 82.0% for the full DP3 decoder. Parameter statistics and full per-task results are in Tables 12 and 13. 74.6 Sim-to-Real Transfer 
+
+We evaluate sim-to-real transfer on the real and simulated settings shown in Figure 3, as the strongest domain shift in our study: the encoder is pretrained in simulation and then adapted to a real single-arm AgileX PiPER platform with different sensing, dynamics, and controller conditions. The real-robot suite contains four tasks: Bin Picking , Cube Stacking , Mug & Plate , and Mug & Toy . For each task, we collect 50 demonstrations from real world and 100 demonstrations from a simulation environ-ment matched to real. This setting tests whether our action-aligned pretraining pipeline can convert simulated demonstra-tions into a useful encoder initialization for real-robot policy learning, so that downstream fine-tuning benefits from only a small amount of real data. For matched-data baselines, we co-train the final policy from scratch using the same 100 simulated and 50 real demonstrations available for each task. Our pretrained variant instead learns the encoder from simulation first using end-effector actions in the 3D point-cloud workspace, then fine-tunes with only the 50 real demonstrations using joint-space actions. Training and data budgets are matched within each protocol. Table 3 shows that, under this comparison, the way simulated demonstrations are used matters substantially for cross-domain transfer. Co-training reaches 20% with DP3 and 25% with our ar-chitecture from scratch, while simulation pretraining followed by real fine-tuning reaches 72.5%. Co-training requires the policy to fit sim and real distributions jointly, where the small real subset can be dominated by the larger simulated batch and the action decoder can fit simulation-specific behavior that transfers poorly. Pretraining the encoder separates 3D representation learning from target-controller fitting, leaving the real fine-tuning step free to specialize on the target distribution. 
+
+## 5 Conclusion 
+
+We introduce Sparse2Act , an action-aligned pretraining framework for learning transferable sparse 3D representations. The central idea is to use task-space actions as geometric supervision for a masked point-cloud encoder prior to downstream policy learning. Since downstream training reuses only the encoder initialization, the policy retains its own architecture and action parameterization, including joint-space commands, while benefiting from a representation shaped in the shared metric workspace. Across simulated benchmarks and real-robot experiments, this encoder initialization improves in-domain adaptation, cross-domain transfer, data-efficient fine-tuning, and sim-to-real transfer. Abla-tions on objective design and decoder capacity further show that the gains stem from the pretrain-ing signal and remain robust across downstream action decoders. Overall, these results support a representation-level view of robot actions: in sparse 3D manipulation, actions can serve as supervi-sion for learning reusable 3D encoders prior to downstream control. 
+
+## 6 Limitations 
+
+Policy and observation scope. We study a controlled setting centered on current sparse point-cloud observations and encoder initialization. This keeps the role of the 3D representation clear, but leaves larger policy architectures, multi-frame context, language conditioning, and complementary sensing modalities such as touch for future study. 
+
+Task and domain coverage. The experiments focus on manipulation tasks with metric point-cloud observations and teleoperation-style data. Larger embodiment changes, deformable objects, clut-tered workspaces, and longer-horizon task structure may require combining action alignment with additional representation signals. 
+
+Real-world scale. The real-robot evaluation uses one platform and four tasks. Scaling to broader real-world pretraining data and more diverse task families remains promising future work. 8References 
+
+[1] Y. Ze, G. Zhang, K. Zhang, C. Hu, M. Wang, and H. Xu. 3D Diffusion Policy: Generalizable Visuomotor Policy Learning via Simple 3D Representations. In Robotics: Science and Systems XX , volume 20, July 2024. ISBN 979-8-9902848-0-7. [2] S. Chen, R. G. Pinel, C. Schmid, and I. Laptev. PolarNet: 3D Point Clouds for Language-Guided Robotic Manipulation. In Proceedings of The 7th Conference on Robot Learning ,pages 1761–1781. PMLR, Dec. 2023. [3] M. Shridhar, L. Manuelli, and D. Fox. Perceiver-Actor: A Multi-Task Transformer for Robotic Manipulation. In Proceedings of The 6th Conference on Robot Learning , pages 785–799. PMLR, Mar. 2023. [4] C. Wang, H. Fang, H.-S. Fang, and C. Lu. RISE: 3D Perception Makes Real-World Robot Imitation Simple and Effective. In 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 2870–2877, Abu Dhabi, United Arab Emirates, Oct. 2024. IEEE. ISBN 979-8-3503-7770-5. doi:10.1109/IROS58592.2024.10801678. [5] T. Gervet, Z. Xian, N. Gkanatsios, and K. Fragkiadaki. Act3D: 3D Feature Field Transform-ers for Multi-Task Robotic Manipulation. In Proceedings of The 7th Conference on Robot Learning , volume 229, pages 3949–3965. PMLR, 2023. [6] T.-W. Ke, N. Gkanatsios, and K. Fragkiadaki. 3D Diffuser Actor: Policy Diffusion with 3D Scene Representations. In Proceedings of The 8th Conference on Robot Learning , pages 1949– 1974. PMLR, Jan. 2025. [7] S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta. R3M: A Universal Visual Repre-sentation for Robot Manipulation. In Proceedings of The 6th Conference on Robot Learning ,pages 892–909. PMLR, Mar. 2023. [8] Y. J. Ma, S. Sodhani, D. Jayaraman, O. Bastani, V. Kumar, and A. Zhang. VIP: Towards Universal Visual Reward and Representation via Value-Implicit Pre-Training. In The Eleventh International Conference on Learning Representations , 2023. [9] I. Radosavovic, T. Xiao, S. James, P. Abbeel, J. Malik, and T. Darrell. Real-World Robot Learning with Masked Visual Pre-training. In Proceedings of The 6th Conference on Robot Learning , pages 416–426. PMLR, Mar. 2023. [10] I. Radosavovic, B. Shi, L. Fu, K. Goldberg, T. Darrell, and J. Malik. Robot Learning with Sensorimotor Pre-training. In Proceedings of The 7th Conference on Robot Learning , pages 683–693. PMLR, Dec. 2023. [11] S. Qian, K. Mo, V. Blukis, D. F. Fouhey, D. Fox, and A. Goyal. 3D-MVP: 3D Multiview Pretraining for Manipulation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 22530–22539, 2025. [12] X. Yu, L. Tang, Y. Rao, T. Huang, J. Zhou, and J. Lu. Point-BERT: Pre-Training 3D Point Cloud Transformers With Masked Point Modeling. In Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition , pages 19313–19322, 2022. [13] Y. Pang, W. Wang, F. E. H. Tay, W. Liu, Y. Tian, and L. Yuan. Masked Autoencoders for Point Cloud Self-supervised Learning. In S. Avidan, G. Brostow, M. Ciss´ e, G. M. Farinella, and T. Hassner, editors, Computer Vision – ECCV 2022 , pages 604–621, Cham, 2022. Springer Nature Switzerland. ISBN 978-3-031-20086-1. doi:10.1007/978-3-031-20086-1 35. [14] Z. J. Cui, H. Pan, A. Iyer, S. Haldar, and L. Pinto. DynaMo: In-Domain Dynamics Pretraining for Visuo-Motor Control. Advances in Neural Information Processing Systems , 37:33933– 33961, Dec. 2024. doi:10.52202/079017-1069. 9[15] C. Hou, Y. Ze, Y. Fu, Z. Gao, S. Hu, Y. Yu, S. Zhang, and H. Xu. 4D Visual Pre-training for Robot Learning. In IEEE/CVF International Conference on Computer Vision , 2025. [16] Q. Liang, B. Cai, M. Lai, S. Zhuang, T. Lin, Y. Qin, Y. Ye, J. Liang, and R. Xu. Bootstrap Dynamic-Aware 3D Visual Representation for Scalable Robot Learning, Dec. 2025. [17] T. Yuan, Z. Dong, Y. Liu, and H. Zhao. Fast-WAM: Do World Action Models Need Test-time Future Imagination?, Mar. 2026. [18] W. Huang, Y.-W. Chao, A. Mousavian, M.-Y. Liu, D. Fox, K. Mo, and L. Fei-Fei. PointWorld: Scaling 3D World Models for In-The-Wild Robotic Manipulation, Jan. 2026. [19] S. Chen, R. Garcia, I. Laptev, and C. Schmid. SUGAR : Pre-training 3D Visual Representations for Robotics. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 18049–18060, Seattle, WA, USA, June 2024. IEEE. ISBN 979-8-3503-5300-6. doi:10.1109/CVPR52733.2024.01709. [20] H. Zhu, H. Yang, Y. Wang, J. Yang, L. Wang, and T. He. SPA: 3D Spatial-Awareness Enables Effective Embodied Representation. In The Thirteenth International Conference on Learning Representations , 2025. [21] I.-C. A. Liu, K. Choromanski, S. Huang, and C. Schenck. CLAMP: Contrastive Learning for 3D Multi-View Action-Conditioned Robotic Manipulation Pretraining, Jan. 2026. [22] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn, K. Gopalakrishnan, K. Haus-man, A. Herzog, J. Hsu, J. Ibarz, B. Ichter, A. Irpan, T. Jackson, S. Jesmonth, N. Joshi, R. Ju-lian, D. Kalashnikov, Y. Kuang, I. Leal, K.-H. Lee, S. Levine, Y. Lu, U. Malla, D. Manjunath, I. Mordatch, O. Nachum, C. Parada, J. Peralta, E. Perez, K. Pertsch, J. Quiambao, K. Rao, M. S. Ryoo, G. Salazar, P. R. Sanketi, K. Sayed, J. Singh, S. Sontakke, A. Stone, C. Tan, H. Tran, V. Vanhoucke, S. Vega, Q. H. Vuong, F. Xia, T. Xiao, P. Xu, S. Xu, T. Yu, and B. Zitkovich. RT-1: Robotics Transformer for Real-World Control at Scale. In Robotics: Science and Systems XIX , volume 19, July 2023. ISBN 978-0-9923747-9-2. [23] C. Chi, S. Feng, Y. Du, Z. Xu, E. Cousineau, B. C. Burchfiel, and S. Song. Diffusion Policy: Visuomotor Policy Learning via Action Diffusion. In Robotics: Science and Systems XIX ,volume 19, July 2023. ISBN 978-0-9923747-9-2. [24] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. P. Foster, P. R. Sanketi, Q. Vuong, T. Kollar, B. Burchfiel, R. Tedrake, D. Sadigh, S. Levine, P. Liang, and C. Finn. OpenVLA: An Open-Source Vision-Language-Action Model. In Proceedings of The 8th Conference on Robot Learning , volume 270, pages 2679–2713. PMLR, 2025. [25] A. ten Pas, M. Gualtieri, K. Saenko, and R. Platt. Grasp Pose Detection in Point Clouds. 
+
+The International Journal of Robotics Research , 36(13–14):1455–1473, 2017. doi:10.1177/ 0278364917735594. [26] H. Liang, X. Ma, S. Li, M. G¨ orner, S. Tang, B. Fang, F. Sun, and J. Zhang. PointNetGPD: De-tecting Grasp Configurations from Point Sets. In IEEE International Conference on Robotics and Automation , 2019. [27] H.-S. Fang, C. Wang, M. Gou, and C. Lu. GraspNet-1Billion: A Large-Scale Benchmark for General Object Grasping. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 11444–11453, 2020. [28] M. Sundermeyer, A. Mousavian, R. Triebel, and D. Fox. Contact-graspnet: Efficient 6-dof grasp generation in cluttered scenes. In 2021 IEEE international conference on robotics and automation (ICRA) , pages 13438–13444. IEEE, 2021. 10 [29] K. Mo, L. J. Guibas, M. Mukadam, A. Gupta, and S. Tulsiani. Where2act: From pixels to actions for articulated 3d objects. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 6813–6823, 2021. [30] B. Eisner, H. Zhang, and D. Held. FlowBot3D: Learning 3D Articulation Flow to Manipulate Articulated Objects. In Robotics: Science and Systems , 2022. [31] Y. Zhu, Z. Jiang, P. Stone, and Y. Zhu. Learning Generalizable Manipulation Policies with Object-Centric 3D Representations. In Proceedings of The 7th Conference on Robot Learning ,volume 229, pages 3418–3433. PMLR, 2023. [32] W. Huang, I. Mordatch, P. Abbeel, and D. Pathak. Generalization in Dexterous Manipulation via Geometry-Aware Multi-Task Learning. arXiv preprint arXiv:2111.03062 , 2021. [33] C. Bao, H. Xu, Y. Qin, and X. Wang. DexArt: Benchmarking Generalizable Dexterous Manip-ulation with Articulated Objects. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21190–21200, 2023. [34] Y. Xu, W. Wan, J. Zhang, H. Liu, Z. Shan, H. Shen, R. Wang, H. Geng, Y. Weng, J. Chen, T. Liu, L. Yi, and H. Wang. UniDexGrasp: Universal Robotic Dexterous Grasping via Learning Diverse Proposal Generation and Goal-Conditioned Policy. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4737–4746, 2023. [35] Y. Qin, B. Huang, Z.-H. Yin, H. Su, and X. Wang. DexPoint: Generalizable Point Cloud Reinforcement Learning for Sim-to-Real Dexterous Manipulation. In Proceedings of The 6th Conference on Robot Learning , volume 205, pages 594–605. PMLR, 2023. [36] C. Yu, S. Ma, W. Du, Z. Zong, H. Xue, W. Chen, C. Lu, Y. Yang, X. Han, J. Master-john, et al. Right-side-out: Learning zero-shot sim-to-real garment reversal. arXiv preprint arXiv:2509.15953 , 2025. [37] D. Seita, Y. Wang, S. J. Shetty, E. Y. Li, Z. Erickson, and D. Held. ToolFlowNet: Robotic Manipulation with Tools via Predicting Tool Flow from Point Clouds. In Proceedings of The 6th Conference on Robot Learning , pages 1038–1049. PMLR, Mar. 2023. [38] C. Wen, X. Lin, J. I. R. So, K. Chen, Q. Dou, Y. Gao, and P. Abbeel. Any-point Trajectory Modeling for Policy Learning. In Robotics: Science and Systems XX , volume 20, July 2024. ISBN 979-8-9902848-0-7. [39] A. Goyal, J. Xu, Y. Guo, V. Blukis, Y.-W. Chao, and D. Fox. RVT: Robotic View Transformer for 3D Object Manipulation. In Proceedings of The 7th Conference on Robot Learning , pages 694–710. PMLR, Dec. 2023. [40] S. Haldar, L. Johannsmeier, L. Pinto, A. Gupta, D. Fox, Y. Narang, and A. Mandlekar. Point Bridge: 3D Representations for Cross Domain Policy Learning, Mar. 2026. [41] R. Yang, G. Chen, C. Wen, and Y. Gao. FP3: A 3D Foundation Policy for Robotic Manipula-tion, Mar. 2025. [42] D. Qu, H. Song, Q. Chen, Y. Yao, X. Ye, Y. Ding, Z. Wang, J. Gu, B. Zhao, D. Wang, and X. Li. SpatialVLA: Exploring Spatial Representations for Visual-Language-Action Model, May 2025. [43] C. Li, J. Wen, Y. Peng, Y. Peng, and Y. Zhu. PointVLA: Injecting the 3D World Into Vision-Language-Action Models. IEEE Robotics and Automation Letters , 11(3):2506–2513, Mar. 2026. ISSN 2377-3766. doi:10.1109/LRA.2026.3653303. [44] G. Jiang, Y. Sun, T. Huang, H. Li, Y. Liang, and H. Xu. Robots Pre-train Robots: Manipulation-Centric Robotic Representation from Large-Scale Robot Datasets. In The Thirteenth Interna-tional Conference on Learning Representations , 2025. 11 [45] S. Li, Y. Gao, D. Sadigh, and S. Song. Unified Video Action Model. In Robotics: Science and Systems XXI , volume 21, June 2025. ISBN 979-8-9902848-1-4. [46] C. Zhu, R. Yu, S. Feng, B. Burchfiel, P. Shah, and A. Gupta. Unified World Models: Coupling Video and Action Diffusion for Pretraining on Large Robotic Datasets. In Robotics: Science and Systems XXI , volume 21, June 2025. ISBN 979-8-9902848-1-4. [47] Y. Feng, J. Zheng, Z. Wang, D. Liu, J. Li, J. Pang, T. Wang, and X. Zhan. Demystifying action space design for robotic manipulation policies, 2026. [48] J. Su, M. Ahmed, Y. Lu, S. Pan, W. Bo, and Y. Liu. RoFormer: Enhanced transformer with Rotary Position Embedding. Neurocomputing , 568:127063, Feb. 2024. ISSN 0925-2312. doi: 10.1016/j.neucom.2023.127063. [49] K. He, X. Chen, S. Xie, Y. Li, P. Doll´ ar, and R. Girshick. Masked Autoencoders Are Scalable Vision Learners. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16000–16009, 2022. [50] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone. LIBERO: Benchmarking Knowledge Transfer for Lifelong Robot Learning. Advances in Neural Information Processing Systems , 36:44776–44791, Dec. 2023. [51] T. Yu, D. Quillen, Z. He, R. Julian, K. Hausman, C. Finn, and S. Levine. Meta-World: A Benchmark and Evaluation for Multi-Task and Meta Reinforcement Learning. In Proceedings of the Conference on Robot Learning , pages 1094–1100. PMLR, May 2020. [52] K. Black, N. Brown, D. Driess, A. Esmail, M. R. Equi, C. Finn, N. Fusai, L. Groom, K. Haus-man, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. X. Shi, L. Smith, J. Tanner, Q. Vuong, A. Walling, H. Wang, and U. Zhilinsky. 
+
+π0: A Vision-Language-Action Flow Model for General Robot Control. In Robotics: Science and Systems XXI , volume 21, June 2025. ISBN 979-8-9902848-1-4. 12 A Appendix 
+
+A.1 Method and Implementation Details 
+
+This section specifies the sparse 3D encoder, masking scheme, positional encoding, and pretraining setup used by our method. 
+
+Patch embedding and architecture. The encoder follows the sparse 3D patch-construction and embedding pipeline described in Section 3: point-cloud patches are formed from farthest-point sam-pled centers and local nearest-neighbor groups, mapped to continuous patch embeddings, then pro-cessed as sparse 3D tokens by a Transformer encoder with axis-aware 3D positional encoding. The patch construction follows the local-patch design of Point-BERT [12], but our patch embedding remains continuous rather than producing discrete codes. We use the same 1024-point xyz-only observation interface as DP3 [1]. Table 4 lists the encoder configuration. Table 4: Sparse 3D encoder configuration.                
+
+> Item Value Input points / channels 1024 points, xyz only Patch centers M= 192 , farthest-point sampling Local grouping k= 32 nearest neighbors per center Patch coordinates Relative xyz coordinates Patch embedding Two-layer MLP with GELU, max-pooled to one token Token dimension d= 384
+> Transformer depth / heads 6 layers / 8 heads Transformer MLP ratio 4Output latent dimension 192 Encoder parameters 10.798M
+
+Masking. During pretraining, 70% of sparse 3D tokens are uniformly sampled and dropped before the Transformer encoder; the model predicts the alignment action from the remaining visible tokens. This defines the masked-input condition used in the pretraining experiments. 
+
+3D rotary positional encoding. The 3D RoPE module injects patch-center position into attention by splitting each attention head across the normalized x, y, and z coordinates. This keeps positional information tied to workspace coordinates without changing the sparse tokenization. It extends rotary positional encoding [48] to sparse 3D patch centers. Patch centers are computed after the point-cloud normalization used by the dataset normalizer. Axial 3D RoPE is applied to queries and keys in every Transformer layer. With 8 heads and d = 384 , each head has 48 channels; with RoPE fraction 1.0, the implementation allocates 16 channels to each of the x, y, and z axes. The frequency base is 10000. 
+
+Pretraining objective and alignment head. A temporary alignment head maps the encoder latent to the action paired with each point-cloud observation during pretraining. For LIBERO, the raw 7D action (∆ x, ∆y, ∆z, axis -angle , g ) is converted to a 10D target (∆ x, ∆y, ∆z, rot6d , g ). For Meta-World, we use the native 4D action (∆ x, ∆y, ∆z, g ). Actions are normalized with the training-set linear normalizer, including the gripper command. The loss is MSE in normalized action space. The alignment head is an MLP with hidden widths 256 and 256; downstream training initializes the encoder and uses its own action decoder. 
+
+Pretraining hyperparameters. Table 5 lists the pretraining hyperparameters. Each pretraining domain uses one merged zarr dataset, sampled uniformly over trajectories. 
+
+A.2 Simulation Setup 
+
+This section lists the simulation datasets, preprocessing, downstream training hyperparameters, and baseline sources. 
+
+Simulation benchmarks and data. We evaluate on LIBERO-10, the 10 long-horizon tasks in the LIBERO suite [50], and a five-task Meta-World subset [51], denoted Meta-World-5, in simulation. 13 Table 5: Pretraining hyperparameters.                
+
+> Item Value Optimizer AdamW Learning rate 2×10 −4
+> Betas / ϵ(0 .95 ,0.999) /10 −8
+> Weight decay 10 −6
+> Schedule / warmup Cosine decay / 500 steps Batch size 512 LIBERO pretraining length 20,000 steps Meta-World pretraining length 10,000 steps
+
+Point-cloud preprocessing follows DP3 [1]: cropped and downsampled to 1024 xyz-only points. Table 6 lists the point-cloud preprocessing parameters. Table 6: Point-cloud preprocessing for simulation benchmarks.                           
+
+> Item LIBERO-10 Meta-World-5 Cameras agentview, robot0 eye in hand corner, gripperPOV Crop bounds [−0.5,−1.0,0.2] to [1 .0,1.0,1.5] [−0.5,0.4,−0.5] to [0 .5,0.95 ,0.5]
+> Depth range [0 .05 ,3.0] [0 .01 ,3.0]
+> Voxel size 0.008 0.008 Policy input 1024 xyz-only points 1024 xyz-only points
+
+LIBERO-10 uses the released demonstration files; Meta-World-5 uses 50 demonstrations per task generated by the official Meta-World scripted expert policies. 
+
+Figure 6: Processed point-cloud observations for all 15 simulation tasks (LIBERO-10, rows 1–2; Meta-World-5, row 3), colored by height ( z-coordinate). Each scene is cropped and downsampled to 1024 xyz-only points following the preprocessing in Table 6. Tabletop points are rendered semi-transparent for visualization clarity; no such filtering is applied during training. 
+
+Downstream training hyperparameters. Table 7 lists the downstream policy hyperparameters. All downstream policies observe xyz point clouds and robot state. 
+
+Baseline implementation and provenance. DP3 [1] on LIBERO-10 is run by us using the origi-nal implementation adjusted to the LIBERO interface. The reproduced LIBERO-10 DP3 baseline is trained for 20,000 downstream steps, evaluated every 2,000 steps, and reported as the average of the top five evaluated checkpoints, following the original DP3 reporting convention. FVP [15], DP3, and AFRO [16] on Meta-World-5 are literature values taken from the AFRO benchmark table [16]. All columns for our method are from our runs. SpatialVLA [42] and π0 [52] are cited from their original papers and appear only in the main-paper comparison. 14 Table 7: Downstream fine-tuning hyperparameters.                   
+
+> Item Value Optimizer AdamW Betas / ϵ(0 .95 ,0.999) /10 −8
+> Weight decay 10 −6
+> Learning rate 5×10 −5for the pretrained DP3 fine-tuning preset Schedule / warmup Constant / no warmup Horizon 16 Observation steps / action steps 2 / 8 Denoising steps 10 DDIM steps Batch size 256 (LIBERO) / 128 (Meta-World) Train / evaluation seeds Single training seed; 3 evaluation seeds
+
+A.3 Additional Simulation Results 
+
+This section provides full per-task results for the main comparisons and ablations. 
+
+LIBERO-10 in-domain adaptation. Table 8 reports per-task LIBERO-10 success rates for our method and DP3 under the in-domain setting. The rows for our method use the full available LIBERO-10 downstream demonstrations, LIBERO-10 pretraining, the fixed 500-step checkpoint, and 50 evaluation episodes per seed across 3 evaluation seeds. DP3 uses the same 1024-point xyz preprocessing and the same LIBERO task split, but is trained for 20,000 downstream steps and re-ported as the top-five average over checkpoints evaluated every 2,000 steps, matching the original DP3 checkpoint-selection protocol. Table 8: Per-task LIBERO-10 results. Success rates are reported in percentage as mean ± std. Task Ours DP3  
+
+> Soup and Sauce to Basket
+
+83.3 ± 2.3 0.0 ± 0.0  
+
+> Cream Cheese and Butter to Basket
+
+88.7 ± 2.3 0.0 ± 0.0  
+
+> Turn On Stove and Place Moka Pot
+
+100.0 ± 0.0 100.0 ± 0.0  
+
+> Bowl to Bottom Drawer and Close
+
+92.7 ± 2.3 90.0 ± 0.0  
+
+> Mugs to Left and Right Plates
+
+84.7 ± 3.1 8.0 ± 4.0  
+
+> Book to Back Caddy Compartment
+
+100.0 ± 0.0 0.0 ± 0.0  
+
+> Mug to Plate and Pudding Right
+
+75.3 ± 1.2 35.0 ± 8.4  
+
+> Soup and Cream Cheese to Basket
+
+76.0 ± 5.3 0.0 ± 0.0  
+
+> Both Moka Pots to Stove
+
+78.0 ± 0.0 11.0 ± 3.7  
+
+> Mug to Microwave and Close
+
+90.0 ± 6.0 47.0 ± 7.5 Avg. 86.9 ± 0.7 29.1 ± 36.4 
+
+Meta-World-5 in-domain and cross-domain adaptation. Table 9 reports per-task Meta-World-5 success rates for in-domain Meta-World-5 pretraining and cross-domain LIBERO-10 pretrain-ing, alongside published baseline numbers; see Appendix A.2 for column sourcing. The two columns for our method use identical downstream fine-tuning conditions and differ only in the pre-training domain. The LIBERO-pretrained encoder is trained on the merged LIBERO-10 dataset (10 tasks × 50 demonstrations); the Meta-World-pretrained encoder is trained on Meta-World-5 (5 tasks × 50 demonstrations). Downstream fine-tuning uses 25 demonstrations per target task. For our Meta-World-5 runs, checkpoints are evaluated every 400 fine-tuning steps, and each reported value is the mean and std of the five highest checkpoint success rates within the first 4,000 steps for that task and pretraining source. Each checkpoint uses 20 evaluation episodes per seed. 
+
+Pretraining data scaling. Table 10 gives the per-task values for the pretraining data-scaling ex-periment summarized in Figure 5. The experiment uses Meta-World-5 with 50 downstream demon-strations per task, evaluates the fixed 2,000-step fine-tuning checkpoint, and uses 20 evaluation episodes per seed across 3 evaluation seeds. We report two schedules. The step-scaled schedule uses 1,000, 3,000, 5,000, and 7,000 pretraining steps for 0.1, 0.3, 0.5, and 0.7 of the pretraining data, respectively. The fixed-step schedule uses 10,000 pretraining steps for each subset. The full-data 10,000-step row is the same masked-input action model used in the objective ablation. 15 Table 9: Per-task Meta-World-5 results under a 25-demonstration budget. Task FVP DP3 AFRO Ours (LIBERO pretrain) Ours (Meta-World pretrain) 
+
+Bin Picking 16 18 20 63.0 ± 4.0 90.0 ± 5.5 
+
+Pick Out of Hole 26 24 32 71.0 ± 2.0 75.0 ± 5.5 
+
+Push 42 74 78 91.0 ± 7.4 95.0 ± 5.5 
+
+Soccer 34 38 36 54.0 ± 4.9 72.0 ± 6.8 
+
+Stick Pull 24 58 78 88.0 ± 2.5 96.0 ± 3.7 
+
+Avg. 28.4 42.4 48.8 73.4 85.6 
+
+Table 10: Per-task Meta-World-5 pretraining data scaling. Success rates are reported in percentage as mean ± std at the fixed 2,000 fine-tuning checkpoint.                                                                                                                                                                                   
+
+> Pretraining schedule Data ratio Bin Picking Pick Out of Hole Push Soccer Stick Pull Avg. Step-scaled 0.1 15.0 ±4.1 50.0 ±7.1 95.0 ±4.1 48.3 ±20.5 11.7 ±8.5 44.0 ±3.6 Step-scaled 0.3 76.7 ±13.1 60.0 ±4.1 96.7 ±4.7 33.3 ±18.9 31.7 ±12.5 59.7 ±8.4 Step-scaled 0.5 76.7 ±4.7 61.7 ±9.4 100.0 ±0.0 53.3 ±20.9 33.3 ±9.4 65.0 ±3.6 Step-scaled 0.7 71.7 ±8.5 60.0 ±7.1 100.0 ±0.0 58.3 ±19.3 50.0 ±10.8 68.0 ±4.5 Fixed-step 0.1 26.7 ±4.7 55.0 ±7.1 100.0 ±0.0 41.7 ±16.5 45.0 ±10.8 53.7 ±5.6 Fixed-step 0.3 75.0 ±10.8 66.7 ±6.2 100.0 ±0.0 55.0 ±12.2 45.0 ±8.2 68.3 ±6.2 Fixed-step 0.5 86.7 ±8.5 51.7 ±11.8 100.0 ±0.0 53.3 ±17.0 58.3 ±17.0 70.0 ±6.2 Fixed-step 0.7 88.3 ±10.3 48.3 ±10.3 100.0 ±0.0 75.0 ±4.1 63.3 ±13.1 75.0 ±6.5 Fixed-step 1.0 93.3 ±7.6 58.3 ±5.8 100.0 ±0.0 73.3 ±20.2 85.0 ±8.7 82.0 ±3.5
+
+Average success improves as more pretraining data is used under both schedules. At a fixed data ratio, the 10,000-step schedule is usually stronger than the step-scaled schedule, indicating that both data coverage and pretraining compute affect the downstream representation. The trend is clearest in the average; individual tasks need not improve monotonically for every subset. 
+
+Objective ablation. Table 11 gives the per-task breakdown of the objective ablation summarized in the main paper. The comparison uses Meta-World-5 with 50 downstream demonstrations per task. All pretrained variants use 10,000 pretraining steps and are evaluated at the fixed 2,000 fine-tuning checkpoint with 20 episodes per seed across 3 evaluation seeds. None trains the downstream policy from scratch. Action only initializes the encoder from unmasked action alignment. Reconstruction only initializes from masked sparse 3D token reconstruction: the model predicts the continuous patch embedding for masked patches and optimizes MSE on masked positions only, following the masked point modeling family of objectives [13]. Masked input + action is the main objective, where visible tokens predict the normalized alignment action. Masked action alignment gives the largest gains on Bin Picking, Soccer, and Stick Pull. Push reaches high success under the action-only and reconstruction-only variants. 
+
+Action-decoder capacity. Tables 12 and 13 report the parameter counts and per-task results for the action-decoder capacity ablation. The experiment uses the same fixed 2,000-step checkpoint and 20-episode-per-seed setting as the objective ablation. The DP3 decoder is the conditional 1D U-Net from DP3 [1], with channel widths 512, 1024, and 2048. The SimpleDP3 decoder uses the same diffusion interface, condition type, horizon, and 10-step DDIM inference, but with U-Net widths reduced to 128, 256, and 384. The MLP decoder is a residual MLP with two 1024-wide hidden layers, GELU activations, LayerNorm, and no dropout. Parameter counts are computed from instantiated PyTorch models under the corresponding encoder–decoder configurations. The pretrained encoder improves all three action decoders over their scratch counterparts. The best decoder varies by task: SimpleDP3 is strongest on Bin Picking, the MLP is strongest on Pick Out of Hole, and the full DP3 decoder is strongest on Stick Pull. 
+
+Model scale. The DP3 PointNet encoder has 0.092M parameters, while our sparse patch encoder has 10.798M parameters. The scratch rows in Table 13 use the same 2,000-step training schedule, single training seed, and 3 evaluation seeds as the pretrained rows. 
+
+A.4 Real-Robot Setup and Evaluation Platform and tasks. We use a single-arm AgileX PiPER 6-DoF robotic arm with a fixed Intel RealSense D415 depth camera. Four tasks are evaluated: Bin Picking , Cube Stacking , Mug & Plate ,16 Table 11: Full per-task objective ablation on Meta-World-5. Success rates are reported in percentage as mean ± std. Pretraining objective Bin Picking Pick Out of Hole Push Soccer Stick Pull Avg. None 18.3 ± 7.6 53.3 ± 5.8 5.0 ± 5.0 5.0 ± 0.0 13.3 ± 7.6 19.0 ± 4.6 None (16,000 steps) 13.3 ± 5.8 50.0 ± 8.7 38.3 ± 16.1 15.0 ± 8.7 25.0 ± 8.7 28.3 ± 6.7 Action only 26.7 ± 5.8 18.3 ± 5.8 98.3 ± 2.9 46.7 ± 11.5 63.3 ± 14.4 50.7 ± 5.5 Reconstruction only 40.0 ± 8.7 46.7 ± 10.4 91.7 ± 5.8 36.7 ± 28.9 61.7 ± 17.6 55.3 ± 8.0 Masked input + action 93.3 ± 7.6 58.3 ± 5.8 100.0 ± 0.0 73.3 ± 20.2 85.0 ± 8.7 82.0 ± 3.5 
+
+Table 12: Total parameter count for each encoder–decoder pairing in the action-decoder capacity ablation. Parameter counts are reported in millions. Encoder DP3 decoder SimpleDP3 decoder MLP decoder DP3 encoder 262.533 8.264 2.808 Pretrained 273.238 18.969 13.513 and Mug & Toy , with 50 real demonstrations per task. We additionally build calibrated, task-matched simulated scenes by replicating the robot model, workspace geometry, objects, and task layouts, and collect 100 simulated demonstrations per task. 
+
+Figure 7: Processed sim and real point-cloud observations for the four PiPER evaluation tasks. Each column shows one task, and the two rows show the corresponding task-matched simulation and real-robot observations after the shared point-cloud preprocessing pipeline. Points are colored by height for visualization. 
+
+Simulated demonstration collection. To improve position generalization, simulated demonstra-tions randomize object and distractor positions within a workspace that is slightly larger than the real-robot task region, while preserving the task semantics and calibrated robot setup used for real-robot fine-tuning. 17 Table 13: Full per-task downstream policy-learning results on Meta-World-5. Success rates are reported in percentage as mean ± std. Encoder Action decoder Bin Picking Pick Out of Hole Push Soccer Stick Pull Avg. Scratch (DP3 PointNet) DP3 decoder 23.3 ± 10.4 35.0 ± 10.0 8.3 ± 7.6 18.3 ± 15.3 5.0 ± 5.0 18.0 ± 4.6 Scratch (DP3 PointNet) SimpleDP3 decoder 16.7 ± 5.8 21.7 ± 25.7 8.3 ± 7.6 15.0 ± 8.7 3.3 ± 2.9 13.0 ± 3.6 Scratch (DP3 PointNet) MLP 15.0 ± 5.0 6.7 ± 2.9 6.7 ± 7.6 11.7 ± 10.4 21.7 ± 12.6 12.3 ± 5.7 Pretrained DP3 decoder 93.3 ± 7.6 58.3 ± 5.8 100.0 ± 0.0 73.3 ± 20.2 85.0 ± 8.7 82.0 ± 3.5                                       
+
+> Pretrained SimpleDP3 decoder 98.3 ±2.9 56.7 ±7.6 98.3 ±2.9 68.3 ±15.3 53.3 ±18.9 75.0 ±8.9 Pretrained MLP 88.3 ±2.9 70.0 ±13.2 100.0 ±0.0 70.0 ±8.7 45.0 ±0.0 74.7 ±3.5
+
+Figure 8: Examples of the position-randomized simulated demonstrations used for real-robot pre-training. The simulated collection varies object and distractor placement across the four target tasks in a slightly larger workspace than the real-robot task region, while keeping the same robot setup and task structure. 
+
+Real-robot training protocols. The real-robot comparison uses three training conditions. The direct mixed-data baselines train a target-task policy from scratch on the matched 100 simulated and 50 real demonstrations for that task, using either the DP3 policy or our downstream policy architecture. The pretrained variant first pretrains the encoder on the 100 simulated demonstrations for each target task (10,000 pretraining steps), then fine-tunes on the same 50 real demonstrations. The pretrained variant uses the downstream fine-tuning setting in Table 7, with batch size 128, and reports the fixed 4,000-step fine-tuning checkpoint. The direct DP3 baseline is evaluated at 5,000, 10,000, 15,000, and 20,000 training steps, and we report its best checkpoint. Table 14: Training protocols and data sources for the real-robot deployment results in Table 3.                 
+
+> Method Pretrain source / steps Fine-tune source Fine-tune budget Reported checkpoint DP3 –100 sim + 50 real/task 20,000 steps Best of 5,000, 10,000, 15,000, 20,000 Ours from scratch –100 sim + 50 real/task 4,000 steps, batch 128 4,000 fixed checkpoint Ours 100 sim/task, 10,000 steps 50 real/task 4,000 steps, batch 128 4,000 fixed checkpoint
+
+Observation and action interface. Point clouds are cropped to 1024 xyz-only points in the world frame centered at the table surface. Pretraining uses end-effector delta pose with absolute gripper width, matching the simulation interface. Fine-tuning uses delta joint positions ( ∆q1, . . . , ∆q6) with absolute gripper commands for the real-robot controller, while keeping the same encoder initializa-tion. 
+
+Success criteria. We count a rollout as successful only when all required task stages are completed in order. For Bin Picking , the robot must approach the target object, grasp it, lift it, and place it at the target location. For Mug & Plate , the robot must approach the mug, grasp it, lift it, and place it inside the plate. For Cube Stacking , the gripper must close, push the medium cube next to the large cube, approach the small cube, grasp the small cube, lift it, and place it on top of the large cube. For Mug & Toy , the robot must approach and grasp the mug, place the mug aside, approach the toy, grasp the toy, and place the toy inside the plate. 
+
+Qualitative failure modes. The main real-robot failures occur during precise approach, lifting, placement, or multi-stage recovery. In Bin Picking , the gripper sometimes approaches the bin at insufficient height or lifts the grasped object without enough clearance. In Mug & Plate , the mug is 18 sometimes not lifted high enough before moving over the plate during placement. In Cube Stacking ,failures include out-of-distribution states during the pushing stage and insufficient lifting height before the stacking placement. In Mug & Toy , failures include empty grasps on the toy and out-of-distribution states during the multi-stage sequence. These cases motivate future extensions with temporal context and recovery-oriented data. 
+
+Figure 9: Real-robot experimental setup. Left: the PiPER arm with the object set used across all four evaluation tasks. Right: the mounted Intel RealSense D415 depth camera used to capture point-cloud observations. 
+
+Figure 10: Representative real-robot task completion sequences for the four PiPER evaluation tasks. Each row shows a rollout progressing from the initial scene to successful task completion. 19

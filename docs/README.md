@@ -6,8 +6,8 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-18
-- 运行时间：2026-06-18 19:33:32 UTC
+- 最新运行日期：2026-06-19
+- 运行时间：2026-06-19 19:07:22 UTC
 - 运行状态：成功
 - 本次总论文数：39
 - 精读区：28
@@ -15,131 +15,131 @@
 
 ### 今日简报（AI）
 - 今日共生成 39 篇推荐（精读 28 篇，速读 11 篇）
-- 精读：《Improving Robotic Generalist Policies via Flow Reversal Steering》（10.0/10）, 《DuoBench: A Reproducible Benchmark for Bimanual Manipulation in Simulation and the Real World》（9.0/10）
-- 速读：《LUCID: Learning Embodiment-Agnostic Intent Models from Unstructured Human Videos for Scalable Dexterous Robot Skill Acquisition》（8.0/10）, 《TacCoRL: Integrating Tactile Feedback into VLA via Simulation》（8.0/10）, 《VICX: Generalizable Robot Manipulation via Video Generation and In-Context Operator Network》（8.0/10）
+- 精读：《EgoEngine: From Egocentric Human Videos to High-Fidelity Dexterous Robot Demonstrations》（9.0/10）, 《See Selectively, Act Adaptively: Dual-Level Structural Decomposition for Bimanual Robot Manipulation》（9.0/10）
+- 速读：《EmbodiSteer: Steering Embodiment-Agnostic Visuomotor Policies with Joint-Space Guidance for Zero-Shot Cross-Embodiment Deployment》（8.0/10）, 《MaskWAM: Unifying Mask Prompting and Prediction for World-Action Models》（8.0/10）, 《WAM4D: Fast 4D World Action Model via Spatial Register Tokens》（8.0/10）
 - 这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。
-- 详情：[/202606/18/README](/202606/18/README)
+- 详情：[/202606/19/README](/202606/19/README)
 
 ### 精读区论文标签
-1. [Improving Robotic Generalist Policies via Flow Reversal Steering](/202606/18/2606.13675v2-improving-robotic-generalist-policies-via-flow-reversal-steering)  
-   标签：评分：10.0/10、query:rob-il
-   evidence：通过流反向转向改进通用操作策略
-2. [DuoBench: A Reproducible Benchmark for Bimanual Manipulation in Simulation and the Real World](/202606/18/2606.11901v1-duobench-a-reproducible-benchmark-for-bimanual-manipulation-in-simulation-and-the-real-world)  
+1. [EgoEngine: From Egocentric Human Videos to High-Fidelity Dexterous Robot Demonstrations](/202606/19/2606.12604v1-egoengine-from-egocentric-human-videos-to-high-fidelity-dexterous-robot-demonstrations)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于双手操纵的可复现基准，包含模拟和真实任务
-3. [DAM-VLA: Decoupled Asynchronous Multimodal Vision Language Action model](/202606/18/2606.12105v1-dam-vla-decoupled-asynchronous-multimodal-vision-language-action-model)  
+   evidence：将第一人称人体视频转换为高保真机器人演示，用于灵巧操作
+2. [See Selectively, Act Adaptively: Dual-Level Structural Decomposition for Bimanual Robot Manipulation](/202606/19/2606.13279v1-see-selectively-act-adaptively-dual-level-structural-decomposition-for-bimanual-robot-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：VLA模型的解耦异步多模态处理
-4. [Fourier Features Let Agents Learn High Precision Policies with Imitation Learning](/202606/18/2606.12334v1-fourier-features-let-agents-learn-high-precision-policies-with-imitation-learning)  
+   evidence：双臂VLA框架，选择注意力视图和双层结构分解
+3. [RepWAM: World Action Modeling with Representation Visual-Action Tokenizers](/202606/19/2606.13674v1-repwam-world-action-modeling-with-representation-visual-action-tokenizers)  
    标签：评分：9.0/10、query:rob-il
-   evidence：利用傅里叶特征实现高精度机器人操纵模仿学习
-5. [Ambient Diffusion Policy: Imitation Learning from Suboptimal Data in Robotics](/202606/18/2606.12365v1-ambient-diffusion-policy-imitation-learning-from-suboptimal-data-in-robotics)  
+   evidence：通过表征视觉-动作分词器实现视觉到潜在动作的对齐映射
+4. [Improving Robotic Generalist Policies via Flow Reversal Steering](/202606/19/2606.13675v1-improving-robotic-generalist-policies-via-flow-reversal-steering)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人从次优数据中进行模仿学习
-6. [World Pilot: Steering Vision-Language-Action Models with World-Action Priors](/202606/18/2606.12403v1-world-pilot-steering-vision-language-action-models-with-world-action-priors)  
+   evidence：通过流反转操纵改进通用模仿学习策略
+5. [Improving Robotic Generalist Policies via Flow Reversal Steering](/202606/19/2606.13675v2-improving-robotic-generalist-policies-via-flow-reversal-steering)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用世界-动作先验增强VLA模型操纵能力
-7. [EgoEngine: From Egocentric Human Videos to High-Fidelity Dexterous Robot Demonstrations](/202606/18/2606.12604v1-egoengine-from-egocentric-human-videos-to-high-fidelity-dexterous-robot-demonstrations)  
+   evidence：引导流匹配通用策略到更好动作模式的方法
+6. [PhysVLA: Towards Physically-Grounded VLA for Embodied Robotic Manipulation](/202606/19/2606.13886v1-physvla-towards-physically-grounded-vla-for-embodied-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：将第一视角人类操纵视频转换为高保真机器人演示
-8. [See Selectively, Act Adaptively: Dual-Level Structural Decomposition for Bimanual Robot Manipulation](/202606/18/2606.13279v1-see-selectively-act-adaptively-dual-level-structural-decomposition-for-bimanual-robot-manipulation)  
+   evidence：冻结VLA骨干网络的推理时物理约束框架
+7. [ReactVLA: Fast and Lightweight Reactive Robot Manipulation via Improved Mean Flow Action Generation](/202606/19/2606.14255v1-reactvla-fast-and-lightweight-reactive-robot-manipulation-via-improved-mean-flow-action-generation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：双臂机器人操控的视觉-语言-动作双层结构分解
-9. [MaskWAM: Unifying Mask Prompting and Prediction for World-Action Models](/202606/18/2606.13515v1-maskwam-unifying-mask-prompting-and-prediction-for-world-action-models)  
+   evidence：用于实时闭环操纵的快速反应式 VLA 框架
+8. [Spatially Conditioned Diffusion Policy: Learning Precise and Robust Manipulation with a Single RGB Camera](/202606/19/2606.14535v1-spatially-conditioned-diffusion-policy-learning-precise-and-robust-manipulation-with-a-single-rgb-camera)  
    标签：评分：9.0/10、query:rob-il
-   evidence：使用掩码进行视觉到动作映射的对象中心世界动作模型
-10. [RepWAM: World Action Modeling with Representation Visual-Action Tokenizers](/202606/18/2606.13674v2-repwam-world-action-modeling-with-representation-visual-action-tokenizers)  
+   evidence：基于扩散的视觉运动策略实现单相机精确操作
+9. [TRACE: Trajectory-Routed Causal Memory for Delayed-Evidence Visuomotor Imitation](/202606/19/2606.14551v2-trace-trajectory-routed-causal-memory-for-delayed-evidence-visuomotor-imitation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：基于表示视觉-动作分词器的世界动作建模
-11. [PhysVLA: Towards Physically-Grounded VLA for Embodied Robotic Manipulation](/202606/18/2606.13886v1-physvla-towards-physically-grounded-vla-for-embodied-robotic-manipulation)  
+   evidence：用于延迟证据视动模仿的因果记忆
+10. [Steering Autoregressive Vision-Language-Action Policies via Action Token Intervention](/202606/19/2606.15021v1-steering-autoregressive-vision-language-action-policies-via-action-token-intervention)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过物理基础增强VLA模型用于机器人操纵
-12. [ReactVLA: Fast and Lightweight Reactive Robot Manipulation via Improved Mean Flow Action Generation](/202606/18/2606.14255v1-reactvla-fast-and-lightweight-reactive-robot-manipulation-via-improved-mean-flow-action-generation)  
+   evidence：推理时通过动作令牌干预引导自回归VLA策略的方法
+11. [Acting While Understanding: Asynchronous Semantic-Action Decoupling for Real-Time Vision-Language-Action Models](/202606/19/2606.15285v1-acting-while-understanding-asynchronous-semantic-action-decoupling-for-real-time-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于反应式闭环操作的低延迟VLA
-13. [Elastic Queries Reinforcement Learning: Self-Aware Policy Execution for VLA Models](/202606/18/2606.14375v1-elastic-queries-reinforcement-learning-self-aware-policy-execution-for-vla-models)  
+   evidence：用于实时闭环控制的VLA异步解耦
+12. [Perfect Demo Makes Poor Teacher: Learning Robust Alignment from Critical Motion Segments](/202606/19/2606.15587v1-perfect-demo-makes-poor-teacher-learning-robust-alignment-from-critical-motion-segments)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过弹性查询实现VLA模型的机器人操纵执行
-14. [Spatially Conditioned Diffusion Policy: Learning Precise and Robust Manipulation with a Single RGB Camera](/202606/18/2606.14535v1-spatially-conditioned-diffusion-policy-learning-precise-and-robust-manipulation-with-a-single-rgb-camera)  
+   evidence：识别专家演示在模仿学习中的反直觉失败模式并提出数据级改进
+13. [Retrieve, Don't Retrain: Extending Vision Language Action Models to New Tasks at Test Time](/202606/19/2606.15631v1-retrieve-dont-retrain-extending-vision-language-action-models-to-new-tasks-at-test-time)  
    标签：评分：9.0/10、query:rob-il
-   evidence：端到端单摄像头视觉运动扩散策略
-15. [TRACE: Trajectory-Routed Causal Memory for Delayed-Evidence Visuomotor Imitation](/202606/18/2606.14551v1-trace-trajectory-routed-causal-memory-for-delayed-evidence-visuomotor-imitation)  
+   evidence：基于检索的视觉语言动作策略实现零样本任务泛化
+14. [Scaling Short-Term Memory of Visuomotor Policies for Long-Horizon Tasks](/202606/19/2606.16178v1-scaling-short-term-memory-of-visuomotor-policies-for-long-horizon-tasks)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于延迟证据情况下视觉运动模仿策略的记忆框架
-16. [TRACE: Trajectory-Routed Causal Memory for Delayed-Evidence Visuomotor Imitation](/202606/18/2606.14551v2-trace-trajectory-routed-causal-memory-for-delayed-evidence-visuomotor-imitation)  
+   evidence：提出基于transformer的门控注意力和层次化结构的视动策略，使模仿学习能够处理需要短期记忆的长时操作任务
+15. [V2P-Manip: Learning Dexterous Manipulation from Monocular Human Videos](/202606/19/2606.16436v1-v2p-manip-learning-dexterous-manipulation-from-monocular-human-videos)  
    标签：评分：9.0/10、query:rob-il
-   evidence：使用轨迹路由因果记忆的视觉运动模仿策略应对延迟证据
-17. [Acting While Understanding: Asynchronous Semantic-Action Decoupling for Real-Time Vision-Language-Action Models](/202606/18/2606.15285v1-acting-while-understanding-asynchronous-semantic-action-decoupling-for-real-time-vision-language-action-models)  
+   evidence：直接从人体演示视频通过模仿学习学习灵巧操作
+16. [Training and Evaluating Diffusion Policies with Long Context Lengths](/202606/19/2606.16447v1-training-and-evaluating-diffusion-policies-with-long-context-lengths)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于实时闭环VLA控制的异步语义-动作解耦
-18. [Scaling Short-Term Memory of Visuomotor Policies for Long-Horizon Tasks](/202606/18/2606.16178v1-scaling-short-term-memory-of-visuomotor-policies-for-long-horizon-tasks)  
+   evidence：在具有记忆需求的操作任务上系统基准测试模仿学习策略的上下文长度影响
+17. [Robots that Collaborate: Sequential Asymmetric Imitation for Learning Coupled Robot Policies](/202606/19/2606.16490v1-robots-that-collaborate-sequential-asymmetric-imitation-for-learning-coupled-robot-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：基于Transformer的门控注意力与层次化压缩的视觉运动策略短期记忆架构
-19. [V2P-Manip: Learning Dexterous Manipulation from Monocular Human Videos](/202606/18/2606.16436v1-v2p-manip-learning-dexterous-manipulation-from-monocular-human-videos)  
+   evidence：用于协作操纵的顺序非对称模仿学习
+18. [Unified Motion-Action Modeling for Heterogeneous Robot Learning](/202606/19/2606.16917v2-unified-motion-action-modeling-for-heterogeneous-robot-learning)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从单目人类演示视频中学习灵巧操控策略
-20. [Training and Evaluating Diffusion Policies with Long Context Lengths](/202606/18/2606.16447v1-training-and-evaluating-diffusion-policies-with-long-context-lengths)  
+   evidence：通过3D运动轨迹桥接视觉运动控制与动力学建模
+19. [ACE-Ego-0: Unifying Egocentric Human and Robotic Data for VLA Pretraining](/202606/19/2606.17200v1-ace-ego-0-unifying-egocentric-human-and-robotic-data-for-vla-pretraining)  
    标签：评分：9.0/10、query:rob-il
-   evidence：在操纵任务的模仿学习中评测扩散策略的上下文长度
-21. [Robots that Collaborate: Sequential Asymmetric Imitation for Learning Coupled Robot Policies](/202606/18/2606.16490v1-robots-that-collaborate-sequential-asymmetric-imitation-for-learning-coupled-robot-policies)  
+   evidence：利用第一人称人类视频和机器人数据统一进行VLA预训练
+20. [EgoInfinity: A Web-Scale 4D Hand-Object Interaction Data Engine for Any-View Robot Retargeting and Video-to-Action Robot Learning](/202606/19/2606.17385v1-egoinfinity-a-web-scale-4d-hand-object-interaction-data-engine-for-any-view-robot-retargeting-and-video-to-action-robot-learning)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向耦合多机器人操控的顺序非对称模仿学习
-22. [APEX: Adaptive Policy Execution for Precise Manipulation](/202606/18/2606.16504v1-apex-adaptive-policy-execution-for-precise-manipulation)  
+   evidence：网络规模的视频到机器人动作的数据引擎
+21. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/19/2606.17846v1-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：自适应执行弥合模仿学习中的执行差距
-23. [MuseVLA: An Adaptive Multimodal Sensing Vision-Language-Action Model for Robotic Manipulation](/202606/18/2606.17598v1-musevla-an-adaptive-multimodal-sensing-vision-language-action-model-for-robotic-manipulation)  
+   evidence：大规模视觉-语言-动作基础模型用于机器人操作
+22. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/19/2606.17846v2-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：自适应多模态感知视觉-语言-动作模型用于机器人操作
-24. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/18/2606.17846v1-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
+   evidence：面向机器人操纵的通用视觉-语言-动作基础模型
+23. [ThinkingVLA: Interleaved Vision and Language Reasoning for Robotic Manipulation](/202606/19/2606.17937v1-thinkingvla-interleaved-vision-and-language-reasoning-for-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人操控的统一对齐视觉-语言-动作基础模型
-25. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/18/2606.17846v2-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
+   evidence：交错的视觉和语言推理用于VLA模型
+24. [DREAM-Chunk: Reactive Action Chunking with Latent World Model](/202606/19/2606.18589v1-dream-chunk-reactive-action-chunking-with-latent-world-model)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于机器人操纵的通用视觉-语言-动作基础模型
-26. [ThinkingVLA: Interleaved Vision and Language Reasoning for Robotic Manipulation](/202606/18/2606.17937v1-thinkingvla-interleaved-vision-and-language-reasoning-for-robotic-manipulation)  
+   evidence：潜在世界模型增强反应式动作分块
+25. [Motion-Focused Latent Action Enables Cross-Embodiment VLA Training from Human EgoVideos](/202606/19/2606.18955v1-motion-focused-latent-action-enables-cross-embodiment-vla-training-from-human-egovideos)  
    标签：评分：9.0/10、query:rob-il
-   evidence：交错视觉-语言推理增强VLA模型操纵能力
-27. [Object-Centric Residual RL for Zero-Shot Sim-to-Real VLA Enhancement](/202606/18/2606.18953v1-object-centric-residual-rl-for-zero-shot-sim-to-real-vla-enhancement)  
+   evidence：利用人类视频进行跨实体VLA模仿学习
+26. [DiffusionVS: A Generative Framework for Robust Visual Servoing Based on Diffusion Policy](/202606/19/2606.19397v1-diffusionvs-a-generative-framework-for-robust-visual-servoing-based-on-diffusion-policy)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过对象中心残余强化学习零样本增强VLA策略
-28. [Do as I Do: Dexterous Manipulation Data from Everyday Human Videos](/202606/18/2606.19333v1-do-as-i-do-dexterous-manipulation-data-from-everyday-human-videos)  
+   evidence：基于扩散策略的机器人视觉伺服方法
+27. [EquiVLA: A General Framework for Rotationally Equivariant Vision-Language-Action Models](/202606/19/2606.19784v1-equivla-a-general-framework-for-rotationally-equivariant-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从单目RGB人类视频重定位到多指灵巧手操作
+   evidence：用于通用操纵的端到端旋转等变视觉-语言-动作模型
+28. [Co-VLA: Coordination-Aware Structured Action Modeling for Dual-Arm Vision-Language-Action Systems](/202606/19/2606.20285v1-co-vla-coordination-aware-structured-action-modeling-for-dual-arm-vision-language-action-systems)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：面向双臂操纵的协调感知VLA模型，属于通用视觉-动作模型核心主题
 
 ### 速读区论文标签
-1. [LUCID: Learning Embodiment-Agnostic Intent Models from Unstructured Human Videos for Scalable Dexterous Robot Skill Acquisition](/202606/18/2606.11628v1-lucid-learning-embodiment-agnostic-intent-models-from-unstructured-human-videos-for-scalable-dexterous-robot-skill-acquisition)  
+1. [EmbodiSteer: Steering Embodiment-Agnostic Visuomotor Policies with Joint-Space Guidance for Zero-Shot Cross-Embodiment Deployment](/202606/19/2606.12965v1-embodisteer-steering-embodiment-agnostic-visuomotor-policies-with-joint-space-guidance-for-zero-shot-cross-embodiment-deployment)  
    标签：评分：8.0/10、query:rob-il
-   evidence：从非结构化人类视频学习的与具身无关的意图模型用于灵巧操作
-2. [TacCoRL: Integrating Tactile Feedback into VLA via Simulation](/202606/18/2606.11743v1-taccorl-integrating-tactile-feedback-into-vla-via-simulation)  
+   evidence：无需训练的视觉运动策略零样本跨具身部署框架
+2. [MaskWAM: Unifying Mask Prompting and Prediction for World-Action Models](/202606/19/2606.13515v1-maskwam-unifying-mask-prompting-and-prediction-for-world-action-models)  
    标签：评分：8.0/10、query:rob-il
-   evidence：将触觉反馈融入VLA模型用于接触丰富的操纵
-3. [VICX: Generalizable Robot Manipulation via Video Generation and In-Context Operator Network](/202606/18/2606.12028v1-vicx-generalizable-robot-manipulation-via-video-generation-and-in-context-operator-network)  
+   evidence：统一掩码输入与预测的物体中心世界动作模型
+3. [WAM4D: Fast 4D World Action Model via Spatial Register Tokens](/202606/19/2606.14048v1-wam4d-fast-4d-world-action-model-via-spatial-register-tokens)  
    标签：评分：8.0/10、query:rob-il
-   evidence：基于视频生成和上下文操作网络的解耦闭环操作框架
-4. [Bridging the Morphology Gap: Adapting VLA Models to Dexterous Manipulation via Intent-Conditioned Fine-Tuning](/202606/18/2606.12109v1-bridging-the-morphology-gap-adapting-vla-models-to-dexterous-manipulation-via-intent-conditioned-fine-tuning)  
+   evidence：使用空间注册令牌的4D世界动作模型进行快速的3D感知动作生成
+4. [Self-Improving VLA Policies: Selected Diffusion Noise for Spurious-Robust Action Smoothing](/202606/19/2606.14084v1-self-improving-vla-policies-selected-diffusion-noise-for-spurious-robust-action-smoothing)  
    标签：评分：8.0/10、query:rob-il
-   evidence：通过意图条件微调将VLA模型适配到灵巧操纵
-5. [Distortion-Resilient Robotic Imitation Learning for Autonomous Cable Routing](/202606/18/2606.11577v1-distortion-resilient-robotic-imitation-learning-for-autonomous-cable-routing)  
+   evidence：扩散 VLA 策略的测试时噪声选择提升鲁棒性
+5. [Sparse2Act: Learning Action-Aligned Sparse 3D Representations for Cross-Domain Robot Manipulation](/202606/19/2606.12759v1-sparse2act-learning-action-aligned-sparse-3d-representations-for-cross-domain-robot-manipulation)  
    标签：评分：7.0/10、query:rob-il
-   evidence：针对图像失真的鲁棒模仿学习用于电缆布线
-6. [Action-Effect Memory Pretraining for Robot Manipulation](/202606/18/2606.12499v1-action-effect-memory-pretraining-for-robot-manipulation)  
+   evidence：以末端执行器动作为几何监督信号预训练稀疏点云编码器，实现视觉-动作对齐，增强跨域操作能力
+6. [GIVE: Grounding Human Gestures in Vision-Language-Action Models](/202606/19/2606.13435v1-give-grounding-human-gestures-in-vision-language-action-models)  
    标签：评分：7.0/10、query:rob-il
-   evidence：从视觉-动作历史中学习时序表征的动作-效果记忆预训练，用于模仿学习
-7. [RoboProcessBench: Benchmarking Process-Aware Understanding in Vision-Language Robotic Manipulation](/202606/18/2606.13040v1-roboprocessbench-benchmarking-process-aware-understanding-in-vision-language-robotic-manipulation)  
+   evidence：通过手势理解增强VLA模型，提升操纵任务的准确性
+7. [RepWAM: World Action Modeling with Representation Visual-Action Tokenizers](/202606/19/2606.13674v2-repwam-world-action-modeling-with-representation-visual-action-tokenizers)  
    标签：评分：7.0/10、query:rob-il
-   evidence：操作中过程感知理解的基准
-8. [EV-WM: Event-Verified World Models for Long-Horizon Robotic Manipulation](/202606/18/2606.13053v2-ev-wm-event-verified-world-models-for-long-horizon-robotic-manipulation)  
+   evidence：提出表征视觉-动作分词器，将视觉输入映射到对齐的视觉和潜在动作令牌，用于构建表征中心的世界动作模型
+8. [$μ_0$: A Scalable 3D Interaction-Trace World Model](/202606/19/2606.13769v1-0-a-scalable-3d-interaction-trace-world-model)  
    标签：评分：7.0/10、query:rob-il
-   evidence：长期操作的世界模型规划
-9. [Dynamic Execution Horizon Prediction for Chunk-based Robot Policies](/202606/18/2606.11408v1-dynamic-execution-horizon-prediction-for-chunk-based-robot-policies)  
+   evidence：预测3D交互轨迹的可扩展世界模型，支持机器人学习
+9. [EV-WM: Event-Verified World Models for Long-Horizon Robotic Manipulation](/202606/19/2606.13053v2-ev-wm-event-verified-world-models-for-long-horizon-robotic-manipulation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：用于基于分块的机器人策略的动态执行范围预测
-10. [Making Foresight Actionable: Repurposing Representation Alignment in World Action Models](/202606/18/2606.12217v1-making-foresight-actionable-repurposing-representation-alignment-in-world-action-models)  
+   evidence：用于长时程操纵的事件验证世界模型
+10. [Mana: Dexterous Manipulation of Articulated Tools](/202606/19/2606.13677v1-mana-dexterous-manipulation-of-articulated-tools)  
    标签：评分：6.0/10、query:rob-il
-   evidence：诊断世界动作模型中的表示不匹配
-11. [SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation with a Pretrained VLA](/202606/18/2606.15568v1-saps-shared-autonomy-for-policy-steering-by-blending-teleoperation-with-a-pretrained-vla)  
+   evidence：通过仿真到现实的灵巧铰接工具操纵
+11. [MimicIK: Real-Time Generative Inverse Kinematics from Teleoperation with FK Consistency](/202606/19/2606.15148v2-mimicik-real-time-generative-inverse-kinematics-from-teleoperation-with-fk-consistency)  
    标签：评分：6.0/10、query:rob-il
-   evidence：共享自主框架融合遥操作与预训练VLA进行策略引导
+   evidence：从遥操作演示中学习的实时生成式逆运动学，用于机器人操纵
 
 
 <div class="dpr-home-promo-card">
