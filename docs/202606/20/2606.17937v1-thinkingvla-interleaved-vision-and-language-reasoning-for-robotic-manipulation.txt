@@ -1,0 +1,1097 @@
+Title: ThinkingVLA: Interleaved Vision and Language Reasoning for Robotic Manipulation
+
+URL Source: https://arxiv.org/pdf/2606.17937v1
+
+Published Time: Wed, 17 Jun 2026 01:15:59 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# ThinkingVLA: Interleaved Vision and Language Reasoning for Robotic Manipulation 
+
+Tianyi Lu 1,2 , Hui Zhang 1, Zĳie Diao 1, Junke Wang 1, Shengqi Xu 1, Xingyao Lin 1,2 ,Guojin Zhong 1, Ziyi Ye 1, Peng Wang 4, Zuxuan Wu 1,2,3 , Yu-Gang Jiang 1,
+
+> 1
+
+Fudan University , 2Shanghai Innovation Institue , 3Neote AI 
+
+> 4
+
+China Unicom 
+
+Abstract 
+
+ost Vision-Language-Action (VLA) models map observations directly to actions without explicit reasoning, limiting their capacity for reasoning-intensive long-horizon tasks. To address this, existing approaches adopt Chain-of-Thought (CoT) reasoning to enable subgoal decomposition and spatial anticipation. However, those methods lack a unified architecture for effective cross-modal reasoning and fail to explicitly include inverse reasoning ability based on the target state. We argue that manipulation planning naturally decomposes into prediction, anticipating the next visual state, and inverse dynamics, inferring the actions to reach it. Bridging both requires a unified autoregressive architecture that interleaves textual and visual reasoning in a single generation process. We propose ThinkingVLA , a generative model that realizes this decomposition within a unified Mixture-of-Transformers architecture. ThinkingVLA consists of a forward CoT that identifies the immediate subgoal and guides the visual forecasting; the predicted image then serves as the target state, grounding an inverse CoT that reasons about spatial relationships and action intent based on the predicted image; and the final action is generated conditioned on this full reasoning context. Extensive experiments on simulation and real-world benchmarks demonstrate that ThinkingVLA consistently outperforms state-of-the-art baselines, with particularly large gains on long-horizon manipulation tasks.  
+
+> Keywords:
+
+Robotic Manipulation, Unified Model, Interleaved Chain-of-Thought  
+
+> Website:
+
+https://fitz135.github.io/thinkingvla.github.io/ 
+
+1 Introduction 
+
+Vision-Language-Action (VLA) models have made remarkable progress toward generalizable robot control by unifying visual perception, language understanding, and action generation within a single model [ 5– 7, 17 ]. Conventionally, VLA models compress the perception-to-action pipeline into a single implicit forward pass, where a vision-language backbone encodes the current observation and instruction and an action head directly decodes the motor command [ 4 , 5, 7, 17 , 21 , 37 ]. This monolithic mapping is effective on short-horizon, well-demonstrated tasks, but it provides no mechanism to decompose a complex instruction into subgoals, anticipate the consequences of a candidate action, or verify that a plan will achieve its intended effect. As tasks grow more complex (multi-step assembly, object rearrangement, long-horizon instruction following), a central question remains: how can we equip VLA models with the structured reasoning capacity that complex manipulation demands? Drawing an analogy to the language domain, where Chain-of-Thought (CoT) prompting [ 35 ] dramatically improves reasoning over direct answer generation, single-pass VLA models similarly lack the “thinking” 1                                           
+
+> arXiv:2606.17937v1 [cs.RO] 16 Jun 2026 “Make breakfast”
+> Subtask text
+> Predicted Image
+> Predicted Image
+> (a1) Text -only
+> (a2) Visual -only
+> Predicted Image Forward CoT Inverse CoT
+> (a) Unimodal CoT
+> Subtask text
+> ➕
+> Less Coherence
+> (b) Decoupled CoT
+> (c) Interleaved CoT (Ours)
+> One Unified Model with High Coherence
+> Task
+> Decom.
+> Spatial
+> Ground
+> Cross -
+> Modal
+> Cohere.
+> Inver
+> Reas .
+> Place bread on the plate
+> Pour tea
+> ... Subgoal :pour tea .Kettle at
+> back -left ,cup to the right of the
+> plate .The target scene show tea
+> flowing from the spout into the cup .
+> Cup to the lower -right of kettle .
+> Move the left arm forward -
+> right ,above the cup opening ,
+> tilt slowly ...
+
+Figure 1 Comparison of VLA reasoning strategies on a multi-step task. We identify four capabilities required for structured manipulation reasoning: task decomposition, spatial grounding, cross-modal coherence, and inverse dynamics reasoning. (a) Unimodal CoT provides at most one of the first two. (b) Decoupled CoT adds both but lacks cross-modal coherence and inverse reasoning. (c) ThinkingVLA achieves all four through an interleaved reasoning chain (forward CoT 
+
+→ predicted image → inverse CoT) within a single autoregressive sequence. 
+
+capacity needed for challenging manipulation. Recognizing this, recent work has introduced CoT reasoning into VLA models via two strategies. Unimodal CoT augments the policy with reasoning in a single modality [ 2, 6, 8 , 18 , 23 , 42 , 44 , 47 ]: text-only approaches [ 2, 6 , 18 , 42 , 44 ] improve multi-step performance but lack spatial precision, while visual-only approaches [ 8 , 23 , 30 , 47 ] provide spatial grounding but lack structured decomposition. Decoupled CoT [ 14 , 16 , 22 , 25 , 34 , 46 ] employs both modalities, but textual reasoning does not directly guide image generation, weakening cross-modal coherence, and no explicit reasoning follows the predicted image, leaving inverse dynamics implicit. Consider a robot instructed to “make breakfast” (Figure 1). It must retrieve a plate from the shelf and place it on the table, pick up bread and set it on the plate, then grasp the kettle and pour tea. At each step, the robot should anticipate what the scene will look like after the action, determine how to grasp and move each object, and verify that preceding steps were completed successfully before proceeding. This interplay between imagining future states and reasoning about how to reach them lies at the heart of manipulation planning. Motivated by this, we argue that two ingredients are needed. First, a principled decomposition: manipulation planning factors into prediction (anticipating the next visual state) and inverse dynamics (inferring the actions to reach it). Unimodal approaches address only one of these subproblems; decoupled approaches cover both but lack an explicit reasoning step that bridges the predicted future state to action generation, leaving inverse dynamics entirely implicit. The second ingredient is a unified autoregressive architecture in which text and image tokens share a common vocabulary: by interleaving textual reasoning, visual prediction, and visually-grounded inverse dynamics reasoning in a single unbroken causal sequence, the predicted image naturally serves as the bridge between prediction and inverse dynamics, with each step directly conditioning on all preceding outputs across modalities. Building on this insight, we propose ThinkingVLA , a generative VLA model that realizes this decomposition within a unified Mixture-of-Transformers (MoT) architecture. ThinkingVLA interleaves textual reasoning and visual prediction in a single autoregressive pass: a forward CoT identifies the immediate subgoal and guides visual forecasting of the next state; the predicted image then serves as the bridge to inverse dynamics, grounding an inverse CoT that explicitly reasons about spatial relationships and action intent with precision that language alone cannot provide; and the final action is generated conditioned on this full reasoning context. The entire model is end-to-end trainable, and every intermediate output remains human-inspectable. 2We adopt a progressive training pipeline analogous to pretraining, continual pretraining, and fine-tuning in large language models: ThinkingVLA first acquires general-purpose reasoning and visual prediction capabilities, then learns end-to-end action generation across diverse manipulation domains, and finally adapts to each target robot embodiment, yielding a reasoning foundation model for manipulation whose structured multimodal reasoning transfers across robot platforms and task distributions. Our main contributions are as follows: 
+
+• We identify the decomposition of manipulation planning into prediction and inverse dynamics as a principled framework for VLA reasoning, and introduce ThinkingVLA, a unified autoregressive model that bridges the two by interleaving language subgoal identification, future image prediction, and visually-grounded action reasoning within a single coherent generation process. 
+
+• We design a progressive training pipeline, from generative reasoning pretraining to end-to-end policy learning, that enables effective acquisition of structured multimodal reasoning capabilities, with pretraining substantially improving data efficiency on downstream manipulation tasks. 
+
+• We demonstrate through extensive simulation and real-world experiments that ThinkingVLA outperforms both unimodal and decoupled CoT approaches, with ablations confirming the contribution of each reasoning stage. 
+
+2 Related Work 
+
+Vision-Language-Action Models. Vision-Language-Action (VLA) models unify visual perception, language understanding, and action generation within a single model, and have demonstrated strong generalization when pretrained on large, diverse datasets [ 2, 7, 17 , 20 , 21 ]. A common architectural pattern pairs a VLM backbone with a dedicated action expert, using flow matching [ 4 –6 ] or diffusion [ 36 , 37 ], to produce smooth, continuous trajectories. Recent work augments VLA policies with Chain-of-Thought (CoT) reasoning [ 35 ]. Unimodal text-only methods prepend intermediate language plans, such as step-by-step instructions, or language subgoals, before action generation [ 2, 6, 18 , 42 , 44 ]. Unimodal visual methods generate future observation states or visual subgoal representations as intermediate outputs [ 8, 23 , 30 , 47 ]. Decoupled multimodal methods, including UP-VLA [ 46 ], UniVLA [ 34 ],VITA [ 25 ], ManualVLA [ 14 ], LaST 0 [ 22 ], and BagelVLA [ 16 ], incorporate both textual and visual reasoning as separate sequential stages. In contrast, ThinkingVLA interleaves both modalities within a single autoregressive pass, with each reasoning step directly conditioning on all preceding outputs across modalities. 
+
+Unified Vision-Language Generation. A key enabler of ThinkingVLA is the ability to generate both text and images within a single autoregressive model. This capability builds on the development of discrete image tokenizers which compress images into sequences of codebook indices, allowing image generation to be cast as next-token prediction over a shared vocabulary with text [ 13 , 27 , 28 , 31 , 32 , 43 ]. Building on this foundation, a growing body of work has explored unified multimodal models that interleave text and image tokens in a single sequence for joint understanding and generation [ 10 – 12 , 24 , 29 , 33 , 38 –41 , 49 ]. Among these, one line of work adopts a purely token-based architecture that handles all modalities with a unified autoregressive transformer [ 10 , 29 , 33 , 38 ], while another integrates next-token prediction for text with diffusion processes for images within a single model [ 41 , 49 ]. ThinkingVLA follows the token-based autoregressive route so that each token directly conditions on all preceding outputs across modalities, and repurposes this capability for robotic planning: generated image tokens serve as functional intermediates bridging language reasoning and action generation within a closed-loop pipeline. 
+
+3 Method 
+
+3.1 Task Formulation 
+
+We formulate instruction-conditioned robotic manipulation as a sequential decision-making problem. At each decision step 𝑡 , the robot receives a task instruction 𝑙 and the visual observation 𝑜 𝑡 , and predicts an 3Multi -modal Tokenizer                            
+
+> QKV QKV
+> FFN FFN
+> Make breakfast, get the
+> plate and put the bread
+> on it, then pour tea.
+> 0.05
+> 0.24
+> ⋯
+> 0.10
+> 0.01
+> Observation Instruction Robot State
+> 0.21
+> 0.06
+> ⋯
+> 0.06
+> 0.78
+> Forward CoT Predicted Images Inverse CoT Action
+> Context token
+> Forward CoT token
+> Head image token
+> Left image token
+> Right image token
+> Inverse CoT token
+> Action token
+> Noise
+> 𝑜 !,𝑙
+> 𝑟 "#$
+> /o%&'
+> /𝑜 !&'
+> (
+> /𝑜 !&'
+> )
+> 𝑟 *+,
+> a!
+> Multi -modal De -tokenizer
+> Thinking
+> Expert
+> Action
+> Expert
+> <think> Future view likely shows
+> bread unchanged, tea -pouring
+> preparation beginning .left gripper
+> moving toward kettle …</think>
+> <think> Seeing the future image with
+> the left gripper closer to the kettle and
+> right arm unchanged …Subtask :
+> left_grasp_kettle ,right_still. </think>
+> Multi -modal Self Attention
+
+Figure 2 Overview of the ThinkingVLA architecture. The thinking expert generates interleaved textual reasoning and future image tokens; the action expert produces the action chunk via flow matching. The attention mask (right) illustrates token-level visibility in the multi-view setting. 
+
+action chunk 𝑎 𝑡 . Standard VLA policies model this as a direct conditional mapping 𝑝 (𝑎 𝑡 | 𝑜 𝑡 , 𝑙 ) [ 5, 7 , 17 ], which leaves the intermediate planning process entirely implicit. ThinkingVLA instead makes this planning process explicit by introducing three structured intermediate variables at each step: a forward CoT 𝑟 fwd  
+
+> 𝑡
+
+that interprets the task instruction and reasons about the desired next state, one or more predicted future images 
+
+ˆ𝑜 𝑡 +1 that visualize that state from the viewpoints available on the robot, guided by the forward reasoning, and an inverse CoT 𝑟 inv  
+
+> 𝑡
+
+that reasons about how to reach it through concrete actions. We therefore factorize action generation as 
+
+𝑝 𝜃 (𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+, 𝑎 𝑡 | 𝑜 𝑡 , 𝑙 )
+
+= 𝑝 𝜃 (𝑟 fwd  
+
+> 𝑡
+
+| 𝑜 𝑡 , 𝑙 ) 𝑝 𝜃 ( ˆ 𝑜 𝑡 +1 | 𝑜 𝑡 , 𝑙, 𝑟 fwd  
+
+> 𝑡
+
+)
+
+| {z }
+
+> prediction
+
+× 𝑝 𝜃 (𝑟 inv  
+
+> 𝑡
+
+| 𝑜 𝑡 , 𝑙, 𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1) 𝑝 𝜃 (𝑎 𝑡 | 𝑜 𝑡 , 𝑙, 𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+)
+
+| {z }
+
+> inverse dynamics
+
+.
+
+(1) We realize this factorization with a Mixture-of-Transformers (MoT) architecture in which a thinking expert generates the interleaved reasoning sequence [𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+], and a dedicated action expert receives the full reasoning context to produce 𝑎 𝑡 . The full pipeline remains end-to-end trainable. We detail the architecture and training procedure in §3.2 and §3.3, respectively. 
+
+3.2 Architecture 
+
+ThinkingVLA adopts a Mixture-of-Transformers (MoT) architecture with two coupled experts (Figure 2): a thinking expert that generates the reasoning chain [𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+] for the prediction phase of Eq. (1) , and an action expert that produces the action chunk 𝑎 𝑡 for inverse dynamics. 
+
+Unified tokenization. A multi-modal tokenizer maps all inputs and outputs into a shared token space: language is tokenized with the pretrained VLM [ 3] text tokenizer, observations are encoded via a SigLIP vision encoder [ 45 ], and images are discretized into vision tokens with a Cosmos image tokenizer [ 1]. Text and vision tokens share a unified vocabulary, so the thinking expert handles both modalities in a single 4autoregressive pass. The training sequence takes the form: 
+
+[BOS ] { 𝑜 𝑡 } { 𝑙 }
+
+| {z }
+
+> context
+
+[think ] { 𝑟 fwd  
+
+> 𝑡
+
+} [ /think ] [ gen ] { ˆ 𝑜 𝑡 +1} [ /gen ] [ think ] { 𝑟 inv  
+
+> 𝑡
+
+} [ /think ]
+
+| {z }
+
+> reasoning chain
+
+[EOS ] (2) The context consists of observation tokens {𝑜 𝑡 } (ViT features concatenated with Cosmos discrete tokens), instruction tokens {𝑙 }, and robot proprioceptive state encoded alongside the instruction. In the reasoning chain, special tokens [think] /[/think] bracket textual CoT segments and [gen] /[/gen] bracket the predicted future image, serving as modality-switching signals. Because text and image tokens share the same vocabulary and are generated by the same autoregressive process, the reasoning chain [𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+] forms a single unbroken causal sequence with no modality boundary: (1) the image generation loss propagates directly through the preceding forward CoT tokens, so the model learns to produce text that facilitates accurate visual prediction—a gradient coupling that requires no separate cross-modal interface; (2) the subsequent inverse CoT 𝑟 inv  
+
+> 𝑡
+
+conditions on individual image tokens through the same causal attention used for text, grounding action reasoning in the spatial details of the predicted scene without any cross-modal projection. 
+
+Mixture-of-Transformers. Both experts are multi-layer transformers with separate parameters that share attention at every layer: each expert computes its own Q/K/V projections; the K/V pairs are concatenated and a single joint attention is applied; the output is then split back and passed through expert-specific feed-forward networks. As illustrated in Figure 2, the attention mask adaptively mixes bidirectional and causal patterns: context tokens attend bidirectionally; reasoning and image tokens are generated causally; and the action expert attends to the full thinking prefix while remaining invisible to it, enabling it to leverage the reasoning context without disrupting generation. For multi-view prediction, each wrist-view image attends to all third-view tokens for spatial consistency but not to other wrist views. 
+
+Training objective. The thinking expert is supervised by next-token prediction over the reasoning chain in Eq. (2) . We decompose this into two terms according to token modality. The text loss supervises CoT generation: 
+
+ℒtext = −
+
+Õ
+
+> 𝑖 ∈𝒯
+
+log 𝑝 𝜃 
+
+ 𝑦 𝑖 | 𝑦 <𝑖 , 𝑜 𝑡 , 𝑙  , (3) where 𝒯 indexes the text token positions—forward CoT and inverse CoT; note that the latter is autoregressively conditioned on the preceding image tokens ˆ𝑜 𝑡 +1. The image loss supervises future-image generation: 
+
+ℒimg = −
+
+Õ
+
+> 𝑗 ∈𝒱
+
+log 𝑝 𝜃 
+
+ 𝑦 𝑗 | 𝑦 <𝑗 , 𝑜 𝑡 , 𝑙  , (4) where 𝒱 indexes all vision token positions in the reasoning chain; in single-view prediction 𝒱 corresponds to ˆ𝑜 𝑡 +1, while in multi-view prediction it spans all generated views. Both losses are standard cross-entropy computed within the thinking expert. The action expert is supervised by a flow-matching loss. Given time index 𝜏 ∈ [ 0, 1] and Gaussian noise 𝜖 ,a perturbed action 𝑥 𝜏 = 𝜏 𝜖 + ( 1 − 𝜏 ) 𝑎 𝑡 is constructed, and the expert learns to predict the target velocity 
+
+𝑢 = 𝜖 − 𝑎 𝑡 conditioned on 𝑥 𝜏 , 𝜏 , and the reasoning context 𝑐 𝑡 = [𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+] provided by the thinking expert via shared attention: 
+
+ℒaction = 𝔼 𝜏 , 𝜖 
+
+∥𝑣 𝜃 (𝑥 𝜏 , 𝜏 , 𝑐 𝑡 ) − 𝑢 ∥2 . (5) The full training objective combines the three losses: 
+
+ℒ = 𝜆 text ℒtext + 𝜆 img ℒimg + 𝜆 action ℒaction , (6) where 𝜆 text , 𝜆 img , and 𝜆 action are per-stage loss weights specified in §3.3. 53.3 Training and Inference Strategy 
+
+Because ThinkingVLA combines reasoning, visual prediction, and action generation—each requiring distinct supervision signals—we adopt a multi-stage training strategy that introduces these capabilities progressively: reasoning and visual prediction (Stage 1), end-to-end action generation (Stage 2), and target robot adaptation (Stage 3). 
+
+Training data. We train on a mixture of robotic manipulation datasets: Stages 1–2 use a subset of the Open X-Embodiment (OXE) dataset [ 26 ], while Stage 3 fine-tunes on RoboTwin [ 9] and real-world demonstrations. For reasoning supervision, we generate forward CoT 𝑟 fwd  
+
+> 𝑡
+
+, inverse CoT 𝑟 inv  
+
+> 𝑡
+
+by prompting Vision-Language Models. Dataset compositions and the annotation pipeline are detailed in Appendix B and C. 
+
+Stage 1: Generative reasoning pretraining. We train only the thinking expert to generate forward reasoning and a single future image, without action prediction. Given a demonstration trajectory, the model receives the observation 𝑜 𝑡 and instruction 𝑙 , and is supervised to produce the forward CoT 𝑟 fwd  
+
+> 𝑡
+
+and the predicted future image ˆ𝑜 𝑡 +1. The loss weights are 𝜆 text = 𝜆 img = 1 with 𝜆 action = 0.
+
+Stage 2: End-to-end policy learning. We introduce the action expert and enable the complete pipeline. The model now generates the full reasoning chain [𝑟 fwd  
+
+> 𝑡
+
+, ˆ𝑜 𝑡 +1 , 𝑟 inv  
+
+> 𝑡
+
+] and predicts actions 𝑎 𝑡 under the full objective in Eq. (6) with 𝜆 text = 1, 𝜆 img = 2, and 𝜆 action = 10 .
+
+Stage 3: Target robot adaptation. We fine-tune the full model on each target dataset. To match each dataset’s camera configuration, single-view future image generation is extended to multi-view prediction. The loss weights are 𝜆 text = 𝜆 img = 1 and 𝜆 action = 10 .
+
+Inference strategy. We employ two complementary techniques to balance generation quality and inference efficiency; training-time implementation details are provided in Appendix E. Classifier-free guidance (CFG) [ 15 ] improves future-image prediction quality. At inference, we fuse logits from three condition-ablated branches: 
+
+𝑙 cfg = 𝑙 base + 𝑠 𝐼 (𝑙 img − 𝑙 base ) + 𝑠 𝑇 (𝑙 full − 𝑙 img ), (7) where 𝑙 full , 𝑙 img , and 𝑙 base are logits under full, image-only, and unconditional conditioning, and 𝑠 𝐼 , 𝑠 𝑇 control guidance strength. CFG is applied exclusively to future-image token generation; reasoning and action prediction are not guided. Reasoning dropout enables flexible efficiency–quality trade-offs. By randomly dropping 𝑟 fwd  
+
+> 𝑡
+
+and 𝑟 inv 
+
+> 𝑡
+
+independently during training, the model learns to generate and predict even without explicit reasoning, allowing selective skipping of CoT generation at inference to reduce latency. 
+
+4 Experiments 
+
+We evaluate ThinkingVLA in simulation (§4.2) and real-world settings (§4.3), and conduct ablation studies on real-world tasks (§4.4) to answer three questions: (1) Does ThinkingVLA outperform state-of-the-art VLA baselines, and does the advantage grow with task horizon? (2) How does each component of the interleaved reasoning chain contribute to task performance? (3) How critical is large-scale end-to-end action pretraining for downstream adaptation? 
+
+4.1 Experimental Setup 
+
+ThinkingVLA builds on the 𝜋 0.5 [ 6] architecture. The thinking expert uses PaliGemma [ 3 ] as its backbone, with a Cosmos image tokenizer [ 1 ] for discrete visual tokenization. The action expert is a 300M-parameter transformer that shares attention with the thinking expert at every layer. We train the model following the three-stage procedure described in §3.3. Additional architecture and training details are provided in Appendix A and D. 6Table 1 Results on RoboTwin 2.0. We report success rate (%) on Easy and Hard splits across task horizons. Best results are bold ; second-best are underlined. 
+
+𝜋 0 [5] XVLA [48] UP-VLA [46] BagelVLA [16] ThinkingVLA (Ours) Metric Easy Hard Easy Hard Easy Hard Easy Hard Easy Hard Average Horizon =1 61.5 27.0 85.9 49.7 76.4 24.8 91.0 26.7 90.2 33.4 Average Horizon =2 43.6 6.0 60.2 23.6 28.8 3.2 55.8 7.0 71.0 26.6 
+
+Average Horizon =3 32.6 8.6 44.6 18.6 23.2 0.2 55.8 6.8 60.0 23.6 
+
+Average 20 Tasks 49.8 17.2 69.2 35.4 51.2 13.3 73.4 16.8 77.9 29.3 
+
+Baselines. We compare against five representative VLA models: 𝝅 0 [ 5], a flow-matching VLA with a dedicated action expert; 𝝅 0.5 [6], a VLA model with subtask prediction; XVLA [48], a scalable cross-embodiment VLA model; UP-VLA [ 46 ], a unified understanding and prediction model; and BagelVLA [16 ], a unified model that integrates linguistic planning, visual forecasting, and action generation. For each baseline, we evaluate using officially released checkpoints when available and cite published results otherwise. In simulation, we compare against 𝜋 0, XVLA, UP-VLA, and BagelVLA (§4.2); in real-world experiments, we compare against 𝜋 0,
+
+𝜋 0.5, and UP-VLA (§4.3). 
+
+4.2 Evaluation in Simulation 
+
+RoboTwin 2.0. RoboTwin 2.0 [ 9 ] is a dual-arm manipulation benchmark with diverse tasks spanning object manipulation, tool use, and coordinated bimanual operations. Following the horizon-based task grouping of Lingbot-VA [ 19 ], we select 20 RoboTwin tasks: 10 at Horizon =1, 5 at Horizon =2, and 5 at Horizon =3. We used the official settings: for each task, we used 50 episodes for fine-tuning, and evaluated each task 100 times under both the Easy and Hard settings. 
+
+Results. Table 1 summarizes the simulation results. ThinkingVLA achieves the highest average success rate on Easy (77.9%) and competitive performance on Hard (29.3%). The advantage grows with task horizon: against BagelVLA, which also generates future images and subtask text, ThinkingVLA improves by 15.2 pp on Horizon =2 Easy and 19.6 pp on Hard; on Horizon =3, ThinkingVLA reaches 60.0% Easy / 23.6% Hard versus 55.8% / 6.8% for BagelVLA and 44.6% / 18.6% for XVLA, indicating that interleaved reasoning provides tighter cross-modal coupling than independently generating text and image. Per-task results are provided in Appendix F. 
+
+4.3 Real-World Deployment 
+
+Task suite. We deploy ThinkingVLA on an ALOHA bimanual robot platform equipped with one head camera and two wrist cameras. We design five manipulation tasks divided into two groups (Figure 3): three basic tasks and two long-horizon tasks. Each task is fine-tuned with 50 demonstration episodes and evaluated over 20 trials. We report success rate (%) per task. More details about real-world setup and per-task descriptions are provided in Appendix G. 
+
+Results. Figure 4 summarizes the real-world results. ThinkingVLA achieves the highest success rate on four of five tasks, with the largest gains on long-horizon tasks: it outperforms 𝜋 0.5 by 10 pp on both Make Breakfast and Assemble Equation. Notably, UP-VLA, which also incorporates visual prediction, drops to 30% and 20% on these tasks, indicating that visual prediction alone is insufficient without structured textual reasoning. Visualizations of the reasoning process are provided in Appendix J; additional robustness experiments in Appendix H. 
+
+4.4 Ablation Study 
+
+We ablate reasoning components and pretraining strategy on the real-world task suite. We compare the full model against five variants: (1) w/o forward CoT : the future image is generated directly without forward reasoning; (2) w/o inverse CoT : actions are conditioned on the predicted image without inverse reasoning; 71          
+
+> 2
+> 3
+> 4
+> 5
+> 6
+> 1
+> 2
+> 1
+> 2
+> 3
+> 48
+> 7
+> 6
+> 5
+> 4
+> 3
+> 2
+> 1
+> 4
+> 3
+> 2
+> 1
+> Hang Cup Place Cubes Arrange Blocks Make Breakfast Assemble Equation
+
+Figure 3 Real-world tasks. We evaluate on five manipulation tasks on an ALOHA bimanual platform: three basic tasks (Hang Cup, Arrange Blocks, Place Cubes) and two long-horizon tasks (Make Breakfast, Assemble Equation). Hang Cup Place Cubes Arrange Blocks Make Breakfast Assemble Equation     
+
+> 0%
+> 20%
+> 40%
+> 60%
+> 80%
+> 100%
+> Success Rate
+> Basic Long-Horizon
+> Ours 00.5 UP-VLA
+
+Figure 4 Real-world manipulation results on ALOHA. We report success rate (%) over 20 trials per task. Tasks are grouped into basic (left) and long-horizon (right). 
+
+(3) only visual prediction : both CoTs are removed, retaining only the predicted future image for action generation; (4) only subtask : both CoTs and visual prediction are removed, retaining only a textual subtask description; (5) w/o Stage 2 pretrain : the model fine-tunes directly from Stage 1 to Stage 3. 
+
+Reasoning component ablation. Table 2 reports the results for variants (1)–(4). The inverse CoT is the most critical component: removing it reduces overall success from 85.0% to 70.0% ( −15 pp), with long-horizon tasks suffering most (Make Breakfast 70 →45%, Assemble Equation 90 →60%). Forward CoT provides a smaller but consistent gain of 6 pp overall, concentrated on multi-step tasks where subgoal identification guides more accurate visual prediction. Notably, Only visual (67.0%) and Only subtask (69.0%) perform comparably, both far below the full model. This shows that neither visual prediction alone nor text-only subtask planning alone is sufficient; the gain comes from their interleaved combination, where textual reasoning grounds visual prediction and the predicted image in turn grounds action reasoning. The ablation effect scales with task complexity: on the single-step Hang Cup, all variants achieve 90%, while on long-horizon tasks the full model outperforms the single-modality variants by 25–40 pp. 
+
+Table 2 Ablation study on real-world tasks. We report success rate (%). Best results are bold .
+
+Method 
+
+Hang Cup Arrange Blocks Place Cubes Make Breakfast Assemble Equation 
+
+Full 90 90 85 70 90 
+
+w/o fwd CoT 90 90 80 55 80 w/o inv CoT 90 80 75 45 60 Only visual 90 80 75 40 50 Only subtask 90 85 75 45 50 
+
+Effect of Stage 2 pretraining. To assess whether large-scale end-to-end action pretraining (Stage 2) is necessary, we compare the full model against a variant that skips Stage 2 and directly fine-tunes from Stage 1 to Stage 3. We vary the number of fine-tuning episodes (10, 25, 40, 50) on three tasks spanning different horizons and report success rate in Figure 5; results on the remaining two tasks are provided in Appendix I. Stage 2 pretraining consistently improves data efficiency, and the benefit grows with task complexity: the gap at 50 810 25 40 50 
+
+> Number of Fine-tuning Episodes
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)  85
+> 50
+> 90
+> 80
+> 90
+> 85
+> 90
+> 85
+
+(a) Hang cup    
+
+> w/ Stage 2
+> w/o Stage 2
+> 10 25 40 50
+> Number of Fine-tuning Episodes
+> 60
+> 20
+> 70
+> 45
+> 80
+> 50
+> 85
+> 60
+
+(b) Place cubes    
+
+> 10 25 40 50
+> Number of Fine-tuning Episodes
+> 60
+> 0
+> 75
+> 20
+> 80
+> 35
+> 90
+> 40
+
+(c) Assemble equation Figure 5 Effect of Stage 2 pretraining on data efficiency. We compare the full model (w/ pretrain) against a variant that skips Stage 2 (w/o pretrain), varying the number of fine-tuning episodes on three tasks: (a) Hang Cup, (b) Place Cubes, and (c) Assemble Equation. 
+
+episodes increases from 5 pp on Hang Cup to 25 pp on Place Cubes and 50 pp on Assemble Equation, where the variant without pretraining fails completely at 10 episodes. These results confirm that end-to-end action pretraining provides transferable manipulation priors that cannot be recovered by additional target-domain data alone. 
+
+5 Conclusion, Limitations and Future Work 
+
+Conclusion. We presented ThinkingVLA, a generative VLA that bridges prediction and inverse dynamics through interleaved vision–language reasoning, achieving consistent gains over unimodal and decoupled CoT approaches in both simulation and real-world settings. 
+
+Limitations and future work. Generating the full reasoning chain adds latency, which is a cost inherent to all reasoning-augmented models. While reasoning dropout (§3.3) already allows selective skipping, adaptive reasoning that invokes the chain only for complex or uncertain steps is a promising direction for further reducing overhead. 9References 
+
+[1] Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvĳit Chattopadhyay, Yongxin Chen, Yin Cui, Yifan Ding, et al. Cosmos world foundation model platform for physical ai. arXiv preprint arXiv:2501.03575, 2025. [2] Suneel Belkhale, Tianli Ding, Ted Xiao, Pierre Sermanet, Quan Vuong, Jonathan Tompson, Yevgen Chebotar, Debidatta Dwibedi, and Dorsa Sadigh. Rt-h: Action hierarchies using language. In Robotics: Science and Systems, 2024. [3] Lucas Beyer, Andreas Steiner, André Susano Pinto, Alexander Kolesnikov, Xiao Wang, Daniel Salz, Maxim Neumann, Ibrahim Alabdulmohsin, Michael Tschannen, Emanuele Bugliarello, et al. Paligemma: A versatile 3b vlm for transfer. arXiv preprint arXiv:2407.07726, 2024. [4] Johan Bjorck, Fernando Castañeda, Nikita Cherniadev, Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox, Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open foundation model for generalist humanoid robots. arXiv preprint arXiv:2503.14734, 2025. [5] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. 𝜋 0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164, 2024. [6] Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Robert Equi, Chelsea Finn, Niccolo Fusai, Manuel Y Galliker, et al. 𝜋 0.5: a vision-language-action model with open-world generalization. In 9th Annual Conference on Robot Learning, 2025. [7] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakr-ishnan, Karol Hausman, Alexander Herzog, Jasmine Hsu, et al. Rt-1: Robotics transformer for real-world control at scale. Robotics: Science and Systems XIX, 2023. [8] Jun Cen, Chaohui Yu, Hangjie Yuan, Yuming Jiang, Siteng Huang, Jiayan Guo, Xin Li, Yibing Song, Hao Luo, Fan Wang, et al. Worldvla: Towards autoregressive action world model. arXiv preprint arXiv:2506.21539, 2025. [9] Tianxing Chen, Zanxin Chen, Baĳun Chen, Zĳian Cai, Yibin Liu, Zixuan Li, Qiwei Liang, Xianliang Lin, Yiheng Ge, Zhenyu Gu, et al. Robotwin 2.0: A scalable data generator and benchmark with strong domain randomization for robust bimanual robotic manipulation. arXiv preprint arXiv:2506.18088, 2025. [10] Xiaokang Chen, Zhiyu Wu, Xingchao Liu, Zizheng Pan, Wen Liu, Zhenda Xie, Xingkai Yu, and Chong Ruan. Janus-pro: Unified multimodal understanding and generation with data and model scaling. arXiv preprint arXiv:2501.17811, 2025. [11] Yufeng Cui, Honghao Chen, Haoge Deng, Xu Huang, Xinghang Li, Jirong Liu, Yang Liu, Zhuoyan Luo, Jinsheng Wang, Wenxuan Wang, et al. Emu3. 5: Native multimodal models are world learners. arXiv preprint arXiv:2510.26583, 2025. [12] Chaorui Deng, Deyao Zhu, Kunchang Li, Chenhui Gou, Feng Li, Zeyu Wang, Shu Zhong, Weihao Yu, Xiaonan Nie, Ziang Song, et al. Emerging properties in unified multimodal pretraining. arXiv preprint arXiv:2505.14683, 2025. [13] Patrick Esser, Robin Rombach, and Bjorn Ommer. Taming transformers for high-resolution image synthesis. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, pages 12873–12883, 2021. [14] Chenyang Gu, Jiaming Liu, Hao Chen, Runzhong Huang, Qingpo Wuwu, Zhuoyang Liu, Xiaoqi Li, Ying Li, Renrui Zhang, Peng Jia, et al. Manualvla: A unified vla model for chain-of-thought manual generation and robotic manipulation. arXiv preprint arXiv:2512.02013, 2025. [15] Jonathan Ho and Tim Salimans. Classifier-free diffusion guidance. In NeurIPS 2021 Workshop on Deep Generative Models and Downstream Applications. [16] Yucheng Hu, Jianke Zhang, Yuanfei Luo, Yanjiang Guo, Xiaoyu Chen, Xinshu Sun, Kun Feng, Qingzhou Lu, Sheng Chen, Yangang Zhang, et al. Bagelvla: Enhancing long-horizon manipulation via interleaved vision-language-action generation. arXiv preprint arXiv:2602.09849, 2026. [17] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan P Foster, Pannag R Sanketi, Quan Vuong, et al. Openvla: An open-source vision-language-action model. In 8th Annual Conference on Robot Learning, 2024. 
+
+10 [18] Jason Lee, Jiafei Duan, Haoquan Fang, Yuquan Deng, Boyang Li, Shuo Liu, Bohan Fang, Jieyu Zhang, Yi Ru Wang, Sangho Lee, et al. Molmoact: Action reasoning models that can reason in space. In Workshop on Making Sense of Data in Robotics: Composition, Curation, and Interpretability at Scale at CoRL 2025, 2025. [19] Lin Li, Qihang Zhang, Yiming Luo, Shuai Yang, Ruilin Wang, Fei Han, Mingrui Yu, Zelin Gao, Nan Xue, Xing Zhu, et al. Causal world modeling for robot control. arXiv preprint arXiv:2601.21998, 2026. [20] Xingyao Lin, Guojin Zhong, Tianyi Lu, Ziyi Ye, Yichen Zhu, Zuxuan Wu, and Yu-Gang Jiang. Activemimic: Egocentric video pretraining with active perception. arXiv preprint arXiv:2606.06194, 2026. [21] Songming Liu, Lingxuan Wu, Bangguo Li, Hengkai Tan, Huayu Chen, Zhengyi Wang, Ke Xu, Hang Su, and Jun Zhu. Rdt-1b: a diffusion foundation model for bimanual manipulation. In The Thirteenth International Conference on Learning Representations, 2025. [22] Zhuoyang Liu, Jiaming Liu, Hao Chen, Ziyu Guo, Chengkai Hou, Chenyang Gu, Jiale Yu, Xiangju Mi, Renrui Zhang, Zhengping Che, et al. Last 0: Latent spatio-temporal chain-of-thought for robotic vision-language-action model. arXiv preprint arXiv:2601.05248, 2026. [23] Qi Lv, Weĳie Kong, Hao Li, Jia Zeng, Zherui Qiu, Delin Qu, Haoming Song, Qizhi Chen, Xiang Deng, and Jiangmiao Pang. F1: A vision-language-action model bridging understanding and generation to actions. arXiv preprint arXiv:2509.06951, 2025. [24] Chuofan Ma, Yi Jiang, Junfeng Wu, Jihan Yang, Xin Yu, Zehuan Yuan, BINGYUE PENG, and XIAOJUAN QI. Unitok: a unified tokenizer for visual generation and understanding. In The Thirty-ninth Annual Conference on Neural Information Processing Systems. [25] Xiangkai Ma, Lekai Xing, Han Zhang, Wenzhong Li, and Sanglu Lu. Unifying perception and action: A hybrid-modality pipeline with implicit visual chain-of-thought for robotic action generation. arXiv preprint arXiv:2511.19859, 2025. [26] Open X-Embodiment Collaboration. Open X-Embodiment: Robotic learning datasets and RT-X models. arXiv preprint arXiv:2310.08864, 2024. [27] Ali Razavi, Aaron Van den Oord, and Oriol Vinyals. Generating diverse high-fidelity images with vq-vae-2. Advances in neural information processing systems, 32, 2019. [28] Fengyuan Shi, Zhuoyan Luo, Yixiao Ge, Yujiu Yang, Ying Shan, and Limin Wang. Scalable image tokenization with index backpropagation quantization. In Proceedings of the IEEE/CVF International Conference on Computer Vision, pages 16037–16046, 2025. [29] Chameleon Team. Chameleon: Mixed-modal early-fusion foundation models. arXiv preprint arXiv:2405.09818, 2024. [30] Yang Tian, Sizhe Yang, Jia Zeng, Ping Wang, Dahua Lin, Hao Dong, and Jiangmiao Pang. Predictive inverse dynamics models are scalable learners for robotic manipulation. In International Conference on Learning Representations, volume 2025, pages 92033–92052, 2025. [31] Aaron Van Den Oord, Oriol Vinyals, et al. Neural discrete representation learning. Advances in neural information processing systems, 30, 2017. [32] Junke Wang, Yi Jiang, Zehuan Yuan, Binyue Peng, Zuxuan Wu, and Yu-Gang Jiang. Omnitokenizer: A joint image-video tokenizer for visual generation. Advances in Neural Information Processing Systems, 37:28281–28295, 2024. [33] Xinlong Wang, Xiaosong Zhang, Zhengxiong Luo, Quan Sun, Yufeng Cui, Jinsheng Wang, Fan Zhang, Yueze Wang, Zhen Li, Qiying Yu, et al. Emu3: Next-token prediction is all you need. arXiv preprint arXiv:2409.18869, 2024. [34] Yuqi Wang, Xinghang Li, Wenxuan Wang, Junbo Zhang, Yingyan Li, Yuntao Chen, Xinlong Wang, and Zhaoxiang Zhang. Unified vision-language-action model. arXiv preprint arXiv:2506.19850, 2025. [35] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al. Chain-of-thought prompting elicits reasoning in large language models. Advances in neural information processing systems, 35:24824–24837, 2022. [36] Junjie Wen, Yichen Zhu, Jinming Li, Minjie Zhu, Zhibin Tang, Kun Wu, Zhiyuan Xu, Ning Liu, Ran Cheng, Chaomin Shen, et al. Tinyvla: Towards fast, data-efficient vision-language-action models for robotic manipulation. IEEE Robotics and Automation Letters, 2025. 
+
+11 [37] Junjie Wen, Yichen Zhu, Minjie Zhu, Zhibin Tang, Jinming Li, Zhongyi Zhou, Xiaoyu Liu, Chaomin Shen, Yaxin Peng, and Feifei Feng. Diffusionvla: Scaling robot foundation models via unified diffusion and autoregression. In Forty-second International Conference on Machine Learning, 2025. [38] Chengyue Wu, Xiaokang Chen, Zhiyu Wu, Yiyang Ma, Xingchao Liu, Zizheng Pan, Wen Liu, Zhenda Xie, Xingkai Yu, Chong Ruan, et al. Janus: Decoupling visual encoding for unified multimodal understanding and generation. In Proceedings of the Computer Vision and Pattern Recognition Conference, pages 12966–12977, 2025. [39] Junfeng Wu, Yi Jiang, Chuofan Ma, Yuliang Liu, Hengshuang Zhao, Zehuan Yuan, Song Bai, and Xiang Bai. Liquid: Language models are scalable and unified multi-modal generators. International Journal of Computer Vision, 134 (1):39, 2026. [40] Yecheng Wu, Zhuoyang Zhang, Junyu Chen, Haotian Tang, Dacheng Li, Yunhao Fang, Ligeng Zhu, Enze Xie, Hongxu Yin, Li Yi, et al. Vila-u: a unified foundation model integrating visual understanding and generation. In The Thirteenth International Conference on Learning Representations. [41] Jinheng Xie, Weĳia Mao, Zechen Bai, David Junhao Zhang, Weihao Wang, Kevin Qinghong Lin, Yuchao Gu, Zhĳie Chen, Zhenheng Yang, and Mike Zheng Shou. Show-o: One single transformer to unify multimodal understanding and generation. In The Thirteenth International Conference on Learning Representations. [42] Cheng Yin, Yankai Lin, Wang Xu, Sikyuen Tam, Xiangrui Zeng, Zhiyuan Liu, and Zhouping Yin. Deepthinkvla: Enhancing reasoning capability of vision-language-action models. arXiv preprint arXiv:2511.15669, 2025. [43] Lĳun Yu, Jose Lezama, Nitesh Bharadwaj Gundavarapu, Luca Versari, Kihyuk Sohn, David Minnen, Yong Cheng, Agrim Gupta, Xiuye Gu, Alexander G Hauptmann, et al. Language model beats diffusion-tokenizer is key to visual generation. In The Twelfth International Conference on Learning Representations. [44] Michał Zawalski, William Chen, Karl Pertsch, Oier Mees, Chelsea Finn, and Sergey Levine. Robotic control via embodied chain-of-thought reasoning. In 8th Annual Conference on Robot Learning, 2024. [45] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and Lucas Beyer. Sigmoid loss for language image pre-training. In Proceedings of the IEEE/CVF international conference on computer vision, pages 11975–11986, 2023. [46] Jianke Zhang, Yanjiang Guo, Yucheng Hu, Xiaoyu Chen, Xiang Zhu, and Jianyu Chen. Up-vla: A unified understanding and prediction model for embodied agent. In International Conference on Machine Learning, pages 74911–74922. PMLR, 2025. [47] Qingqing Zhao, Yao Lu, Moo Jin Kim, Zipeng Fu, Zhuoyang Zhang, Yecheng Wu, Zhaoshuo Li, Qianli Ma, Song Han, Chelsea Finn, et al. Cot-vla: Visual chain-of-thought reasoning for vision-language-action models. In Proceedings of the Computer Vision and Pattern Recognition Conference, pages 1702–1713, 2025. [48] Jinliang Zheng, Jianxiong Li, Zhihao Wang, Dongxiu Liu, Xirui Kang, Yuchun Feng, Yinan Zheng, Jiayin Zou, Yilun Chen, Jia Zeng, et al. X-vla: Soft-prompted transformer as scalable cross-embodiment vision-language-action model. arXiv preprint arXiv:2510.10274, 2025. [49] Chunting Zhou, LILI YU, Arun Babu, Kushal Tirumala, Michihiro Yasunaga, Leonid Shamis, Jacob Kahn, Xuezhe Ma, Luke Zettlemoyer, and Omer Levy. Transfusion: Predict the next token and diffuse images with one multi-modal model. In The Thirteenth International Conference on Learning Representations. 
+
+12 A Model Architecture Details 
+
+Table 3 provides the full architectural specification of the released ThinkingVLA model, supplementing the overview in §3.2. 
+
+B Training Dataset Composition 
+
+Stages 1 and 2 train on a mixture of 25 datasets drawn from the Open X-Embodiment collection, comprising approximately 27.3M frames of diverse robotic manipulation data across multiple robot platforms, task families, and environment configurations. Table 4 lists each constituent dataset. 
+
+C Thinking Data Construction 
+
+ThinkingVLA requires paired reasoning annotations—a forward CoT 𝑟 fwd  
+
+> 𝑡
+
+and an inverse CoT 𝑟 inv  
+
+> 𝑡
+
+—at each training timestep. We generate these offline by prompting a multimodal language model on demonstration trajectories. For each timestep 𝑡 , the pipeline receives three inputs: (1) the task instruction 𝑙 , (2) the current observation image 𝑜 𝑡 , and (3) a future observation image 𝑜 𝑡 +𝑘 , where 𝑘 equals the action horizon so the future frame corresponds to the ground-truth next state in the demonstration. Two separate calls produce the forward and inverse CoT respectively; both are constrained to a single paragraph of at most 60 words enclosed in <think>...</think> delimiters. 
+
+Forward CoT annotation. The forward CoT 𝑟 fwd  
+
+> 𝑡
+
+reasons about future visual state prediction: given the current scene and task, what should the next state look like? The model is prompted with the system instruction in Table 5 and the user message: 
+
+Task: {task} Please analyze the current observation and future observation. Generate a concise thinking process that explains how the future visual state follows from the current visual state under the task. Output your reasoning in exactly one <think>...</think> block. 
+
+followed by two images captioned Current Observation (𝑜 𝑡 ) and Future Observation (𝑜 𝑡 +𝑘 ). The output covers four aspects: (1) current state analysis—positions and states of the robot arm, gripper, and target objects; (2) task decomposition—what immediate progress is needed; (3) future state prediction—expected visual changes from 𝑜 𝑡 to 𝑜 𝑡 +𝑘 ; and (4) visual prediction details—how object positions, robot pose, and spatial relationships should change. 
+
+Inverse CoT annotation. The inverse CoT 𝑟 inv  
+
+> 𝑡
+
+reasons about action inference: given the observed state transition, what immediate action primitive explains it? The model is prompted with the system instruction in Table 6 and the user message: 
+
+Task: {task} Please analyze the visual transition from the current observation to the future observation and identify the immediate action needed to advance the task. Generate your reasoning in exactly one <think>...</think> block, and include “subtask: [action]” inside the block. 
+
+with the same two images. The output must include an explicit subtask: tag identifying the inferred action primitive (e.g., approach, grasp, lift, move_to, place, release, finish), embedding a discrete action categorization within the free-form reasoning paragraph. 
+
+Annotation constraints. Both prompts enforce the following: (i) output is a single continuous paragraph without bullet points or line breaks; (ii) reasoning focuses on spatial relationships and visible scene elements; (iii) no references to frame indices, timestamps, camera names, or other metadata; (iv) subtask: finish 
+
+is reserved for cases where the task is already fully satisfied in the current observation. 13 D Training Hyperparameters 
+
+ThinkingVLA is trained progressively: Stage 1 initializes from pretrained PaliGemma [ 3] weights; each subsequent stage initializes from the best checkpoint of the preceding stage. Table 7 summarizes which modules are trainable or frozen at each stage. Tables 8–10 provide the optimizer, loss-weight, and schedule configurations. 
+
+E Classifier-Free Guidance Details 
+
+We describe here the training-time implementation of the classifier-free guidance (CFG) and reasoning dropout techniques introduced in §3.3. Both are applied only during training; the inference-time CFG fusion formula is given in Eq. (7). 
+
+Three-branch decomposition. CFG is applied exclusively to future image token generation; the forward CoT 
+
+𝑟 fwd  
+
+> 𝑡
+
+, inverse CoT 𝑟 inv  
+
+> 𝑡
+
+, and flow-matching action denoising are all produced under the full conditional. Let 
+
+𝑓 𝑣 (𝑜 𝑡 ) denote the ViT tokens of the current observation, ˜𝑜 𝑡 the Cosmos discrete tokens of 𝑜 𝑡 (the image condition), and 𝑙 the task instruction. The forward CoT 𝑟 fwd  
+
+> 𝑡
+
+is generated under the full condition and is shared across all three branches. Let ˆ𝑔 <𝑘 denote the future image tokens generated up to position 𝑘 . The three branches compute logits over the vision vocabulary as 
+
+𝑙 𝑘  
+
+> base
+
+= 𝑓 𝜃 
+
+
+
+ˆ𝑔 <𝑘 ; 𝑓 𝑣 (𝑜 𝑡 ), 𝑟 fwd 
+
+> 𝑡
+
+
+
+, (8) 
+
+𝑙 𝑘  
+
+> img
+
+= 𝑓 𝜃 
+
+
+
+ˆ𝑔 <𝑘 ; 𝑓 𝑣 (𝑜 𝑡 ), ˜𝑜 𝑡 , 𝑟 fwd 
+
+> 𝑡
+
+
+
+, (9) 
+
+𝑙 𝑘  
+
+> full
+
+= 𝑓 𝜃 
+
+
+
+ˆ𝑔 <𝑘 ; 𝑓 𝑣 (𝑜 𝑡 ), ˜𝑜 𝑡 , 𝑙, 𝑟 fwd 
+
+> 𝑡
+
+
+
+. (10) The ViT tokens 𝑓 𝑣 (𝑜 𝑡 ) are retained in all three branches; the branches differ only in whether the image condition ˜𝑜 𝑡 and task instruction 𝑙 are included. The per-token fused logit (Eq. (7) ) thus becomes 𝑙 𝑘  
+
+> cfg
+
+=
+
+𝑙 𝑘  
+
+> base
+
++ 𝑠 𝐼 (𝑙 𝑘  
+
+> img
+
+− 𝑙 𝑘 
+
+> base
+
+) + 𝑠 𝑇 (𝑙 𝑘  
+
+> full
+
+− 𝑙 𝑘 
+
+> img
+
+), with 𝑠 𝐼 = 1.5 and 𝑠 𝑇 = 2.
+
+Training branch sampling. Each training sample is independently assigned to one of the three branches at random: 
+
+• Full (90%): the complete prefix is used; all stage losses ( ℒtext + ℒ img + ℒ action , weighted per Eq. (6) ) are computed. 
+
+• DropT (5%): the task instruction 𝑙 is omitted; only the image loss ℒimg over future image tokens ˆ𝑜 𝑡 +1 is computed. 
+
+• DropTI (5%): both 𝑙 and ˜𝑜 𝑡 are omitted; only ℒimg is computed. The forward CoT 𝑟 fwd  
+
+> 𝑡
+
+is retained in all branches, so CFG dropout does not interfere with thinking-loss supervision. In Stage 3, per-view attention isolation is additionally enforced within each branch’s prefix to prevent cross-view token interference during multi-view image generation. 
+
+Reasoning dropout. During training, 𝑟 fwd  
+
+> 𝑡
+
+and 𝑟 inv  
+
+> 𝑡
+
+are each independently replaced with an empty string with probability 𝑝 drop = 0.1; the structural tokens [think] /[/think] are always preserved so the sequence format remains well-defined. This trains the model to handle absent reasoning steps without encountering out-of-distribution inputs, which is orthogonal to image CFG and enables selective skipping of CoT generation at inference to reduce per-step latency. 
+
+F Per-Task RoboTwin 2.0 Results 
+
+Table 11 reports success rates (%) on the 20 RoboTwin 2.0 tasks evaluated by ThinkingVLA under two conditions: Clean (demo_clean ) and Rand. (demo_randomized ). Bold marks the best result per task and condition; underline marks the second-best. 14 Figure 6 Lighting conditions used in the robustness evaluation. From left to right: blue, red, pink, green, and warm-white illumination. 
+
+G Real-World Setup and Task Details 
+
+We deploy ThinkingVLA on an ALOHA bimanual robot platform equipped with one overhead third-view camera and two wrist-mounted cameras (one per arm). All three views are used as visual observations during both training and evaluation. We design five manipulation tasks divided into three basic tasks and two long-horizon tasks; each task is trained with 50 teleoperated demonstration episodes and evaluated over 20 trials. Table 12 summarizes the task specifications, and per-task descriptions follow. 
+
+Hang Cup. The robot grasps a cup from the table and hangs it on a fixed rack. Training demonstrations vary the initial cup position across the workspace and use cups of different colors, requiring the policy to generalize over object appearance and spatial layout. 
+
+Place Cubes. Two cubes must be picked and placed at designated target positions. The training set contains three cubes of distinct shapes; each episode selects a combination of two, so the policy must identify the correct pair from the instruction and place each at the corresponding location. 
+
+Arrange Blocks. The robot picks lettered blocks and assembles them to spell “CORL.” Each training episode selects two of the four target blocks for grasping, so the policy must recognize which blocks to pick and where to place them to form the correct arrangement. This task tests fine-grained object discrimination and precise placement. 
+
+Make Breakfast. A long-horizon task requiring three sequential subtasks: place a plate on the table, plate a piece of bread onto the plate, and pour water from a cup. Training demonstrations use plates of varied colors, bread of different shapes, and cups of different colors, introducing appearance diversity across all three subtasks. Success requires completing the full sequence in order. 
+
+Assemble Equation. The robot assembles digit blocks to complete a given arithmetic equation (e.g., “assemble the blocks to complete 24 − 18 = ?”). The task requires the model to first compute the correct result from the equation in the instruction, then identify and grasp the corresponding digit blocks and place them at the designated position. This task is the most demanding in our suite: it combines numerical reasoning over the language instruction with multi-step pick-and-place execution, testing whether the interleaved reasoning chain can support both semantic understanding and precise manipulation. 
+
+H Robustness Experiments 
+
+To evaluate visual robustness, we test all real-world methods under varied lighting conditions that drastically alter the color distribution of the scene. We use a programmable LED light to cast uniform blue, red, pink, green, and warm-white illumination over the workspace (Figure 6), each shifting both object appearance and background color far from the training distribution. Each task is evaluated for 25 trials in total (5 trials per lighting condition); we report the aggregate success rate (%) per task. ThinkingVLA consistently outperforms all baselines under lighting perturbation, achieving the highest success rate on every task. Arrange Blocks and Assemble Equation are particularly affected by lighting variation, as both tasks require identifying and grasping specific blocks whose appearance changes substantially under colored illumination. All methods experience notable performance drops on these two tasks compared to 15 10 25 40 50 
+
+Number of Fine-tuning Episodes 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+> 60
+> 10
+> 70
+> 20
+> 85
+> 45
+> 90
+> 60
+
+## (a) Arrange blocks 
+
+10 25 40 50 
+
+Number of Fine-tuning Episodes 
+
+> 30
+> 0
+> 60
+> 0
+> 65
+> 20
+> 70
+> 30
+
+## (b) Make breakfast  
+
+> w/ Stage 2
+> w/o Stage 2 Figure 7 Effect of Stage 2 pretraining on the remaining two real-world tasks: (a) Arrange Blocks and (b) Make Breakfast. Format follows Figure 5.
+
+standard lighting (Table 2). Nevertheless, ThinkingVLA retains a clear advantage (48% and 68% vs. 32% and 56% for the next-best method). We attribute this in part to the robustness of the visual prediction module: because the image generation model is trained with data augmentation, the predicted future image is less sensitive to input color shifts than the raw observation, effectively providing a more stable visual context for downstream action reasoning. UP-VLA, which also incorporates visual prediction, does not exhibit the same robustness, suggesting that the interleaved reasoning structure, in which textual CoT mediates between observation and image generation, may play a role in stabilizing the visual prediction under distribution shift. 
+
+I Additional Ablation Studies 
+
+Figure 7 reports the Stage 2 pretraining ablation on the two tasks not shown in Figure 5: Arrange Blocks (Horizon =2) and Make Breakfast (Horizon =3). Stage 2 pretraining improves data efficiency on both tasks, and the benefit is larger for the longer-horizon task, consistent with the main results. On Make Breakfast, the variant without pretraining fails completely at both 10 and 25 episodes (0%) and reaches only 30% at 50 episodes, whereas the pretrained model achieves 70%—a 40 pp gap. On Arrange Blocks, the gap is largest at 10 episodes (60% vs. 10%) and narrows to 30 pp at 50 episodes as more demonstrations compensate for the missing priors. Together with the main-text results, the gaps at 50 episodes increase monotonically with task horizon: 5 pp (Hang Cup, H =1) → 25–30 pp (Place Cubes and Arrange Blocks, H =2) → 40–50 pp (Make Breakfast and Assemble Equation, H =3), confirming that end-to-end action pretraining is most critical for complex, multi-step tasks. 
+
+J Real-World Reasoning Visualization and Prediction Quality 
+
+We visualize the complete interleaved reasoning chain produced by ThinkingVLA on a successful Make Breakfast rollout (Figure 8). This long-horizon task requires three sequential subtasks—grasp and place a plate, plate bread onto it, and pour water from a kettle—and thus exercises the full reasoning pipeline across six decision steps. Each row in Figure 8 corresponds to one reasoning step and shows, from left to right: (1) the current multi-view observation 𝑜 𝑡 (third-view), (2) the forward CoT 𝑟 fwd  
+
+> 𝑡
+
+that analyzes the scene and predicts the expected visual change, (3) the predicted multi-view future images ˆ𝑜 𝑡 +1 (third-view, left wrist, right wrist), and (4) the inverse CoT 𝑟 inv  
+
+> 𝑡
+
+that identifies the immediate action primitive (e.g., left_grasp_bread , left_release ,
+
+left_pour ). Comparing the predicted images with the actual observations in the subsequent step confirms that the visual prediction module produces spatially faithful forecasts: object positions, gripper states, and scene layouts are accurately anticipated, providing reliable visual context for inverse dynamics reasoning. The reasoning chain exhibits two notable properties. First, the forward CoT adapts its focus as the task 16 <think> Table has fruit bowls, pastries, metal kettle, blue cup, 
+
+and plate rack. Right wrist is near yellow plate and blue cup; 
+
+left wrist is idle near kettle. Action: right arm grasps or moves 
+
+plate toward left fruit bowl; left arm stays still. Overhead view 
+
+changes little; gripper remains open or lightly holding .</think> 
+
+<think>Plate(right) is already near the right arm and the right 
+
+wrist view plate shifting toward the robot, bread (front -left) 
+
+remains on the lower -left plate and the kettle(center) is 
+
+unchanged. The immediate change is the right arm moving in 
+
+to grasp the plate for lifting; subtask: right_grasp_plate</think> 
+
+<think> Table has two pastry plates, small fruit plate, center 
+
+metal pitcher, blue cup right, and yellow plate. Right arm 
+
+hovers near yellow plate; left stays back. Action: right gripper 
+
+retracts after positioning. Future: objects unchanged; gripper 
+
+open near plate; views steady .</think> 
+
+<think> Table has bread on plate in left wrist view, fruit plate 
+
+upper -left, cup and utensil rack overhead. Right arm near rack; 
+
+left gripper hovers over bread. Action: grasp or arrange bread. 
+
+Future: left gripper centered over bread; right arm stays side; 
+
+objects remain in place .</think> 
+
+<think> Kettle on table. Left arm near kettle; right arm 
+
+unchanged. Action: place bread on the plate ; right arm idle. 
+
+Future: left gripper release bread , right gripper unchanged; 
+
+overhead view shows bread on the plate .</think> 
+
+<think> Current subgoal: grasp kettle. Future: left gripper holds 
+
+the kettle; right gripper unchanged; overhead view unchanged. 
+
+</think> 
+
+<think> Table has kettle and cup. Left arm holds kettle; right 
+
+arm unchanged. Action: pour tea. Future: left arm moves 
+
+closer to cup, overhead shows left arm near cup, left wrist view 
+
+tilts; right wrist remains unchanged. 
+
+</think> 
+
+<think> Overhead: bread on white plate lower -left, kettle center, 
+
+cup upper -right, plate under right gripper lower -right. Future: 
+
+plate centered; bread stays left. Action: move right -held plate 
+
+down and place it on table. Subtask: 
+
+right_place_plate .</think> 
+
+<think> Table has fruit bowls, pastries, metal kettle, blue cup, 
+
+and plate rack. Right wrist still . Left wrist grasp bread. Action: 
+
+right arm still ; left arm close gripper . Subtask: 
+
+left_grasp_bread .</think> 
+
+<think> Plate is on table; bread slices centered in plate under 
+
+left gripper. Future shows same setup with bread slightly 
+
+adjusted/settled. Immediate action: small left -arm 
+
+placement/release over plate. Subtask: left_release . </think> 
+
+<think>bread(left -on -plate) and kettle(front -left) remain in 
+
+place while the overhead scene is unchanged; Future left wrist 
+
+frame shows gripper closed. subtask: 
+
+left_ grasp _kettle </think>" 
+
+<think> Future overhead shows the left arm holding the kettle 
+
+and moving closer to the cup. Left wrist view shows a slight tilt, 
+
+indicating the left arm will pour slowly and align the kettle with 
+
+the cup. Right arm stays still. Subtask: left_pour . </think> Figure 8 Interleaved reasoning chain on Make Breakfast (Horizon =3). Each row shows one decision step: the current observation (left), forward CoT reasoning about the expected visual change (black box), predicted multi-view future images (center), and inverse CoT identifying the action primitive (black box, right). Six steps cover the full task: grasp plate → place plate → grasp bread → place bread → grasp kettle → pour water. The predicted images closely match the actual observations at the next step, confirming accurate visual forecasting. <think>Initially the triangle is under the left gripper on the 
+
+board, the square and circle remain on the tray, and the right 
+
+arm is poised near the closed drawer. The next state should 
+
+show the left gripper securing the triangle more tightly while 
+
+the overhead and wrist views keep the drawer closed.</ think> 
+
+<think >Triangle(front -left) lies on the white board under the left 
+
+gripper, the circle(center) and square(right) stay on the board, 
+
+and the drawer(back -right) is unchanged; the needed change 
+
+is for the left arm to close on the triangle and secure it for 
+
+lifting. subtask: left_grasp_triangle </think> 
+
+<think >The triangle has been lifted . Future it will be placed on 
+
+the table. Left view shows arm should grasp the triangle and 
+
+right view shows arm still. Overhead: left arm move towards 
+
+right.</ think> 
+
+<think >Triangle has been placed below the square . Future the 
+
+square should be picked. Left view unchanged. Right view 
+
+shows gripper holding the square. Overhead: right arm 
+
+appears, grasping the square.</ think> 
+
+<think >Square is lifted by right arm. Next it should be placed 
+
+on the drawer . Overhead: m ostly unchanged, with only part of 
+
+the right arm visible, moved to the upper -right corner of the 
+
+frame. Right view shows gripper closed, top of drawer appears 
+
+in the center of the frame.</ think> 
+
+<think> Overhead :left arm liftin g the triangle . Future: triangle 
+
+placed on the table . Action: left arm securing the triangle and 
+
+approaching the position below square . Subtask: 
+
+left _place_ triangle .</think> 
+
+<think >Future view shows right arm holding the square (front -
+
+right). Left view unchanged. Right arm should approach left 
+
+and open gripper for grasping . Subtask: 
+
+right_ grasp _square .</ think> 
+
+<think>The future right view shows that the right arm has 
+
+moved above the drawer, with the gripper grasping the square. 
+
+The right arm should move toward the upper right . Subtask: 
+
+right_place_square . </think> 
+
+Figure 9 Interleaved reasoning chain on Place Cubes (Horizon =2) 
+
+progresses: early steps reason about object locations and grasping targets, while later steps track multi-object relationships (e.g., bread-on-plate, kettle-near-cup). Second, the inverse CoT consistently grounds its action decisions in the predicted visual state, referencing specific spatial cues (gripper closure, arm proximity, pouring angle) rather than relying on abstract subtask labels alone. The visualization of a successful Place Cubes rollout is shown in Figure 9. 17 Table 3 Model architecture details for the released ThinkingVLA PyTorch configuration. 
+
+Component Configuration Thinking Expert 
+
+Backbone PaliGemma / Gemma-2B Hidden Size 2048 Layers 18 Attention Heads 8KV Heads 1Head Dim. 256 MLP Dim. 16384 
+
+Action Expert 
+
+Backbone Gemma-300M Hidden Size 1024 Layers 18 Attention Heads 8KV Heads 1Head Dim. 256 MLP Dim. 4096 Action Dim. 32 
+
+Shared Attention 
+
+Stream Coupling Layerwise QKV concat. Attention Shared over prefix/suffix FFN / Norm / Output Separate per stream Multi-view Mask Wrist views isolated 
+
+Unified Tokenizer 
+
+Text Tokens 257152 Special Tokens 10 Vision Tokens 64000 Total Vocabulary 321162 Embedding / LM Head Tied, 657.74M params 
+
+Vision Modules 
+
+Vision Encoder SigLIP Encoder Hidden / Layers 1152 / 27 Image / Patch Size 224 / 14 Projection Dim. 2048 Image Tokenizer Cosmos DI16x16-360p Tokenizer Status Frozen 
+
+Action Prediction 
+
+Input Projection 32 → 1024 
+
+Output Projection 1024 → 32 
+
+Time MLPs 1024 → 1024 × 2Objective Flow matching Time Sampling Beta (1.5, 1.0)
+
+Head Params ∼2.17M 
+
+Model Scale 
+
+Thinking Expert ∼2B Action Expert ∼300M Unified Embedding / Head 657.74M 
+
+18 Table 4 Training dataset composition for Stages 1 and 2. Proportions are computed from per-dataset frame counts (27.3M total). 
+
+Dataset Mixture (%) 
+
+Language Table 25.85 BC-Z 20.08 Furniture Bench Dataset 14.49 Fractal 13.89 Bridge 6.95 Dobbe 4.18 FMB 4.17 Berkeley RPT 1.44 UTAustin Mutex 1.33 Stanford Hydra Dataset 1.31 Austin Sailor Dataset 1.30 Toto 1.08 CMU Play Fusion 0.87 Taco Play 0.79 IAMLab CMU Pickup Insert 0.54 Berkeley Autolab UR5 0.32 Jaco Play 0.26 Viola 0.25 Berkeley Fanuc Manipulation 0.23 Berkeley MVP 0.17 Berkeley Cable Routing 0.14 NYU Franka Play Dataset 0.13 Austin Buds Dataset 0.13 CMU Stretch 0.09 DLR Edan Shared Control 0.03 
+
+Table 5 System prompt for forward CoT ( 𝑟 fwd  
+
+> 𝑡
+
+) annotation. The placeholder {task} is replaced with the episode’s task instruction at generation time. 
+
+System Prompt — Forward CoT Role: You are an advanced robotic intelligence agent specializing in visual future state prediction and manipulation planning. 
+
+Task: Given the global task instruction, the current observation, and the future observation, generate a concise thinking process that explains how to predict the future visual state from the current visual state. 
+
+Inputs: (1) Global task instruction: the overall manipulation goal. (2) Current observation: the current visual observation of the robot, objects, and workspace. (3) Future observation: the future visual observation after the robot has made progress toward the task. 
+
+Required output: Exactly one <think>...</think> block containing a single coherent paragraph of plain text (max 60 words), covering: current state analysis, task decomposition, future state prediction, and visual prediction details. 
+
+Constraints: No bullet points or line breaks. Focus on spatial reasoning. Be specific about visible object locations and robot–object relationships. No frame indices, timestamps, camera names, or metadata. 
+
+19 Table 6 System prompt for inverse CoT ( 𝑟 inv  
+
+> 𝑡
+
+) annotation. The output must contain an explicit subtask: tag. 
+
+System Prompt — Inverse CoT Role: You are an advanced robotic intelligence agent specializing in visually grounded robotic manipulation planning. 
+
+Task: Given the global task instruction, the current observation, and the future observation, infer the immediate action primitive that best explains the transition from the current visual state to the future visual state. 
+
+Inputs: (1) Global task instruction: the overall manipulation goal. (2) Current observation: the current visual observation of the robot, objects, and workspace. (3) Future observation: the future visual observation after an immediate task-relevant action has been taken. 
+
+Required output: Exactly one <think>...</think> block containing a single coherent paragraph of plain text (max 60 words). Must include “ subtask: [action] ” where [action] is a concise action primitive (e.g., approach, grasp, lift, move_to, place, release, finish). 
+
+Think rules: (1) Spatial grounding: describe relevant robot, gripper, and object positions. (2) State difference: identify the key physical change between observations. (3) Immediate action: infer the single action explaining this transition. (4) subtask: finish only if the goal is already fully satisfied. 
+
+Constraints: No bullet points or line breaks. No metadata, success/failure labels, or multiple alternative actions. 
+
+Table 7 Trainable ( ✓) and frozen (—) modules per training stage. 
+
+Module Stage 1 Stage 2 Stage 3 
+
+Thinking expert transformer ✓ ✓ ✓
+
+Vision tower ✓ — ✓
+
+Multimodal projector ✓ — ✓
+
+Unified embedding / head ✓ — ✓
+
+Action expert — ✓ ✓
+
+Action / time heads — ✓ ✓
+
+Cosmos tokenizer — — —
+
+Table 8 Stage 1 training hyperparameters. 
+
+Setting Configuration 
+
+Action horizon 10 Training data 25-dataset mix Loss weights text 1.0; action 0.0; img 1.0
+
+Optimizer AdamW Gradient clipping 1.0 EMA decay 0.999 Schedule batch 512 ; warmup 2000 ; peak LR 1e −4; decay 30000 ; decay LR 
+
+1e −5; steps 200000 
+
+CFG drop-task prob. 0.05 CFG drop-task-image prob. 0.05 CFG image scale 1.5 CFG task scale 2
+
+20 Table 9 Stage 2 training hyperparameters. 
+
+Setting Configuration 
+
+Action horizon 10 Training data 25-dataset mix Reasoning dropout 0.1/0.1
+
+Loss weights text 1.0; action 10 .0; img 2.0
+
+Optimizer AdamW Gradient clipping 1.0 EMA decay 0.999 Schedule batch 512 ; warmup 1000 ; peak LR 1e −4; decay 45000 ; decay LR 
+
+1e −5; steps 100000 
+
+CFG drop-task prob. 0.05 CFG drop-task-image prob. 0.05 CFG image scale 1.5 CFG task scale 2
+
+Table 10 Stage 3 training hyperparameters. 
+
+Setting Configuration RoboTwin 
+
+Action horizon 10 Loss weights text 1.0; action 10 .0; img 1.0
+
+Optimizer AdamW Gradient clipping 1.0 EMA decay 0.999 Schedule batch 32 ; warmup 2000 ; peak LR 5e −5; decay 30000 ; decay LR 5e −6;steps 30000 
+
+ALOHA 
+
+Action horizon 50 Loss weights text 1.0; action 10 .0; img 1.0
+
+Reasoning dropout 0.1/0.1
+
+Optimizer AdamW Gradient clipping 1.0 EMA decay 0.999 Schedule batch 64 ; warmup 2000 ; peak LR 1e −5; decay 15000 ; decay LR 5e −6;steps 15000 
+
+21 Table 11 Per-task success rates (%) on RoboTwin 2.0 (20 tasks, 2 conditions). Clean = demo_clean ; Rand. = demo_-randomized . Bold : best; underline: second-best. 
+
+𝜋 0 UP-VLA XVLA BagelVLA ThinkingVLA (Ours) Task Hor. Clean Rand. Clean Rand. Clean Rand. Clean Rand. Clean Rand. Adjust Bottle 1 90 56 100 17 97 56 100 14 92 20 Beat Block Hammer 1 43 21 66 16 78 18 87 16 85 25 
+
+Click Alarmclock 1 63 11 69 41 96 69 85 20 90 25 Click Bell 1 44 3 54 72 100 61 100 35 80 60 Dump Bin Bigbin 1 83 24 81 35 94 59 91 51 92 60 
+
+Grab Roller 1 96 80 99 28 99 66 99 41 95 38 Move Playingcard Away 1 53 22 79 13 94 57 92 30 90 28 Open Laptop 1 85 46 86 21 85 73 96 37 96 40 Place A2B Left 1 31 1 74 4 62 21 79 12 90 20 Place A2B Right 1 27 6 56 1 54 17 81 11 92 18 
+
+Handover Block 2 45 8 4 0 27 30 38 0 40 10 Handover Mic 2 98 13 45 0 100 38 75 8 85 28 Hanging Mug 2 11 3 4 0 34 15 12 1 40 15 
+
+Place Bread Skillet 2 23 1 71 16 82 17 91 26 92 30 
+
+Place Can Basket 2 41 5 20 0 58 18 63 0 98 50 
+
+Blocks Ranking RGB 3 19 5 38 0 79 26 84 4 90 30 
+
+Blocks Ranking Size 3 7 1 21 0 42 9 45 2 50 15 
+
+Put Bottles Dustbin 3 54 13 7 0 0 1 42 10 40 15 
+
+Stack Blocks Three 3 17 0 8 0 22 15 45 5 40 18 
+
+Stack Bowls Three 3 66 24 42 1 80 42 63 13 80 40 
+
+Average − 50 17 51 13 69 35 73 17 78 29 
+
+Table 12 Real-world task specifications. Horizon denotes the number of sequential subtasks required for completion. 
+
+Task Group Horizon Success Criterion 
+
+Hang Cup Basic 1 Cup stably hanging on rack Place Cubes Basic 2 Both cubes at target positions Arrange Blocks Basic 2 Target letter blocks placed correctly Make Breakfast Long-horizon 3 Plate placed, bread plated, water poured Assemble Equation Long-horizon 3 Correct digits placed to complete equation 
+
+Table 13 Robustness to lighting variation on real-world tasks. We report success rate (%) aggregated over 25 trials per task (5 trials × 5 lighting conditions). Best results are bold ; second-best are underlined. 
+
+Method Hang Cup Place Cubes Arrange Blocks Make Breakfast Assemble Equation 
+
+𝜋 0 [5] 20 40 16 4 40 
+
+𝜋 0.5 [6] 40 60 32 28 56 UP-VLA [46] 28 20 12 0 0
+
+ThinkingVLA (Ours) 68 80 48 52 68 
+
+22
