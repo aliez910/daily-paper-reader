@@ -1,0 +1,575 @@
+Title: Contrastive Action-Image Pre-training for Visuomotor Control
+
+URL Source: https://arxiv.org/pdf/2606.17256v1
+
+Published Time: Wed, 17 Jun 2026 00:14:52 GMT
+
+Number of Pages: 29
+
+Markdown Content:
+# Contrastive Action-Image Pre-training for Visuomotor Control 
+
+Yuvan Sharma 1,∗, Dantong Niu 1,2,∗,‡, Anirudh Pai 1,∗, Zekai Wang 1, Zhuoyang Liu 1,Baifeng Shi 1, Stefano Saravalle 3, Boning Shao 1, Ruijie Zheng 2, Jing Wang 2,Konstantinos Kallidromitis 4, Yusuke Kato 4, Fabio Galasso 3,5, Yuke Zhu 2, Danfei Xu 2,Linxi “Jim” Fan 2, Jitendra Malik 1,†, Trevor Darrell 1,†, Roei Herzig 1,†
+
+> 1
+
+UC Berkeley 2NVIDIA 3Sapienza University of Rome 4Panasonic 5ItalAI 
+
+> *
+
+Equal Contribution ‡Project Lead †Equal Advising 
+
+Abstract: Existing vision encoders for robotics face a fundamental bottleneck: robotic datasets lack the scale necessary for large-scale pre-training. Prior work circumvents this data scarcity by turning to internet-scale image and language data or egocentric human video. While these models show promise, neither paradigm learns from paired vision and action data, which downstream visuomotor con-trol policies require. However, robot trajectories, the most direct source of this paired signal, are not available at pre-training scale, motivating us to extract ac-tion signals from abundant human video instead. To this end, we introduce CAIP (Contrastive Action-Image Pre-training), a vision encoder that treats human hand poses from large-scale egocentric video as a proxy for end-effector actions. By extracting 3D hand keypoints, a representation that aligns naturally with down-stream robot action spaces, CAIP learns a unified action–image representation through a contrastive objective. Leveraging 32,041 hours of egocentric human video and only 88 hours of robotic manipulation data, CAIP outperforms state-of-the-art vision encoders including DINOv2, SigLIP, MVP, and R3M. Evaluated on a challenging real-world dexterous manipulation setup using Dexmate Vega and Sharpa Wave hands, CAIP yields performance gains of more than 30% on tasks involving folding, pouring, and fine-grained manipulation. Our results show that our method of contrastive action-centric pre-training yields a scalable path to achieving robust visual representations better suited for physical interaction. 
+
+Keywords: Action-Image Contrastive Learning, Dexterous Manipulation 
+
+# 1 Introduction 
+
+Visual perception is fundamental to robotic manipulation, as a robot’s ability to reason about its environment and perform precise interactions depends critically on the quality of its visual fea-tures. Dominant visual pre-training paradigms such as image-text contrastive learning [1, 2], self-supervised reconstruction [3], and self-distillation [4] have produced encoders with remarkable se-mantic and visual understanding. Although these backbones have driven major advances in vi-sion [5, 6] and language tasks [7, 8], they were not designed with physical interaction in mind. For example, semantic encoders like CLIP [1] and SigLIP [2] provide high-level semantic knowledge, while encoders like DINO [4, 9] capture fine-grained geometric details like depth and segmentation. However, neither class of encoder sees manipulation environments during training, nor receives di-rect action supervision. This creates a fundamental misalignment: current models have a strong semantic understanding of a scene (aligning language and vision), but lack the action-centric struc-ture that we demonstrate benefits downstream policy learning. 
+
+> arXiv:2606.17256v1 [cs.RO] 15 Jun 2026
+
+Action 
+
+Encoder   
+
+> +-
+> +
+> +
+> -
+> --
+> --
+
+Image-Text 
+
+Encoder 0.13  0.27  -0.04  0.83 0.13  0.27  -0.04  0.83 0.13  0.27  -0.04  ... DINOv2    
+
+> Spatial Detail
+> Action-Centric
+> Manipulation-
+> relevant features CAIP
+> Action-Centric SigLIP
+> Action-Centric
+> Semantic Meaning
+> Image-Text
+> Embedding
+> Action
+> Embedding Contrastive
+> Training
+> “Vacuum floor...” Hand Pose Actions
+> “Organize
+> supplies...” R3M
+> Qwen3.5 ViT
+> MVP
+> DINOv2
+> SigLIP2
+> Ours
+> 0
+> 20
+> 40
+> 60
+> 80
+> Average Success Rate (%)
+> 17
+> 34
+> 42 42 43
+> 76
+
+Downstream 
+
+Policy Performance 
+
+Contrastive Action-Image Pre-training 
+
+Action-Centric Features Figure 1: (Left) We visualize which image regions each encoder emphasizes, with saliency be-ing computed using each encoder’s natural query mechanism (see Section A.1). SigLIP captures high-level semantics and DINOv2 captures visual structure, but neither attends to action-relevant regions. Our encoder produces manipulation-centric features focused on hands and relevant objects. 
+
+(Center) Hand pose actions and paired image-text inputs are encoded separately, then aligned via a SigLIP-style contrastive loss. (Right) CAIP achieves superior performance on real-world tasks compared to state-of-the-art vision encoders such as SigLIP 2, DINOv2, and MVP (see Section 3). The most direct way to close this gap is to pre-train on robot data itself, where action labels are natively available. In practice, however, robot trajectories are notoriously difficult to collect at scale. While recent large-scale datasets such as DROID [10] and Open X-Embodiment [11] have led to significant progress, the volume of available robot trajectories remains orders of magnitude smaller than internet-scale video corpora. This scarcity naturally motivates the search for alternative sources of action-rich data. Egocentric human video datasets [12, 13, 14] offer an abundant repository of human–object interactions, yet they lack the explicit robotic labels required for action-centric pre-training. Consequently, prior approaches such as R3M [15] and MVP [16] resort to alternative objectives like frame-level contrastive loss or masked autoencoder reconstruction. While these ob-jectives produce useful visual features, they omit the action-conditioned information that is critical for learning downstream control. In this work, we propose that human hand poses can serve as a powerful proxy for these missing robotic labels. By leveraging these poses in a form analogous to robotic end-effector actions, we bridge the gap between abundant human demonstrations and sparse robotic data to learn representations better suited for manipulation. Building on this insight, we introduce CAIP (Contrastive Action-Image Pre-training), a vision en-coder trained via a contrastive objective on large-scale egocentric video paired with extracted hand pose labels (see Figure 1). We unify these diverse egocentric video sources into a shared action space and learn the relationship between image-text representations and their corresponding action signals. This formulation yields a modular vision encoder, and we empirically demonstrate that its action-centric representations enable more robust and capable policies. Crucially, CAIP achieves this with minimal robot data, leveraging abundant human video and using action supervision to structure the visual representation space. We summarize our contributions as follows: (i) We propose a contrastive training methodology for learning action-centric visual representations from egocentric human video, directly grounded in explicit action labels. (ii) We curate and unify large-scale egocentric video datasets to train on 32,129 2Vision            
+
+> Transformer
+> Text
+> Transformer
+> Attention
+> Pooling
+> Action
+> Transformer 0.13 0.27 -0.04 0.83 0.13 0.27 -0.04 0.83 0.13 0.27 -0.04 ...
+> Attention Pooling
+> Q
+> Text
+> Tokens
+> patches
+> “Wash vegetables...” tokens
+> Action embedding
+> [CLS]
+> token
+> Contrastive Loss
+> Text-aligned
+> visual features
+> Text-conditioned
+> image embedding
+> K,V Patch
+> Tokens K,V
+> Learnable
+> Query
+> Q
+
+Figure 2: CAIP architecture. A ViT encodes N image patches and a text transformer encodes L
+
+language tokens, while an action transformer encodes a T -step action chunk into a single embedding via the [CLS ] token. To form a text-conditioned image embedding, we attention-pool patch tokens using text tokens as queries, then pool the result with a learnable query. The action embedding and text-conditioned image embedding are aligned via a SigLIP contrastive loss. hours of manipulation data. (iii) We show that our learned encoder consistently outperforms current state-of-the-art vision encoders such as DINOv2, SigLIP, and MVP. (iv) We demonstrate that our learned representations generalize to out-of-distribution settings, enabling robust downstream policy performance under environmental variation. 
+
+# 2 Contrastive Action-Image Pre-training 
+
+We introduce CAIP , an action-centric vision encoder that learns manipulation-relevant visual repre-sentations by aligning egocentric scenes with paired hand actions. Inspired by image-text contrastive methods [1, 2], CAIP optimizes a contrastive objective between a joint image–text latent space and an action latent space. We train CAIP on vast egocentric human data, exposing our model to the diverse embodiments and environments needed to learn robust visual representations. 
+
+2.1 Pre-training Architecture 
+
+We pre-train a vision encoder that produces text-conditioned image features that align with action features through a contrastive objective. The architecture consists of three encoders: one for each of vision, language, and action. Their outputs are combined through attention pooling before the contrastive loss. Figure 2 illustrates the architecture. Our vision encoder uses a ViT-L/16 backbone for the image tower and a 24-layer transformer for the text tower, both initialized from SigLIP 2 [17]. 
+
+Vision encoder. An input image I is split into N patches and processed by a ViT backbone, yielding patch features of shape B × N × C, where B is the batch size and C is the embedding dimension. We do not perform global pooling at this stage; the full patch sequence is retained so that text tokens can attend to spatially localized features in the next step. 
+
+Language encoder. The accompanying natural-language instruction is tokenized into L tokens and passed through a transformer text encoder, producing token-level features of shape B × L × C.
+
+Action encoder. Each training sample includes a sequence of future actions of shape B × T × Ad,where T is the prediction horizon and Ad = 378 is the per-timestep action dimensionality ( 378 = 42 × 9, corresponding to 21 keypoints per hand represented through 9D pose). A lightweight 4-layer transformer encoder processes this sequence, and the CLS token is extracted to produce a single action embedding of shape B × 1 × C. The action encoder is trained from scratch. 
+
+Text-conditioned image pooling. To produce text-conditioned image features, we apply two stages of attention pooling. First, language tokens ( B × L × C) serve as queries while image patch features (B × N × C) serve as keys and values, producing text-grounded visual features of shape B × L × C.3Second, a learnable query token attends over these text-grounded features to produce a single text-conditioned image embedding of shape B × 1 × C.
+
+2.2 Pre-training Objective 
+
+We adopt a SigLIP-style sigmoid contrastive loss [2] to align text-conditioned image embeddings with action embeddings. Unlike the softmax-based InfoNCE loss used in CLIP [1], the SigLIP objective treats each pair independently as a binary classification problem, which removes the need for a global normalization across the batch and improves training stability at large batch sizes. The loss is described in further detail in Section C.3. 
+
+2.3 Downstream Policy 
+
+We evaluate the pre-trained vision encoder by transferring it to a closed-loop manipulation policy. 
+
+Policy architecture. The policy takes as input head and two wrist camera images and a natural-language task instruction, and outputs a chunk of future actions to be executed on the robot. Visual and language inputs are processed by the frozen pre-trained encoder, producing per-patch visual tokens (one set per camera view) and text tokens. Each modality is projected through a learnable linear layer into the policy’s hidden dimension and interleaved into a single token sequence. The token sequence is processed by a decoder-only transformer (Qwen3.5-0.8B [18]). All weights are trained from scratch rather than initialized from the pre-trained VLM, providing a strong sequence-modeling architecture while enabling fair comparison with baselines. 
+
+Action head. Conditioned on the backbone’s output representation, the policy predicts the action chunk using a flow-matching objective [19]. The noisy action chunk and flow timestep are first embedded into the backbone’s hidden dimension via multi-layer perceptrons (MLPs), then concate-nated with the conditioning tokens and processed jointly by the Qwen backbone. An MLP action head predicts the flow-matching velocity at the action positions. 
+
+2.4 Data Sources and Representation 2.4.1 Egocentric Human Video 
+
+Egocentric human video is, by a wide margin, the most abundant source of dexterous manipula-tion data: it captures the same first-person viewpoint a head-mounted robot camera would observe, spans a vast range of scenes and tasks, and comes with naturally co-occurring hand motion that can be recovered through pose estimation. CAIP trains on 32,041 hours of annotated human egocentric data, collected in both lab ( ∼1,000 hours, with wrist views) and in-the-wild environments ( ∼31,000 hours, egocentric view only). We additionally include a small amount of tabletop humanoid ma-nipulation data ( ∼88 hours) for embodiment diversity and extended wrist-view coverage, which is largely absent from our egocentric sources. This data is collected with a different embodiment and environment than our downstream evaluation setting. The diversity of the data on which we train, in terms of both the environment and task, enables our vision encoder to learn latent representations that can be used downstream to great effect. More details are provided in Section C.1. 
+
+2.4.2 Action Representation Hand Pose Representation. We use end-effector keypoints to represent hand pose, allowing us to form action chunks that are analogous to downstream robotic policy outputs. Specifically, we represent the hand poses at each timestep as a set of 42 keypoints (21 per hand, including the wrist), with each keypoint expressed as an SE(3) transform, following the MANO hand convention [20]. These hand poses are collected through various means. The largest portion of our data was annotated using pose estimation techniques, while our in-lab data was collected using the Manus Metagloves Pro and Vive Ultimate Trackers, making these annotations fine-grained and high-quality. 4Table 1: Performance comparison across six real-world manipulation tasks. Each task is evaluated through 12 trials, and results are reported as success rates (%).                                                                       
+
+> Method Fold Shorts Pour Pick Fruits Dispense Soap Turn On Lamp Pull Tissue Avg. R3M [15] 14.58 12.50 2.08 29.17 8.33 37.50 17.36 Qwen3.5 ViT [18] 27.08 22.92 60.42 72.92 8.33 12.50 34.03 VideoMAE [21] 22.92 52.08 0.00 37.50 25.00 18.75 26.04 VC-1 [22] 18.75 56.25 0.00 62.50 0.00 22.92 26.74 MVP [16] 54.17 62.50 2.08 93.75 8.33 31.25 42.01 DINOv2 [4] 22.92 81.25 52.08 50.00 25.00 20.83 42.01 SigLIP [2] 12.50 70.83 37.50 83.33 25.00 25.00 42.36 SigLIP 2 [17] 4.17 35.42 52.08 93.75 50.00 25.00 43.40
+> CAIP (Ours) 68.75 83.33 56.25 100.00 75.00 72.92 76.04
+
+Action Chunking. To convert these poses into actions analogous to what downstream policies must produce, we emulate end-effector delta control. Given a base frame at time t, we define the “action” at offset i as the relative SE(3) transform between the pose at time t and the pose at time t + i, for 
+
+i = 1 , . . . , T . The full action chunk A is thus a tensor of T × 42 SE(3) transforms. In practice, we use T = 64 , thus capturing roughly two seconds of future hand motion at 30 Hz. 
+
+# 3 Experiments 
+
+We evaluate CAIP on both downstream policy performance and on representation quality via action retrieval. Additional experiments and analyses are provided in Section A. 
+
+3.1 Real-world Evaluation Experimental Setup. We evaluate policies on a real-world setup (see Section B) consisting of a Dexmate Vega bimanual manipulator equipped with two 22-DoF Sharpa Wave dexterous hands. Visual observations are captured from three cameras: the Vega’s built-in stereo head camera (ZED X Mini) and two ZED X One S-Wide monocular cameras mounted on the wrists. Actions use end-effector delta control for the arms, and absolute joint control for the fingers. This setup is challenging as the hands are highly dexterous, and we train policies from scratch with only 200 demonstrations per task (150 for pour). Policies are evaluated over 12 trials across six manipulation tasks. Task descriptions, scene configurations, and success criteria are detailed in Section D. 
+
+Baselines. We compare CAIP against a representative set of vision encoders spanning self-supervised, language-supervised, video, and robotics-pretrained representations: R3M [15], MVP [16], DINOv2 [4], SigLIP [2], SigLIP 2 [17], VideoMAE [21], VC-1 [22], and the native Qwen3.5-0.8B vision encoder [18]. For each baseline, we train a policy from scratch on top of the frozen encoder, as described in Section 2.3. For encoders without a native text tower (R3M, MVP, DINOv2, VideoMAE, VC-1), we use CLIP [1] to embed the language instruction. All policies share the same downstream architecture, training data, and optimization schedule; only the vision encoder differs across runs. Baseline implementation details are provided in Section E. We also experimented with direct action regression as a pre-training objective, both from the pooled text-conditioned image embedding via an MLP head and from the full ViT patch sequence via a transformer decoder. Neither variant produced useful representations (details provided in Section E). 
+
+Results. Table 1 reports per-task success rates across the six manipulation tasks. CAIP achieves the highest average success rate at 76% , outperforming the strongest baseline (SigLIP 2, 43.4%) by over 30 points. CAIP attains the top success rate on five of the six tasks; in contrast, the baselines do not exhibit consistent behavior: encoders that perform competitively on one task (e.g., MVP at 93.8% on Dispense Soap, DINOv2 at 81.3% on Pour) degrade significantly on others. This variance suggests that since these representations are not manipulation-centric, they produce features that 5may suit some tasks over others. CAIP, by contrast, maintains strong performance across all tasks, indicating that our action-centric contrastive pre-training produces representations that generalize. Notably, CAIP outperforms the larger SigLIP 2 SO400M baseline despite being initialized from the smaller SigLIP 2 ViT-L backbone, isolating the gain to our action-centric pre-training. Qualitative rollouts and failure-mode analysis are provided in Section A. 
+
+3.2 Zero-Shot Action Classification 
+
+To directly evaluate how well CAIP’s learned representations generalize beyond the pre-training distribution, we devise an action classification task on a held-out egocentric dataset. This dataset consists of human manipulation activities and is completely disjoint from any training data used. To construct the task, we cluster held-out action chunks in raw action space using K-means with 
+
+K = 50 . We then evaluate each frozen vision encoder under two protocols. 
+
+Linear probing. For each vision encoder (SigLIP, DINOv2, MVP, R3M, and CAIP), we train a logistic regression classifier on top of frozen image features to predict the K-means cluster label. We sweep the number of training samples per class from 1 to 256 to measure data efficiency. 
+
+Zero-shot retrieval (CAIP only). CAIP supports retrieval without supervised adaptation. We define each cluster prototype as the mean action embedding over all cluster members, and predict cluster assignments using argmax cosine similarity between the prototypes and image features. Labeled Examples Per Cluster Mean Per-Class Accuracy (%) Action Retrieval (Top-1) 
+
+Figure 3: Linear probe and zero-shot action classification on the held-out dataset. As shown in Figure 3, CAIP consistently outper-forms all baselines, including the strongest, DI-NOv2, by a substantial margin across the full data-efficiency curve. Notably, zero-shot retrieval with CAIP, despite requiring no in-domain supervision, exceeds the linear-probe performance of every base-line up to 16 samples per class. These results suggest that CAIP’s learned representations transfer effec-tively to unseen data and capture semantically mean-ingful structure for action understanding. 
+
+3.3 Environmental Robustness Analysis 
+
+We evaluate the robustness of our policies under en-vironmental perturbations. Specifically, we vary the scene lighting and add distractor objects, then evaluate each policy in the perturbed environment (see Section D.4). Because all policies are trained only on demonstrations collected under standard conditions, any change in success rate reflects the sensitivity of the learned visual representation to these perturbations. 
+
+Lighting Variation. We consider two lighting perturbations. In the Light condition, we add an extra bulb above the scene in front of the robot, which casts shadows across the workspace. In the Dark 
+
+condition, we reduce the intensity of the standard scene lighting. 
+
+Distractors. We add two distractor objects to the scene: a red book and a multi-colored Hanoi toy tower. Both are placed within the manipulation area so that they remain clearly visible in the egocentric camera, and their locations are randomized across trials. 
+
+Results. As shown in Tables 2 and 3, CAIP achieves the highest success rate under every per-turbation. While all encoders degrade relative to the original setting, CAIP remains the strongest, outperforming Qwen3.5 ViT by roughly 20–30% and degrading far less than MVP. We note that Qwen3.5 ViT retains a larger relative fraction of its original performance under some perturbations, but its original success rate is also much lower, leaving less room to degrade. In absolute terms, CAIP is the most robust of the encoders we compare. 6Table 2: Policy success rates (%) under varying lighting conditions. All policies are trained only on demonstrations collected under original lighting. Average columns report the mean success rate across all three tasks under each lighting condition. Best result per column is shown in bold .                                                   
+
+> Turn on Lamp Dispense Soap Fold Shorts Average Encoder Orig. Light Dark Orig. Light Dark Orig. Light Dark Orig. Light Dark Qwen3.5 ViT 8.33 0.00 16.67 72.92 58.33 56.25 27.08 8.33 0.00 36.11 22.22 24.31 MVP 8.33 0.00 8.33 93.75 8.33 39.58 54.17 8.33 4.17 52.08 5.56 17.36
+> CAIP (ours) 75.00 25.00 33.33 100.00 93.75 75.00 68.75 35.42 20.83 81.25 51.39 43.06
+
+Table 3: Policy success rates (%) under the influence of distractors. All policies are trained only on demonstrations collected without distractors. Average columns report the mean success rate across all three tasks under each distractor condition. Best result per column is shown in bold .                                   
+
+> Turn on Lamp Dispense Soap Fold Shorts Average Encoder Orig. 2 Distractors Orig. 2 Distractors Orig. 2 Distractors Orig. 2 Distractors Qwen3.5 ViT 8.33 8.33 72.92 60.42 27.08 16.67 36.11 28.47 MVP 8.33 0.00 93.75 12.50 54.17 16.67 52.08 9.72
+> CAIP (ours) 75.00 33.00 100.00 85.42 68.75 39.58 81.25 52.78
+
+3.4 Scaling Ablations 
+
+We study the effect of scaling the vision encoder across ViT-B, ViT-L, and ViT-SO400M on three manipulation tasks. As shown in Section A.2, increasing encoder scale leads to substantial per-formance improvements, with the transition from ViT-B to ViT-L yielding the largest gain of over 30% on average. Based on this ablation, we select ViT-L as the primary vision encoder for all ex-periments, as it provides the best trade-off between performance, model size, and inference speed. Additional scaling ablations and analyses are provided in Section A. 
+
+# 4 Related Work 
+
+Internet-Scale Image-Language Encoders. The evolution of visual representations for robotic manipulation has progressed from convolutional neural networks (CNNs) trained directly on raw pixels [23, 24, 25] to transformer-based architectures with substantially greater representational ca-pacity and scalability [26, 27]. Yet despite these architectural advances, the ViT backbones powering modern VLAs [28, 29, 30] are pre-trained on internet-scale image-language data that is fundamen-tally misaligned with the demands of manipulation. CLIP [1] introduced the contrastive image-text training paradigm that inspires our architecture, but is trained primarily on images and captions without physical interaction. SigLIP [2] improves the ob-jective with a pairwise sigmoid loss, but is likewise trained on WebLI [31], which lacks interaction. Thus, these encoders capture semantics, but not the actions required for real-world manipulation. Since the vast majority of modern vision encoders are pre-trained on internet-scale image-language corpora, their limitations propagate directly into state-of-the-art VLAs. Systems such as RT-2 [28], π0.5 [30], OpenVLA [32], and GR00T [33] all build upon large-scale vision or vision-language backbones [2, 4, 34, 35] originally optimized for semantic internet understanding rather than manipulation-centric perception. 
+
+Egocentric Representation Learning. More recent efforts have sought to mitigate data mismatch by pre-training specifically on manipulation settings. Egocentric human video is the most abundant such data source available, with corpora like Ego4D [12], Epic-Kitchens [36], and EgoDex [37] offering thousands of hours of hand-object interaction. The rise of such datasets has motivated a line of work building visual representations directly on top of egocentric manipulation data, with many of these encoders showing substantive gains over backbones pre-trained on image-text pairs. 7R3M [15] was among the first frozen backbones pre-trained explicitly on human video data, us-ing time-contrastive learning and video-language alignment over 3,700 hours of Ego4D. Its time-contrastive loss encourages the encoder to produce embeddings such that temporally-close frames are similar, and temporally-distant frames are more dissimilar. This self-supervised approach allows the encoder to capture intra-frame relationships, but it does not expose the encoder to ground-truth action or poses during pre-training. MVP [16, 38] and VC-1 [22] take a more direct route by porting masked autoencoding [3] onto egocentric and manipulation-relevant images. The data is appropri-ate, but the objective is identical to its internet-scale counterpart: predict missing pixels, regardless of whether those pixels matter for robotic control purposes. HRP [39] is a step toward explicit pre-training with action annotations, fine-tuning encoders to predict hand-object affordances, like contact points, future hand poses, and active objects. However, these supervision signals are still distant from the downstream actions policies must produce. 
+
+Action-Aware Visual Representation Learning. A growing body of work learns latent action rep-resentations directly from video, without ground-truth robot action labels. One family of methods discretizes inter-frame transitions into latent action tokens via VQ-VAE objectives, then pre-trains a VLA to predict them from observations and language [40, 41, 42]. A related line, such as Uni-VLA [43] and CLAP [44], incorporates contrastive objectives or language grounding to suppress task-irrelevant visual dynamics and improve cross-embodiment transfer. While demonstrating the value of learning from video, these methods rely on ungrounded latent action tokens rather than explicit action supervision, and are designed as full vision-language-action systems, making them difficult to deploy as general-purpose visual backbones for arbitrary downstream policies. A parallel line of work supervises representation learning with action correspondences on robot data, using contrastive objectives that align visual observations with proprioceptive state-action dynamics [45, 46, 47], or incorporating 3D geometric structure from depth and point cloud observations [48, 49]. These methods are constrained by the scale and diversity of robot demonstration data. In contrast, CAIP leverages large-scale egocentric human video as its primary pre-training source, thus scaling its visual pre-training beyond what robot datasets alone can support. 
+
+# 5 Conclusion 
+
+In this work, we show that vision encoders can learn action-centric representations for dexterous manipulation from large-scale egocentric human video, using hand poses as a proxy for end-effector actions. By aligning visual observations with action chunks through a contrastive objective, our method learns representations that are more effective for downstream robotic control than standard semantic or self-supervised pre-training. Our approach combines a ViT image encoder with an action transformer and attention pooling, and is trained on 32,129 hours of egocentric video. The resulting encoder achieves a 76% average success rate across downstream dexterous manipulation tasks, outperforming strong vision baselines including DINOv2, SigLIP, MVP, and Qwen3.5 ViT. We further show through action retrieval experiments that action-grounded pre-training transfers effectively to unseen data. Overall, our results suggest that large-scale human video paired with action supervision provides a scalable path toward manipulation-oriented visual pre-training. 
+
+# 6 Limitations and Future Work 
+
+Negative sampling under continuous action structure. Our contrastive objective treats all off-diagonal image–action pairs within a batch as negatives, regardless of their physical similarity. In practice, distinct trajectories drawn from different timesteps or scenes may feature similar hand motions (e.g., two pouring actions or two reaches toward similar targets), yet the loss will actively push their representations apart. This assumption can weaken the learning signal and constrain representation quality. Future work could explore soft contrastive objectives that weight negatives by their action-space distance to the anchor. 8Anthropomorphic bias from the hand-pose proxy. Our action representation is built around the 42-keypoint MANO skeleton, which biases the learned features toward human hands. While this aligns well with five-fingered end-effectors like the Sharpa hands, CAIP’s transferability to em-bodiments such as parallel-jaw grippers or three-fingered claws remains an open question. Future work should evaluate CAIP across a broader range of end-effector morphologies to characterize the regime in which human hand pose serves as a useful action proxy. 
+
+Acknowledgments 
+
+We thank Sharpa and Dexmate for their continued technical support, including equipment mainte-nance and software updates. UC Berkeley authors were supported in part by the Berkeley Artificial Intelligence Research Humanoid Intelligence Center (BAIR HIC). Sapienza University acknowl-edges funding from Panasonic and from the Sapienza grant RG123188B3EF6A80 (CENTS). 9References 
+
+[1] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark, G. Krueger, and I. Sutskever. Learning transferable visual models from natural language supervision, 2021. URL https://arxiv.org/abs/2103.00020 .[2] X. Zhai, B. Mustafa, A. Kolesnikov, and L. Beyer. Sigmoid loss for language image pre-training, 2023. URL https://arxiv.org/abs/2303.15343 .[3] K. He, X. Chen, S. Xie, Y. Li, P. Doll´ ar, and R. Girshick. Masked autoencoders are scalable vision learners, 2021. URL https://arxiv.org/abs/2111.06377 .[4] M. Oquab, T. Darcet, T. Moutakanni, H. Vo, M. Szafraniec, V. Khalidov, P. Fernandez, D. Haz-iza, F. Massa, A. El-Nouby, M. Assran, N. Ballas, W. Galuba, R. Howes, P.-Y. Huang, S.-W. Li, I. Misra, M. Rabbat, V. Sharma, G. Synnaeve, H. Xu, H. Jegou, J. Mairal, P. Labatut, A. Joulin, and P. Bojanowski. Dinov2: Learning robust visual features without supervision, 2024. URL 
+
+https://arxiv.org/abs/2304.07193 .[5] H. Liu, C. Li, Q. Wu, and Y. J. Lee. Visual instruction tuning, 2023. URL https://arxiv. org/abs/2304.08485 .[6] H. Bao, L. Dong, S. Piao, and F. Wei. Beit: Bert pre-training of image transformers, 2022. URL https://arxiv.org/abs/2106.08254 .[7] J.-B. Alayrac, J. Donahue, P. Luc, A. Miech, I. Barr, Y. Hasson, K. Lenc, A. Mensch, K. Milli-can, M. Reynolds, R. Ring, E. Rutherford, S. Cabi, T. Han, Z. Gong, S. Samangooei, M. Mon-teiro, J. Menick, S. Borgeaud, A. Brock, A. Nematzadeh, S. Sharifzadeh, M. Binkowski, R. Barreira, O. Vinyals, A. Zisserman, and K. Simonyan. Flamingo: a visual language model for few-shot learning, 2022. URL https://arxiv.org/abs/2204.14198 .[8] J. Li, D. Li, S. Savarese, and S. Hoi. Blip-2: Bootstrapping language-image pre-training with frozen image encoders and large language models, 2023. URL https://arxiv.org/abs/ 2301.12597 .[9] M. Caron, H. Touvron, I. Misra, H. J´ egou, J. Mairal, P. Bojanowski, and A. Joulin. Emerging properties in self-supervised vision transformers, 2021. URL https://arxiv.org/abs/ 2104.14294 .[10] A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karamcheti, S. Nasiriany, M. K. Srirama, L. Y. Chen, K. Ellis, P. D. Fagan, J. Hejna, M. Itkina, M. Lepert, Y. J. Ma, P. T. Miller, J. Wu, S. Belkhale, S. Dass, H. Ha, A. Jain, A. Lee, Y. Lee, M. Memmel, S. Park, I. Radosavovic, K. Wang, A. Zhan, K. Black, C. Chi, K. B. Hatch, S. Lin, J. Lu, J. Mercat, A. Rehman, P. R. Sanketi, A. Sharma, C. Simpson, Q. Vuong, H. R. Walke, B. Wulfe, T. Xiao, J. H. Yang, A. Yavary, T. Z. Zhao, C. Agia, R. Baijal, M. G. Castro, D. Chen, Q. Chen, T. Chung, J. Drake, E. P. Foster, J. Gao, V. Guizilini, D. A. Herrera, M. Heo, K. Hsu, J. Hu, M. Z. Irshad, D. Jackson, C. Le, Y. Li, K. Lin, R. Lin, Z. Ma, A. Maddukuri, S. Mirchandani, D. Morton, T. Nguyen, A. O’Neill, R. Scalise, D. Seale, V. Son, S. Tian, E. Tran, A. E. Wang, Y. Wu, A. Xie, J. Yang, P. Yin, Y. Zhang, O. Bastani, G. Berseth, J. Bohg, K. Goldberg, A. Gupta, A. Gupta, D. Jayaraman, J. J. Lim, J. Malik, R. Mart´ ın-Mart´ ın, S. Ramamoorthy, D. Sadigh, S. Song, J. Wu, M. C. Yip, Y. Zhu, T. Kollar, S. Levine, and C. Finn. Droid: A large-scale in-the-wild robot manipulation dataset, 2025. URL https://arxiv.org/abs/ 2403.12945 .[11] E. Collaboration, A. O’Neill, A. Rehman, A. Gupta, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee, A. Pooley, A. Gupta, A. Mandlekar, A. Jain, A. Tung, A. Bewley, A. Herzog, A. Ir-pan, A. Khazatsky, A. Rai, A. Gupta, A. Wang, A. Kolobov, A. Singh, A. Garg, A. Kembhavi, A. Xie, A. Brohan, A. Raffin, A. Sharma, A. Yavary, A. Jain, A. Balakrishna, A. Wahid, B. Burgess-Limerick, B. Kim, B. Sch¨ olkopf, B. Wulfe, B. Ichter, C. Lu, C. Xu, C. Le, C. Finn, 10 C. Wang, C. Xu, C. Chi, C. Huang, C. Chan, C. Agia, C. Pan, C. Fu, C. Devin, D. Xu, D. Morton, D. Driess, D. Chen, D. Pathak, D. Shah, D. B¨ uchler, D. Jayaraman, D. Kalash-nikov, D. Sadigh, E. Johns, E. Foster, F. Liu, F. Ceola, F. Xia, F. Zhao, F. V. Frujeri, F. Stulp, G. Zhou, G. S. Sukhatme, G. Salhotra, G. Yan, G. Feng, G. Schiavi, G. Berseth, G. Kahn, G. Yang, G. Wang, H. Su, H.-S. Fang, H. Shi, H. Bao, H. B. Amor, H. I. Christensen, H. Fu-ruta, H. Bharadhwaj, H. Walke, H. Fang, H. Ha, I. Mordatch, I. Radosavovic, I. Leal, J. Liang, J. Abou-Chakra, J. Kim, J. Drake, J. Peters, J. Schneider, J. Hsu, J. Vakil, J. Bohg, J. Bing-ham, J. Wu, J. Gao, J. Hu, J. Wu, J. Wu, J. Sun, J. Luo, J. Gu, J. Tan, J. Oh, J. Wu, J. Lu, J. Yang, J. Malik, J. Silv´ erio, J. Hejna, J. Booher, J. Tompson, J. Yang, J. Salvador, J. J. Lim, J. Han, K. Wang, K. Rao, K. Pertsch, K. Hausman, K. Go, K. Gopalakrishnan, K. Goldberg, K. Byrne, K. Oslund, K. Kawaharazuka, K. Black, K. Lin, K. Zhang, K. Ehsani, K. Lekkala, K. Ellis, K. Rana, K. Srinivasan, K. Fang, K. P. Singh, K.-H. Zeng, K. Hatch, K. Hsu, L. Itti, L. Y. Chen, L. Pinto, L. Fei-Fei, L. Tan, L. J. Fan, L. Ott, L. Lee, L. Weihs, M. Chen, M. Lep-ert, M. Memmel, M. Tomizuka, M. Itkina, M. G. Castro, M. Spero, M. Du, M. Ahn, M. C. Yip, M. Zhang, M. Ding, M. Heo, M. K. Srirama, M. Sharma, M. J. Kim, M. Z. Irshad, N. Kanazawa, N. Hansen, N. Heess, N. J. Joshi, N. Suenderhauf, N. Liu, N. D. Palo, N. M. M. Shafiullah, O. Mees, O. Kroemer, O. Bastani, P. R. Sanketi, P. T. Miller, P. Yin, P. Wohlhart, P. Xu, P. D. Fagan, P. Mitrano, P. Sermanet, P. Abbeel, P. Sundaresan, Q. Chen, Q. Vuong, R. Rafailov, R. Tian, R. Doshi, R. Mart´ ın-Mart´ ın, R. Baijal, R. Scalise, R. Hendrix, R. Lin, R. Qian, R. Zhang, R. Mendonca, R. Shah, R. Hoque, R. Julian, S. Bustamante, S. Kirmani, S. Levine, S. Lin, S. Moore, S. Bahl, S. Dass, S. Sonawani, S. Tulsiani, S. Song, S. Xu, S. Haldar, S. Karamcheti, S. Adebola, S. Guist, S. Nasiriany, S. Schaal, S. Welker, S. Tian, S. Ramamoorthy, S. Dasari, S. Belkhale, S. Park, S. Nair, S. Mirchandani, T. Osa, T. Gupta, T. Harada, T. Matsushima, T. Xiao, T. Kollar, T. Yu, T. Ding, T. Davchev, T. Z. Zhao, T. Arm-strong, T. Darrell, T. Chung, V. Jain, V. Kumar, V. Vanhoucke, V. Guizilini, W. Zhan, W. Zhou, W. Burgard, X. Chen, X. Chen, X. Wang, X. Zhu, X. Geng, X. Liu, X. Liangwei, X. Li, Y. Pang, Y. Lu, Y. J. Ma, Y. Kim, Y. Chebotar, Y. Zhou, Y. Zhu, Y. Wu, Y. Xu, Y. Wang, Y. Bisk, Y. Dou, Y. Cho, Y. Lee, Y. Cui, Y. Cao, Y.-H. Wu, Y. Tang, Y. Zhu, Y. Zhang, Y. Jiang, Y. Li, Y. Li, Y. Iwasawa, Y. Matsuo, Z. Ma, Z. Xu, Z. J. Cui, Z. Zhang, Z. Fu, and Z. Lin. Open x-embodiment: Robotic learning datasets and rt-x models, 2025. URL 
+
+https://arxiv.org/abs/2310.08864 .[12] K. Grauman, A. Westbury, E. Byrne, Z. Chavis, A. Furnari, R. Girdhar, J. Hamburger, H. Jiang, M. Liu, X. Liu, M. Martin, T. Nagarajan, I. Radosavovic, S. K. Ramakrishnan, F. Ryan, J. Sharma, M. Wray, M. Xu, E. Z. Xu, C. Zhao, S. Bansal, D. Batra, V. Cartillier, S. Crane, T. Do, M. Doulaty, A. Erapalli, C. Feichtenhofer, A. Fragomeni, Q. Fu, A. Gebreselasie, C. Gonzalez, J. Hillis, X. Huang, Y. Huang, W. Jia, W. Khoo, J. Kolar, S. Kottur, A. Kumar, F. Landini, C. Li, Y. Li, Z. Li, K. Mangalam, R. Modhugu, J. Munro, T. Murrell, T. Nishiyasu, W. Price, P. R. Puentes, M. Ramazanova, L. Sari, K. Somasundaram, A. Southerland, Y. Sug-ano, R. Tao, M. Vo, Y. Wang, X. Wu, T. Yagi, Z. Zhao, Y. Zhu, P. Arbelaez, D. Crandall, D. Damen, G. M. Farinella, C. Fuegen, B. Ghanem, V. K. Ithapu, C. V. Jawahar, H. Joo, K. Ki-tani, H. Li, R. Newcombe, A. Oliva, H. S. Park, J. M. Rehg, Y. Sato, J. Shi, M. Z. Shou, A. Torralba, L. Torresani, M. Yan, and J. Malik. Ego4d: Around the world in 3,000 hours of egocentric video, 2022. URL https://arxiv.org/abs/2110.07058 .[13] D. Shan, J. Geng, M. Shu, and D. Fouhey. Understanding human hands in contact at internet scale. 2020. [14] D. Damen, H. Doughty, G. M. Farinella, S. Fidler, A. Furnari, E. Kazakos, D. Moltisanti, J. Munro, T. Perrett, W. Price, and M. Wray. Scaling egocentric vision: The epic-kitchens dataset. In European Conference on Computer Vision (ECCV) , 2018. [15] S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta. R3m: A universal visual represen-tation for robot manipulation, 2022. URL https://arxiv.org/abs/2203.12601 .11 [16] T. Xiao, I. Radosavovic, T. Darrell, and J. Malik. Masked visual pre-training for motor control, 2022. URL https://arxiv.org/abs/2203.06173 .[17] M. Tschannen, A. Gritsenko, X. Wang, M. F. Naeem, I. Alabdulmohsin, N. Parthasarathy, T. Evans, L. Beyer, Y. Xia, B. Mustafa, O. H´ enaff, J. Harmsen, A. Steiner, and X. Zhai. Siglip 2: Multilingual vision-language encoders with improved semantic understanding, localization, and dense features, 2025. URL https://arxiv.org/abs/2502.14786 .[18] Qwen Team. Qwen3.5: Towards native multimodal agents, February 2026. URL https: //qwen.ai/blog?id=qwen3.5 .[19] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling, 2023. URL https://arxiv.org/abs/2210.02747 .[20] J. Romero, D. Tzionas, and M. J. Black. Embodied hands: modeling and capturing hands and bodies together. ACM Transactions on Graphics , 36(6):1–17, Nov. 2017. ISSN 1557-7368. doi:10.1145/3130800.3130883. URL http://dx.doi.org/10.1145/3130800.3130883 .[21] Z. Tong, Y. Song, J. Wang, and L. Wang. Videomae: Masked autoencoders are data-efficient learners for self-supervised video pre-training, 2022. URL https://arxiv.org/abs/2203. 12602 .[22] A. Majumdar, K. Yadav, S. Arnaud, Y. J. Ma, C. Chen, S. Silwal, A. Jain, V.-P. Berges, P. Abbeel, J. Malik, D. Batra, Y. Lin, O. Maksymets, A. Rajeswaran, and F. Meier. Where are we in the search for an artificial visual cortex for embodied intelligence?, 2023. URL 
+
+https://arxiv.org/abs/2303.18240 .[23] S. Levine, C. Finn, T. Darrell, and P. Abbeel. End-to-end training of deep visuomotor policies, 2016. URL https://arxiv.org/abs/1504.00702 .[24] C. Finn, X. Y. Tan, Y. Duan, T. Darrell, S. Levine, and P. Abbeel. Deep spatial autoencoders for visuomotor learning, 2016. URL https://arxiv.org/abs/1509.06113 .[25] R. Rahmatizadeh, P. Abolghasemi, L. B¨ ol¨ oni, and S. Levine. Vision-based multi-task ma-nipulation for inexpensive robots using end-to-end learning from demonstration, 2018. URL 
+
+https://arxiv.org/abs/1707.02920 .[26] A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. De-hghani, M. Minderer, G. Heigold, S. Gelly, J. Uszkoreit, and N. Houlsby. An image is worth 16x16 words: Transformers for image recognition at scale, 2021. URL https: //arxiv.org/abs/2010.11929 .[27] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn, K. Gopalakrishnan, K. Haus-man, A. Herzog, J. Hsu, J. Ibarz, B. Ichter, A. Irpan, T. Jackson, S. Jesmonth, N. J. Joshi, R. Julian, D. Kalashnikov, Y. Kuang, I. Leal, K.-H. Lee, S. Levine, Y. Lu, U. Malla, D. Man-junath, I. Mordatch, O. Nachum, C. Parada, J. Peralta, E. Perez, K. Pertsch, J. Quiambao, K. Rao, M. Ryoo, G. Salazar, P. Sanketi, K. Sayed, J. Singh, S. Sontakke, A. Stone, C. Tan, H. Tran, V. Vanhoucke, S. Vega, Q. Vuong, F. Xia, T. Xiao, P. Xu, S. Xu, T. Yu, and B. Zitkovich. Rt-1: Robotics transformer for real-world control at scale, 2023. URL 
+
+https://arxiv.org/abs/2212.06817 .[28] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, X. Chen, K. Choromanski, T. Ding, D. Driess, A. Dubey, C. Finn, P. Florence, C. Fu, M. G. Arenas, K. Gopalakrishnan, K. Han, K. Hausman, A. Herzog, J. Hsu, B. Ichter, A. Irpan, N. Joshi, R. Julian, D. Kalashnikov, Y. Kuang, I. Leal, L. Lee, T.-W. E. Lee, S. Levine, Y. Lu, H. Michalewski, I. Mordatch, K. Pertsch, K. Rao, K. Reymann, M. Ryoo, G. Salazar, P. Sanketi, P. Sermanet, J. Singh, A. Singh, R. Soricut, H. Tran, V. Vanhoucke, Q. Vuong, A. Wahid, S. Welker, P. Wohlhart, J. Wu, F. Xia, T. Xiao, P. Xu, S. Xu, T. Yu, and B. Zitkovich. Rt-2: Vision-language-action models transfer web knowledge to robotic control. In arXiv preprint arXiv:2307.15818 , 2023. 12 [29] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Haus-man, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. X. Shi, J. Tanner, Q. Vuong, A. Walling, H. Wang, and U. Zhilinsky. π0: A vision-language-action flow model for general robot control, 2026. URL https://arxiv. org/abs/2410.24164 .[30] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, M. Y. Galliker, D. Ghosh, L. Groom, K. Hausman, B. Ichter, S. Jakubczak, T. Jones, L. Ke, D. LeBlanc, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, A. Z. Ren, L. X. Shi, L. Smith, J. T. Springenberg, K. Stachowicz, J. Tanner, Q. Vuong, H. Walke, A. Walling, H. Wang, L. Yu, and U. Zhilinsky. π0.5: a vision-language-action model with open-world generalization. [31] X. Wang, I. Alabdulmohsin, D. Salz, Z. Li, K. Rong, and X. Zhai. Scaling pre-training to one hundred billion data for vision language models, 2025. URL https://arxiv.org/abs/ 2502.07617 .[32] M. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, Q. Vuong, T. Kollar, B. Burchfiel, R. Tedrake, D. Sadigh, S. Levine, P. Liang, and C. Finn. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. [33] NVIDIA, :, J. Bjorck, F. Casta˜ neda, N. Cherniadev, X. Da, R. Ding, L. J. Fan, Y. Fang, D. Fox, F. Hu, S. Huang, J. Jang, Z. Jiang, J. Kautz, K. Kundalia, L. Lao, Z. Li, Z. Lin, K. Lin, G. Liu, E. Llontop, L. Magne, A. Mandlekar, A. Narayan, S. Nasiriany, S. Reed, Y. L. Tan, G. Wang, Z. Wang, J. Wang, Q. Wang, J. Xiang, Y. Xie, Y. Xu, Z. Xu, S. Ye, Z. Yu, A. Zhang, H. Zhang, Y. Zhao, R. Zheng, and Y. Zhu. Gr00t n1: An open foundation model for generalist humanoid robots, 2025. URL https://arxiv.org/abs/2503.14734 .[34] L. Beyer, A. Steiner, A. S. Pinto, A. Kolesnikov, X. Wang, D. Salz, M. Neumann, I. Al-abdulmohsin, M. Tschannen, E. Bugliarello, T. Unterthiner, D. Keysers, S. Koppula, F. Liu, A. Grycner, A. Gritsenko, N. Houlsby, M. Kumar, K. Rong, J. Eisenschlos, R. Kabra, M. Bauer, M. Boˇ snjak, X. Chen, M. Minderer, P. Voigtlaender, I. Bica, I. Balazevic, J. Puigcerver, P. Pa-palampidi, O. Henaff, X. Xiong, R. Soricut, J. Harmsen, and X. Zhai. Paligemma: A versatile 3b vlm for transfer, 2024. [35] Z. Li, G. Chen, S. Liu, S. Wang, V. VS, Y. Ji, S. Lan, H. Zhang, Y. Zhao, S. Radhakrishnan, N. Chang, K. Sapra, A. S. Deshmukh, T. Rintamaki, M. Le, I. Karmanov, L. Voegtle, P. Fischer, D.-A. Huang, T. Roman, T. Lu, J. M. Alvarez, B. Catanzaro, J. Kautz, A. Tao, G. Liu, and Z. Yu. Eagle 2: Building post-training data strategies from scratch for frontier vision-language models, 2025. URL https://arxiv.org/abs/2501.14818 .[36] D. Damen, H. Doughty, G. M. Farinella, A. Furnari, E. Kazakos, J. Ma, D. Moltisanti, J. Munro, T. Perrett, W. Price, and M. Wray. Rescaling egocentric vision: Collection, pipeline and challenges for epic-kitchens-100, 2020. URL https://arxiv.org/abs/2006.13256 .[37] R. Hoque, P. Huang, D. J. Yoon, M. Sivapurapu, and J. Zhang. Egodex: Learning dexter-ous manipulation from large-scale egocentric video, 2025. URL https://arxiv.org/abs/ 2505.11709 .[38] I. Radosavovic, T. Xiao, S. James, P. Abbeel, J. Malik, and T. Darrell. Real-world robot learn-ing with masked visual pre-training, 2022. URL https://arxiv.org/abs/2210.03109 .[39] M. K. Srirama, S. Dasari, S. Bahl, and A. Gupta. Hrp: Human affordances for robotic pre-training, 2024. URL https://arxiv.org/abs/2407.18911 .[40] S. Ye, J. Jang, B. Jeon, S. Joo, J. Yang, B. Peng, A. Mandlekar, R. Tan, Y.-W. Chao, B. Y. Lin, L. Liden, K. Lee, J. Gao, L. Zettlemoyer, D. Fox, and M. Seo. Latent action pretraining from videos, 2025. URL https://arxiv.org/abs/2410.11758 .13 [41] Y. Chen, Y. Ge, W. Tang, Y. Li, Y. Ge, M. Ding, Y. Shan, and X. Liu. Moto: Latent mo-tion token as the bridging language for learning robot manipulation from videos, 2025. URL 
+
+https://arxiv.org/abs/2412.04445 .[42] W. Dai, K. Lan, J. Zhou, B. Zhao, X. Su, J. Tong, W. Guan, and S. Yang. Conla: Contrastive latent action learning from human videos for robotic manipulation, 2026. URL https:// arxiv.org/abs/2602.00557 .[43] Q. Bu, Y. Yang, J. Cai, S. Gao, G. Ren, M. Yao, P. Luo, and H. Li. Univla: Learning to act anywhere with task-centric latent actions, 2025. URL https://arxiv.org/abs/2505. 06111 .[44] C. Zhang, J. Wang, Z. Gao, Y. Su, T. Dai, C. Zhou, J. Lu, and Y. Tang. Clap: Contrastive latent action pretraining for learning vision-language-action models from human videos, 2026. URL 
+
+https://arxiv.org/abs/2601.04061 .[45] G. Jiang, Y. Sun, T. Huang, H. Li, Y. Liang, and H. Xu. Robots pre-train robots: Manipulation-centric robotic representation from large-scale robot datasets, 2024. URL https://arxiv. org/abs/2410.22325 .[46] S.-W. Lee, X. Kang, B. Yang, and Y.-L. Kuo. Class: Contrastive learning via action sequence supervision for robot manipulation, 2025. URL https://arxiv.org/abs/2508.01600 .[47] T. Kim, J. Lee, M. Koo, D. Kim, K. Lee, C. Kim, Y. Seo, and J. Shin. Contrastive representation regularization for vision-language-action models, 2025. URL https://arxiv.org/abs/ 2510.01711 .[48] I.-C. A. Liu, K. Choromanski, S. Huang, and C. Schenck. Clamp: Contrastive learning for 3d multi-view action-conditioned robotic manipulation pretraining, 2026. URL https:// arxiv.org/abs/2602.00937 .[49] W. Wang, J. Li, Y. Zhu, Z. Xu, Z. Che, Y. Peng, C. Shen, D. Liu, F. Feng, and J. Tang. Visual robotic manipulation with depth-aware pretraining, 2024. URL https://arxiv.org/abs/ 2401.09038 .[50] T. Darcet, M. Oquab, J. Mairal, and P. Bojanowski. Vision transformers need registers, 2024. URL https://arxiv.org/abs/2309.16588 .[51] J. Gu, F. Xiang, X. Li, Z. Ling, X. Liu, T. Mu, Y. Tang, S. Tao, X. Wei, Y. Yao, X. Yuan, P. Xie, Z. Huang, R. Chen, and H. Su. Maniskill2: A unified benchmark for generalizable manipulation skills. In International Conference on Learning Representations , 2023. [52] S. Caron, Y. De Mont-Marin, R. Budhiraja, S. H. Bang, I. Domrachev, S. Nedelchev, P. Du, A. Escande, J. Vaillant, B. Wingo, S. Patapati, D. San Jos´ e Pro, and N. G. Marticorena Vidal. Pink: Python inverse kinematics based on Pinocchio, 2026. URL https://github.com/ stephane-caron/pink .[53] J. Carpentier, G. Saurel, G. Buondonno, J. Mirabel, F. Lamiraux, O. Stasse, and N. Mansard. The Pinocchio C++ library – A fast and flexible implementation of rigid body dynamics al-gorithms and their analytical derivatives. In SII 2019 - International Symposium on System Integrations , Paris, France, Jan. 2019. URL https://hal.laas.fr/hal-01866228 .[54] J. A. E. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl. CasADi – A software framework for nonlinear optimization and optimal control. Mathematical Programming Com-putation , 11(1):1–36, 2019. doi:10.1007/s12532-018-0139-4. [55] R. Hoque, P. Huang, D. J. Yoon, M. Sivapurapu, and J. Zhang. Egodex: Learning dexter-ous manipulation from large-scale egocentric video, 2025. URL https://arxiv.org/abs/ 2505.11709 .14 [56] Y. Zhou, C. Barnes, J. Lu, J. Yang, and H. Li. On the continuity of rotation representations in neural networks, 2020. URL https://arxiv.org/abs/1812.07035 .[57] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn. Learning fine-grained bimanual manipulation with low-cost hardware, 2023. URL https://arxiv.org/abs/2304.13705 .15 Appendix A Additional Experiments 
+
+A.1 Saliency Visualization Details 
+
+The visualizations in Figure 1 (left) and the per-encoder comparison in Figure 4 are computed us-ing each encoder’s native query mechanism, since the three encoders expose spatial information in fundamentally different ways. Unless otherwise noted, all maps are overlaid on a common square center crop of the input image to ensure spatial alignment across encoders. 
+
+SigLIP. SigLIP’s vision tower terminates in a multi-head attention-pooling (MAP) head whose query is a single learned probe. Consequently, the resulting attention map is text-agnostic. We obtain the probe-to-patch attention weights, reshape them to the patch grid, min–max normalize each head independently, and visualize the mean across heads. The resulting map is overlaid on the image with opacity α = 0 .55 .
+
+DINOv2. DINOv2 does not contain an explicit pooling query. Following the standard visualization protocol [4], we extract the final-layer patch tokens and fit PCA independently for each image. The first three principal components are mapped to RGB channels after percentile normalization to expose semantic structure. The first principal component is additionally used as a soft foreground mask that gradually fades the background to black. Since PCA is fit independently for each image, we note that colors are not comparable across examples. 
+
+CAIP (Ours). Our encoder architecture ends with a text-conditioned cross-attention pooling layer in which text tokens act as queries and image patches serve as keys and values. The resulting attention is therefore natively instruction-conditioned. We extract the pooling attention tensor 
+
+A ∈ RH×L×N
+
+where H denotes attention heads, L text tokens, and N image patches. For each non-special text token (excluding padding, BOS, and EOS tokens), we normalize each head by its spatial maximum and then take the maximum across heads, yielding one spatial map per to-ken. We subsequently aggregate across all content tokens using a per-location maximum operation. In practice, this token-aggregate map is visually indistinguishable from the map produced by any in-dividual content token, and therefore provides a concise summary of the encoder’s behavior without requiring token selection. For visualization, the aggregated map is percentile clipped (lower/upper percentiles 50 /98 ) and gamma corrected ( γ = 1 .6) before being overlaid on the image. 
+
+Analysis. The following observations emerge from these visualizations. 
+
+(i) CAIP’s text-conditioned attention focuses on a stable task region. Although each text token produces its own attention distribution, the resulting maps are nearly identical across content tokens. Attention consistently concentrates on the hands and the actively manipulated object rather than localizing the specific noun or verb associated with a given token. We attribute this to how the pooling layer is supervised: the contrastive objective constrains only the pooled output, not the individual per-token attention rows. Without any token-specific supervision, the per-token maps are nearly identical to one another, which is the motivation for why we visualize the aggregate. 
+
+(ii) Only CAIP consistently highlights task-relevant regions. SigLIP’s learned probe is text-agnostic and often concentrates on a small number of high-norm patches, frequently in low-information background regions. This behavior is consistent with the register “sink” token phe-nomenon observed in ViTs [50] and generally does not track the manipulation being performed. DINOv2, by contrast, produces clean semantic segmentations of the scene but, as an unsupervised and instruction-unaware representation, does not reliably identify the task-relevant region. 16 Folding a pink and gold 
+
+invitation card and 
+
+smoothing the crease with 
+
+both hands 
+
+source CAIP (ours) SigLIP pool DINOv2 PCA 
+
+Shaving off thin layers of 
+
+wood from a cylindrical 
+
+block to refine its shape 
+
+scrubbing white sneaker 
+
+with a toothbrush and 
+
+soapy water 
+
+using scissors to trim the 
+
+borders of several printed 
+
+labels 
+
+screwing the top metal 
+
+plate back onto the phone 
+
+assembly 
+
+mixing white batter in a 
+
+large pink bowl using a 
+
+ladle and chopsticks 
+
+picking up soil from black 
+
+pot and placing it in 
+
+black plastic bag 
+
+filling a small individual 
+
+plastic bag with black 
+
+cable ties from a pile on 
+
+the table Figure 4: Saliency across vision encoders on held-out egocentric manipulation frames. Columns: input, CAIP (ours), SigLIP, DINOv2. CAIP’s text-conditioned cross-attention pool (aggregated over instruction tokens) focuses on the hands and manipulated object; SigLIP’s text-agnostic learned probe scatters across background sink patches; DINOv2’s per-image PCA segments by appearance but is instruction-unaware (colors not comparable across rows). See Appendix A.1. 17 Table 4: Policy success rates (%) using different vision encoder scales. All encoders are pre-trained and evaluated under identical settings.                
+
+> Task ViT-B/16 ViT-L/16 ViT-SO400M/16 Turn On Lamp 16.67 75.00 83.33
+> Fold Shorts 54.17 68.75 79.17
+> Dispense Soap 72.92 100.00 100.00
+> Average 47.92 81.25 87.50
+
+A.2 Scaling Vision Encoder Capacity 
+
+We study how vision encoder capacity affects downstream policy performance by pre-training CAIP at three scales—ViT-B/16, ViT-L/16, and ViT-SO400M/16—under identical data, training, and op-timization settings, and evaluating each on three downstream tasks. Table 4 reports the results. Performance improves consistently with encoder scale. The largest gain comes from ViT-B to ViT-L, where average success rate rises from 47.9% to 81.3%, an absolute improvement of over 30 points. This jump is driven primarily by the two harder tasks: Turn on Lamp improves from 16.7% to 75.0% and Fold Shorts from 54.2% to 68.8%, while Dispense Soap, already strong at the smallest scale, saturates at 100%. The gains suggest that the smaller ViT-B backbone lacks the capacity to learn the fine-grained, action-relevant features required for precise manipulation, whereas ViT-L provides sufficient capacity to capture them. Scaling further to ViT-SO400M yields a smaller additional improvement, raising the average from 81.3% to 87.5%. Given that ViT-SO400M is substantially larger and slower at both training and inference time, we adopt ViT-L as our main encoder, as it captures most of the benefit of scaling while remaining efficient enough for practical downstream use. 
+
+A.3 Simulation Results 
+
+To test whether CAIP’s learned representations transfer beyond the embodiment and domain they were trained for, we evaluate on a simulated manipulation benchmark that differs substantially from all of our other experiments. Whereas CAIP is pre-trained on egocentric dexterous human ma-nipulation and evaluated in the real world on a bimanual humanoid platform, here we use the Man-iSkill2 [51] Franka setup: a single 7-DoF Franka arm with a parallel-jaw gripper performing tabletop tasks. This represents a large shift in embodiment (single arm vs. bimanual dexterous hands), action space, and visual domain (simulation vs. real-world egocentric video). We keep the same evaluation protocol as our real-world experiments: the vision encoder is frozen, a policy is trained from scratch on 200 demonstrations per task using the overhead and wrist views, and each (encoder, task) pair is evaluated over 12 trials. Table 5 reports per-task success rates. Despite the substantial domain gap, CAIP achieves the highest average success rate (77.8%), outperforming all baselines including the strongest, SigLIP 2 (72.2%) and DINOv2 (69.4%). These results indicate that CAIP’s action-centric representations provide a useful prior for manipulation even under a large shift in embodiment and visual domain from the dexterous bimanual setting it was trained on. 
+
+A.4 Scaling Vision Encoder Data 
+
+We next study how the amount of pre-training data affects downstream performance, holding the encoder fixed at ViT-L/16 and varying the fraction of pre-training data used. We pre-train CAIP on 20%, 50%, and 100% of the full dataset, training each for the same number of epochs so that the comparison reflects the amount of unique data seen by the model. Each encoder is evaluated on the ManiSkill2 Franka tasks under the same protocol as Appendix A.3 (frozen encoder, policy trained from scratch on 200 demonstrations per task, 12 trials per task). Table 6 reports the results. 18 Table 5: Policy success rates (%) on the ManiSkill2 Franka simulation tasks, a single-arm tabletop setup that differs substantially from CAIP’s egocentric dexterous pre-training domain. Each (en-coder, task) pair is evaluated over 12 trials. Best result per column in bold .                            
+
+> Encoder Lift Peg Stack Cubes Push Cube Average VC-1 16.67 0.00 91.67 36.11 R3M 25.00 16.67 91.67 44.44 MVP 33.33 0.00 100.00 44.44 DINOv2 58.33 50.00 100.00 69.44 SigLIP 2 58.33 58.33 100.00 72.22
+> CAIP (ours) 75.00 58.33 100.00 77.78
+
+Table 6: Policy success rates (%) as a function of pre-training data scale, holding the encoder fixed at ViT-L/16. All runs are trained for the same number of epochs. Evaluated on the ManiSkill2 Franka tasks over 12 trials each. Best result per column in bold .                
+
+> Pre-training data Lift Peg Stack Cubes Push Cube Average 20% 58.33 25.00 66.67 50.00 50% 66.67 33.33 83.33 61.11 100% 75.00 58.33 100.00 77.78
+
+Performance improves monotonically with pre-training data. Average success rate rises from 50.0% at 20% of the data to 61.1% at 50%, and to 77.8% at full scale. The gains are consistent across all three tasks: every task improves at each step, with the hardest task, Stack Cubes, more than doubling from 25.0% to 58.3%. Notably, we observe no sign of saturation, with performance still climbing at the full data scale. This result suggests that CAIP would continue to benefit from additional pre-training data beyond what we currently use. This supports our central premise: that large-scale egocentric human video is a valuable and scalable source of supervision for action-centric visual representations. 
+
+A.5 Failure Case Analysis 
+
+We observe a few recurring failure modes in policies trained with the CAIP encoder that highlight potential shortcomings. In the pouring task, a common failure was to grasp successfully but then begin pouring before the two cups were aligned. We hypothesize that this stems from both cups being the same color (red): when the cups are close together but not yet aligned, the visual features may closely resemble those of the aligned configuration. In the fold-shorts task, the policy would sometimes fail to attempt the second fold, likely because the visual features after the first fold re-semble those of the completed state. We observed both failure modes in policies trained with other vision encoders as well, suggesting they reflect general perceptual ambiguities of the tasks. 
+
+# B Hardware Setup 
+
+B.1 Embodiment 
+
+Our physical setup is a fixed-base bimanual manipulator built on the Dexmate Vega platform. We mount each arm with the Sharpa Wave dexterous hands to allow for precise manipulation (see Fig-ure 5). 
+
+B.1.1 Dexmate Vega 
+
+The Dexmate Vega is a dual-arm mobile manipulation platform with 36 total degrees of freedom (DoF), spanning an omnidirectional wheeled base, a foldable torso, an articulated head, and two 7-DoF arms. For all experiments in this work, we operate the Vega as a fixed-base bimanual manip-19 Zed X Mini  
+
+> Sharpa Wave
+> Dexterous Hands Zed X One S
+
+## Robot Platform 
+
+> Manus Gloves
+> Vive Trackers
+
+## Teleoperation 
+
+## Setup Figure 5: CAIP Hardware Setup. ulator: the base, torso, and head joints are held static, and we drive only the two 7-DoF arms (14 joints in total). We replace the platform’s native end-effectors with Sharpa Wave hands, so each 7-DoF arm provides full SE (3) positioning of its attached dexterous hand. Arm motion is commanded as relative end-effector pose targets (Section B.3.2). 
+
+B.1.2 Sharpa Wave 
+
+Each arm is equipped with a Sharpa Wave hand, an anthropomorphic five-fingered end-effector with 22 active degrees of freedom built at 1:1 human size and scale. The hand uses a tendon-driven transmission and is fully actuated, allowing all finger joints to be commanded directly in joint space without the mechanical coupling or masked joints common to lower-DoF designs. We control the 22 joints via absolute position targets. Although the Sharpa Wave integrates onboard fingertip tactile sensing, we do not use any tactile or proprioceptive signals in this work. 
+
+B.2 Camera Setup 
+
+Visual observations are captured from three cameras. A ZED X Mini stereo camera mounted on the Vega head provides an egocentric view that approximates the first-person viewpoint of our egocentric pre-training data, and two ZED X One S monocular cameras (wide-view variant) are mounted on the wrists to capture close-range views of each hand that are otherwise occluded from the head. We position the head camera to cover the full reachable workspace in front of the robot, and the wrist cameras to keep the fingers in clear view with minimal palm occlusion. All three streams are RGB and captured at 640 × 360 resolution; we do not use depth. 
+
+B.3 Teleoperation 
+
+We collect demonstrations through a teleoperation interface that maps the operator’s wrist and finger motion onto the bimanual platform. The interface shares the same control pipeline as policy rollout, ensuring that demonstrated and executed policy actions occupy a consistent action space. 20 B.3.1 Pose Tracking 
+
+The operator wears a pair of Manus gloves, each augmented with a Vive Ultimate Tracker attached via a custom 3D-printed mount that rigidly fixes the tracker to the back of the glove. The two devices supply complementary signals. Each Vive tracker reports the 6-DoF SE (3) pose of the corresponding wrist in the Vive world frame, which drives arm control. The Manus glove reports 3D finger keypoints expressed relative to the wrist (hand-base) frame, which drive hand control. We map tracked wrist motion to the robot using relative end-effector (delta) control. Given consec-utive wrist poses in the Vive world frame, we compute the relative SE (3) transform and apply it as a delta to the current robot end-effector pose to obtain a target pose. 
+
+B.3.2 Control Arms. Given a target end-effector pose (either from teleoperation or produced by a policy), we com-pute the corresponding 7-DoF arm joint angles using differential inverse kinematics implemented in Pink [52], which builds on the Pinocchio rigid-body dynamics library [53]. The resulting joint commands are smoothed with a low-pass filter and passed to the manufacturer’s low-level cascade PID controller. A high-level loop generates target poses at 30 Hz—from the teleoperator during data collection, or from the policy at inference—and asynchronously updates the targets tracked by a 300 Hz low-level control thread. 
+
+Hands. We retarget the Manus 3D finger keypoints, expressed in the wrist frame, onto the Sharpa Wave joint space using a manufacturer-provided differential inverse kinematics package built on Pinocchio [53] and CasADi [54], yielding absolute joint-position targets for the hand’s 22 actuated DoF. This establishes a direct correspondence between the operator’s finger configuration and the commanded hand pose. 
+
+# C Pre-training Details 
+
+C.1 Data Pre-training Data. We pre-train on a mixture of four egocentric manipulation datasets spanning both in-lab demonstrations and large-scale in-the-wild videos (Table 7). The in-lab robot demon-strations were collected on the Galaxea R1Pro humanoid robot with 22-DoF Sharpa dexterous hands. All sources are converted to a unified hand-action representation. EgoDex [55] and the large-scale in-the-wild dataset are recorded at 30 Hz, while the in-lab datasets are recorded at 20 Hz. In total, the corpus contains approximately 3.46 B frames (∼32,000 hours) of egocentric interaction data. The in-the-wild dataset contributes the majority of the raw volume ( 96 .6% of all frames). To prevent this source from dominating training, we apply dataset-specific upsampling factors, yielding an effec-tive sampling distribution of 10% EgoDex, 3% in-lab human, 2% in-lab robot, and 85% large-scale in-the-wild data. These in-lab sources also carry higher-fidelity supervision: EgoDex hand poses are tracked with the Apple Vision Pro headset, the in-lab human poses with Manus Metagloves Pro gloves and Vive trackers, and the in-lab robot poses from recorded robot joint angles, yielding cleaner action annotations than the in-the-wild data despite their smaller scale.                                     
+
+> Source FPS Hours Frames Raw % Upsamp. Eff. % EgoDex [55] 30 826 89.2 M 2.6 4.4 ×10.0 In-lab human data 20 287 20.6 M 0.6 5.7 ×3.0 In-lab robot data 20 88 6.3 M 0.2 12.6 ×2.0 In-the-wild egocentric videos 30 30,928 3.34 B 96.6 1.0 ×85.0
+> Total –32,129 3.46 B 100 –100
+
+Table 7: Composition of the pre-training corpus. Effective sampling percentages are proportional to frames × upsampling factor and correspond to the distribution used during training. 21 Action Representation. Each training sample consists of an egocentric image paired with a future action chunk of horizon T = 64 . At each timestep, the action is represented by the poses of 42 hand joints (21 per hand). Each joint is encoded using a 9-dimensional representation comprising a 3D translation and a continuous 6D rotation representation [56], resulting in 378 dimensions per timestep and 24,192 dimensions for the full action chunk. Action targets are expressed as pose deltas relative to the current-frame hand pose and are normal-ized independently per dimension using mean and standard deviation statistics computed over the training set. A per-timestep validity mask is used to ignore padding near sequence boundaries when fewer than T future steps are available. Our decision to represent actions as a temporal chunk was inspired by ACT [57], which showed that predicting chunks of actions, rather than single-step actions, improves imitation learning by capturing temporal structure in demonstrations. We adapt this intuition to the pre-training setting, encouraging our vision encoder to produce latents that represent action over longer horizons. 
+
+Preprocessing. Input frames are decoded to RGB and resized to 256 × 256 , matching the in-put resolution of the SigLIP 2 ViT-L/16 backbone. Pixel values are scaled to [0 , 1] and nor-malized using the standard CLIP channel-wise mean (0 .481 , 0.458 , 0.408) and standard deviation 
+
+(0 .269 , 0.261 , 0.276) . During training, we apply a light random resized crop with scale sampled from [0 .9, 1.0] , aspect-ratio jitter in [0 .75 , 1.33] , and bicubic interpolation. At inference, images are resized to a shorter side length of 256 using bicubic interpolation and center-cropped to 256 × 256 .Text inputs consist of the natural-language task instruction associated with each clip. Instructions are canonicalized by lowercasing and removing punctuation, then tokenized using the SigLIP 2 tokenizer with a maximum context length of 64 tokens. 
+
+C.2 Architecture 
+
+Our model is an image-text-action contrastive architecture built on the SigLIP 2 backbone, with two modifications relative to the original design: (i) the vision tower’s global attention-pooling head is replaced with a text-conditioned cross-attention pooling module, and (ii) an action encoder is introduced during pre-training. The action tower injects action supervision into the shared embed-ding space but is discarded after pre-training; only the image and text encoders are retained for downstream policy learning. We instantiate three backbone scales—ViT-B/16, ViT-L/16, and ViT-SO400M/16—which differ only in transformer width and depth. Architecture hyperparameters are summarized in Table 8 and Table 9. 
+
+Vision tower. The vision encoder is a SigLIP 2 Vision Transformer operating at 256 ×256 resolution with 16 ×16 patches, producing 256 patch tokens. We remove the default SigLIP MAP pooling head and expose the full patch-token sequence to a downstream pooling module. The ViT-B, ViT-L, and ViT-SO400M variants use widths of 768 , 1024 , and 1152 , depths of 12 , 24 , and 27 , and 12 , 16 ,and 16 attention heads, respectively. The SO400M variant follows the original SigLIP configuration with an MLP ratio of 3.7362 , while the base and large models use a ratio of 4.
+
+Text tower. The text encoder is the corresponding SigLIP 2 text transformer with bidirectional self-attention. Inputs are tokenized using the SigLIP 2 multilingual (Gemma) tokenizer with a vocabulary of 256 k tokens and a context length of 64 . The encoder produces both a pooled text embedding and the full sequence of token representations. The pooled embedding is unused, and the token-level features are used to condition image pooling. 
+
+Text-conditioned cross-attention pooling. We condition image pooling on the paired language instruction. Let X ∈ RB×N ×C denote the visual patch tokens and TL ∈ RB×L×C the text-token features. After applying the LayerNorm and linear projection, text tokens serve as queries while vi-sual tokens provide keys and values in a multi-head cross-attention operation. This yields a sequence of text-conditioned visual features. The resulting sequence is then aggregated using a learned-query pooling operation consisting of a single trainable query token attending over the conditioned fea-tures, followed by LayerNorm and a linear projection. The final output is a text-conditioned image 22 Table 8: Architecture configuration that scales with vision encoder size. The vision and text towers share the same width, depth, and head count at each size. The cross-attention pooling module uses an embedding dimension matched to the tower width.                               
+
+> ViT-B/16 ViT-L/16 ViT-SO400M/16
+> Vision tower
+> Width 768 1024 1152 Depth 12 24 27 Heads 12 16 16 MLP ratio 443.74
+> Text tower
+> Width 768 1024 1152 Depth 12 24 27 Heads 12 16 16
+> Cross-attn pooling
+> Embed dim C768 1024 1152 Heads 816 16
+
+Table 9: Architecture configuration shared across all vision encoder sizes.                
+
+> Component Parameter Value Text tower Context length 64 Vocab size 256,000 Attention Bidirectional Cross-attn pooling Query source All text tokens Action encoder Layers / heads 4 / 8 FFN dim 4C
+> Horizon T64 Action dim Ad378 Shared Dropout 0.1
+
+embedding zimg ∈ RC . The cross-attention module uses 8 heads for ViT-B and 16 heads for ViT-L and SO400M, with attention dropout of 0.1.
+
+Action encoder. To inject action information during pre-training, we introduce a lightweight Transformer encoder operating on future action sequences. Given a horizon-T action chunk 
+
+a ∈ RB×T ×Ad , each action vector is projected into the shared embedding space, augmented with learned positional embeddings, and prepended with a learnable class token. The resulting sequence is processed by a 4-layer Transformer encoder with 8 attention heads, feed-forward dimension 4C,GELU activations, and dropout 0.1. The final class-token representation is projected to obtain the action embedding zact ∈ RC . For all our experiments, the action horizon is T = 64 and the action dimensionality is Ad = 378 , corresponding to the full two-hand pose representation described in Section C.1. Padded timesteps are masked during attention. The action encoder is trained jointly with the image and text towers and removed after pre-training. 
+
+Initialization. The vision and text towers are initialized from publicly released SigLIP 2 checkpoints at the corresponding backbone scale. All newly introduced modules are randomly initialized. The contrastive temperature and bias follow the SigLIP parameterization, with the logit bias initialized to −10 .
+
+C.3 Training Contrastive Image–Action Objective. Let zimg  
+
+> i
+
+∈ RC and zact  
+
+> i
+
+∈ RC denote the L2-normalized text-conditioned image embedding and action embedding for the i-th sample in a batch of size B.23 For each pair (i, j ), we compute a similarity logit 
+
+ℓij = t · ⟨ zimg  
+
+> i
+
+, zact  
+
+> j
+
+⟩ + b, 
+
+where t is a learnable temperature (parameterized in log-space and clamped at a maximum value) and b is a learnable bias. We define binary labels yij ∈ { +1 , −1} with yij = +1 for matching image–action pairs (i.e., i = j)and yij = −1 otherwise. The training objective is a full-batch sigmoid contrastive loss: 
+
+L = − 1
+
+B
+
+> B
+
+X
+
+> i=1
+> B
+
+X
+
+> j=1
+
+log σ(yij · ℓij ) ,
+
+where σ(·) denotes the sigmoid function. Positive pairs are constructed from the same trajectory: an image at time t0 is paired with the subsequent action chunk spanning t0 + 1 , . . . , t 0 + T , where T is the horizon length. All other image–action pairs in the batch serve as negatives. 
+
+Batch and masking. The loss is computed over the full global batch, where every image is con-trasted against every action ( B = 32 ,768 for our reference run). We do not apply explicit false-negative filtering; supervision is fully determined by the diagonal labeling structure above. Two masking operations are applied upstream of the loss: (i) padded action frames in variable-length sequences are masked within the action encoder, and (ii) padded text tokens are masked in the text-conditioned cross-attention pooling module, ensuring that padding does not contribute to pooled representations. 
+
+Optimization. We train with AdamW ( β1=0 .9, β2=0 .98 , ϵ=10 −6, weight decay 1 × 10 −4), using a linear warmup of 2,000 steps followed by cosine decay to zero. The temperature t is initialized to 1/0.07 ≈ 14 .3 and clamped at a maximum of 100 ; in practice it saturates at this bound during training. The logit bias b is initialized to −10 . Actions are normalized per channel using dataset-level mean–std statistics. We train for one full pass over the complete dataset with no gradient clipping. The vision and text towers are initialized from pretrained SigLIP 2 weights, while the cross-attention pooling module and action encoder are trained from scratch (Appendix C.2). 
+
+Hardware and throughput. The reference ViT-L/16 model is trained in bf16 mixed precision (amp bf16 ) on 128 GPUs, using a per-GPU micro-batch of 128 and gradient accumulation of 2 for a global batch of 32,768. 
+
+# D Downstream Policy Training and Evaluation 
+
+D.1 Tasks 
+
+We evaluate on six real-world manipulation tasks chosen to span deformable-object handling, dy-namic and granular manipulation, multi-object sequencing, and fine-grained dexterity. Each policy is trained from scratch on 200 teleoperated demonstrations (150 for Pour Almonds) and evaluated over 12 trials. Five of the six tasks are bimanual; only Turn On Lamp is single-arm. 
+
+Fold Shorts. Language instruction: “A pair of gray shorts lay on the tabletop. Grasping them from underneath with both hands, fold them upward; then, using your right hand to hold down the right side, use your left hand to grasp the left side and fold them upward a second time.” This bimanual task tests manipulation of a highly deformable object whose configuration changes unpredictably under contact, and requires coordinated two-handed control across a two-stage fold in which the second fold depends on the result of the first. 24 Table 10: Training configuration for the ViT-L/16 model. The global batch is computed as per-GPU batch × number of GPUs × gradient accumulation factor, and provides in-batch negatives for the sigmoid contrastive loss.                                       
+
+> Optimizer AdamW
+> (β1, β 2)(0 .9,0.98)
+> ϵ10 −6
+> Weight decay 1×10 −4
+> Peak learning rate 1×10 −4
+> LR schedule cosine decay to 0
+> Warmup 2,000 steps Epochs 1
+> Per-GPU micro-batch 128
+> Gradient accumulation 2
+> Global batch 32 ,768
+> Precision bf16 AMP Gradient clipping none Temperature t(init / max) 1/0.07 ≈14 .3/100
+> Logit bias b(init) −10
+> Action normalization per-channel mean–std Tower init pretrained SigLIP 2 GPUs 128 H100 ( 16 nodes ×8)
+
+Figure 6: Progression of Fold Shorts. 
+
+Pour Almonds. Language instruction: “Pour the almonds from the filled cup to the empty cup.” This bimanual task probes control of a dynamic, granular process: the policy must regulate cup orientation and pour rate to transfer free-flowing almonds without spilling or overshooting. It is our most data-constrained task, trained on only 150 demonstrations. 
+
+Figure 7: Progression of Pour Almonds. 
+
+Pick Fruits. Language instruction: “Pick up the fruit on the left side using your left hand and place it in the basket. Then, pick up the fruit on the right side using your right hand and place it in the basket.” This bimanual task evaluates sequential pick-and-place over multiple objects, testing reliable grasp-ing of irregularly shaped items and correct hand–object assignment across sub-goals. 25 Figure 8: Progression of Pick Fruits. 
+
+Dispense Soap. Language instruction: “Use your left hand to pick up the soap dispenser, and then use your right hand to press the pump to dispense soap into the red bowl.” This bimanual task requires asymmetric coordination in which one hand stabilizes the dispenser while the other applies a controlled downward press, testing precise force application against a compliant mechanism. 
+
+Figure 9: Progression of Dispense Soap. 
+
+Turn On Lamp. Language instruction: “Using your left hand, carefully pull the lamp chain and release it to turn on the lamp.” This single-arm task targets fine-grained dexterity: the policy must grasp a thin, freely hanging chain, pull it through a short actuation stroke, and release, leaving little margin for imprecise contact. 
+
+Figure 10: Progression of Turn On Lamp. 
+
+Pull Tissue. Language instruction: “Use your left hand to pick up the tissue box, and then use your right hand to pull out the tissue.” This bimanual task tests coordinated extraction of a flexible object, where one hand secures the box while the other gently pulls a single tissue free without tearing it or dislodging the box. 
+
+Figure 11: Progression of Pull Tissue. 26 D.2 Policy Training 
+
+We train a separate policy for each downstream task on top of the frozen vision encoder. The policy backbone is a Qwen3.5-0.8B [18] decoder, trained from scratch. The vision encoder produces per-patch image tokens (or a single pooled/CLS token per image) which are linearly projected along with the text tokens into the policy’s hidden dimension and concatenated with the flow-matching timestep embedding and noisy action tokens to form the policy input sequence. The action head uses flow matching, and we do not use proprioceptive or tactile inputs. We train with AdamW (learning rate 10 −4, no weight decay) and a cosine schedule without warmup. We use bfloat16 mixed precision and gradient clipping at 1.0. Each task is trained for 200 epochs with a per-GPU batch size of 8 and no gradient accumulation. We train on 200 demonstrations per task, except for the almond-pouring task which uses 150. Each policy is trained on 4 nodes of 8 H100 GPUs (32 GPUs total, effective batch size 256), taking roughly 12–15 hours per task. Each baseline encoder uses its own native input preprocessing (image resolution and normalization); all other policy training settings are held fixed across encoders for a controlled comparison. 
+
+D.3 Evaluation Protocol 
+
+We evaluate each policy with 12 rollouts per task. For every task we define a fixed grid of initial states that systematically varies the pose of the manipulated objects across the reachable workspace; where object orientation matters, the grid additionally samples a small set of rotations. The same grid is used for all policies so that comparisons are matched on initial conditions. All placements are referenced to fixed fiducials on the table (the black background edge, the table edge, the hanger-mount markings, and taped reference lines), making the grid reproducible across sessions. Success is scored per rollout against a task-specific rubric. Single-stage tasks use binary success, while multi-stage tasks award partial credit for completing individual sub-stages (e.g., a successful grasp or alignment), with full credit reserved for completing the entire motion. 
+
+Fold Shorts. Initial states span a 3 × 2 grid of workspace positions, each evaluated at two ±25 ◦
+
+tilts from neutral. We award +0 .25 per completed fold and full credit when both folds succeed. 
+
+Pick Fruits. Fruit is placed at 2 positions on the left and 3 on the right along the table edge, with the apple and lemon swapped across sides. We award +0 .25 for each fruit picked and placed in the basket, and full credit when both are completed. 
+
+Pour Almonds. The end and start cups are placed over a 3 × 4 grid of positions relative to the hanger midline. We award +0 .25 per cup picked and full credit for a successful pour. 
+
+Dispense Soap. The dispenser is placed over a 6 × 2 grid between the reference lines on the left edge. We award +0 .25 for picking the dispenser and aligning it over the bowl, and full credit when soap is successfully dispensed into the bowl. 
+
+Turn On Lamp. We have a 4 × 3 grid for the lamp. Each is scored as binary success/fail. 
+
+Pull Tissue. Initial states span a 4 × 3 grid. We award +0 .25 for grasping the tissue box and full credit for completing the full pull motion. 
+
+D.4 Environmental Robustness Experiment Setting 
+
+All policies are trained only on demonstrations collected under the original, clean conditions; the perturbations below are introduced solely at evaluation time to probe the sensitivity of the learned visual representation. 27 Lighting. We consider two lighting perturbations relative to the original training condition. In the 
+
+Light setting, we place an additional bulb above and in front of the robot, casting extra shadows across the workspace. In the Dark setting, we reduce the intensity of the standard scene lighting. The three conditions are shown side by side in Figure 12. 
+
+Figure 12: (Left) The Dark condition reduces the intensity of the standard scene lighting. (Center) 
+
+The original lighting used during training. (Right) The Light condition adds an overhead bulb that casts shadows across the workspace. 
+
+Distractors. For the distractor setting, we add two objects to the scene: a red book and a multi-colored Hanoi toy tower. Both are placed well within the manipulation area so that they remain clearly visible in the egocentric camera view, as shown in Figure 13, and their positions are random-ized across trials. 
+
+Figure 13: (Left) The original scene without distractors. (Right) The scene with the two distractor objects added. 
+
+# E Baseline Encoders 
+
+We evaluate the following baseline vision encoders, all frozen during policy training. The token strategy (CLS/pooled single token vs. all patch tokens) was selected per encoder based on which option yielded the best policy performance; see Table 11 for the selected strategy and other per-encoder specifications. 
+
+Shared adaptation. All baselines are integrated into the policy through the same lightweight pipeline. The encoder’s image and text tokens are each passed through a LayerNorm followed by a single linear projection (Xavier-initialized) that maps from the encoder’s native output dimension into the policy’s hidden dimension. Vision-only baselines (i.e., those without a paired text encoder) all use the CLIP ViT-L/14 [1] text encoder for the language stream, ensuring that differences in policy performance reflect differences in vision representations rather than text representations. 
+
+SigLIP [2]. We use google/siglip-so400m-patch14-384 , with both vision and text towers loaded from the same checkpoint. Images are normalized with SigLIP’s native statistics. 
+
+SigLIP 2 [17]. We use google/siglip2-so400m-patch14-384 , with both vision and text towers loaded from the same checkpoint. Preprocessing matches SigLIP 2’s native pipeline. 28 DINOv2 [4]. Vision tower: facebook/dinov2-large , a ViT-L/14 trained with self-supervised image objectives. Images are normalized with ImageNet statistics. We drop the CLS and register tokens and use the full patch grid. 
+
+MVP [16]. Vision tower: ViT-L/16 pretrained with MAE on the datasets described in the original work. Images are bilinearly resized and normalized with ImageNet statistics. 
+
+R3M [15]. Vision tower: ResNet-50 pretrained with R3M’s time-contrastive and video-language alignment objective. Images are resized to 256 along the shorter side, center-cropped, and normal-ized with ImageNet statistics. We use R3M’s global pooled feature as the single token. 
+
+VC-1 [22]. Vision tower: ViT-L/16 pretrained with MAE on the egocentric video and ImageNet mixture described in [22]. Images are bicubically resized to 256 along the shorter side, center-cropped, and normalized with ImageNet statistics. 
+
+VideoMAE [21]. Vision tower: MCG-NJU/videomae-large , a ViT-L with 3D patch embedding (temporal tubelet = 2 , spatial patch = 16 ). At each policy step, we stack two consecutive frames from the same camera (the current frame and the frame at t − 2, clamped at the trajectory boundary) to form the 3D input. Images are bilinearly resized and normalized with ImageNet statistics. 
+
+Qwen3.5 Vision Encoder [18]. As an additional reference point, we evaluate the native Qwen3.5-0.8B vision tower loaded from the same checkpoint used for the policy backbone. Unlike the other baselines, this encoder shares the policy’s hidden dimension natively, so the LayerNorm and linear projection layers are replaced with identity mappings. Text bypasses the latent stage entirely and is embedded by the policy backbone’s native token embeddings.                                                   
+
+> Encoder Vision arch. Image res. Token strategy Vision dim Text tower SigLIP ViT-SO400M/14 384 patch 1152 SigLIP SigLIP 2 ViT-SO400M/14 384 patch 1152 SigLIP 2 DINOv2 ViT-L/14 224 patch 1024 CLIP ViT-L/14 MVP ViT-L/16 256 cls 1024 CLIP ViT-L/14 R3M ResNet-50 224 cls 2048 CLIP ViT-L/14 VC-1 ViT-L/16 224 cls 1024 CLIP ViT-L/14 VideoMAE ViT-L/16 (3D) 224 ×2frames patch 1024 CLIP ViT-L/14 Qwen Qwen3.5 native ViT 384 ×288 patch 1024 shared with LM
+
+Table 11: Summary of baseline vision encoders. “Token strategy” indicates whether we feed a single CLS/pooled feature or the full per-patch grid into the policy. The token strategy was selected per encoder based on downstream performance. 
+
+Direct Regression Baseline. We also experimented with direct action regression as a pre-training objective, using both (i) an MLP head operating on the pooled text-conditioned image embedding and (ii) a transformer decoder operating on the full ViT patch sequence. Both variants were ini-tialized from the same SigLIP 2 checkpoint and trained with the identical dataset, optimizer, and schedule as our contrastive model. Training supervised a chunk of future actions using an L1 loss on per-dimension-normalized targets, masked over valid timesteps; we additionally evaluated MSE and Huber losses, which yielded similar results. The MLP variant regresses the entire action chunk from the single pooled image-text embedding. The decoder variant instead discards the SigLIP cross-attention pooling head and applies a 4-layer transformer decoder (hidden size 1024 , 16 attention heads, MLP ratio 4). A set of learned per-timestep query tokens, each conditioned by the text embedding, cross-attends to the full ViT patch sequence before a shared linear projection maps decoder outputs to the action space. Neither variant produced useful representations. In both cases, training failed to learn a useful map-ping: the regression loss plateaued early and the resulting features carried no meaningful structure for downstream evaluation. These results motivated our use of a contrastive objective in all main experiments. 29

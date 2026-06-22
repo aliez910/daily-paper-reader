@@ -6,118 +6,107 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-21
-- 运行时间：2026-06-21 18:51:04 UTC
+- 最新运行日期：2026-06-22
+- 运行时间：2026-06-22 20:36:35 UTC
 - 运行状态：成功
-- 本次总论文数：32
-- 精读区：21
+- 本次总论文数：28
+- 精读区：17
 - 速读区：11
 
 ### 今日简报（AI）
-1. 今日聚焦视觉-语言-动作模型前沿，满分的跨体训练VLA与9分的异步语义-动作解耦模型取得突破。  
-2. 最值得深读的是《Motion-Focused Latent Action Enables Cross-Embodiment VLA Training from Human EgoVideos》，其跨体理念极具启发性。  
-3. 建议优先阅读精读列表中的两篇高分论文，能帮你抓住VLA领域从训练到部署的核心创新。
-- 详情：[/202606/21/README](/202606/21/README)
+- 今日共生成 28 篇推荐（精读 17 篇，速读 11 篇）
+- 精读：《Reinforcement Learning-Guided Retrieval with Soft Fusion for Robust Multimodal Imitation Learning under Missing Modalities》（9.0/10）, 《Perfect Demo Makes Poor Teacher: Learning Robust Alignment from Critical Motion Segments》（9.0/10）
+- 速读：《Retrieve, Don't Retrain: Extending Vision Language Action Models to New Tasks at Test Time》（8.0/10）, 《LaWAM: Latent World Action Models for Efficient Dynamics-Aware Robot Policies》（8.0/10）, 《Scaling Short-Term Memory of Visuomotor Policies for Long-Horizon Tasks》（8.0/10）
+- 这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。
+- 详情：[/202606/22/README](/202606/22/README)
 
 ### 精读区论文标签
-1. [Motion-Focused Latent Action Enables Cross-Embodiment VLA Training from Human EgoVideos](/202606/21/2606.18955v1-motion-focused-latent-action-enables-cross-embodiment-vla-training-from-human-egovideos)  
-   标签：评分：10.0/10、query:rob-il
-   evidence：通过潜在动作从自我中心视频进行跨实体VLA训练
-2. [Acting While Understanding: Asynchronous Semantic-Action Decoupling for Real-Time Vision-Language-Action Models](/202606/21/2606.15285v1-acting-while-understanding-asynchronous-semantic-action-decoupling-for-real-time-vision-language-action-models)  
+1. [Reinforcement Learning-Guided Retrieval with Soft Fusion for Robust Multimodal Imitation Learning under Missing Modalities](/202606/22/2606.15514v1-reinforcement-learning-guided-retrieval-with-soft-fusion-for-robust-multimodal-imitation-learning-under-missing-modalities)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于实时闭环VLA控制的异步解耦
-3. [Perfect Demo Makes Poor Teacher: Learning Robust Alignment from Critical Motion Segments](/202606/21/2606.15587v1-perfect-demo-makes-poor-teacher-learning-robust-alignment-from-critical-motion-segments)  
+   evidence：缺失模态下的鲁棒模仿学习
+2. [Perfect Demo Makes Poor Teacher: Learning Robust Alignment from Critical Motion Segments](/202606/22/2606.15587v1-perfect-demo-makes-poor-teacher-learning-robust-alignment-from-critical-motion-segments)  
    标签：评分：9.0/10、query:rob-il
-   evidence：关注关键运动片段的操纵模仿学习
-4. [V2P-Manip: Learning Dexterous Manipulation from Monocular Human Videos](/202606/21/2606.16436v1-v2p-manip-learning-dexterous-manipulation-from-monocular-human-videos)  
+   evidence：从关键运动段进行模仿学习，提高精细操作性能
+3. [APEX: Adaptive Policy Execution for Precise Manipulation](/202606/22/2606.16504v1-apex-adaptive-policy-execution-for-precise-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从单目人类视频中通过模仿学习学习灵巧操作策略
-5. [Training and Evaluating Diffusion Policies with Long Context Lengths](/202606/21/2606.16447v1-training-and-evaluating-diffusion-policies-with-long-context-lengths)  
+   evidence：针对模仿学习策略的自适应执行方法
+4. [ATOM-Bench: A Real-World Benchmark for Atomic Skills and Compositional Generalization in Manipulation Policies](/202606/22/2606.16826v1-atom-bench-a-real-world-benchmark-for-atomic-skills-and-compositional-generalization-in-manipulation-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：在模仿学习扩散策略中基准测试上下文长度
-6. [Decoupled Object-Centric Video Understanding for Generating Robotic Manipulation Commands](/202606/21/2606.16470v1-decoupled-object-centric-video-understanding-for-generating-robotic-manipulation-commands)  
+   evidence：原子技能与组合泛化操作基准
+5. [Unified Motion-Action Modeling for Heterogeneous Robot Learning](/202606/22/2606.16917v2-unified-motion-action-modeling-for-heterogeneous-robot-learning)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从演示视频生成操作命令的对象中心视频理解
-7. [ATOM-Bench: A Real-World Benchmark for Atomic Skills and Compositional Generalization in Manipulation Policies](/202606/21/2606.16826v1-atom-bench-a-real-world-benchmark-for-atomic-skills-and-compositional-generalization-in-manipulation-policies)  
+   evidence：使用3D物体运动轨迹的统一运动-动作模型用于视动控制
+6. [ACE-Ego-0: Unifying Egocentric Human and Robotic Data for VLA Pretraining](/202606/22/2606.17200v1-ace-ego-0-unifying-egocentric-human-and-robotic-data-for-vla-pretraining)  
    标签：评分：9.0/10、query:rob-il
-   evidence：操纵策略原子技能和组合泛化的真实世界基准
-8. [Unified Motion-Action Modeling for Heterogeneous Robot Learning](/202606/21/2606.16917v1-unified-motion-action-modeling-for-heterogeneous-robot-learning)  
+   evidence：统一自我中心人类与机器人数据用于VLA预训练，提升模仿学习效果
+7. [Contrastive Action-Image Pre-training for Visuomotor Control](/202606/22/2606.17256v1-contrastive-action-image-pre-training-for-visuomotor-control)  
    标签：评分：9.0/10、query:rob-il
-   evidence：以3D物体运动为共享接口连接视觉运动控制与动力学建模
-9. [Geometric Action Model for Robot Policy Learning](/202606/21/2606.17046v1-geometric-action-model-for-robot-policy-learning)  
+   evidence：利用人类手部姿态作为代理动作进行视觉编码器的对比预训练用于视动控制
+8. [WeaveLA: Event Driven Cross-Subtask Latent Memory Weaving for Repetitive Robot Manipulation](/202606/22/2606.17463v1-weavela-event-driven-cross-subtask-latent-memory-weaving-for-repetitive-robot-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于通用机器人策略学习的几何动作模型
-10. [ACE-Ego-0: Unifying Egocentric Human and Robotic Data for VLA Pretraining](/202606/21/2606.17200v1-ace-ego-0-unifying-egocentric-human-and-robotic-data-for-vla-pretraining)  
+   evidence：具有跨子任务记忆的操作VLA模型
+9. [MuseVLA: An Adaptive Multimodal Sensing Vision-Language-Action Model for Robotic Manipulation](/202606/22/2606.17598v1-musevla-an-adaptive-multimodal-sensing-vision-language-action-model-for-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：统一利用人类和机器人数据的VLA预训练
-11. [Contrastive Action-Image Pre-training for Visuomotor Control](/202606/21/2606.17256v1-contrastive-action-image-pre-training-for-visuomotor-control)  
+   evidence：集成多种传感器的操作VLA模型
+10. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/22/2606.17846v1-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：利用自我中心人类视频的对比动作图像预训练用于视动控制
-12. [GeneralVLA-2: Geometry-Aware Reconstruction and Governed Memory for Robot Planning](/202606/21/2606.17480v1-generalvla-2-geometry-aware-reconstruction-and-governed-memory-for-robot-planning)  
+   evidence：提出Qwen-RobotManip，一个可泛化的视觉-语言-动作操纵基础模型，通过对齐实现规模化
+11. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/22/2606.17846v2-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通用VLA系统结合几何感知重建和可控记忆用于机器人规划
-13. [MuseVLA: An Adaptive Multimodal Sensing Vision-Language-Action Model for Robotic Manipulation](/202606/21/2606.17598v1-musevla-an-adaptive-multimodal-sensing-vision-language-action-model-for-robotic-manipulation)  
+   evidence：提出Qwen-RobotManip，一个可泛化的视觉-语言-动作操纵基础模型，通过对齐实现规模化
+12. [PearlVLA: Progressive Embodied Action-Plan Refinement in Latent Space](/202606/22/2606.17924v1-pearlvla-progressive-embodied-action-plan-refinement-in-latent-space)  
    标签：评分：9.0/10、query:rob-il
-   evidence：自适应多模态感知的视觉-语言-动作模型
-14. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/21/2606.17846v1-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
+   evidence：用于操作的VLA模型中的渐进式隐空间动作规划细化
+13. [LAGO Policy: Latency-Aware Asynchronous Diffusion Policies with Goal-Directed Collision-Free Planning for Smooth Manipulation](/202606/22/2606.17982v1-lago-policy-latency-aware-asynchronous-diffusion-policies-with-goal-directed-collision-free-planning-for-smooth-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人操作的通用视觉-语言-动作基础模型，统一对齐框架
-15. [Qwen-RobotManip Technical Report: Alignment Unlocks Scale for Robotic Manipulation Foundation Models](/202606/21/2606.17846v2-qwen-robotmanip-technical-report-alignment-unlocks-scale-for-robotic-manipulation-foundation-models)  
+   evidence：基于扩散的视觉运动操作策略
+14. [Uncertainty Quantification for Flow-Based Vision-Language-Action Models](/202606/22/2606.18043v1-uncertainty-quantification-for-flow-based-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：可泛化的视觉-语言-动作基础模型用于机器人操作
-16. [ThinkingVLA: Interleaved Vision and Language Reasoning for Robotic Manipulation](/202606/21/2606.17937v1-thinkingvla-interleaved-vision-and-language-reasoning-for-robotic-manipulation)  
+   evidence：针对视觉-语言-动作模型的不确定性量化，提升机器人操控可靠性
+15. [DiffusionVS: A Generative Framework for Robust Visual Servoing Based on Diffusion Policy](/202606/22/2606.19397v1-diffusionvs-a-generative-framework-for-robust-visual-servoing-based-on-diffusion-policy)  
    标签：评分：9.0/10、query:rob-il
-   evidence：交叉视觉语言推理的VLA模型
-17. [EBench: Elemental Diagnosis of Generalist Mobile Manipulation Policies](/202606/21/2606.18239v1-ebench-elemental-diagnosis-of-generalist-mobile-manipulation-policies)  
+   evidence：基于扩散策略的鲁棒视觉伺服
+16. [One Demo is Worth a Thousand Trajectories: Action-View Augmentation for Visuomotor Policies](/202606/22/2606.19586v1-one-demo-is-worth-a-thousand-trajectories-action-view-augmentation-for-visuomotor-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通用操作策略的诊断基准
-18. [Object-Centric Residual RL for Zero-Shot Sim-to-Real VLA Enhancement](/202606/21/2606.18953v1-object-centric-residual-rl-for-zero-shot-sim-to-real-vla-enhancement)  
+   evidence：基于单次演示的数据增强方法
+17. [MirrorDuo: Reflection-Consistent Visuomotor Learning from Mirrored Demonstration Pairs](/202606/22/2606.20048v1-mirrorduo-reflection-consistent-visuomotor-learning-from-mirrored-demonstration-pairs)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向物体的残差强化学习通过零样本仿真到真实迁移改进VLA模仿学习策略的精确操作能力
-19. [Do as I Do: Dexterous Manipulation Data from Everyday Human Videos](/202606/21/2606.19333v1-do-as-i-do-dexterous-manipulation-data-from-everyday-human-videos)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：从人类视频扩展灵巧操作模仿学习的数据生成
-20. [EquiVLA: A General Framework for Rotationally Equivariant Vision-Language-Action Models](/202606/21/2606.19784v1-equivla-a-general-framework-for-rotationally-equivariant-vision-language-action-models)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：首个面向通用机器人操作的SO(2)等变视觉-语言-动作模型通用框架
-21. [Co-VLA: Coordination-Aware Structured Action Modeling for Dual-Arm Vision-Language-Action Systems](/202606/21/2606.20285v1-co-vla-coordination-aware-structured-action-modeling-for-dual-arm-vision-language-action-systems)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：用于双臂操纵的VLA模型，具有协调感知的结构化动作建模
+   evidence：通过镜像演示增强视觉运动模仿学习
 
 ### 速读区论文标签
-1. [Steering Autoregressive Vision-Language-Action Policies via Action Token Intervention](/202606/21/2606.15021v1-steering-autoregressive-vision-language-action-policies-via-action-token-intervention)  
+1. [Retrieve, Don't Retrain: Extending Vision Language Action Models to New Tasks at Test Time](/202606/22/2606.15631v1-retrieve-dont-retrain-extending-vision-language-action-models-to-new-tasks-at-test-time)  
    标签：评分：8.0/10、query:rob-il
-   evidence：通过动作令牌干预引导预训练VLA策略以实现灵活机器人控制
-2. [Rethinking Implicit Spatial Representation in Visuomotor Policy Learning](/202606/21/2606.15232v1-rethinking-implicit-spatial-representation-in-visuomotor-policy-learning)  
+   evidence：通过检索实现VLA策略的测试时任务适应
+2. [LaWAM: Latent World Action Models for Efficient Dynamics-Aware Robot Policies](/202606/22/2606.15768v1-lawam-latent-world-action-models-for-efficient-dynamics-aware-robot-policies)  
    标签：评分：8.0/10、query:rob-il
-   evidence：重新思考模仿学习中视动策略的空间软最大化表示
-3. [Reinforcement Learning-Guided Retrieval with Soft Fusion for Robust Multimodal Imitation Learning under Missing Modalities](/202606/21/2606.15514v1-reinforcement-learning-guided-retrieval-with-soft-fusion-for-robust-multimodal-imitation-learning-under-missing-modalities)  
+   evidence：潜在世界动作模型用于高效的动态感知机器人策略
+3. [Scaling Short-Term Memory of Visuomotor Policies for Long-Horizon Tasks](/202606/22/2606.16178v1-scaling-short-term-memory-of-visuomotor-policies-for-long-horizon-tasks)  
    标签：评分：8.0/10、query:rob-il
-   evidence：强化学习引导的模仿学习处理缺失模态
-4. [Retrieve, Don't Retrain: Extending Vision Language Action Models to New Tasks at Test Time](/202606/21/2606.15631v1-retrieve-dont-retrain-extending-vision-language-action-models-to-new-tasks-at-test-time)  
+   evidence：通过模仿学习训练的视动策略，具有短期记忆
+4. [ATHENA: Accelerated Multi-Task Heterogeneous Influence Functions for Robot Data Curation](/202606/22/2606.16208v1-athena-accelerated-multi-task-heterogeneous-influence-functions-for-robot-data-curation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：检索增强VLA策略，无需重新训练即可扩展任务
-5. [Inference-time Policy Steering via Vision and Touch](/202606/21/2606.14981v1-inference-time-policy-steering-via-vision-and-touch)  
+   evidence：面向VLA模型模仿学习的数据整理方法
+5. [SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation with a Pretrained VLA](/202606/22/2606.15568v1-saps-shared-autonomy-for-policy-steering-by-blending-teleoperation-with-a-pretrained-vla)  
    标签：评分：7.0/10、query:rob-il
-   evidence：视觉-触觉闭环引导操控策略
-6. [SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation with a Pretrained VLA](/202606/21/2606.15568v1-saps-shared-autonomy-for-policy-steering-by-blending-teleoperation-with-a-pretrained-vla)  
+   evidence：VLA策略引导的共享自主
+6. [Learned Image Compression for Vision-Language-Action Models](/202606/22/2606.16253v1-learned-image-compression-for-vision-language-action-models)  
    标签：评分：7.0/10、query:rob-il
-   evidence：共享自主控制混合遥操作指令与VLA动作，实现鲁棒操纵
-7. [Learning New Tasks via Reusable Skills: Skill-Compositional Experts for Embodied Continual Learning](/202606/21/2606.15685v1-learning-new-tasks-via-reusable-skills-skill-compositional-experts-for-embodied-continual-learning)  
+   evidence：针对VLA驱动机器人的学习型图像压缩
+7. [Robots that Collaborate: Sequential Asymmetric Imitation for Learning Coupled Robot Policies](/202606/22/2606.16490v1-robots-that-collaborate-sequential-asymmetric-imitation-for-learning-coupled-robot-policies)  
    标签：评分：7.0/10、query:rob-il
-   evidence：在闭环控制下进行具身持续学习的技能复用框架
-8. [TopoRetarget: Interaction-Preserving Retargeting for Dexterous Manipulation](/202606/21/2606.16272v1-toporetarget-interaction-preserving-retargeting-for-dexterous-manipulation)  
+   evidence：顺序非对称模仿学习耦合多机器人操作策略
+8. [ROVE: Unlocking Human Interventions for Humanoid Manipulation via Reinforcement Learning](/202606/22/2606.17011v1-rove-unlocking-human-interventions-for-humanoid-manipulation-via-reinforcement-learning)  
    标签：评分：7.0/10、query:rob-il
-   evidence：将人类演示重定位到灵巧手用于模仿学习
-9. [MimicIK: Real-Time Generative Inverse Kinematics from Teleoperation with FK Consistency](/202606/21/2606.15148v1-mimicik-real-time-generative-inverse-kinematics-from-teleoperation-with-fk-consistency)  
+   evidence：基于人类干预的强化学习用于人形VLA模型后训练
+9. [Learning New Tasks via Reusable Skills: Skill-Compositional Experts for Embodied Continual Learning](/202606/22/2606.15685v1-learning-new-tasks-via-reusable-skills-skill-compositional-experts-for-embodied-continual-learning)  
    标签：评分：6.0/10、query:rob-il
-   evidence：基于条件流匹配的实时生成式逆运动学
-10. [WireCraft: A Simulation Benchmark for Industrial DLO Manipulation](/202606/21/2606.18097v1-wirecraft-a-simulation-benchmark-for-industrial-dlo-manipulation)  
+   evidence：提出技能组合专家框架，用于闭环操控任务的持续学习
+10. [Qwen-RobotWorld Technical Report: Unifying Embodied World Modeling through Language-Conditioned Video Generation](/202606/22/2606.17030v1-qwen-robotworld-technical-report-unifying-embodied-world-modeling-through-language-conditioned-video-generation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：工业柔性线缆操纵仿真基准
-11. [Guava: An Effective and Universal Harness for Embodied Manipulation](/202606/21/2606.18363v1-guava-an-effective-and-universal-harness-for-embodied-manipulation)  
+   evidence：用于具身操作的语言条件视频世界模型
+11. [Qwen-RobotWorld Technical Report: Unifying Embodied World Modeling through Language-Conditioned Video Generation](/202606/22/2606.17030v2-qwen-robotworld-technical-report-unifying-embodied-world-modeling-through-language-conditioned-video-generation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：利用LLM和外部模块的具身操作框架
+   evidence：提出统一语言条件视频世界模型，覆盖机器人操作等具身任务
 
 
 <div class="dpr-home-promo-card">
