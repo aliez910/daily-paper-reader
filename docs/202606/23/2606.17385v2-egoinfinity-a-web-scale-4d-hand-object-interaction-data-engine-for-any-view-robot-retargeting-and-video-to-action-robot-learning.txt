@@ -1,0 +1,842 @@
+Title: EgoInfinity: A Web-Scale 4D Hand-Object Interaction Data Engine for Any-View Robot Retargeting and Video-to-Action Robot Learning
+
+URL Source: https://arxiv.org/pdf/2606.17385v2
+
+Published Time: Tue, 23 Jun 2026 00:46:49 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# EgoInfinity: A Web-Scale 4D Hand-Object Interaction Data Engine for Any-View Robot Retargeting and Video-to-Action Robot Learning 
+
+Gaotian Wang 
+
+Rice University 
+
+gw23@rice.edu 
+
+Kejia Ren 
+
+Rice University 
+
+kr43@rice.edu 
+
+Andrew Morgan 
+
+Robotics and AI Institute 
+
+andy@rai-inst.com 
+
+Yiting Chen 
+
+Rice University 
+
+yc203@rice.edu 
+
+Howard H. Qian 
+
+Rice University 
+
+hhq1@rice.edu 
+
+Podshara Chanrungmaneekul 
+
+Rice University 
+
+pc45@rice.edu 
+
+Kaiyu Hang 
+
+Rice University 
+
+kaiyu.hang@rice.edu Robot Deployment 
+
+Action100M Dataset 
+
+Candidate Clips Data Filter Retarget 
+
+> root-frame +IK See Fig. 3
+
+Text Description Text Extraction via LLM: 
+
+“Crunch box” 
+
+> Hand Estimator Flow3r +Moge 2 (metric) Object Estimator
+
+SAM3 (detector) +SAM2 (tracker) Hand statistics Size, appearance, Camera motion stability WiLoR 
+
+Interaction-aware refinement 
+
+> Policy learning
+> IL / RL data as prior
+
+SAM3D Object 3D mesh Object point-cloud 
+
+> Motion infiller & smoothing
+> “He lifts the Cinnamon Toast Crunch box and shows it to the camera while standing still.”
+> Per-frame proposal
+> State classification
+> State-aware refinement
+> Object mask trajectory
+
+Raw Video  
+
+> Stable metric depth
+> Optimized hand trajectory Optical flow
+> MEMFOF
+> Per-frame hand pose
+> GeoCalib 3D gravity
+> direction
+> Joint traj.
+> per embodiment
+> Sanity check (scale + spurious)
+> 4D HOI repr.
+> engine output
+> Direct Replay Deployed policy
+> e.g. LEAP grasp
+
+Sot
+
+Pot
+
+Mo                         
+
+> Mht,Kht,cpht
+> ˜pot= ( Rcano
+> ,center( Sot⊙Dt))
+> st∈ { static ,grasped ,moving }
+> cˆpot=cpht·Tcano
+> Ht=
+> {M ht,Kht,cpht,
+> Pot,Mo,cpot}
+
+Dt
+
+> c
+
+g
+
+Figure 1: EGO INFINITY pipeline. From filtered in-the-wild Action100M clips and their text descriptions, the engine recovers metric hand trajectories and object geometry/pose for the automatically extracted objects. An interaction-aware refinement stage uses detected interaction states to align hand and object motion and suppress drift, yielding a metric, agent-agnostic 4D hand-object representation for downstream cross-embodiment retargeting and policy learning. 
+
+Abstract: Internet videos constitute the largest reservoir of embodied human manipulation knowl-edge, yet converting arbitrary RGB footage into actionable robot training data remains a major bottleneck. Existing lab- or factory-collected datasets are narrow in scale and diversity, limiting their ability to support open-world robot learning. Instead of proposing a static dataset, we introduce EgoInfinity, a universal 4D hand-object interaction data engine that enables web-scale data generation for robot retargeting and learning. EgoInfinity is built as a modular engine that integrates perception, segmentation, reconstruction, interaction-aware refinement, and retargeting components to automate this traditionally unscalable video-to-action problem without human-in-the-loop annotation. Its modular design allows the engine to continuously benefit from advances in any incorporated compo-nent. With EgoInfinity, in-the-wild human manipulation videos are lifted into agent-agnostic, metric 4D hand-object interaction representations, including hand trajectories, 6-DoF object poses, and 
+
+> arXiv:2606.17385v2 [cs.RO] 19 Jun 2026
+
+contact-relevant states. Rather than naively connecting standalone components, EgoInfinity combines cross-module metric calibration with interaction-aware refinement to improve physical reliability, reducing drift and contact inconsistencies common in pure visual reconstruction. In addition, we propose a novel motion retargeter to compile the recovered 3D hand motions into executable joint trajectories for diverse robot morphologies, enabling video-to-action retargeting on any robot from arbitrary viewpoints and shot sizes (e.g., the human body is only partially visible). We validate EgoInfinity across perception fidelity, kinematic feasibility, contact consistency, cross-embodiment generalization, and real-robot skill acquisition (e.g., grasping, cutting, wiping, and pouring), demon-strating a scalable bridge from internet videos to executable robot behavior for robust open-world robot learning. Project Page: https://huggingface.co/spaces/Rice-RobotPI-Lab/EgoInfinity 
+
+Keywords: Automatic Data Generation, Benchmarks and Datasets for Robot Learning, Learning from Human Videos, Cross-Embodiment Retargeting 
+
+## 1 Introduction 
+
+Training generalist robots requires manipulation data that is both scalable and diverse. Lab- or factory-collected data provides robot-compatible supervision, and egocentric demonstrations are especially valuable because they capture acting hands, manipulated objects, and contact patterns from an embodiment-aligned perspective. However, such data remains difficult to scale, and existing wearable or lab-collected corpora are limited by task diversity, collection setting, or participant behavior [ 1, 2, 3 ]. Internet videos offer a natural alternative, capturing humans manipulating everyday objects across diverse environments, viewpoints, and task contexts; Action100M alone contains 14.6 years of footage across 147M action segments [ 4]. Yet these videos are not directly robot-actionable: they lack metric 3D geometry, 6-DoF object state, contact information, and executable robot actions, causing existing learning-from-human-video methods to remain under-grounded for execution or mis-grounded when 2D action alignment is lifted into robot action space [ 5, 6, 7, 8 , 9]. Therefore, automatically processing in-the-wild, web-scale videos into useful robot manipulation data, including curating egocentric-style data from arbitrary views, is a key step toward scalable robot learning. We introduce E GO INFINITY , a fully automated 4D manipulation data engine that converts in-the-wild RGB videos into agent-agnostic, metric hand-and-object representations without human annotation. It uses a modular pipeline spanning hand pose and mesh estimation, target-object discovery, object segmentation, monocular metric depth, camera/gravity estimation, object tracking and reconstruction, and interaction-aware refinement. This design makes E GO INFINITY 
+
+continuously upgradeable as individual modules improve. Importantly, E GO INFINITY is not a naive composition of off-the-shelf components: it coordinates modules through unified coordinates, metric scale alignment, object-side priors, and interaction-aware refinement to reduce cross-module inconsistency and improve physical plausibility. Furthermore, we provide a functional retargeting method that converts the processed 3D hand motions into executable robot motions across diverse embodiments. Rather than exactly replicating human body or arm kinematics, the retargeter estimates a robot-specific root transformation and preserves task-relevant hand motion within the target robot’s constraints. This makes the approach applicable to arbitrary-view videos and partially observed humans, where the full body pose may be unavailable. Our contributions are: (i) a fully automated, modular 4D manipulation data engine for web-scale videos; (ii) cross-module calibration and interaction-aware refinement for more consistent hand-and-object reconstruction; and (iii) a functional cross-embodiment retargeter validated through kinematic feasibility, physical consistency, and real-robot skill acquisition. 
+
+## 2 Related Work 
+
+Data Sources for Robot-Usable Manipulation. Existing manipulation data trades off scale, embodiment alignment, and robot actionability. As summarized in Tab. 1, egocentric datasets such as Ego4D, EgoDex, HOT3D, and OakInk2 provide valuable human manipulation observations, but often rely on headsets, mocap, Vision Pro tracking, manual narration, or controlled collection [ 10 , 1, 2 , 3]. DROID [ 13 ] and Open X-Embodiment [ 12 ] provide executable robot actions but are limited by hardware, task design, and collection cost, while UniHand-Mix improves coverage through aggregation but inherits heterogeneous annotations and partial wearable dependence [ 11 ]. In contrast, E GO INFINITY 
+
+targets in-the-wild internet videos and automatically extracts 4D manipulation data without wearables, depth sensors, 2Dataset Source Ann. Wear. req.? Auto gen.? Manual obj.? Scale 
+
+Ego4D [10] curated narr. headset ✗ ✗ 3.7K hr EgoDex [1] curated tracking V. Pro ✗ ✗ 829 hr HOT3D [2] curated mocap mocap ✗ ✗ 13.9 hr OakInk2 [3] curated mocap mocap ✗ ✗ 6.5 hr UniHand-Mix [11] aggregated mixed partial ✗ ✗ 1.2K–35K hr Open-X [12] robot agg. actions robot ✗ ✗ 1M+ traj. DROID [13] teleop actions robot ✗ ✗ 350 hr 
+
+EGO INFINITY (ours) internet auto 4D ✓ none ✓ full ✓ none 127K hr † 
+
+> †Scale is currently bounded by Action100M; the data engine itself is corpus-agnostic.
+
+Table 1: Comparison with prior egocentric manipulation and robot datasets. Columns indicate data source, annotation type, hardware requirement, automation level, manual object specification, and scale. E GO INFINITY uniquely combines internet-scale data, no wearable requirement, full automatic generation, no manual object specification, and robot-usable 4D outputs. CAD models, or human-specified object annotations, making it scalable like internet video while structured for robot use through metric hand motion, object state, and interaction cues. 
+
+From Human Videos to 4D Manipulation Data. Following the task/observation/action taxonomy of [ 5 ], task-oriented methods infer intent with VLMs [ 14 , 15 , 16 ]; observation-oriented methods bridge appearance gaps via video translation [ 17 , 18 , 19 ] or visual embeddings [ 20 , 21 , 22 , 23 ]; and action-oriented methods expose affordances or latent actions [ 24 , 25 ]. E GO INFINITY is closest to action-level, interaction-centric methods, but recovers metric hand-and-object structure rather than 2D pseudo-actions. This is newly feasible because key components have matured: RGB hand reconstruction [ 26 ], monocular metric geometry [ 27 , 28 ], open-vocabulary segmentation and tracking [ 29 , 30 ], object reconstruction [ 31 ], optical-flow/PnP tracking [ 32 ], and gravity/camera calibration [ 33 ]. Recent single-clip systems make strong progress on world-grounded hand-object recovery from egocentric video [ 34 , 35 , 36 , 37 ]. Most related to our perception design, the concurrent EgoGrasp [ 38 ] reconstructs world-space hand-object interactions from dynamic egocentric video on a similar foundation-model stack and likewise uses grasp state to decide when hand motion drives object pose [ 39 ], but recovers a world frame via SLAM-like camera estimation, relies on a full-body SMPL-X prior, and refines trajectories with learned diffusion priors. E GO INFINITY instead operates on approximately static-camera in-the-wild video without online SLAM or a body model, resolves grasp-state trust deterministically through interaction-state classification and rigid hand binding, and integrates these components with unified representations, cross-module calibration, and automated target-object discovery as a corpus-scale data engine. 
+
+Functional Cross-Embodiment Retargeting. Prior retargeting methods often target specific embodiment classes, such as dexterous hands [ 40 , 41 ], parallel grippers [ 42 , 43 ], or humanoid upper bodies [ 44 ]. They work well when demonstrations and target embodiments are aligned, but arbitrary internet videos often contain only hands, partial arms, or changing viewpoints, making exact body-pose recovery and kinematic imitation unreliable. E GO INFINITY 
+
+instead exposes an agent-agnostic 4D manipulation representation and performs functional retargeting: it estimates a feasible robot-specific root transformation and preserves task-relevant hand motion within the target robot’s constraints, enabling the same recovered video data to be compiled into executable trajectories for diverse morphologies. 
+
+## 3 The E GO INFINITY Data Engine 
+
+EGO INFINITY processes raw internet RGB videos and their semantic annotations into structured 4D manipulation data. The engine outputs metric hand states, object point clouds and meshes, 6-DoF object pose trajectories, contact-relevant 3states, and coordinate-reframed outputs for downstream retargeting and learning. A schematic overview is shown in Fig. 1. 
+
+3.1 Modular Pipeline Architecture 
+
+EGO INFINITY is designed as a modular pipeline for converting internet RGB videos into structured 4D manipulation data. It integrates hand mesh estimation, metric geometry recovery, camera and gravity calibration, target-object discovery, object reconstruction and tracking, and interaction-aware refinement within a unified intermediate representation. This modular design makes the engine component-replaceable: each module can be upgraded independently as stronger foundation or geometry models emerge. For scalability, E GO INFINITY uses a two-pass strategy: Pass 1 performs a lightweight temporal scan to identify hand-present segments and filter videos using hand-motion statistics and camera-motion cues, retaining clips likely to contain useful manipulation. Pass 2 runs the full reconstruction stack only on active segments. We currently target internet videos with approximately static views, common in tutorial and how-to manipulation content. 
+
+3.2 Metric-Calibrated Hand–Object Tracking Unified Metric Geometry. A central design principle of E GO INFINITY is cross-module calibration: rather than consuming each model’s raw output, we align modules along a shared metric scale, a unified camera frame, object-side geometric priors, and interaction-aware refinement. Hand and object predictions are produced by different modules and are not inherently aligned in scale or 3D reference frame. To enable reliable hand–object association, contact reasoning, and downstream retargeting, E GO INFINITY first calibrates them into a shared metric camera-frame geometry from RGB video. Specifically, we use M OGE-2 [ 27 ] to estimate camera focal length and global metric scale, F LOW 3R [28 ] to predict dense depth maps, and G EO CALIB [33 ] to estimate the gravity vector cg. This shared metric reconstruction lifts image-space hand and object predictions into the same calibrated 3D space, providing the geometric basis for consistent hand poses, object point clouds, and downstream pose tracking. 
+
+Metric 3D Hand Tracking. We use W ILOR [ 26 ] to estimate MANO hand parameters [ 45 ], including pose θht and shape βht , from RGB frames. These parameters define hand meshes {M ht }Tt=1 , 3D hand keypoints {K ht }Tt=1 , and global hand poses cpht = ( cRht , ctht ) ∈ SE (3) . An infilling module completes missing or unstable hand estimates, and the recovered hand trajectory is grounded in the shared metric geometry above. The resulting camera-frame hand motion is therefore calibrated with object geometry under the same scale, supporting reliable object association. 
+
+Object Discovery, Reconstruction, and Tracking. The manipulated object is discovered automatically from semantic prompts and visual evidence, without human annotation. We use the video description as a semantic prompt for SAM-3 [ 30 ] detection, then propagate the detected mask through the segment using SAM-2 [ 29 ] and lift it with depth to produce per-frame object point clouds {P ot }Tt=1 . When sufficient visual evidence is available, SAM-3D [ 31 ]reconstructs the object mesh Mo. Given the object mesh, masks, and point clouds, F OUNDATION POSE ++ [ 46 ] tracks the object 6-DoF pose trajectory {cpot }Tt=1 in the same metric frame as the hands, with additional stabilization for static or weakly observed frames. Together, these components produce the initial 4D manipulation state 
+
+Ht = {M ht , Kht , cpht , Pot , Mo, cpot }.
+
+3.3 Interaction-Aware Refinement 
+
+Pure visual object tracking can be temporally unstable: poses may drift for static objects, fail under hand occlusion, or fluctuate when visual correspondences are weak. Rather than relying on visual tracking alone, we use detected interaction states to refine object trajectories. Each frame first receives an initial 6-DoF proposal ˜pot = ( Rcano , center( Sot ⊙ Dt)) 
+
+from the object mask and depth, keeping the canonical SAM-3D orientation Rcano and estimating translation from the back-projected masked points. We then classify each frame from MEMFOF [ 32 ] optical flow and hand keypoints as 
+
+st ∈ { static , grasped , moving }. Based on st, a grasped object is rigidly attached to the hand frame as c ˆpot = cpht · Tcano 
+
+with a palm-aligned canonical transform Tcano ; a static object is locked to its robust point-cloud centroid; and a moving object retains the proposal ˜pot . Finally, we apply lightweight sanity checks to suppress implausible scales and spurious background detections; these three stages correspond to the refinement block in Fig. 1. We expose finer-grained interaction states in our implementation; additional details are provided in Appendix A. 4SE(3)-Equivariant Neural Estimator of Root Frame 
+
+> Right Hand Trajectory Gravity Left Hand Trajectory
+> ⋮
+> t = 1 t = 2 t = T
+> Per-frame VN features Temporal Transformer
+> Multi-head Attention Feed-forward
+> pooling Rotation head Flow-matching Clustering and scoring to find the best estimate
+> Translationh ead IK and smoothing
+
+Figure 2: Retargeting pipeline. Recovered 3D hand trajectories and gravity are fed into a simulation-trained, robot-specific root estimator Φ, which generates candidate root frames. After clustering and scoring, the best candidate (e.g., the torso frame for Unitree G1) is selected, and the hand motion is retargeted through IK followed by post-optimization. 
+
+3.4 Output Cleanup and Coordinate Reframing 
+
+For consumers that require clean object point clouds, E GO INFINITY optionally applies mask erosion, depth-gradient filtering, and statistical outlier removal. Finally, under the approximately static-camera setting, exo-to-ego conversion is performed as a rigid coordinate reframing in recovered 3D space rather than as 2D generative video translation. This avoids pixel hallucination from inpainting or GAN-based translation [ 17 , 47 , 48 ] while preserving geometric consistency. 
+
+## 4 Cross-Embodiment Robot Motion Retargeting 
+
+Retargeting converts agent-agnostic 3D hand motion into robot-specific motion. Rather than requiring an exact human body pose or full kinematic motion, we estimate a feasible root transformation for the target embodiment, enabling transfer across robot morphologies. This is crucial for internet videos where only the hands are visible and the arms or body are partially observed or absent. Our goal is functional retargeting: preserving task-relevant hand motion without mimicking precise human body or arm motion. 
+
+4.1 Equivariant Neural Estimation of the Kinematic Root Frame 
+
+Given reconstructed hand trajectories {(cRht , ctht ) ∈ SE (3) }Tt=1 and optional gravity cg, we use a neural network Φ( ·)
+
+to estimate a shared kinematic root frame, e.g., a humanoid torso frame. The network predicts cpr = ( cRr , ctr ) ∈
+
+SE (3) in the camera frame, which converts the recovered hand motion into root-relative coordinates for retargeting, as illustrated in Fig. 2. More architectural details of this network Φ are given in Appendix B. 
+
+Vector-Neuron SE (3) -Equivariant Architecture. We design Φ to be SE (3) -equivariant: if the input trajectories are rigidly transformed, or the camera frame changes, the predicted root frame transforms accordingly. For any G ∈ SE (3) 
+
+applied to observations x,
+
+G · Φ( x) = Φ( G · x), (1) where x contains the hand trajectories and optional gravity. We implement this mapping with Vector Neuron (VN) layers [ 49 ], which process 3D vector features and are rotation-equivariant by construction. Translation equivariance is obtained by centering hand positions around their centroid c. Each timestep is encoded by centered hand positions, hand orientation axes, and optional gravity; bilateral trajectories are fused with VN linear layers, processed by a VN-Transformer encoder, and temporally pooled. The rotation head decodes two vector outputs into cRr ∈ SO (3) via Gram–Schmidt orthogonalization. For translation, the network predicts a root-relative offset v and maps it back as ctr = cRr v + c, avoiding direct camera-frame translation regression while preserving equivariance. 
+
+Flow-Matching Estimation. Instead of deterministic regression, we formulate root-frame prediction as flow-matching conditional generation [ 50 ], modeling p(cpr | x) over plausible root frames. This captures cases where different torso poses yield the same hand motion, especially under partial-body observations. From prior samples (cRr
+
+> 0
+
+, ctr
+
+> 0
+
+),with cRr 
+
+> 0
+
+∼ U (SO (3)) and ctr 
+
+> 0
+
+∼ N (c, 0.52I), the learned flow maps to root-frame hypotheses conditioned on x. At inference, samples are generated by integrating the learned ODE with 20 Euler steps. 54.2 Robot-Specific Model Training 
+
+The network is trained entirely in MuJoCo simulation [ 51 ], without real-world supervision. For each target robot, we procedurally generate paired hand trajectories and ground-truth root poses. Per-arm Cartesian hand trajectories are sampled around the manipulation workspace: starting from a noisy reference joint configuration, forward kinematics provides a hand anchor; smooth control points are generated by an Ornstein–Uhlenbeck random walk biased toward this anchor, converted to joint-space knots with warm-started position-only IK, and interpolated with a cubic spline. For each trajectory, a random camera pose is sampled around the robot and used to transform both hand trajectories and root frames into the camera frame. 
+
+Augmentations. To improve robustness to in-the-wild reconstruction errors, we apply tracking noise, tracking jumps, hand occlusion, and gravity noise. These augmentations mimic noisy hand-pose estimates, temporary tracker failures, partial or single-hand observations, and inaccurate or missing gravity estimates. We additionally drop gravity for 30% 
+
+of samples so the network degrades gracefully when gravity is unavailable. 
+
+4.3 Trajectory Post-Processing and Robot Retargeting Root-Trajectory Hypothesis Selection. At inference, we divide the video into overlapping temporal windows and sample multiple root-frame hypotheses {(cRrk, ctrk)} from the flow model. Hypotheses are clustered by k-means, and a small set of representative candidates is retained. Since either the camera or the human body may move, these window-level estimates are treated as keyframes and interpolated into smooth per-frame root trajectories using linear interpolation for translation and SLERP for rotation. Each candidate is then evaluated through downstream IK: hand poses are transformed into the time-varying root frame and tracked frame-by-frame with warm starts and null-space regularization. Candidates are scored by IK convergence, residual tracking error, manipulability, joint-limit margin, and smoothness, and the best one is selected. More implementation details are provided in Appendix B. 
+
+Motion and Hand Post-Processing. The selected joint trajectory is refined by interpolating failed IK frames and applying repeated uniform filtering to remove high-frequency jitter. For dexterous hands, finger joints are retargeted separately from reconstructed MANO hand keypoints using a geometry-based, robot-specific mapping. Thus, arm joints follow wrist-level IK targets, while finger joints are inferred directly from hand keypoints. 
+
+## 5 Experiments and Validation 
+
+We evaluate E GO INFINITY from four perspectives: interactive data access, curated dataset statistics, cross-embodiment retargeting, and real-robot execution and learning. 
+
+5.1 Browser-Based Data Server and Visualization 
+
+We develop an online browser-based data server for searching, processing, visualizing, and downloading E GO INFINITY -generated 4D manipulation data. As shown in Fig. 3 (a), users can search the internet-video corpus with natural-language keywords, inspect retrieved clips, launch online processing, and visualize intermediate and final outputs, including MANO hand mesh trajectories, 6-DoF object trajectories, reconstructed object geometry, point clouds, 3D bounding boxes, depth maps, optical flow, and detected grasp events. The interface makes outputs directly inspectable for failure diagnosis and turns E GO INFINITY into an interactive curation tool. 
+
+5.2 Curated Action100M Dataset 
+
+We curate an extensible subset of Action100M with 106 processed manipulation videos hosted on our data server. Each video is processed by E GO INFINITY to produce downloadable 4D outputs. We report dataset statistics in Fig. 4, including clip duration, object categories, top action verbs, and per-frame interaction-state distribution across manipulated objects. More examples from the curated dataset are provided in Appendix C. 
+
+5.3 Cross-Embodiment Motion Retargeting 
+
+We evaluate retargeting on three substantially different embodiments: Unitree G1, NASA’s Robonaut2, and a dual-Franka FR3 setup. For each robot, the retargeter estimates a robot-specific root transformation and solves IK to convert recovered 3D hand motions into executable joint trajectories under the robot’s kinematic constraints. We 6Simulation Real robots 
+
+> Reconstruction
+> Raw video
+
+(a)  
+
+> 3D Viewer Clip list
+> Text description
+> Video details
+> Track summary State tracker
+> Intermediate results
+
+(b) 
+
+(c)    
+
+> Reconstruction Learned policy rollouts
+> Apple Banana Soup can
+
+(d)   
+
+> as prior
+> Cut Pour Wipe
+
+Figure 3: EGO INFINITY experiments. (a) Project page visualization (3D viewer, intermediate results, text descriptions, track summaries). (b) 4D HOI reconstructions retargeted to multiple embodiments in simulation and on real robots. (c) Extracted hand trajectories used as priors for downstream policy use, generalizing across objects. (d) Real-robot demos on Cut, Pour, and Wipe. Robot IK Rate Pos. Error Ori. Error Jnt.-Limit Margin Manipulability Smoothness Unitree G1 0.821 2.86 cm 6.73 ° 0.619 rad 0.012 0.00693 
+
+Robonaut2 0.774 6.67 cm 8.25 ° 0.134 rad 0.058 0.00343 
+
+Dual-Franka 0.706 10 .27 cm 12 .17 ° 0.572 rad 0.080 0.00582 
+
+Table 2: IK Rate: per-frame IK success rate. Pos./Ori. Error: mean hand position ( ℓ2, cm) and orientation (geodesic, °) error between IK target and achieved pose. Jnt.-Limit Margin: mean minimum joint clearance (rad). Manipulability: mean manipulability index pdet( JJ ⊤). Smoothness: mean squared joint velocity ˙q.report dataset-level statistics in Tab. 2, including IK success rate, residual hand-pose tracking error, joint-limit margin, manipulability, and trajectory smoothness. Fig. 3 (b) shows an example motion retargeted across multiple embodiments in simulation and deployed on real robots, with additional retargeted examples provided in Appendix C. 
+
+5.4 Real-Robot Retargeting and Skill Learning 
+
+We further test whether E GO INFINITY -generated motions support real-robot learning and execution. First, we use extracted hand motions as priors to train a grasping policy on a real LEAP dexterous hand, enabling grasping of diverse objects (Fig. 3 (c)). Second, we directly retarget extracted motions to a real dual-arm Franka FR3 setup, demonstrating functional execution of cutting, pouring, and wiping skills (Fig. 3 (d)). These results validate the full video-to-action 749% 17% 13% 7%            
+
+> 0510 15 20 25
+> Duration (s)
+> 0
+> 510 15 20 25 30
+> # Clips
+> 106 clips 277 objects 12,107 frames
+> (a) Clip duration
+> median 5.8 s
+> (b) Object categories
+> container (139) tool (49) food (38) hardware (20) appliance (12) textile (5) electronics (5) decor (5) paper (4) hygiene (3) other (3)
+> 0246810
+> # Clips
+> slice insert remove present pour pick hold arrange season show add place
+> (c) Top action verbs
+> 32% 14% 28% 25%
+
+88% 
+
+> clips with manipulation
+
+47% 
+
+> objects manipulated
+> (d) Per-object state mix (avg over manipulated objects)
+> static grasp L grasp R grasp both moving
+
+Figure 4: Statistics of the curated Action100M subset. (a) Clip durations. (b) Object category mix. (c) Top action verbs. (d) Per-frame state distribution averaged across manipulated objects (d). 88% of clips and 47% of objects are manipulated, with balanced use of left, right, and bimanual grasps. pipeline, from in-the-wild RGB videos to 4D manipulation data, robot-specific retargeting, downstream policy use, and real-world execution. Additional real-robot examples are provided in Appendix C. 
+
+## 6 Conclusion 
+
+We presented E GO INFINITY , a universal 4D manipulation data engine that converts pure-RGB internet videos into agent-agnostic, robot-usable hand-and-object representations without mocap, depth sensors, CAD models, wearables, or human-specified object annotations. By prioritizing metric 3D geometry, 6-DoF object state, and interaction-aware refinement over 2D pseudo-actions, E GO INFINITY improves the physical grounding of data extracted from human videos. By leveraging unscripted, equipment-free internet videos, it also captures diverse manipulation behaviors, pedagogical demonstrations, and natural multimodal context that are difficult to reproduce in curated lab datasets. Together with functional cross-embodiment retargeting, E GO INFINITY provides scalable infrastructure for turning web-scale human video into executable robot behavior, supporting future work in robot learning, multimodal grounding, and HRI. 
+
+## 7 Limitations 
+
+EGO INFINITY currently assumes approximately static-camera videos, excluding body-mounted or hand-held footage. This makes web-scale processing tractable and avoids online SLAM, but limits corpus diversity; as SLAM-aware depth models mature, our modular architecture can incorporate stronger geometry modules to relax this assumption. EGO INFINITY also does not solve precise physical hand-object alignment. Its interaction-aware refinement provides coarse grasp detection and spatially correlates hand and object trajectories, but does not guarantee contact-level accuracy such as exact fingertip placement, force consistency, or no-slip constraints. In addition, E GO INFINITY does not provide tactile observations, which are important for fine-grained contact reasoning and have been explored in tactile-specific datasets [ 52 ]. Finally, the motion retargeter is robot-specific and may require retraining or calibration for new robot designs. It targets functional motion transfer rather than fine-grained kinematic imitation, and may be insufficient for tasks requiring exact hand posture, precise contact timing, tactile feedback, or highly dexterous manipulation. 
+
+## References 
+
+[1] R. Hoque, P. Huang, D. J. Yoon, M. Sivapurapu, and J. Zhang. Egodex: Learning dexterous manipulation from large-scale egocentric video. arXiv preprint arXiv:2505.11709 , 2025. [2] P. Banerjee, S. Shkodrani, P. Moulon, S. Hampali, S. Han, F. Zhang, L. Zhang, J. Fountain, E. Miller, S. Basol, et al. Hot3d: Hand and object tracking in 3d from egocentric multi-view videos. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 7061–7071, 2025. [3] X. Zhan, L. Yang, Y. Zhao, K. Mao, H. Xu, Z. Lin, K. Li, and C. Lu. Oakink2: A dataset of bimanual hands-object manipulation in complex task completion. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 445–456, 2024. [4] D. Chen, T. Kasarla, Y. Bang, M. Shukor, W. Chung, J. Yu, A. Bolourchi, T. Moutakanni, and P. Fung. Action100m: A large-scale video action dataset. arXiv preprint arXiv:2601.10592 , 2026. 8[5] J. Ma, E. Zhang, H. Yang, D. Li, C. Xu, G. Wang, and H. Wang. Robot learning from human videos: A survey. 
+
+arXiv preprint arXiv:2604.27621 , 2026. [6] H. Bharadhwaj, R. Mottaghi, A. Gupta, and S. Tulsiani. Track2act: Predicting point tracks from internet videos enables generalizable robot manipulation. In European Conference on Computer Vision , pages 306–324. Springer, 2024. [7] C. Wen, X. Lin, J. So, K. Chen, Q. Dou, Y. Gao, and P. Abbeel. Any-point trajectory modeling for policy learning. 
+
+arXiv preprint arXiv:2401.00025 , 2023. [8] S. Bahl, R. Mendonca, L. Chen, U. Jain, and D. Pathak. Affordances from human videos as a versatile represen-tation for robotics. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 13778–13790, 2023. [9] S. Ye, J. Jang, B. Jeon, S. J. Joo, J. Yang, B. Peng, A. Mandlekar, R. Tan, Y.-W. Chao, B. Y. Lin, et al. Latent action pretraining from videos. In International Conference on Learning Representations , volume 2025, pages 28213–28239, 2025. [10] K. Grauman, A. Westbury, E. Byrne, Z. Chavis, A. Furnari, R. Girdhar, J. Hamburger, H. Jiang, M. Liu, X. Liu, et al. Ego4d: Around the world in 3,000 hours of egocentric video. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 18995–19012, 2022. [11] H. Luo, Y. Wang, W. Zhang, H. Yuan, Y. Feng, H. Xu, S. Zheng, and Z. Lu. Joint-aligned latent action: Towards scalable vla pretraining in the wild. arXiv preprint arXiv:2602.21736 , 2026. [12] A. O’Neill, A. Rehman, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee, A. Pooley, A. Gupta, A. Mandlekar, A. Jain, et al. Open x-embodiment: Robotic learning datasets and rt-x models: Open x-embodiment collaboration 0. In 
+
+2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 6892–6903. IEEE, 2024. [13] A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karamcheti, S. Nasiriany, M. K. Srirama, L. Y. Chen, K. Ellis, et al. Droid: A large-scale in-the-wild robot manipulation dataset. arXiv preprint arXiv:2403.12945 ,2024. [14] G. Chen, M. Wang, T. Cui, Y. Mu, H. Lu, T. Zhou, Z. Peng, M. Hu, H. Li, L. Yuan, et al. Vlmimic: Vision language models are visual imitation learner for fine-grained actions. Advances in Neural Information Processing Systems , 37:77860–77887, 2024. [15] V. Jain, M. Attarian, N. J. Joshi, A. Wahid, D. Driess, Q. Vuong, P. R. Sanketi, P. Sermanet, S. Welker, C. Chan, et al. Vid2robot: End-to-end video-conditioned policy learning with cross-attention transformers. arXiv preprint arXiv:2403.12943 , 2024. [16] N. Wake, A. Kanehira, K. Sasabuchi, J. Takamatsu, and K. Ikeuchi. Gpt-4v (ision) for robotics: Multimodal task planning from human demonstration. IEEE Robotics and Automation Letters , 9(11):10567–10574, 2024. [17] M. Lepert, J. Fang, and J. Bohg. Phantom: Training robots without robots using only human videos. arXiv preprint arXiv:2503.00779 , 2025. [18] G. Li, Y. Lyu, Z. Liu, C. Hou, J. Zhang, and S. Zhang. H2r: A human-to-robot data augmentation for robot pre-training from videos. arXiv preprint arXiv:2505.11920 , 2025. [19] M. Lepert, J. Fang, and J. Bohg. Masquerade: Learning from in-the-wild human videos using data-editing. arXiv preprint arXiv:2508.09976 , 2025. [20] S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta. R3m: A universal visual representation for robot manipulation. arXiv preprint arXiv:2203.12601 , 2022. [21] Y. J. Ma, S. Sodhani, D. Jayaraman, O. Bastani, V. Kumar, and A. Zhang. Vip: Towards universal visual reward and representation via value-implicit pre-training. arXiv preprint arXiv:2210.00030 , 2022. 9[22] I. Radosavovic, T. Xiao, S. James, P. Abbeel, J. Malik, and T. Darrell. Real-world robot learning with masked visual pre-training. In Conference on Robot Learning , pages 416–426. PMLR, 2023. [23] C.-L. Cheang, G. Chen, Y. Jing, T. Kong, H. Li, Y. Li, Y. Liu, H. Wu, J. Xu, Y. Yang, et al. Gr-2: A generative video-language-action model with web-scale knowledge for robot manipulation. arXiv preprint arXiv:2410.06158 ,2024. [24] X. Chen, H. Wei, P. Zhang, C. Zhang, K. Wang, Y. Guo, R. Yang, Y. Wang, X. Xiao, L. Zhao, et al. Villa-x: enhancing latent action modeling in vision-language-action models. arXiv preprint arXiv:2507.23682 , 2025. [25] M. K. Govind, D. Reilly, P. Wang, and S. Das. Unilact: Depth-aware rgb latent action learning for vision-language-action models. arXiv preprint arXiv:2602.20231 , 2026. [26] R. A. Potamias, J. Zhang, J. Deng, and S. Zafeiriou. Wilor: End-to-end 3d hand localization and reconstruction in-the-wild. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 12242–12254, 2025. [27] R. Wang, S. Xu, Y. Dong, Y. Deng, J. Xiang, Z. Lv, G. Sun, X. Tong, and J. Yang. Moge-2: Accurate monocular geometry with metric scale and sharp details. Advances in Neural Information Processing Systems , 38:35928– 35959, 2026. [28] Z. Cong, Q. Zhao, M. Jeon, and S. Tulsiani. Flow3r: Factored flow prediction for scalable visual geometry learning. arXiv preprint arXiv:2602.20157 , 2026. [29] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. Rädle, C. Rolland, L. Gustafson, et al. Sam 2: Segment anything in images and videos. In International Conference on Learning Representations , volume 2025, pages 28085–28128, 2025. [30] N. Carion, L. Gustafson, Y.-T. Hu, S. Debnath, R. Hu, D. Suris, C. Ryali, K. V. Alwala, H. Khedr, A. Huang, et al. Sam 3: Segment anything with concepts. arXiv preprint arXiv:2511.16719 , 2025. [31] S. D. Team, X. Chen, F.-J. Chu, P. Gleize, K. J. Liang, A. Sax, H. Tang, W. Wang, M. Guo, T. Hardin, X. Li, A. Lin, J. Liu, Z. Ma, A. Sagar, B. Song, X. Wang, J. Yang, B. Zhang, P. Dollár, G. Gkioxari, M. Feiszli, and J. Malik. Sam 3d: 3dfy anything in images. 2025. URL https://arxiv.org/abs/2511.16624 .[32] V. Bargatin, E. Chistov, A. Yakovenko, and D. Vatolin. Memfof: High-resolution training for memory-efficient multi-frame optical flow estimation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 8187–8196, 2025. [33] A. Veicht, P.-E. Sarlin, P. Lindenberger, and M. Pollefeys. Geocalib: Learning single-image calibration with geometric optimization. In European Conference on Computer Vision , pages 1–20. Springer, 2024. [34] J. Zhang, J. Deng, C. Ma, and R. A. Potamias. Hawor: World-space hand motion reconstruction from egocentric videos. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 1805–1815, 2025. [35] G. Pavlakos, D. Shan, I. Radosavovic, A. Kanazawa, D. Fouhey, and J. Malik. Reconstructing hands in 3d with transformers. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9826–9836, 2024. [36] B. Wen, W. Yang, J. Kautz, and S. Birchfield. Foundationpose: Unified 6d pose estimation and tracking of novel objects. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 17868–17879, 2024. [37] Y. Ye, J. Li, R. Rong, and C. K. Liu. Whole: World-grounded hand-object lifted from egocentric videos. arXiv preprint arXiv:2602.22209 , 2026. [38] H. Fu, W. Wang, X. Qiao, R. A. Potamias, T. Komura, S. Yang, Z. Liu, and B. Zhao. Egograsp: World-space hand-object interaction estimation from egocentric videos. arXiv preprint arXiv:2601.01050 , 2026. 10 [39] J. Shin, J. Lee, J. Lee, I. Bae, D. Lee, H. Im, Y. Lee, and H.-G. Jeon. Compose: When to trust hands for object pose tracking. arXiv preprint arXiv:2605.23523 , 2026. [40] K. Li, P. Li, T. Liu, Y. Li, and S. Huang. Maniptrans: Efficient dexterous bimanual manipulation transfer via residual learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,pages 6991–7003, 2025. [41] Z. Chen, S. Chen, E. Arlaud, I. Laptev, and C. Schmid. Vividex: Learning vision-based dexterous manipulation from human videos. In 2025 IEEE International Conference on Robotics and Automation (ICRA) , pages 3336– 3343. IEEE, 2025. [42] S. Kareer, D. Patel, R. Punamiya, P. Mathur, S. Cheng, C. Wang, J. Hoffman, and D. Xu. Egomimic: Scaling imitation learning via egocentric video. In 2025 IEEE International Conference on Robotics and Automation (ICRA) , pages 13226–13233. IEEE, 2025. [43] S. Park, H. Bharadhwaj, and S. Tulsiani. Demodiffusion: One-shot human imitation using pre-trained diffusion policy. arXiv preprint arXiv:2506.20668 , 2025. [44] R.-Z. Qiu, S. Yang, X. Cheng, C. Chawla, J. Li, T. He, G. Yan, D. J. Yoon, R. Hoque, L. Paulsen, et al. Humanoid policy˜ human policy. arXiv preprint arXiv:2503.13441 , 2025. [45] J. Romero, D. Tzionas, and M. J. Black. Embodied hands: Modeling and capturing hands and bodies together. 
+
+ACM Transactions on Graphics, (Proc. SIGGRAPH Asia) , 36(6), Nov. 2017. [46] W. Yan and J. Chu. FoundationPose++, Mar. 2025. URL https://github.com/teal024/ FoundationPose-plus-plus .[47] H. Li, I. Zhang, R. Ouyang, X. Wang, Z. Zhu, Z. Yang, Z. Zhang, B. Wang, C. Ni, W. Qin, et al. Mimicdreamer: Aligning human and robot demonstrations for scalable vla training. arXiv preprint arXiv:2509.22199 , 2025. [48] H. Ci, X. Liu, P. Yang, Y. Song, and M. Z. Shou. H2r-grounder: A paired-data-free paradigm for translating human interaction videos into physically grounded robot videos. arXiv preprint arXiv:2512.09406 , 2025. [49] C. Deng, O. Litany, Y. Duan, A. Poulenard, A. Tagliasacchi, and L. J. Guibas. Vector neurons: A general framework for so (3)-equivariant networks. In Proceedings of the IEEE/CVF international conference on computer vision , pages 12200–12209, 2021. [50] Y. Lipman, R. T. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 , 2022. [51] E. Todorov, T. Erez, and Y. Tassa. Mujoco: A physics engine for model-based control. In 2012 IEEE/RSJ international conference on intelligent robots and systems , pages 5026–5033. IEEE, 2012. [52] J. Zhou, Z. Gao, F. Hong, Z. Liu, G. Zhang, W. Dai, R. Zhen, C. Lyu, H. Wu, Y. Mao, et al. Touchanything: A dataset and framework for bimanual tactile estimation from egocentric video. arXiv preprint arXiv:2605.13083 ,2026. 11 Appendix: Implementation and Data Details 
+
+This supplementary material is organized into three parts. Sec. A details the data engine of Sec. 3, including the egocentric view synthesis that gives E GO INFINITY its name, the full interaction-state definition, the rigid hand-binding mechanism, the robust-statistics primitives, the off-the-shelf perception-module configuration, our coordinate conventions, the sanity filtering of implausible detections, and a consolidated table of all (non-learned) thresholds. Sec. B covers the cross-embodiment retargeter of Sec. 4, including its network architecture, training setup, and sliding-window inference. Sec. C provides additional qualitative results, from the curated egocentric reconstructions and the interactive browser through the full video-to-robot pipeline to the downstream grasping policy. 
+
+## A Data Engine Implementation Details 
+
+This appendix expands the data engine of Sec. 3. It details the egocentric view synthesis behind E GO INFINITY ’s name, the full interaction-state definition underlying the three-way description of Sec. 3.3, the state-dependent pose sources, the rigid hand-binding mechanism, the robust-statistics primitives reused throughout, the configuration of the off-the-shelf perception modules, our coordinate conventions, and a consolidated table of all (non-learned) thresholds. 
+
+A.1 Egocentric View Synthesis 
+
+A defining capability of E GO INFINITY is turning arbitrary-viewpoint source video into a consistent egocentric observa-tion, which is what its name refers to. The exo-to-ego conversion of Sec. 3.4 is a rigid reframing of the recovered 3D scene, not a 2D generative translation. Since all hand and object geometry already lives in the metric camera-world frame of Sec. A.7, an egocentric view is obtained by re-rendering from a synthesized ego camera: for each frame we place a virtual camera at a fixed offset above a hand-derived anchor (the bilateral hand midpoint), set its up-axis to the GeoCalib gravity vector cg, and aim it at the hand-object interaction region, following the anchor frame by frame. The reframing thus reduces to applying the ego extrinsics to the reconstructed points cpt, preserving metric geometry and contact exactly. This interaction-centric placement is deliberate rather than an attempt to reproduce a true head view. Against the raw exocentric frames, it keeps the interaction centered, close, and viewpoint-consistent across clips; against a hypothetical recovered head trajectory, it avoids the frames a real head wastes by turning away or being occluded, retaining them as usable egocentric observations and so raising the usable-frame yield per clip. We emphasize this is a deterministic, functional approximation that does not recover the true head pose (consistent with the partial-observation setting of Sec. 7), mirroring the functional over exact principle of our retargeter (Sec. 4). This embodiment-aligned unification of arbitrary viewpoints into a consistent egocentric observation, at corpus scale, is the sense in which E GO INFINITY 
+
+operates. Example reconstructions in this synthesized egocentric view are shown in Fig. 5 (further discussed in Sec. C.1). 
+
+A.2 Full Interaction-State Definition 
+
+Sec. 3.3 classifies each object frame into the three states st ∈ { STATIC , GRASPED , MOVING } that are sufficient to describe the refinement logic. Internally, the engine uses a finer six-state label that distinguishes scene-fixed objects from momentarily resting ones and resolves which hand is in contact: 
+
+σt ∈ Σ = {STATIC _GLOBAL , STATIC , GRASPED _L, GRASPED _R, GRASPED _BOTH , MOVING }. (2) The mapping to the main-text states is {STATIC _GLOBAL , STATIC } → STATIC ,
+
+{GRASPED _L, GRASPED _R, GRASPED _BOTH } → GRASPED , and MOVING → MOVING .
+
+Global static gate. Let ct ∈ R2 be the object mask centroid in image coordinates and ∆[10 ,90] = ∥p90 (c) − p10 (c)∥2
+
+its inter-percentile span over the clip. If ∆[10 ,90] ≤ 0.02 · min( H, W ) the object is declared STATIC _GLOBAL for the entire clip. This short-circuit handles fixtures (stoves, cutting boards, plates) cheaply and avoids per-frame motion noise on genuinely immovable objects. 
+
+Per-frame motion gate. For non-globally-static objects we form the centroid displacement dt = ∥ct − ct−1∥2 and pass it through a Schmitt trigger (Sec. A.5) with thresholds (dlo , d hi ) = (2 , 4) px, yielding a hysteresis-stable binary motion signal mt that does not flicker around the threshold. 12 Figure 5: Curated Action100M reconstructions in synthesized egocentric view. Each pair shows the original exocentric source frame (left) and the corresponding egocentric re-rendering (right) with recovered hand meshes, object meshes and point clouds, and 6-DoF poses, produced by the gravity-aligned interaction-following camera described above. The source clips share no common capture viewpoint, yet all are reframed into a consistent egocentric observation. 
+
+Per-hand grasp signal. For each hand h ∈ { L, R } we OR-combine three binary contact indicators into g(t) 
+
+> h
+
+, in order of reliability: (i) 2D mask overlap (primary): the rasterized MANO hand mask and the object mask overlap by at least 
+
+30 px; (ii) 3D fingertip proximity (fallback): a fingertip joint lies within 6 cm of the back-projected object point cloud 
+
+Pot ; (iii) 3D wrist proximity (fallback): the wrist joint lies within 5 cm of Pot . The 2D overlap is primary because it is immune to monocular-depth noise and to the hand-mask subtraction that drains the 3D cloud when the hand fully wraps the object; the 3D fallbacks cover frames where W ILOR returns an incomplete mesh. 13 Temporal smoothing. Each per-hand signal is filtered with the morphological close-and-drop operator of Sec. A.5: internal gaps of ≤ 30 frames ( ∼ 2 s at 15 fps) are bridged (handling brief mid-action finger lifts), and runs shorter than 
+
+8 frames ( ∼ 0.5 s) are removed. We write the resulting smoothed per-hand signal ˆg(t) 
+
+> h
+
+, which feeds the hierarchical assignment below. 
+
+State composition. With the gates above, the label is assigned hierarchically (Fig. 6a): 
+
+σt =
+
+
+
+> STATIC
+
+_GLOBAL globally static 
+
+> GRASPED
+
+_BOTH else if ˆg(t) 
+
+> L
+
+∧ ˆg(t)
+
+> R
+> GRASPED
+
+_L else if ˆg(t)
+
+> L
+> GRASPED
+
+_R else if ˆg(t) 
+
+> R
+> MOVING
+
+else if mt 
+
+> STATIC
+
+otherwise. (3) 
+
+Dominant-hand resolution. GRASPED _BOTH frames are reduced to a single dominant hand for the rigid bind (Sec. A.4) by a two-tier policy. Tier 1 uses the clip-level majority of unambiguous single-hand frames (one side has explicit frames and the other has none, or a 5:1 majority among non-BOTH frames); the whole clip then folds to that hand. 
+
+Tier 2 , used only when no unambiguous single-hand frame exists, computes per-frame minimum fingertip-to-cloud distance for each hand and takes the clip-wide majority; minimum fingertip distance is preferred over wrist proximity because it is robust to elongated tools whose centroid sits far from the grip. 
+
+A.3 State-Dependent Pose Sources 
+
+The per-frame pose c ˆpot = ( c ˆRot , cˆtot ) decomposes into a translation and a rotation, each driven by a different signal depending on σt (Tab. 3). The central design choice is that the interaction state selects which geometric signal is reliable enough to drive each degree of freedom, rather than relying on a single state-blind estimator.                        
+
+> State Translation cˆtotRotation cˆRot
+> STATIC _GLOBAL med tcpca
+> t(whole clip) Rcano (SAM-3D)
+> STATIC med t∈S cpca
+> t(per stretch) Rcano (SAM-3D)
+> MOVING mask-bbox-center back-projection (smoothed) per-frame PCA, sign-corrected
+> GRASPED _* cRhttcanon +cthtcRhtRcanon
+
+Table 3: State-dependent pose sources. cpca  
+
+> t
+
+is the robust point-cloud centroid (defined below, using the MAD filter of Sec. A.5); the GRASPED rows are the rigid hand bind of Sec. A.4. 
+
+Robust static centroid. Both static categories localize translation at the robust centroid of the back-projected mask cloud Pot : after a MAD outlier filter (Sec. A.5) we take the inlier mean cpca  
+
+> t
+
+. Locking the mesh to this centroid (rather than a raw point mean or a bbox center, which are density-biased and outlier-sensitive respectively) keeps the posed mesh coincident with its rendered bounding box on every static frame. 
+
+Moving translation. For MOVING frames we use the eroded-mask bbox center (min + max) /2 of the back-projection, Gaussian-smoothed ( σ = 2 frames) along the trajectory. MOVING frames are rare and transient (pickup / setdown), so residual error here has limited downstream impact. 
+
+Per-segment depth realignment. Edge blur on hand–object boundaries leaves a small ( 1–10 cm) systematic depth offset between a grasped object and the hand. Within each grasp segment we estimate a z-correction by matching the posed object mesh to the hand-vertex surface in the contact region: for each frame we take the K=20 nearest (hand-vertex, mesh-point) pairs, reject the frame if the closest pair exceeds 20 cm (residual grasp false positive), and compute ∆zt = zhand − zmesh . A Savitzky–Golay filter (window 7, order 2) smooths ∆z within the segment, the correction is capped at ±0.1 m, and it is applied jointly to the mesh translation, cached object points, and bounding box so all surfaces stay consistent. Using the integrated mesh (canonical scale + robust centroid) as the depth reference, rather than the noisy per-frame observation, anchors a stable contact plane. 14 object / motion signal hand grasp signal state classifier neutral / state 
+
+Object mask track 
+
+Global-static gate yes no Per-frame motion gate 
+
+> Schmitt trigger
+
+Per-hand grasp signal 
+
+> 2D overlap + 3D fallback
+
+Close-and-drop 
+
+> bridge 30 / drop 8 fr
+
+Hierarchical assignment 
+
+> priority both > L > R
+
+moving grasped 
+
+> grasped_l grasped_r grasped_both
+
+static 
+
+> static_global static
+
+grasped_both only Dominant-hand resolution 
+
+> two-tier majority vote
+
+Sot       
+
+> ∆[10 ,90] ≤0.02 ·min( H, W )
+> (2 ,4) px
+
+(a) Interaction-state classifier and dominant-hand resolution (Sec. A.2): the global-static gate, the per-frame motion gate (Schmitt), the per-hand grasp signal (2D overlap with 3D fallbacks) and its morphological smoothing, the hierarchical assignment into the six states Σ, and the two-tier resolution branching off GRASPED _BOTH .(a) hand body frame 
+
+(wrist) 
+
+(b) Grasp placement 
+
+Palm surface 
+
+Object centroid Palm centroid 
+
+> min-y vertex seated on plane
+
+RIGHT seats min-y LEFT seats max-y 
+
+palm normal ( )→ ,
+
+x y z
+
+j5 j17 
+
+j0x
+
+j17 
+
+j0
+
+j5 z = x × y
+
+y =
+
+=
+
+y
+
+¯p′
+
+¯qpalm 
+
+y = 0 
+
+(b) Hand body frame and chirality-aware grasp place-ment (Sec. A.4): the palm-landmark construction of 
+
+(cRht , ctht ) from j0, j5, j17 with +y out of the palm (left), and a mesh-thickness extreme seated on the y=0 
+
+palm surface with the chirality flip (right). 
+
+Figure 6: Geometry of the data engine: the per-object interaction-state classifier (a) and the rigid hand bind used for 
+
+GRASPED segments (b). 
+
+A.4 Rigid Hand Binding 
+
+This section details the c ˆpot = cpht · Tcano rule of Sec. 3.3 for GRASPED segments, where Tcano = ( Rcanon , tcanon ) is the constant hand-relative transform aggregated over a grasp segment. Note this is distinct from the SAM-3D object orientation Rcano (Sec. A.7), despite the similar name. 
+
+Hand body frame. As illustrated in Fig. 6b, for each frame with a single dominant hand we build an articulation-invariant SE(3) hand frame cpht = ( cRht , ctht ) from three palm landmarks (wrist j0, index MCP j5, pinky MCP 
+
+j17 ): 
+
+x = j5 − j0
+
+∥j5 − j0∥ , v = ( j17 − j0) −  (j17 − j0)⊤xx, y = x × v
+
+∥x × v∥ , z = x × y, (4) with cRht = [ x y z ] and ctht = j0. The frame depends only on the palm, not on finger flexion. The cross-product construction is right-handed for the RIGHT hand; the resulting +y axis points out of the palm for the RIGHT hand and into the palm for the LEFT hand, a chirality handled explicitly in the placement below. 15 Per-segment canonical pose. A grasp segment is a maximal run of frames sharing one GRASPED _* state and one dominant hand; a mid-grasp hand change splits the segment. With the per-frame relative pose Trel  
+
+> t
+
+= ( cpht )−1 cpot
+
+(rotation Rrel  
+
+> t
+
+= ( cRht )⊤cRot , translation trel  
+
+> t
+
+= ( cRht )⊤(ctot − ctht )) computed from the observed pre-refinement pose, we aggregate a constant canonical pose: Rcanon is the chordal mean on SO (3) (Sec. A.5) of {Rrel  
+
+> t
+
+} after rejecting rotations more than 30 ◦ from a robust seed (segment-middle frame), and tcanon is the per-axis MAD-filtered median of 
+
+{trel  
+
+> t
+
+}; this translation is provisional and is replaced by the geometric placement below, whereas Rcanon is final. The pose is propagated as c ˆpot = cpht Tcano for t ∈ S , making the object rigidly bound to the hand by construction (zero relative motion). 
+
+Geometric placement. Because the visible portion of a grasped object is asymmetric about the held end, the observation-derived tcanon is biased. We replace it with a geometric placement from mesh and palm anatomy. Let 
+
+p′ 
+
+> i
+
+= Rcanon pi be mesh points in the hand frame with centroid ¯p′, and let ¯qpalm be the centroid of five palm landmarks 
+
+{j0, j5, j9, j13 , j17 }. In-plane components align the centroids, t(x,z ) 
+
+> canon
+
+= ¯ q(x,z ) 
+
+> palm
+
+− ¯p′(x,z ), while the out-of-plane com-ponent seats a mesh-thickness extreme on the palm surface ( y = 0 ): t(y) 
+
+> canon
+
+= − min i p′(y) 
+
+> i
+
+for the RIGHT hand and 
+
+− max i p′(y) 
+
+> i
+
+for the LEFT (chirality flip from the body-frame construction). The result flushes the object’s palm-facing face against the palm for both hands. 
+
+Boundary smoothing. When adjacent segments use different canonical poses (hand change or re-grip), we remove the discontinuity with SLERP on rotation and linear interpolation on translation over a 5-frame ramp, applied both between two grasp segments and between a grasp and an adjacent non-grasp segment. 
+
+A.5 Robust-Statistics Primitives 
+
+The refinement reuses a small set of robust operators. 
+
+MAD outlier filter. For points {pi} with median m, residuals di = ∥pi − m∥2, ˜d = med( di), and MAD = med( |di − ˜d|), inliers satisfy di ≤ ˜d + 3 · 1.4826 · MAD ; the constant 1.4826 makes MAD a consistent estimator of the standard deviation under normality. The per-axis variant applies the same test independently per coordinate and keeps points that are inliers on all axes. 
+
+Chordal mean on SO (3) . For inlier rotations {R(k)}, ¯R = Proj SO (3) 
+
+  1
+
+> K
+
+P 
+
+> k
+
+R(k), where the projection is the SVD Procrustes map: with M = U ΣV ⊤, ¯R = U diag(1 , 1, det( U V ⊤)) V ⊤.
+
+Schmitt-trigger hysteresis. For a signal xt with thresholds (xlo , x hi ), the binary state turns on when xt > x hi and off when xt < x lo , preventing flicker near a single threshold. 
+
+Morphological close-and-drop. For a binary sequence with bridge B and minimum run L: every 0-run of length 
+
+≤ B flanked by 1s is filled, then every 1-run of length < L is removed; edge-bounded runs are not bridged. 
+
+A.6 Perception-Module Configuration 
+
+The off-the-shelf modules of Sec. 3.2 are configured as follows. M OGE-2 (ViT-L, fp16) produces a per-frame metric depth map Dt and a fitted focal length, used without temporal aggregation. F LOW 3R provides the dense depth used for back-projection; per-frame depth is temporally aligned against a static-background template (per-pixel median over flow-classified background pixels) with the dynamic-mask region excluded. G EO CALIB is run on three evenly spaced frames to recover the gravity vector cg. Hand reconstruction runs a YOLO detector for hand boxes and handedness, W ILOR (DINOv2-L backbone, fp16) for the per-detection MANO mesh ( 21 joints, 778 vertices), and rescales the MANO root translation into metric units by multi-scale alignment of fingertip projections against Dt; a clip-level handedness vote removes label flips, a ∼ 35 M-parameter motion infiller fills missing frames, biomechanical swing–twist limits clamp finger joints, and a Savitzky–Golay filter (window 9, order 3, in quaternion space) removes jitter. MEMFOF (fp16) provides per-frame dense optical flow, used only to classify static-background versus dynamic pixels for the F LOW 3R depth template above; the object pose itself is geometry-driven and consumes no optical flow. SAM-3 detects a region per text prompt on a subset of frames and initializes a SAM-2 streaming track (forward + backward) for the full clip; a prompt-aware NMS and a containment merge collapse near-duplicate prompts, keeping up 16 to seven objects. SAM-3D runs once per object on its cleanest unoccluded frame, returning the canonical mesh Mo, a canonical orientation, and a canonical metric scale. 
+
+A.7 Coordinate Conventions 
+
+All geometry lives in the OpenCV camera-world frame (right-handed, +x right, +y down, +z into the scene), centered at the static camera; the focal length comes from M OGE-2, so no calibration is required. SAM-3D returns its canonical orientation as a row-form PyTorch3D quaternion q; we convert it to the left-applied column-form rotation Rcano used in the main text by 
+
+Rcano = F R⊤ 
+
+> q
+
+, F = diag( −1, −1, +1) , (5) where Rq is the matrix of q and F maps the PyTorch3D camera convention to OpenCV’s. An object-canonical point pc
+
+maps to the camera frame as cpt = cRot (sopc) + ctot with canonical scale so.
+
+A.8 Sanity Filtering 
+
+The sanity checks mentioned at the end of Sec. 3.3 are two automated tests. Scale sanity : SAM-3D’s monocular scale so
+
+is occasionally off by 2–5×; if the scaled mesh extent exceeds 1.8× the mask-implied size smask = max( Wmask , H mask )·
+
+¯D/f , we override so with the mask-implied scale. Spurious flagging : objects whose 3D centroid is more than 0.5 mfrom all hand activity and whose 2D centroid moves less than 10 px across the clip are flagged as background false matches; flagged objects are dimmed rather than deleted so downstream consumers may keep or drop them. 
+
+A.9 Action100M Annotation Fields and Consolidated Parameters Semantic prompts. The text prompts driving SAM-3 detection (Sec. 3.2) are taken directly from Action100M’s hierarchical annotations, requiring no additional VLM at processing time. We use the short and detailed action descriptions and the per-clip caption; object nouns are extracted from these fields (e.g. a clip annotated “slicing a tomato” yields the prompt “tomato”), and the same labels are inherited as language grounding on the output trajectory. 
+
+Parameters. Tab. 4 lists every threshold in the engine. All are fixed constants chosen by inspection on a development set, not learned, and are held constant across the 106 -clip dataset.                                                                
+
+> Parameter Value Use Global-static span threshold 0.02 ·min( H, W )state gate (Sec. A.2) Motion Schmitt thresholds (2 ,4) px state gate Mask-overlap grasp threshold 30 px grasp signal Fingertip grasp distance 6cm grasp signal Wrist grasp distance 5cm grasp signal Grasp gap bridge / min run 30 /8frames temporal smoothing Rotation outlier threshold 30 ◦chordal mean (Sec. A.4) MAD inlier multiplier 3·1.4826 all robust filters Moving-state Gaussian σ2frames moving translation Depth-realign K/ far-reject 20 /0.2mdepth realignment Depth-realign SavGol / cap win 7, ord 2/±0.1mdepth realignment Boundary SLERP/LERP ramp 5frames segment boundaries MANO SavGol window / order 9/3hand smoothing Scale-sanity factor 1.8×sanity (Sec. A.8) Spurious distance / 2D-motion 0.5m / 10 px sanity
+
+Table 4: Consolidated engine parameters. All values are fixed constants, not learned, and stable across the dataset. 
+
+## B Robot Motion Retargeting Details 
+
+This appendix provides additional implementation details for the cross-embodiment retargeter described in Sec. 4. 17 SE(3)-Equivariant Neural Es �mator of Root Frame         
+
+> … …
+> Gravity (3, )
+> Tile ×T+Concat
+> (T, 5, 3) (T, 5, 3)
+> VN encoding VN encoding Concat VN-Linear (5, d)
+> …
+> (T, d, 3)
+> …
+> (T, d, 3)
+> VN-Linear (5, d)
+> ……
+> (T, 2d, 3)
+> VN-Linear (2d, d)
+> Per-frame VN features (T, d, 3) …
+> t = 1 t = 2 t = T
+> VN-Transformer Layer ×4
+> Multi-head Attention Feed-forward
+> Mean Pool over T(d, 3)
+
+𝑹 𝑟 𝑐   
+
+> Rota �on Head :Body-frame MLP
+> Le �Hand Trajectory (T, 7) Right Hand Trajectory (T, 7) Posi �onal centroid
+
+𝒄 
+
+> …
+> (T, d, 3)
+
++Transla �on Head :VN-Linear(d, 1) VN encoding + VN-Linear(4, d) + Tile × T
+
+𝒕 𝑟 𝑐 𝒖 𝑹 ∈ 𝑠𝑜 (3) 
+
+𝒗 ∈ ℝ 𝟑                   
+
+> Flow-matching :Euler update:
+> 𝑹 𝑟 𝑐 =𝑹 𝑟 𝑐 ∙exp Δ𝜏 𝑹 𝑟 𝑐 ⊤𝒖 𝑹 ;
+> 𝒕 𝑟 𝑐 =𝑹 𝑟 𝑐 𝒗 +𝒄 ,𝒗 =𝒗 +𝚫𝝉 𝒗
+
+Figure 7: Root-frame estimator architecture. Bilateral hand trajectories and the optional gravity vector (upper left) are encoded as Vector-Neuron (VN) features and processed by a transformer-based temporal encoder. The encoder output is passed to rotation and translation output heads, which predict flow-matching velocities used to denoise a noisy root-frame sample into the final root-frame estimate (yellow, lower right). 
+
+B.1 Network Architecture 
+
+Fig. 7 illustrates the architecture of the neural root-frame estimator Φ. Given bilateral hand trajectories {(cRht , ctht ) ∈
+
+SE (3) }Tt=1 and an optional gravity vector cg, Φ predicts a distribution over feasible root-frame poses used for down-stream IK-based retargeting. The network is implemented as a Vector Neuron (VN) flow model: all internal geometric features are represented as collections of 3D vectors, preserving SO(3)-equivariance throughout the architecture. 
+
+Input representation. Each hand trajectory is represented as a tensor of shape (T, 7) , where T is the trajectory length (i.e., number of time steps) and the 7 dimensions consist of a 3D hand position plus a 4D unit quaternion (w, x, y, z ) in the camera frame. We compute the bilateral hand centroid c ∈ R3 by averaging all 2T hand positions, and subtract it before VN encoding to remove global translation. At each timestep, each hand state is converted into five VN channels: 
+
+ctht − c, cRht [: , 0] , cRht [: , 1] , cRht [: , 2] , cg , (6) where cRht ∈ SO (3) is the hand rotation matrix and cg is the camera-frame gravity direction, broadcast over time and zeroed when unavailable. Thus, each left/right hand trajectory is encoded as VN features of shape (T, 5, 3) , where the five vector channels correspond to the centered hand position, three hand orientation axes, and gravity direction. 
+
+VN trajectory encoder. Left and right hand trajectory features are first projected independently with a 
+
+VN -Linear(5 , d ) layer, producing features of shape (T, d, 3) for each hand, where d is the channel width (i.e., the number of VN feature channels). The two streams are concatenated along the channel dimension and fused with 
+
+VN -Linear(2 d, d ), yielding a bilateral trajectory feature of shape (T, d, 3) . To condition the flow-matching model, we encode the noisy root-frame state (cRrτ , ctrτ ) ∈ SE (3) at flow time τ ∈ [0 , 1] as four VN channels: 
+
+hctrτ − c, cRrτ [: , 0] , cRrτ [: , 1] , cRrτ [: , 2] 
+
+i
+
+. (7) These channels are projected by VN -Linear(4 , d ) to shape (d, 3) , modulated by a sinusoidal τ -MLP that outputs one scalar scale per channel, broadcast to (T, d, 3) , and added to the fused bilateral trajectory features. This conditioning is 18 Parameter Symbol Value Channel width d 128 Attention heads H 4Transformer layers L 4FFN hidden width dff 512 Dropout – 0.1 Input VN channels per hand – 5Conditioning VN channels – 4Input shape per hand – (T, 7) 
+
+VN feature shape per hand – (T, 5, 3) 
+
+Fused feature shape – (T, d, 3) 
+
+Pooled output shape – (d, 3) 
+
+Flow ODE steps at inference N 20 Table 5: Model hyperparameters for the root-frame estimator. injected before the transformer, allowing attention layers to model equivariant interactions between the noisy SE (3) 
+
+state and trajectory features. The conditioned sequence of shape (T, d, 3) is processed by a VN-Transformer encoder with L blocks. Each block applies LayerNorm, multi-head attention with H heads and sinusoidal temporal attention bias, followed by dropout and a feed-forward network of width dff . Mean pooling over time yields a trajectory-level feature of shape (d, 3) , passed to the output heads. 
+
+Output heads. Under the flow-matching formulation, the network predicts the velocity field for both rotation and translation. For rotation, the pooled VN features of shape (d, 3) are rotated into the current body frame using (cRrτ )⊤,flattened, passed through an invariant MLP, and mapped back to the camera frame. For translation, a VN-Linear head predicts the body-frame offset velocity ˙v from the pooled vector features. The root translation is recovered from the predicted offset as ctr = cRr v + c, where c is the bilateral hand-position centroid. This parameterization keeps the learned flow field consistent with the equivariant structure of the root-frame estimator. At inference, root-frame hypotheses are sampled by integrating the learned model with N Euler steps. The full architecture and inference hyperparameters, including VN channel counts, tensor shapes, transformer width/depth, dropout, and flow steps, are summarized in Tab. 5. 
+
+B.2 Training Configuration 
+
+All models are trained on a single NVIDIA GeForce RTX 3060 with 12 GB VRAM. Each robot model is trained independently for 500 epochs, with 20 gradient steps per epoch. At each step, we draw a fresh batch of 1024 simulated trajectories from the JAX-accelerated physics environment. Training takes approximately 1.5–2 hours per robot. We use Adam with a fixed learning rate of 10 −3 and gradient clipping at norm 1.0. All training hyperparameters are summarized in Tab. 6. 
+
+Trajectory generation. Training trajectories are generated online via task-space sampling. For each environment, 
+
+Nctrl = 7 Cartesian control points are sampled using an Ornstein–Uhlenbeck random walk around a forward-kinematics anchor pose, with per-step noise approximately 0.025 m and spring constant 0.05 . The control points are solved to joint angles with IK and then interpolated with a cubic spline to obtain T = 60 frames at f = 30 fps , corresponding to a 2-second window. Example simulated trajectories for different robots are shown in Fig. 8. 
+
+Flow-matching objective. We train the network with a flow-matching objective over root-frame poses. At each training step, a noisy intermediate root-frame state is sampled along a probability path between a prior sample and the ground-truth root frame. The prior rotation is sampled uniformly from SO (3) , and the prior translation offset is sampled near the bilateral hand centroid. The network predicts the velocity that moves this intermediate state toward the ground truth, with an ℓ2 loss applied to both rotation and body-frame translation velocities. We use equal loss weights for rotation and translation, wR = wt = 1 .0.19 Figure 8: Example sampled training trajectories in simulation for Unitree G1, Robonaut2, dual-Franka, and XLeRobot (left to right). Left-hand trajectories are shown in blue and right-hand trajectories in orange. The robots are rendered semi-transparently for visualization. For each example, the root frame and hand trajectories are projected into a randomly sampled camera frame (green). Parameter Value GPU NVIDIA RTX 3060 (12 GB) Training time per robot ≈ 1.5–2 hours Epochs 500 Steps per epoch 20 Batch size 1024 Optimizer Adam Learning rate 10 −3
+
+Gradient clip norm 1.0 Trajectory length T 60 frames Frame rate f 30 fps Control points Nctrl 7OU step noise 0.025 m 
+
+OU spring constant 0.05 Loss weights (wR, w t) (1 .0, 1.0) 
+
+Position noise σp 0.01 m 
+
+Orientation noise max 0.05 rad 
+
+Tracking jump probability pj 0.20 Tracking jump magnitude max 0.15 m 
+
+Occlusion probability po 0.20 Gravity noise max 0.10 rad 
+
+Gravity dropout pg 0.30 Rear-camera probability pc 0.15 Table 6: Training hyperparameters for the root-frame estimator. 
+
+Data augmentation. To simulate realistic egocentric capture conditions, we apply the following augmentations independently per batch. Position noise adds zero-mean Gaussian noise with σp = 0 .01 m to all hand positions, simulating hand-pose tracking jitter. Orientation noise perturbs each hand quaternion with random rotations up to 
+
+0.05 rad . Tracking jumps occur with probability pj = 0 .20 and randomly displace one arm trajectory by up to 0.15 m ,simulating tracking loss and reacquisition. Hand occlusion zeros one arm’s VN features over a contiguous block of frames with probability po = 0 .20 , improving robustness to single-hand visibility. Gravity noise perturbs the camera-frame gravity vector cg by up to 0.10 rad ; with probability pg = 0 .30 , the gravity channel is zeroed entirely so the model can operate without gravity information. Finally, rear-facing camera augmentation places the synthetic camera behind the subject with probability pc = 0 .15 , increasing viewpoint diversity. 
+
+B.3 Sliding-Window Inference and Optimization 
+
+Given a video clip with WiLOR-estimated hand trajectories in the camera frame, we first evaluate the root-frame estimator over centered sliding windows. The window stride can be adjusted depending on the desired trade-off between temporal resolution and computation. Each window produces an SE (3) root-frame estimate by the learned estimator, 20 allowing the prediction to capture gradual body or camera motion rather than relying only on sparse keyframes. The estimates are then clustered into K = 5 candidates using k-means under an SE (3) geodesic metric. Each candidate is scored by running batched IK over the full trajectory using that candidate as a static reference root frame, and the candidate with the highest bilateral IK convergence rate is selected as the anchor (cRr, ∗, ctr, ∗).We then blend each per-frame estimate toward the anchor using separate factors for translation and rotation, with 
+
+αt = 0 .3 and αr = 0 .7. The anchor provides global stability, while the per-frame estimates preserve slow root-frame variation over time. A Gaussian filter with σ = 10 frames is applied to the blended root trajectory to reduce residual frame-to-frame noise. Each camera-frame hand pose is projected into the moving root frame using the corresponding smoothed per-frame SE (3) estimate, yielding root-frame IK targets for every timestep. The IK objective tracks these hand targets while using null-space regularization to improve manipulability, avoid self-collision, respect joint limits, and penalize deviation from the robot’s default posture. Failed frames are filled by linear interpolation from neighboring converged solutions. 
+
+## C Additional Results 
+
+This appendix provides additional examples referenced in Sec. 5, organized from data (the curated egocentric recon-structions and the interactive browser) through the full video-to-robot pipeline (simulation and real-robot retargeting) to downstream policy use. 
+
+C.1 Curated Action100M Egocentric Reconstructions 
+
+Fig. 5 (Appendix A) shows engine outputs across the curated subset of Sec. 5.2: each clip is given as the original exocentric source frame paired with its synthesized egocentric re-rendering (hand meshes, object meshes and point clouds, and 6-DoF poses), produced by the exo-to-ego reframing of Sec. A.1. Source videos with no common capture viewpoint are all reframed into a consistent, embodiment-aligned egocentric observation, which is the view exposed by the browser’s exo/ego toggle (Sec. C.2) and the sense in which E GO INFINITY produces egocentric data at corpus scale. The same gallery also illustrates the engine’s operating envelope. Rather than devoting a separate figure to failures, we note the representative modes visible in Fig. 5: under severe hand occlusion or when the hand fully wraps the object, the object cloud is partially drained and the recovered mesh can be incomplete; reflective or transparent surfaces yield noisy depth and unstable point clouds; an imperfect SAM-3D mesh or a SAM-3 mis-segmentation of the target object occasionally produces a wrong or coarse object geometry. These cases are consistent with the limitations discussed in Sec. 7; the sanity checks of Sec. A.8 suppress or flag the most implausible ones rather than deleting them. 
+
+C.2 Interactive Dataset Browser 
+
+The full curated subset is also released as an interactive web viewer, shown only in miniature in the main-text system figure (Fig. 1) and enlarged in Fig. 9. Each clip’s reconstructed scene is serialized offline with Viser (get_scene_serializer() ) and compiled to a self-contained client ( viser-build-client ), so the page runs entirely in the browser with no runtime backend and the same assets back both the static figures of Sec. C.1 and the interactive views. The hosting URL is withheld for anonymity and provided in the camera-ready version. For each clip the browser exposes the same quantities as the offline engine output, all scrubbable along a synchronized timeline. The Viser viewer renders the metric MANO hand trajectory, the posed object SAM-3D mesh, the point cloud and 3D bounding box, the recovered interaction state, and the camera cone, with a viewpoint toggle between the original exocentric camera and the synthesized egocentric view (Sec. A.1). Side panels surface the per-frame intermediate results (raw video, SAM-2 mask, depth, and optical flow), the Action100M text description, video-level statistics, and a track summary with per-frame contact, motion, and trust signals together with the object interaction state. The same clip can also be compiled onto the supported robot embodiments directly in the viewer. 
+
+C.3 Video-to-Robot Pipeline Gallery 
+
+Fig. 10 traces the complete video-to-action pipeline of Sec. 5.3 end to end on ten clips sampled from the curated subset. Each row reads left to right: the raw exocentric source frame, the reconstructed egocentric hand-object view, the motion retargeted in simulation onto the dual-arm Franka FR3 setup, Unitree G1, Robonaut2, and XLeRobot, and 21 Homepage Overview 
+
+Clip list 
+
+> Two layouts
+
+Viser Viewer 
+
+Robot Retargetings 
+
+> Interaction State
+> Hand Trajectory
+> Object SAM3D Mesh
+> Point cloud BBox
+> Camera Cone
+
+Video Statistics 
+
+Text Description   
+
+> Intermediate results
+> Raw video SAM2 mask
+> Depth Optical flow
+
+Track Summary   
+
+> Track Statistics
+> Contacts Motion
+> Trust State
+
+Figure 9: The interactive dataset browser. A static Viser client served with no runtime backend lets a reader browse and inspect the curated subset. Homepage and clip list: a searchable gallery of all episodes in grid or table layout. Viser viewer: the interactive 3D scene exposing the hand trajectory, object SAM-3D mesh, point cloud and bounding box, interaction state, and camera cone, with a robot-retargeting panel. Side panels: video statistics, the Action100M text description, per-frame intermediate results (raw video, SAM-2 mask, depth, optical flow), and a track summary with per-frame contact / motion / trust signals and the object interaction state (Sec. C.2). finally the same motion executed on the two real-robot platforms. A single recovered 4D trajectory thus compiles onto substantially different embodiments and transfers from simulation to hardware, illustrating the agent-agnostic nature of the engine output. 
+
+C.4 Real-Robot Skill Execution 
+
+Fig. 11 shows additional dual-arm Franka FR3 executions extending Sec. 5.4: retargeted motions directly replayed on hardware for Cut, Pour Bowl, Pour Glass, Wipe Box, and Wipe Computer. Each row is a time-ordered filmstrip of one skill, demonstrating that motions recovered from in-the-wild video drive functional execution across several distinct manipulation tasks. 
+
+C.5 Downstream Grasping Policy 
+
+Beyond direct replay, Fig. 12 shows rollouts of a grasping policy trained on a real LEAP dexterous hand using EGO INFINITY -extracted hand motions as priors (Sec. 5.4). We show three rollouts each for grasping an apple, a banana, and a tomato can, generalizing across object shape and demonstrating that the recovered motions support learned policies rather than open-loop replay alone. 22 Figure 10: End-to-end video-to-robot pipeline on ten sampled clips. From left: raw exocentric frame, reconstructed egocentric view, simulation retargeting on dual-arm Franka FR3, Unitree G1, Robonaut2, and XLeRobot, and real-robot execution. One recovered trajectory compiles onto multiple embodiments and transfers from simulation to hardware. 23 Cut 
+
+> Pour
+> Bowl
+> Pour
+> Glass
+> Wipe
+> Box
+> Wipe
+> Computer
+
+Figure 11: Real-robot skill execution on the dual-arm Franka FR3. Each row is a time-ordered filmstrip of a retargeted skill: Cut, Pour Bowl, Pour Glass, Wipe Box, and Wipe Computer. 
+
+Figure 12: Downstream grasping policy on a real LEAP hand, trained with E GO INFINITY -extracted hand motions as priors. Three rollouts each are shown for an apple, a banana, and a tomato can, generalizing across object shape. 24
