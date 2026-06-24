@@ -1,0 +1,535 @@
+Title: Balancing Signal and Variance: Adaptive Offline RL Post-Training for VLA Flow Models
+
+URL Source: https://ojs.aaai.org/index.php/AAAI/article/download/38944/42906
+
+Number of Pages: 9
+
+Markdown Content:
+# Balancing Signal and Variance: Adaptive Offline RL Post-Training for VLA Flow Models 
+
+# Hongyin Zhang 1,2 , Shiyuan Zhang 3, Junxi Jin 2, Qixin Zeng 2, Yifan Qiao 4,Hongchao Lu 2, Donglin Wang 2*  
+
+> 1
+
+Zhejiang University, Hangzhou, China  
+
+> 2
+
+Westlake University, Hangzhou, China  
+
+> 3
+
+University of California, Los Angeles, USA  
+
+> 4
+
+National Key Laboratory of Human-Machine Hybrid Augmented Intelligence, National Engineering Research Center for Visual Information and Applications, and Institute of Artificial Intelligence and Robotics, Xi’an Jiaotong University wangdonglin@westlake.edu.cn 
+
+Abstract 
+
+Vision-Language-Action (VLA) models based on flow matching have shown excellent performance in general-purpose robotic manipulation tasks. However, the action ac-curacy of these models on complex downstream tasks is un-satisfactory. One important reason is that these models rely solely on the post-training paradigm of imitation learning, which makes it difficult to have a deeper understanding of the distribution properties of data quality, which is exactly what Reinforcement Learning (RL) excels at. In this paper, we theoretically propose an offline RL post-training objec-tive for VLA flow models and induce an efficient and feasible offline RL fine-tuning algorithm −− Adaptive Reinforced 
+
+Flow Matching ( ARFM ). By introducing an adaptively ad-justed scaling factor in the VLA flow model loss, we con-struct a principled bias-variance trade-off objective function to optimally control the impact of RL signal on flow loss. ARFM adaptively balances RL advantage preservation and flow loss gradient variance control, resulting in a more sta-ble and efficient fine-tuning process. Extensive simulation and real-world experimental results show that ARFM exhibits excellent generalization, robustness, few-shot learning, and continuous learning performance. 
+
+# Introduction 
+
+In recent years, the rapid development of vision-language-action (VLA) models has enabled robots to perform a va-riety of manipulation tasks based on multi-modal percep-tion. Large-scale pre-training systems have demonstrated the feasibility of learning general policies from internet-level multi-modal data and have performed well in real-world robotic manipulation tasks, such as RT-1 (Brohan et al. 2022), RT-2 (Brohan et al. 2023), PaLM-E (Driess et al. 2023), Octo (Team et al. 2024), OpenVLA (Kim et al. 2024), 
+
+π0 (Black et al. 2024). In particular, π0 is a VLA flow pol-icy model based on trajectory vector fields, which utilizes trajectory-level denoising modeling mechanism to achieve parallel and efficient policy learning and achieves state-of-the-art performance in realistic manipulation tasks. 
+
+> *
+
+Corresponding author. Copyright © 2026, Association for the Advancement of Artificial Intelligence (www.aaai.org). All rights reserved. 
+
+Although pre-trained VLA models show good generaliz-ability, fine-tuning on downstream tasks based on the imita-tion learning paradigm still faces great challenges in terms of action accuracy (Brohan et al. 2023; Black et al. 2023; Li et al. 2024; Zhang et al. 2025a). In this scenario, VLA models that rely solely on behavior cloning or flow match-ing may not be able to effectively exploit the quality dis-tribution structure in the training data. Some works (Mark et al. 2024; Zhai et al. 2024; Zhao et al. 2025; Guo et al. 2025b; Zhang et al. 2025b) resort to offline Reinforcement Learning (RL) in the hope of mining deeper and fine-grained data quality features to achieve more efficient VLA model fine-tuning. Recently, an algorithm called ReinboT (Zhang et al. 2025b) was proposed, which attempts to introduce RL return-to-go as a fine-grained goal to guide the fine-tuning of the VLA model. However, we observed that this approach has limited performance in VLA flow models (such as π0), see the experimental section for details. We infer that this is because VLA flow models the entire action trajectory distri-bution through a vector field. During the inference phase of the VLA flow model, the maximized return-to-go can only control the generation of the trajectory vector field, thereby indirectly and inefficiently guiding the final action predic-tion. Therefore, how to effectively perform offline RL fine-tuning of VLA flow models remains underexplored. To this end, we propose Adaptive Reinforced Flow 
+
+Matching ( ARFM ), a novel adaptive offline RL fine-tuning method for VLA flow models. We control the strength of the RL signal introduced into the sample data by introducing an adaptively adjusted scaling factor in the VLA flow loss func-tion. Specifically, we theoretically construct a variance-bias trade-off optimization objective with respect to the scaling factor. We aim to dynamically select the scaling factor to preserve the RL signal, i.e., samples with higher RL advan-tage are still amplified in the data distribution during flow model fine-tuning. Meanwhile, we hope to control the flow matching loss gradient variance, i.e., avoid some weights from exponentially exploding, resulting in excessive gradi-ent variance and training crash. Therefore, we focus on adaptively balancing “retaining enough RL advantage signal” and “controlling loss gradi-ent variance” in the scaling factor as the distribution of the The Fortieth AAAI Conference on Artificial Intelligence (AAAI-26) 
+
+18755 current batch data changes during the post-training process of the VLA flow model. We theoretically construct an op-timization objective for the scaling factor and construct an approximately analyzable objective function through some reasonable assumptions. A bisection iterative algorithm for real-time updating of the scaling factor is further induced, so that the loss of the VLA flow model is adaptively adjusted and corrected according to the data distribution. Our princi-pled contributions include three aspects: • We propose ARFM, a novel offline RL post-training method for VLA flow models that can adaptively adjust the data quality distribution. • We theoretically establish the optimization objective of adaptively adjusting the scaling factor and induce a bisec-tion iterative algorithm to update the factor in real time, thereby achieving efficient VLA flow model fine-tuning. • Extensive experiments in simulation and real-world robot manipulation tasks show that our proposed ARFM ex-hibits state-of-the-art generalization ability, robustness to dynamic perturbations, and excellent performance in few-shot and continuous learning scenarios. 
+
+# Related Work 
+
+Flow matching models in RL. Flow matching (Lipman et al. 2023) is a more general counterpart to the diffu-sion model (Ho, Jain, and Abbeel 2020). Both diffusion and flow matching tend to have good results in offline RL. Some previous work explored modeling behavior poli-cies based on diffusion models (Janner et al. 2022; Wang, Hunt, and Zhou 2022). Following these studies, some re-searchers modeled offline RL objectives as energy-guided diffusion processes (Chen et al. 2022; Lu et al. 2023), while others adopted the same policy optimization approach uti-lizing diffusion and flow matching models without classi-fiers (Ajay et al. 2022; Zheng et al. 2023). Recently, an energy-weighted flow matching method (Zhang, Zhang, and Gu 2025) for learning energy-guided distributions was pro-posed, which can directly utilize RL rewards or other metrics as energy functions without learning intermediate energy models. Compared with previous studies, our work further extends the energy-weighted flow matching method to the VLA model post-training setting and proposes a new adap-tive energy-weighted algorithm. 
+
+RL for VLA models. RL has recently emerged as a piv-otal technique for post-training VLA models, overcoming the limitations of vanilla imitation learning (Zhai et al. 2024; Mark et al. 2024) on infrastructure such as RT-1 (Brohan et al. 2022). These efforts are mainly divided into online and offline RL fine-tuning. Online methods exploit direct envi-ronment interaction, adopt algorithms such as PPO (Schul-man et al. 2017) or develop more data-efficient interaction frameworks (Lu et al. 2025; Tan et al. 2025; Guo et al. 2025b). On the other hand, offline methods learn from static datasets by introducing various signals, such as human pref-erences (Chen et al. 2025; Zhang et al. 2024) and value guid-ance (Nakamoto et al. 2024). Recent work, ReinboT (Zhang et al. 2025b), has effectively implemented the core idea of RL in predicting the future to maximize return when exam-ining offline RL post-training of VLA models. The idea of utilizing RL returns as fine-grained goals to guide the policy comes from the previous new paradigms of sequence mod-eling, Decision Transformer (Chen et al. 2021) and Rein-former (Zhuang et al. 2024). Different from these studies, our work considers the implementation of offline RL post-training in the energy-weighted VLA flow model to achieve efficient and stable policy optimization. 
+
+# Preliminaries 
+
+In this section, we first list the energy-weighted flow match-ing and give two equivalent loss functions to train a neu-ral network policy to approximate the energy-guided flow. We then list the RL advantage evaluation method for post-training data and the expressive VLA flow model. 
+
+Energy-weighted flow matching 
+
+Definition 1. Both flow matching (Lipman et al. 2023) and Energy-Weighted Flow Matching (EWFM) (Zhang, Zhang, and Gu 2025) learn the vector field (Chen et al. 2019). Con-sider a probability density path: p : [0 , 1] × Rd → R≥0,
+
+x 7 → pt(x). Define the vector field v : [0 , 1] × Rd → Rd
+
+which generates the probability density path p, satisfying: 
+
+ddt pt(x) + div (vt(x)pt(x)) = 0 . (1) For the conditional distribution pt0(x|x0), the conditional vector field is defined in the same way. Consider a probabil-ity distribution p0(x0) and an energy function E(·), then the energy-guided distribution satisfies: 
+
+q0(x0) ∝ p0(x0) exp( −βE(x0)) . (2) Then consider adding Gaussian noises as con-ditional distributions to the two distributions: 
+
+pt0(x|x0) = qt0(x|x0) := N (xt|αtx0, σ 2 
+
+> t
+
+I). De-fine pt(x) := R 
+
+> x0
+
+pt0(x|x0)p0(x0)d x0, qt(x) := 
+
+R 
+
+> x0
+
+qt0(x|x0)q0(x0)d x0 as the marginal distributions at time t, then energy-weighted flow matching aims to efficiently learn the vector field ˆut(x) which generates 
+
+qt(x). Theorem 1 calculates the vector field ˆut(x) which generates q, and Theorem 2 finds the equivalent loss be-tween learning the conditional vector field and the marginal vector field. The proof process is in the Appendix. 
+
+Theorem 1. Suppose p0(x0), q0(x0) are defined in Eq. (2) ,and the conditional distributions pt0(x|x0), q t0(x|x0),marginal distributions pt(x), q t(x) are also defined above. Consider the conditional vector field ut0(x|x0) which generates pt0(x|x0), and the vector field ˆut(x) which generates qt(x), then we have: 
+
+ˆut(x) = 
+
+Z
+
+> x0
+
+p0t(x0|x)ut0(x|x0) exp( −βE(x0)) exp( −E t(x)) dx0, (3) 
+
+where Et(x) is an intermediate energy function which is de-fined as: 
+
+Et(x) = − log Ep0t(x0|x)[exp( −βE(x0))] .18756 Theorem 1 finds out a closed form of the vector field 
+
+ut(x), but it still remains challenging to learn ut(x), since the intermediate energy function is unknown during the pro-cess, therefore Theorem 2 gives the method to simplify the training process. 
+
+Theorem 2. p0(x0), q 0(x0), p t(x), q t(x), E(x0), Et(xt),
+
+ˆut(x), ut0(x|x0) are all defined above. Consider learning a model vθ (x) with the learnable parameter θ, then we define the Energy-weighted Flow Matching (EFM) loss LEF M as:        
+
+> LEF M (θ) = Ex,t [exp( −E t(x))
+> E˜x∼pt(˜ x)[exp( −E t(˜ x))] || vθ(x)−ˆut(x)|| 2],
+
+and the Conditional Energy-weighted Flow Matching (CEFM) loss LCEF M as: 
+
+LCEF M (θ) = 
+
+Ex,t [ exp( −βE(x0)) 
+
+E˜x∼p0(˜ x0)[exp( −βE(˜ x0))] || vθ (x) − ut0(x|x0)|| 2],
+
+where the expectation on t is taken over some predefined dis-tribution λ(t), x0 is sampled from the data distribution p0(·)
+
+and x at time t is sampled by pt(x) with conditional distri-bution pt0(x|x0) generated by the flow ut0(x|x0). Then the two losses are equal up to a constant factor to θ. Hence, 
+
+∇θ LEF M (θ) = ∇θ LCEF M (θ).
+
+Theorem 2 proves that the training process of the vec-tor field of the marginal energy-guided distribution could be simplified to learning the conditional vector field, without the calculation of the intermediate energy function. In the VLA offline RL post-training process, given the observa-tion and action actor ot, At, and compared with the vanilla imitation learning action distribution p(At|ot), we consider designing a new energy function E(At, ot) and further ex-tend the EWFM method to fine-tune the energy-guided VLA model distribution π(At|ot) ∝ p(At|ot) exp( βE(At, ot)) .
+
+RL advantage signal estimation 
+
+Leave-one-out (Kool, van Hoof, and Welling 2019) es-timates the RL advantage using sampling. The REIN-FORCE Leave-One-Out generates K independent samples 
+
+x1, . . . , x K ∼ pθ (·| c) and utilizes all other samples to compute a baseline for the current return: R∗(c, x k) =
+
+R(c, x k) − 1
+
+> K−1
+
+PKi=1 ,i ̸=k R(c, x i). The equivalent form of this objective is: 
+
+R∗(c, x k) = KK − 1 R(c, x k) − 1
+
+K
+
+> K
+
+X
+
+> i=1
+
+R(c, x i)
+
+!
+
+. (4) This is a simple, unbiased, and low-variance advantage esti-mate, so we are inspired by it to design a critic-free offline RL advantage signal for the VLA multi-task setting. 
+
+VLA flow model 
+
+The π0 model (Black et al. 2024) is a recently proposed VLA flow model with excellent performance, which mainly con-sists of a language model transformer backbone. Following the standard late fusion VLM recipe, image encoders em-bed the robot’s image observations into the same embedding 
+
+Figure 1: The proposed ARFM method. We construct an energy-weighted flow matching loss with adaptive scaling factor, aiming to balance the RL signal and gradient vari-ance on the data samples. Then, we establish a solvable op-timization objective and obtain a nonlinear equation about the scaling factor, which is solved by bisection iteration. space as language tokens. The observation ot consists of multiple RGB images, a language command, and the robot’s proprioceptive state. Formally, ot = [It
+
+> 1
+
+, . . . , I tn, ℓ t, q t],where Iti is the i-th image, ℓt is a sequence of language to-kens, and qt is a vector of joint angles. The action chunk 
+
+At = [at, at+1 , . . . , at+H−1] corresponds to a sequence of future actions, where H is the action horizon. The Flow Matching (FM) loss is given by:           
+
+> LF M (θ) = Ep(At|ot),q (Atτ|At)
+> h
+> vθ(Atτ,ot)−u(Atτ|At)2i
+> ,
+> (5)
+
+where vθ (Atτ , ot) is the model’s output, u(Atτ |At) is the denoising vector field, and q(Atτ |At) = N (τ At, (1 − τ )2I)
+
+is the noisy distribution. The noisy actions Atτ are computed as Atτ = τ At + (1 −
+
+τ )ϵ, where ϵ ∼ N (0 , I ). During inference, actions are gen-erated by integrating the learned vector field from τ = 0 
+
+to τ = 1 , starting with random noise At 
+
+> 0
+
+∼ N (0 , I ). The integration rule is given by: 
+
+Atτ +δ = Atτ + δvθ (Atτ , ot), (6) where δ is the integration step size. 
+
+# Methodology 
+
+This work aims to construct a novel efficient post-training method for the VLA Flow model and induce a practical of-fline RL fine-tuning algorithm (Fig. 1). First, we construct an energy-weighted VLA model and the corresponding energy-weighted flow matching loss. Then, we explain in detail how to construct the optimization objective of the adaptive scal-ing factor in the loss function, which aims to weigh the RL signal and gradient variance of the data samples. Finally, we give the solution equations of the scaling factor, as well as the corresponding bisection iteration and the fine-tuning al-gorithm of the VLA flow model. 18757 Energy-weighted VLA flow model 
+
+Consider a data distribution p(At|ot), where At =[at, . . . at+H ] is the action chunk, and ot is the observa-tion. Following ReinboT (Zhang et al. 2025b), we utilize a dense reward (App. Tab. 8) and undiscounted Return-To-Go (RTG). Action chunks in a trajectory share the same RTG (corresponding to the first action), divided by the remain-ing timesteps. The RTG advantage R∗(At, ot) is used as the negative energy function −E (·), and α is used to repre-sent the guidance scale β. Therefore, the policy distribution 
+
+π based on EWFM is: 
+
+π(At|ot) ∝ p(At|ot) exp( αR ∗(At, ot)) .
+
+We could learn the vector field of the policy distribution π
+
+by optimizing CEFM loss: 
+
+Lτ (θ) = E[E∗(At, ot)|| vθ (Aτt , ot) − u(Aτt |At)|| 2],
+
+where E∗(At, ot) = exp( αR ∗(At, ot)) 
+
+EA∗  
+
+> t∼p(·| ot)
+
+exp( αR ∗(A∗ 
+
+> t
+
+, ot)) .
+
+Here in the expectation in Lτ (θ), the action At is sampled from the distribution p(·| ot), while Aτt is to add a simple linear Gaussian noise (Optimal Transport) on At, which is 
+
+Aτt = τ At + (1 − τ )ϵ, where ϵ ∼ N (0 , 1) is a standard Gaussian variable. u(Aτt |At) is the conditional vector field, which could be formulated by: u(Aτt |At) = At − ϵ.In practical post-training, we utilize the sampling assump-tion instead of directly calculating the expectation. In each step, we sample a batch of B data pairs of (ot, At), and calculate the softmax of the energy function as the energy weight E∗, and then calculate the weighted loss Lτ (θ) within this batch, so the practical loss function should be: 
+
+Lτ 
+
+> 1
+
+(θ) = 
+
+> B
+
+X
+
+> i=1
+
+wi(α)|| vθ ({Ait}τ , ot) − u({Ait}τ |Ait)|| 2,
+
+where wi(α) = exp( αR ∗(Ait, ot)) 
+
+PBj=1 exp( αR ∗(Ajt , ot)) .
+
+Here {Ait} are a batch sampled from p(·| ot), while {Ait}τ
+
+is the noisy action from Ait. We utilize the standardized RL advantage R∗(·) as the energy weight in the loss func-tion Lτ 
+
+> 1
+
+(θ). The RL advantage is computed per task cate-gory (Eq. 4), where K depends on the number of tasks, not a hyperparameter. This enables trajectory-level quality comparison beyond single-step group-relative schemes, e.g., GRPO (Guo et al. 2025a). Moreover, α in the loss function 
+
+Lτ 
+
+> 1
+
+(θ) is an important adaptive parameter, and we adaptively adjust its value by constructing an optimization objective that trades off between RL signal and gradient variance. 
+
+Adaptive adjustment of the scaling factor α
+
+The scaling factor α plays an important role in post-training of the VLA flow model. Intuitively, if α is too small, the advantage of the data sample may not be fully reflected, so the improvement on the original flow matching is not signif-icant. When α = 0 , energy-weighted fine-tuning degener-ates into vanilla flow matching. When α is large, fine-tuning Algorithm 1: Bisection Iteration of Scaling Factor α
+
+Input: RL advantages R∗ 
+
+> i
+
+, FM losses LiF M , batch size B,hyperparameter λ, value range of α [αmin , α max ], number of iterations M and tolerance ϵ.
+
+1: Calculate σ2 
+
+> R
+
+= P 
+
+> i
+
+R2 
+
+> i
+
+/B , μL =P 
+
+> i
+
+LiF M /B , σ2 
+
+> L
+
+=P
+
+> i
+
+(LiF M − μL)2/B , xlow = σ2
+
+> R
+
+αmin , xhigh =
+
+σ2
+
+> R
+
+αmax 
+
+2: Define F (x) = 4 √xe 2x − 2√xe x − λσ R
+
+> σ2
+> L
+
+3: for m = 1 to M do 
+
+4: xmid = 0 .5( xlow + xhigh )
+
+5: if |F (xmid )| < ϵ : Break 
+
+6: if F (xmid ) > 0: xhigh = xmid 
+
+7: else : xlow = xmid 
+
+8: end for 
+
+9: α∗ = p0.5( xlow + xhigh )/σ A
+
+10: Return clip ( α∗, α max , α min )Algorithm 2: ARFM: Post-Training of VLA Flow Model 
+
+Input : Post-traing data {At, ot}, batch size B, VLA flow model vθ .
+
+1: for a batch of data {Ait, oit} do 
+
+2: for i in [B] do 
+
+3: Sample ϵi ∼ N (0 , I), τ ∼ Uniform (0 , 1) 
+
+4: {Ait}τ = τ (Ait) + (1 − τ )ϵi
+
+5: Ri = R∗(Ait, oit), gi = exp( R∗(Ait, oit)) 
+
+6: LiF M = || vθ ({Ait}τ , ot) − (Ait − ϵ)|| 2
+
+7: end for 
+
+8: Calculate the optimal α∗ from Alg. 1 
+
+9: wi(α∗) = exp( α∗gi)/ P 
+
+> j
+
+exp( α∗gj )
+
+10: Lτ 
+
+> 1
+
+(θ) = P 
+
+> i
+
+wi(α∗)LiF M 
+
+11: Take a gradient step of Lτ 
+
+> 1
+
+(θ)
+
+12: end for 
+
+tends to focus only on those data samples with higher en-ergy. This will cause the sample data variance to be too large, resulting in gradient explosion and thus destroying the sta-bility of fine-tuning. Therefore, the α is adaptively adjusted in each fine-tuning step, and its adjustment direction is to minimize J(α):
+
+J(α) = Var (ˆ g(α)) − λS (α),
+
+where ˆg(α) = ∇θ Lτ 
+
+> 1
+
+(θ) =
+
+PBi=1 ˆwi(α)∇θ || vθ ({Ait}τ , ot) − u({Ait}τ |Ait)|| 2 is the gradient of the loss Lτ 
+
+> 1
+
+(θ), where ˆwi = exp( αR ∗(Ait, ot)) 
+
+is the energy weight, so α tends to minimize the variation of the gradient. Then we define 
+
+S(α) = PBi=1 ˆwi(α)R∗(Ait, ot)/ PBi=1 ˆwi(α) is ascore function which shows the effect of the RL advantage as the energy weight, and α tends to maximize the score. 
+
+λ is a hyperparameter, to adjust the ratio between the RL signal and the gradient variance. Intuitively, minimizing J(α) is to balance the trade-off to emphasize the energy weight and prevent the post-training from gradient explosion. In order to make this optimization objective solvable, three assumptions need to be considered: 18758 Assumption 1. The standardized RL advantage signal 
+
+R∗(At, ot) is assumed to be Gaussian variable N (0 , σ 2
+
+> R
+
+).
+
+Assumption 2. The Conditional Flow Matching (CFM) loss LiCF M = || vθ (Ait, oit) − u({Ait}τ |Ait)|| 2 is also as-sumed to be Gaussian variable N (μL, σ 2
+
+> L
+
+).
+
+Assumption 3. When the batch size B is large enough, the sample-based expectation and variance could be utilized to approximate αL, σ A, σ L.
+
+In the post-training stage of the VLA flow model, the RL advantage is standardized, and the CFM loss value will quickly tend to have a lower variance, so the Gaussian dis-tribution assumption here is mild and reasonable. Based on these assumptions, we can obtain two important corollaries on the solution of the scaling factor α. The derivation details are in the Appendix. 
+
+Corollary 1. With the assumptions and functions defined above, the objective J(α) could be represented by: 
+
+J(α) = σ2
+
+> L
+
+[e2α2σ2 
+
+> R
+
+− eα2σ2 
+
+> R
+
+] − λασ 2
+
+> R
+
+. (7) 
+
+Corollary 2. The α∗ which minimizes J(α) is solved by: 
+
+4√xe 2x − 2√xe x − λσ R/σ 2 
+
+> L
+
+= 0 , α ∗ = √x/σ R. (8) 
+
+Corollary 1 gives a specific solvable optimization objec-tive for α. Corollary 2 gives the corresponding nonlinear equation for α, which can be quickly solved utilizing bisec-tion iteration (Alg. 1). Therefore, we can utilize the Alg. 1 to obtain the optimal α∗, thereby obtaining the adaptive loss, which is utilized in the post-training process of the VLA flow model (Alg. 2). 
+
+# Experiments 
+
+In this section, we conduct extensive experiments in vari-ous scenarios to evaluate the effectiveness of the proposed ARFM method. Specifically, we aim to examine the follow-ing five questions: 1) Does ARFM show superior generaliza-tion ability compared to previous SOTA baseline methods? 
+
+2) How resistant is ARFM to action noise in robot manipu-lation tasks with action noise? 3) How does ARFM perform in data-scarce scenarios and lifelong learning, especially in terms of few-shot learning and continuous learning capa-bilities? 4) To what extent do the key hyper-parameters in the ARFM method affect the performance of the VLA flow model? 5) How does ARFM perform in real-world robot ma-nipulation tasks, especially manipulating disturbed objects? 
+
+Experimental setup. We evaluate the performance of the proposed ARFM method in LIBERO (Liu et al. 2023) simulation and the real-world UR5 platform (Fig. 2). The LIBERO is a comprehensive lifelong learning benchmark that encompasses multiple task suites. These suites are de-signed to assess specific aspects of general robot manipu-lation, with tasks defined through language-guided instruc-tions. Specifically, LIBERO includes four main suites: Ob-ject, Long, Spatial and Goal. Each suite is tailored to test different object manipulation capabilities and comprises 10 distinct tasks. For real-world evaluation, we utilize a UR5 robotic arm to assess the ARFM’s performance. We set up 
+
+Figure 2: We evaluate performance on four categories of the LIBERO benchmark suite (Object, Long, Spatial and Goal) and three categories of real-world UR5 grasping and placing tasks. In realistic experiments, we introduce multiple exter-nal perturbations to the objects to be manipulated. three distinct pick-and-place tasks to evaluate the model’s robustness under physical perturbations. Hyperparameters and reward configurations can be found in Appendix Tab. 7 and Tab. 8 respectively. 
+
+Baselines. We mainly consider two types of baseline models −− non-flow matching type and flow matching type. In the non-flow matching baseline model, we include the general auto-regressive models Octo (Team et al. 2024) and OpenVLA (Kim et al. 2024). We also consider diffusion-based models such as Diffusion Policy (Chi et al. 2023), MDT (Reuss et al. 2024) and Dita (Hou et al. 2025). In addi-tion, we include QueST (Mete et al. 2024), which discretizes the continuous action space into a skill codebook through VQ-VAE and then predicts the skills auto-regressively. On the other hand, for the flow matching type of baseline meth-ods, we first consider π0 (Black et al. 2024), which is a VLA flow model that utilizes trajectory-level flow match-ing to achieve efficient policy learning. We also consider the offline RL fine-tuning baselines ReinboT (Zhang et al. 2025b) and RWR (Peters and Schaal 2007). ReinboT guides VLA action generation by predicting densely maximized fu-ture return, while RWR optimizes the VLA model by per-forming reward-weighted regression on samples. For a more fair comparison, we implemented the flow model versions of ReinboT and RWR based on the π0 model. The baseline re-production details are in the Appendix. 
+
+Multi-task learning setting. Tab. 1 compares ARFM with previous state-of-the-art baseline algorithms. The re-sults show that the performance of flow matching models is higher than that of non-flow matching models overall, which may be mainly attributed to the powerful trajectory mod-eling ability of flow matching models. Moreover, among flow matching models, ARFM achieves the highest success rate 92 .1% , which is 4.5% higher than the baseline π0. It is followed by ReinboT ( 91 .2) and RWR ( 90 .8) baseline al-gorithms, which are 3.5% and 3.3% higher than the base-line π0, respectively. The results preliminarily prove that our ARFM method can more efficiently fine-tune the VLA flow model through the adaptive energy-weighted scaling mech-anism, thereby obtaining better generalization performance. 18759 LIBERO Multi-task Learning Model Type Models Goal Spatial Object Long Average 
+
+Non-Flow Matching Octo 84.6 78.9 85.7 51.1 75.1 OpenVLA 79.2 84.7 88.4 53.7 76.5 Dita 85.4 84.2 96.3 63.8 82.4 Diffusion Policy 68.3 78.3 92.5 50.5 72.4 MDT 73.5 78.5 87.5 64.8 76.1 QueST 80.8 87.4 93.6 68.8 82.7 Flow Matching 
+
+π0 93.8 91.2 93.2 74.2 88.1 ReinboT 94.0 95.6 93.8 81.4 91.2 (+3 .5%) 
+
+RWR 94.4 94.0 94.3 80.4 90.8 (+3 .1%) 
+
+ARFM (Ours) 94.9 95.8 95.0 82.6 92.1 (+ 4.5%) 
+
+Table 1: Multi-task Success Rate (SR) on the LIBERO benchmark, with the best results highlighted in bold.                          
+
+> LIBERO Action Perturbation Models Goal Spatial Object Long Avg.
+> π047.5 50.6 44.9 30.0 43.3 ReinboT 51.4 59.6 44.8 29.3 46.3 (+6 .9%)
+> RWR 49.5 60.1 46.9 29.1 46.4 (+7 .2%)
+> ARFM (Ours) 49.7 61.1 48.9 33.0 48.2 (+ 11 .4%)
+
+Table 2: Average SR(%) under action perturbations (noise levels = 0.1, 0.15, 0.2, 0.25, 0.3) across four LIBERO suites.                     
+
+> LIBERO-Long Few-Shot Models 30-shot 20-shot 10-shot Avg.
+> π041.7 33.8 22.1 32.5 ReinboT 39.5 37.5 24.6 33.9 (+4 .1%)
+> RWR 39.5 37.7 26.7 34.6 (+6 .5%)
+> ARFM (Ours) 42.9 38.9 27.7 36.5 (+ 12 .2%)
+
+Table 3: Average SR(%) of few-shot learning settings on LIBERO-Long task (noise levels = 0.1, 0.15, 0.20). 
+
+Action perturbation setting. To evaluate the model’s re-sistance to perturbations, we added different levels of Gaus-sian noise ( 0.1 ∼ 0.3) to the actions inferred by the model during evaluation. The experimental results are shown in Tab. 2. The results show that compared with the ReinboT (46 .3) and RWR (46.4), ARFM has the highest average suc-cess rate ( 48 .2), which is 11 .4% higher than the baseline π0
+
+(43 .3). This indicates that by balancing the RL signal and gradient variance, ARFM learns a more robust VLA model that is effectively resistant to action perturbations. 
+
+Few-shot learning setting. We examine the few-shot learning capabilities of the model in the LIBERO-Long suite, as shown in Tab. 3, Fig. 3 (a) and Appendix Tab. 5. The experiment shows that ARFM performs best ( 36 .5), followed by RWR ( 34 .6) and ReinboT ( 33 .9), and finally 
+
+π0 (32 .5). This shows that compared with the offline RL fine-tuning method introduced by the baseline ReinboT and RWR, ARFM’s adaptive energy-weighted RL fine-tuning has better data utilization efficiency, thus reflecting better small sample learning and continuous learning performance. 
+
+Figure 3: (a) Average SR(%) of different few-shot learning settings on LIBERO-Long under action perturbations (noise levels = 0.1, 0.15, 0.2). The three color shades from light to dark correspond to increasing levels of action noise (0.1 →
+
+0.2). (b) Continuous learning on LIBERO benchmark (noise levels=0.1). Training sequence: Long 10 → Long 5 + Goal 5 → Long 2 + Goal 2 + Object 2. ”Long 10” means that the model is trained on 10 trajectories per task on the LIBERO-Long suite, and other abbreviations are similar. 
+
+Continual learning setting. In the continual learning setting, we evaluate the model’s ability to learn tasks se-quentially without forgetting previously acquired skills. We utilize the Negative Backward Transfer (NBT) met-ric to measure how much the model’s performance de-grades on task i after learning all tasks: N BT = 
+
+> 1
+> T−1
+
+PT −1 
+
+> i
+
+(max (0 , (SR )i − (SR )Ti )) . (SR )i indicates the success rate of the model on task i after learning it, and 
+
+(SR )Ti indicates the success rate of the model on task i af-ter learning all tasks. The experiment result are in Tab. 4, Fig. 3 (b) and Appendix Tab. 6. Compared with the base-18760 Models LIBERO Continual Learning Avg. NBT ↓ Avg. SR ↑L 30 → L 15 + G 15 L 20 → L 10 + G 10 L 10 → L 5 + G 5 → L 2 + G 2 + O 2 L NBT ↓ Avg. SR ↑ L NBT ↓ Avg. SR ↑ L NBT ↓ G NBT ↓ Avg. SR ↑                                    
+
+> π03.2 64.3 9.4 55.8 10.6 6.8 45.6 7.5 55.2 ReinboT 063.1 6.7 59.2 13.7 6.0 45.4 6.6 (−12 .0%) 55.9 (+1 .2%)
+> RWR 060.3 11.4 58.6 14.5 3.4 47.1 7.3 (−2.3%) 55.3 (+0 .2%)
+> ARFM (Ours) 1.1 67.6 8.5 61.1 3.4 5.6 54.2 4.7 (−38 .0%) 61.0 (+ 10 .5%)
+
+Table 4: Negative Backward Transfer (NBT) and Success Rate (SR) under continual learning on LIBERO-Long (L), Goal (G), and Object (O) suites (noise levels=0.1). 
+
+Figure 4: Ablation study in the LIBERO-Goal suite on the optimization objection hyperparameter λ (a) and the number of bisection iterations M (b). line π0 (SR of 55 .2 and NBT of 7.5), ARFM (SR of 61 .0
+
+and NBT of 4.7) not only improves the final average success rate by 10 .5% , but also reduces the NBT by 38 .0% . This shows that ARFM is not only able to learn new tasks more effectively, but also significantly alleviates catastrophic for-getting, which is crucial for lifelong learning agents. 
+
+Ablation study 
+
+In the implementation of the proposed ARFM method, the optimization objective hyperparameter λ and the total num-ber of bisection iterations M play an important role. The λ
+
+is utilized to balance the relative magnitude between the RL signal and the gradient variance, while the M directly affects the accuracy of the α∗. The results in Fig. 4 show that the performance of ARFM is insensitive to the λ, that is, differ-ent λ values have little effect on the performance of the VLA flow model. This may be mainly due to the adaptive adjust-ment ability of the loss weight of the ARFM method itself. In terms of the number of iterations M , the performance of the VLA flow model begins to stabilize when the M value is 
+
+10 or higher, indicating that ARFM can find an approximate optimal solution within a small number of steps. 
+
+Figure 5: Performance comparison of real-world pick-and-place tasks under external perturbations. 
+
+Real-world experiments 
+
+We compared the model’s performance on real-world tasks subject to external perturbations (Fig. 5). The results show that ARFM achieves the best performance, followed by ReinboT and RWR, with π0 being the worst. Moreover, the ability of ARFM to resist perturbation is significantly better than that of baseline π0. These results confirm that our adap-tive offline RL fine-tuning method can enable the robot to perform more robust decision-making actions to cope with real-world complex scenarios. 
+
+# Conclusion 
+
+In this work, we propose an adaptive offline RL post-training method for VLA flow models. We consider the balance be-tween retaining RL advantage signals and controlling the loss gradient variance, so that the loss can change adaptively according to the quality distribution of the current batch of post-training data. Extensive experiments verify that ARFM has excellent generalization ability, robustness to dynamic perturbations, and few-shot learning and continuous learn-ing capabilities. A promising research direction is to explore online RL post-training of VLA flow models. 18761 Acknowledgments 
+
+This work was supported by the National Science and Technology Innovation 2030 - Major Project (Grant No. 2022ZD0208800), and NSFC General Program (Grant No. 62176215). 
+
+# References 
+
+Ajay, A.; Du, Y.; Gupta, A.; Tenenbaum, J. B.; Jaakkola, T. S.; and Agrawal, P. 2022. Is Conditional Generative Mod-eling all you need for Decision Making? In The Eleventh International Conference on Learning Representations .Alayrac, J.-B.; Donahue, J.; Luc, P.; Miech, A.; Barr, I.; Has-son, Y.; Lenc, K.; Mensch, A.; Millican, K.; Reynolds, M.; et al. 2022. Flamingo: a visual language model for few-shot learning. Advances in neural information processing sys-tems , 35: 23716–23736. Black, K.; Brown, N.; Driess, D.; Esmail, A.; Equi, M.; Finn, C.; Fusai, N.; Groom, L.; Hausman, K.; Ichter, B.; et al. 2024. π0: A Vision-Language-Action Flow Model for Gen-eral Robot Control. arXiv preprint arXiv:2410.24164 .Black, K.; Nakamoto, M.; Atreya, P.; Walke, H.; Finn, C.; Kumar, A.; and Levine, S. 2023. Zero-shot robotic manipu-lation with pretrained image-editing diffusion models. arXiv preprint arXiv:2310.10639 .Brohan, A.; Brown, N.; Carbajal, J.; Chebotar, Y.; Chen, X.; Choromanski, K.; Ding, T.; Driess, D.; Dubey, A.; Finn, C.; et al. 2023. Rt-2: Vision-language-action models transfer web knowledge to robotic control. arXiv preprint arXiv:2307.15818 .Brohan, A.; Brown, N.; Carbajal, J.; Chebotar, Y.; Dabis, J.; Finn, C.; Gopalakrishnan, K.; Hausman, K.; Herzog, A.; Hsu, J.; et al. 2022. Rt-1: Robotics transformer for real-world control at scale. arXiv preprint arXiv:2212.06817 .Cadene, R.; Alibert, S.; Soare, A.; Gallouedec, Q.; Zoui-tine, A.; Palma, S.; Kooijmans, P.; Aractingi, M.; Shukor, M.; Aubakirova, D.; Russi, M.; Capuano, F.; Pascale, C.; Choghari, J.; Moss, J.; and Wolf, T. 2024. LeRobot: State-of-the-art Machine Learning for Real-World Robotics in Py-torch. https://github.com/huggingface/lerobot. Chen, H.; Lu, C.; Ying, C.; Su, H.; and Zhu, J. 2022. Offline Reinforcement Learning via High-Fidelity Generative Be-havior Modeling. In The Eleventh International Conference on Learning Representations .Chen, L.; Lu, K.; Rajeswaran, A.; Lee, K.; Grover, A.; Laskin, M.; Abbeel, P.; Srinivas, A.; and Mordatch, I. 2021. Decision transformer: Reinforcement learning via sequence modeling. Advances in neural information processing sys-tems , 34: 15084–15097. Chen, R. T. Q.; Rubanova, Y.; Bettencourt, J.; and Duve-naud, D. 2019. Neural Ordinary Differential Equations. arXiv:1806.07366. Chen, Y.; Jha, D. K.; Tomizuka, M.; and Romeres, D. 2025. FDPP: Fine-tune Diffusion Policy with Human Preference. 
+
+arXiv preprint arXiv:2501.08259 .Chi, C.; Xu, Z.; Feng, S.; Cousineau, E.; Du, Y.; Burchfiel, B.; Tedrake, R.; and Song, S. 2023. Diffusion policy: Visuo-motor policy learning via action diffusion. The International Journal of Robotics Research , 02783649241273668. Driess, D.; Xia, F.; Sajjadi, M. S.; Lynch, C.; Chowdhery, A.; Wahid, A.; Tompson, J.; Vuong, Q.; Yu, T.; Huang, W.; et al. 2023. Palm-e: An embodied multimodal language model. Guo, D.; Yang, D.; Zhang, H.; Song, J.; Zhang, R.; Xu, R.; Zhu, Q.; Ma, S.; Wang, P.; Bi, X.; et al. 2025a. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948 .Guo, Y.; Zhang, J.; Chen, X.; Ji, X.; Wang, Y.-J.; Hu, Y.; and Chen, J. 2025b. Improving Vision-Language-Action Model with Online Reinforcement Learning. arXiv preprint arXiv:2501.16664 .Ho, J.; Jain, A.; and Abbeel, P. 2020. Denoising Diffusion Probabilistic Models. CoRR , abs/2006.11239. Hou, Z.; Zhang, T.; Xiong, Y.; Duan, H.; Pu, H.; Tong, R.; Zhao, C.; Zhu, X.; Qiao, Y.; Dai, J.; et al. 2025. Dita: Scaling diffusion transformer for generalist vision-language-action policy. arXiv preprint arXiv:2503.19757 .Janner, M.; Du, Y.; Tenenbaum, J.; and Levine, S. 2022. Planning with Diffusion for Flexible Behavior Synthesis. In International Conference on Machine Learning , 9902– 9915. PMLR. Kim, M. J.; Pertsch, K.; Karamcheti, S.; Xiao, T.; Balakr-ishna, A.; Nair, S.; Rafailov, R.; Foster, E.; Lam, G.; Sanketi, P.; et al. 2024. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 .Kool, W.; van Hoof, H.; and Welling, M. 2019. Buy 4 rein-force samples, get a baseline for free! Li, X.; Hsu, K.; Gu, J.; Pertsch, K.; Mees, O.; Walke, H. R.; Fu, C.; Lunawat, I.; Sieh, I.; Kirmani, S.; et al. 2024. Eval-uating real-world robot manipulation policies in simulation. 
+
+arXiv preprint arXiv:2405.05941 .Lipman, Y.; Chen, R. T. Q.; Ben-Hamu, H.; Nickel, M.; and Le, M. 2023. Flow Matching for Generative Modeling. arXiv:2210.02747. Liu, B.; Zhu, Y.; Gao, C.; Feng, Y.; Liu, Q.; Zhu, Y.; and Stone, P. 2023. LIBERO: Benchmarking Knowledge Transfer for Lifelong Robot Learning. arXiv preprint arXiv:2306.03310 .Loshchilov, I.; and Hutter, F. 2017. Decoupled weight decay regularization. arXiv preprint arXiv:1711.05101 .Lu, C.; Chen, H.; Chen, J.; Su, H.; Li, C.; and Zhu, J. 2023. Contrastive energy prediction for exact energy-guided dif-fusion sampling in offline reinforcement learning. In Inter-national Conference on Machine Learning , 22825–22855. PMLR. Lu, G.; Guo, W.; Zhang, C.; Zhou, Y.; Jiang, H.; Gao, Z.; Tang, Y.; and Wang, Z. 2025. Vla-rl: Towards masterful and general robotic manipulation with scalable reinforce-ment learning. arXiv preprint arXiv:2505.18719 .Mark, M. S.; Gao, T.; Sampaio, G. G.; Srirama, M. K.; Sharma, A.; Finn, C.; and Kumar, A. 2024. Policy Agnostic 18762 RL: Offline RL and Online RL Fine-Tuning of Any Class and Backbone. arXiv preprint arXiv:2412.06685 .Mete, A.; Xue, H.; Wilcox, A.; Chen, Y.; and Garg, A. 2024. Quest: Self-supervised skill abstractions for learning contin-uous control. Advances in Neural Information Processing Systems , 37: 4062–4089. Nakamoto, M.; Mees, O.; Kumar, A.; and Levine, S. 2024. Steering your generalists: Improving robotic foundation models via value guidance. arXiv preprint arXiv:2410.13816 .Peters, J.; and Schaal, S. 2007. Reinforcement learning by reward-weighted regression for operational space con-trol. In Proceedings of the 24th International Conference on Machine Learning , ICML ’07, 745–750. New York, NY, USA: Association for Computing Machinery. ISBN 9781595937933. Reuss, M.; Ya˘ gmurlu, ¨O. E.; Wenzel, F.; and Lioutikov, R. 2024. Multimodal diffusion transformer: Learning ver-satile behavior from multimodal goals. arXiv preprint arXiv:2407.05996 .Schulman, J.; Wolski, F.; Dhariwal, P.; Radford, A.; and Klimov, O. 2017. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 .Tan, S.; Dou, K.; Zhao, Y.; and Kr¨ ahenb¨ uhl, P. 2025. Inter-active Post-Training for Vision-Language-Action Models. 
+
+arXiv preprint arXiv:2505.17016 .Team, O. M.; Ghosh, D.; Walke, H.; Pertsch, K.; Black, K.; Mees, O.; Dasari, S.; Hejna, J.; Kreiman, T.; Xu, C.; et al. 2024. Octo: An open-source generalist robot policy. arXiv preprint arXiv:2405.12213 .Wang, Z.; Hunt, J. J.; and Zhou, M. 2022. Diffusion Poli-cies as an Expressive Policy Class for Offline Reinforce-ment Learning. In The Eleventh International Conference on Learning Representations .Zhai, S.; Bai, H.; Lin, Z.; Pan, J.; Tong, P.; Zhou, Y.; Suhr, A.; Xie, S.; LeCun, Y.; Ma, Y.; et al. 2024. Fine-tuning large vision-language models as decision-making agents via re-inforcement learning. Advances in neural information pro-cessing systems , 37: 110935–110971. Zhang, H.; Ding, P.; Lyu, S.; Peng, Y.; and Wang, D. 2025a. Gevrm: Goal-expressive video generation model for robust visual manipulation. arXiv preprint arXiv:2502.09268 .Zhang, H.; Zhuang, Z.; Zhao, H.; Ding, P.; Lu, H.; and Wang, D. 2025b. ReinboT: Amplifying Robot Visual-Language Manipulation with Reinforcement Learn-ing. arXiv preprint arXiv:2505.07395 .Zhang, S.; Zhang, W.; and Gu, Q. 2025. Energy-Weighted Flow Matching for Offline Reinforcement Learn-ing. arXiv:2503.04975. Zhang, Z.; Zheng, K.; Chen, Z.; Jang, J.; Li, Y.; Wang, C.; Ding, M.; Fox, D.; and Yao, H. 2024. Grape: Generaliz-ing robot policy via preference alignment. arXiv preprint arXiv:2411.19309 .Zhao, H.; Song, W.; Wang, D.; Tong, X.; Ding, P.; Cheng, X.; and Ge, Z. 2025. MoRE: Unlocking Scalability in Reinforcement Learning for Quadruped Vision-Language-Action Models. arXiv preprint arXiv:2503.08007 .Zheng, Q.; Le, M.; Shaul, N.; Lipman, Y.; Grover, A.; and Chen, R. T. 2023. Guided flows for generative modeling and decision making. arXiv preprint arXiv:2311.13443 .Zhuang, Z.; Peng, D.; Liu, J.; Zhang, Z.; and Wang, D. 2024. Reinformer: Max-return sequence modeling for offline rl. 
+
+arXiv preprint arXiv:2405.08740 .18763
