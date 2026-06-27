@@ -1,0 +1,472 @@
+Title: RE4: Transformation-aware Imitation of Object Interactions Using Manipulation Modes
+
+URL Source: https://arxiv.org/pdf/2606.24403v1
+
+Published Time: Wed, 24 Jun 2026 00:50:52 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# RE4: Transformation-aware Imitation of Object Interactions Using Manipulation Modes 
+
+Arsh Chawla 
+
+Australian National University 
+
+Rahul Shome ∗
+
+Australian National University 
+
+Abstract: Object interaction tasks have been a focus of advances in imitation learning. End-to-end methods, dominated by diffusion and flow-based variants have shown leaps in performance while sacrificing interpretability. Object-centric and pose-informed variants have had a role in learning from demonstration in ma-nipulation tasks. In this paper, we revisit a few modern imitation learning bench-marks for object interactions, with the aim of composing a framework that repur-poses principled theories of manipulation, preserving both performance and inter-pretability. For image observations, lightweight training is proposed for model-free pose estimation of the target object, using self-supervision over the demon-stration data available for imitation learning. This information is then used to inform a manipulation mode-aware retrieval of a demonstration, a mode-aware transformation, a replan step that connects to the retrieval point while preserving mode constraints, and finally rolling out the transformed demonstration. These compose four key steps of the proposed RE4 framework, evaluated over state-based and image-based benchmarks in Push-T and Robomimic. An adversarial benchmark that evaluates sparse data regions of image-based Push-T showcases the robustness, further bolstered by indications from low-data regime experiments. The current work shows promise in using simple interpretable building blocks to learn manipulation skills. 
+
+Keywords: Imitation learning, Manipulation 
+
+# 1 Introduction 
+
+Figure 1: Retrieve, Reframe, Replan, Replay: 
+
+On the left, the ablation using only the retrieval 
+
+and replay rollouts fail to make progress in the task. All four steps are used in the rollouts vi-sualized on the right. While RE4 is not stochas-tic on its own, the right image shows random-ness injected artificially at the retrieval phase by selecting a random neighbor within an ϵ−ball, mimicking noise expected in closed-loop rollouts. Notably, the multimodality emerges, alongside a clear task-consistent progress. Manipulation [1] is a well-studied area that has historically driven advances in multiple areas of robotics. Learning behaviour from expert demonstrations has shown promise for complex, contact-rich manipulation [2]. Re-cent generative policies, diffusion and flow-matching models, now set the state of the art by capturing the multimodal, discontinuous struc-ture of expert behaviour that classical explicit policies are not expressive enough to represent [3, 4]. That expressiveness, however, comes at the expense of compute, demonstration budget, and interpretability: each action requires iterat-ing a learned denoiser, and the resulting policy is effectively a black box [5, 4]. The memorization characteristics of generative models for computer vision tasks have been in-vestigated for generalization and robustness [6]. Recent analyses suggest much of this machinery 
+
+> ∗
+
+Corresponding author: rahul.shome@anu.edu.au 
+
+> arXiv:2606.24403v1 [cs.RO] 23 Jun 2026
+
+Figure 2: An interpretable sequence of RE4 rollouts in a Robomimic Square benchmark, indicating the demonstrations (45, 122, 68) that were retrieved (then reframed, replanned, and replayed). may be unnecessary for robotic action trajectories, arguing that diffusion policies largely memorize 
+
+their demonstrations and replay the nearest one at inference [7]—reframing retrieval, rather than generation, as the operative mechanism. Yet existing retrieval- and object-centric methods each re-cover only a fragments of what may be needed—nearest-neighbour reuse, or a single per-episode pose transfer [8, 9]. Notably, behaviour switching at the contact points may not be categorically modeled, where the relationship between gripper and object changes discontinuously. These obser-vations correspond to the well-studied theories of manipulation modes [10, 11]. Modeling contact modalities of manipulation closely relates to identifying the topologies of the task constraints [12], differing in analysis when non-prehensile manipulation is considered [13, 14]. The connectivity of these spaces is also understood to affect how information can be shared between different modes and contacts [15]. Motion controllers [16] learned from demonstrations have also informed task constraints in planning [17]. Here, we identify our key question: can theories of multimodal manip-ulation inform a framework for imitating object interactions from demonstration? 
+
+In this paper we compose a handful of lightweight, interpretable modules—transformation-aware retrieval, object-relative reframing, motion-planned bridging, and replay, each conditioned on the underlying manipulation mode . Building on principles drawn from manipulation theory, we pro-pose a method that matches or exceeds baselines at a fraction of the training cost while remaining exactly interpretable. We identify a key component as the estimate of the pose of the target object. While this is assumed known in state-based experiments, we recognise that real-world settings re-quire pose estimation. General-purpose 6DoF object pose estimation [18] is non-trivial and risks introducing overheads we desire to avoid. We explore lightweight model-free self-supervised train-ing only from the demonstration data, to estimate object pose, in the context of our imitation domain. We forego generalization of the pose estimator in favour of what is necessary to our imitation task. This strategy is surprisingly effective for the studied benchmarks, while remaining lightweight in training. The key observation is, using the composable framework, each component while simple, together achieve performance that exceeds the sum of the parts (see Fig 2 for exact interpretability). Our key contributions are: (i) identifying key components of a framework RE4 for object interac-tion imitation as retrieval, reframing, replanning, and replay; (ii) demonstrating over Push-T and Robomimic settings showcase benefits of RE4 in terms of performance, training time, and inter-pretability; (iii) robustness tests evaluate sparse and low-data regimes to assess the benefits of using our principled framework over black-box learned baselines that tend to struggle more in the dearth of data. The current work, though preliminary, demonstrates promise towards imitation of manipu-lation skills that balances performance robustness, lightweight training, and interpretability. 
+
+# 2 Related Work 
+
+Generative policies. Inspired by image generation, diffusion and flow-matching generative models have shown strong performance in behavioural cloning across contact-rich manipulation tasks [5, 3, 7]—requiring only expert demonstration data. A downside to generative policies are the associated computational costs, and lack of interpretablity [19]. Efficiency-focused variants reduce the cost— distilling to few-step generation [20], enforcing SO (2) symmetry in the denoiser [4], or flowing in action rather than action-sequence space [5]—but do not solve issues entirely. 2Retrieval-based imitation learning. He et al. [7] argue diffusion policies largely memorise their demonstrations, and propose a latent space based Action Lookup Table that operates at a fraction of the cost. Retrieval based methods predate generative policies, VINN [21] predicts actions as a weighted average over the nearest demonstration frames in a learned embedding, but replays them 
+
+as recorded and is thus bound to demonstration coverage. Di Palo and Johns [22] decompose reuse into retrieval, alignment, and replay—the closest structure to RE4—but their alignment is a learned 
+
+visual servo, with no explicit object-frame transform and no notion of manipulation mode. 
+
+Object-centric imitation learning. A long line of structured IL encodes demonstrations as reusable, object-relative motion models—task-parameterized skills in object frames [23], and key-point groundings [24]—treating object pose as the anchor that transports a demonstration. One-shot imitation [8] transports a demonstrated end-effector trajectory by an estimated relative object pose, with no notion of manipulation mode , while GPI [9] composes flows over the nearest demonstrations rather than applying an explicit transform. The ingredients of RE4—nearest-neighbour retrieval, object-pose transfer, and pose-aware reuse—appear separately. 
+
+Pose Estimation. Object pose is a powerful conditioning signal for manipulation across retrieval and task-parameterised skill learning [8, 23, 9], but training pose estimators without ground-truth supervision is non-trivial. General-purpose 6-DoF pose estimators exist [18] but often require CAD models. Recovering the manipulated object’s pose directly and only from the demonstration data 
+
+is largely unexplored, even though self-supervised pose estimation is well established in adjacent domains such as human-body pose [25]. RE4 targets exactly this gap with a lightweight, self-supervised estimator trained on demonstrations alone (section 4). 
+
+Manipulation. A widely explored problem area, manipulation [1] has presented principled mod-eling of the underlying search spaces as modes [10, 11]. Motion planning with constraints [12], distinguishes transit and transfer, as well as contact parameters. Sequential manipulation expresses task and motion topologies [26] where the transition of modes inform careful consideration of neigh-borhoods [15]. These contact topologies and constraints change when non-prehensile interactions are introduced [13, 14, 27]. Imitation learning takes a data-centric approach to modeling manipu-lation constraints. The current work remains data-driven, while composing interpretable modules based on object pose, transformations, and manipulation modes. 
+
+# 3 Preliminaries 
+
+In this section, we present some preliminaries for contact-rich manipulation imitation. 
+
+Object Manipulation A robotic manipulator has an end-effector (eef)link ree , describing an end-effector pose x in a task space X . An end-effector configuration can describe its SE (3) pose, i.e., 
+
+x ∈ X ⊂ SE (3) (for planar problems, the corresponding spaces may typically be SE (2) ). The workspace of the robot is occupied by a target object at its pose o ∈ SE (3) . The workspace is also occupied by other geometries. A sequence of end-effector configurations can describe a continuous motion for the manipulator, π : [0 , 1] → X where such a motion can go from a start configuration 
+
+xstart = π(0) to some end configuration xend = π(1) . Next we carefully define manipulation modes necessary for the modeling sequential interactions with an object. 
+
+Manipulation Modes: The combination of the end-effector and actuators, along with the object’s properties express manipulation affordances. These correspond to task-relevant object interactions or actions. For the purposes of affordances (like grasping, pushing) defining a contact is necessary in terms of the object-centric relative transformation from the object to the eef Tr o→x. A wide category of these contact-rich interactions readily fall under the two manipulation modes - transit and transfer. Transit is defined as end-effector and object configurations from where the relative pose of the end-effector and object may change, i.e., the robot can move freely without the object in static, rigid contact. Transfer corresponds to configurations where the relative pose remains fixed, i.e., the object moves with the robot. The mode is then one of, m = {M transit , Mtransfer } ∈ M .Consider an action changing the eef and object, (xi, o t) at
+
+→ (xt+1 , o t+1 ). In the Mtransit mode, 3∥xi, x t+1 ∥ − ∥ oi, o t+1 ∥ ≥ ϵ. In the Mtransfer , ∥xi, x t+1 ∥ − ∥ oi, o t+1 ∥ < ϵ for some small ϵ ≥ 0.The modes may switch at mode transitions M× that correspond to points of affordance contact like at grasps or placements. This means, if Tr o×→x× defines the relative transform before a Mtransfer ,this is preserved along a transfer segment. 
+
+Imitation Learning A demonstration is a sequence of N eef poses, observations, and actions 
+
+d = {⟨ xi, Oi, a i⟩} Hi=1 . A set of N demonstrations are provided for a task, D = {d1, · · · dN }.Imitation learning computes a control policy that proposes an action given the eef pose and the observation. at = Π D (xt, Ot).
+
+3.1 Foundations 
+
+Now we describe some necessary concepts that will be used to devise the framework. 
+
+Demonstration as Task Constraint: A demonstration d of N steps, can be associated with a se-quence of manipulation modes, m1 · · · mN . This may naturally form segments of consecutive modes of the same type, till it switches to a different mode. Each demonstration, d corresponds to a se-quence eef poses representing a discretization of the continuous end-effector trajectory for the task. Define a mode-augmented trajectory ˆπ = [( x1, o 1, m 1), · · · (xN , o N , m N )] . Given a manipulation task, the available model for the task objective and constraints is D, describing for a x and O, a mode-augmented trajectory ˆπ that solves the task. For matching consecutive modes, define a segment as ˆπtransit and ˆπtransfer .
+
+Object-centric Trajectory: The mode-augmented trajectory segments can be represented with an object-centric trajectory for transit as ˆπtransit  
+
+> o
+
+= ⟨o, [Tr o→xt ]Nt=1 ⟩. For transfer, where the relative transform is fixed from the transition Tr o×→x× , we can define ˆπtransfer  
+
+> o
+
+= ⟨Tr o×→x× , [ot]Nt=1 ⟩.
+
+Mode-aware Neighborhood Connections: Define a object-augmented state as q = ⟨x, o ⟩. Given two points (qimi) and (qj mj ), we can describe some properties of their neighborhoods and neigh-borhood connections πNN . The connection begins at the start query point, πNN (0) = qi. When 
+
+mi̸ = mj , we cannot connect the two points with a simple continuous eef trajectory π that does not contain a mode transition. When mi = mj , in Mtransit an object-centric connection can be defined to move the eef with the constraint that the object pose cannot be altered . The eef needs to be moved to πNN (1) = ( Tr oj →xj · oi, oi). When mi = mj , in Mtransfer an object-centric neigh-borhood connection alters the object pose but preserves the transition transformation Tr o×→x× to yields πNN (1) = ( Tr o×→x× · oj , oj ) as the target of the connection. 
+
+Assumption (Object-centric Task) We assume that the object centric trajectory is sufficient to de-scribe the underlying task constraint, i.e, transforming the demonstration set to an object-centric form preserves the task information. 
+
+Mode-aware Transformed Imitation: We can now state the imitation learning objec-tive we study. For a set of object interaction demonstrations, given a query to ΠD as 
+
+(xquery , Oquery , m query ), the task constraint trajectory from some (xnear , Onear , m query ) which belongs to a demonstration dnear ∈ D can be composed using (i) the connection πNN to join the demonstration, followed by (ii) the object-centric demonstration corresponding to d from 
+
+(xnear , Onear , m query ).The specifics of how the primitives are designed will be presented in the next sections, including the choice of dnear , the planning for πNN , and closed loop repeated invocation of the policy query. 
+
+# 4 Method 
+
+RE4 composes four lightweight steps—Retrieve, Reframe, Replan, Replay—inside a receding-horizon loop, with every step conditioned on the current manipulation mode . The design rests on two principles: (i) Relative reframing expressing a demonstration’s actions relative to the manipulated 4Algorithm 1 RE4 L OOP 
+
+Require: Demonstrations D = {⟨ xi, Oi, a i⟩} Ni=1  
+
+> 1:
+
+x, O ← GET OBSERVATION ()  
+
+> 2:
+
+while ¬ MAX STEPS () and ¬ SOLVED (x, O) do  
+
+> 3:
+
+x, O ← GET OBSERVATION () ▷ get current observation O and robot state x 
+
+> 4:
+
+m ← GET MODE (x, O) ▷ m ∈ { TRANSIT , TRANSFER } 
+
+> 5:
+
+o ← GET POSE (O) ▷ pose estimate, either available or learned from D 
+
+> 6:
+
+q ← ⟨ x, o ⟩ 
+
+> 7:
+
+j⋆ ← RETRIEVE (q, D, m ) ▷ nearest target-aware demo frame  
+
+> 8:
+
+ˆa1: h, x near ← REFRAME (j⋆, q, m ) ▷ transport chunk into xnear  
+
+> 9:
+
+ˆaplan ← REPLAN (x, O, x near ) ▷ drive EEF to chunk start  
+
+> 10:
+
+REPLAY (ˆ aplan , ˆa1: h, n ) ▷ execute n + ∥ˆaplan ∥ actions  
+
+> 11:
+
+end while 
+
+object rather than the world lets a single demonstration cover a continuum of object placements. (ii) Manipulation mode conditioning every step on whether the object is grasped keeps RE4 cor-rect across the discontinuity at contact m ∈ {M transit , Mtransfer } Retrieval and reframing are both expressed relative to the pose of the object being manipulated, o ∈ SE (3) , in the world frame. We use this object-centric framing around object pose, rather than a task-defined goal frame, because it is precisely the quantity that relative reframing transports demonstrations into. In the single-object setting we study, the manipulated object is unique, though potentially involving interactions with parts of the scene. The rest of the section explains the steps of the framework. 
+
+The RE4 Loop. Algorithm 1 describes RE4 as a receding-horizon loop over its four steps, threading the demonstrations D, the current observation O, and robot state x through a small set of enabling functions. Each iteration first reads the current observation and state, infers the manipulation mode 
+
+m and the manipulated-object pose o, and forms the query q = ⟨x, o ⟩. RETRIEVE returns the nearest object-aware demonstration frame j⋆; R EFRAME transports that frame’s action chunk into the current object frame and emits an end-effector set-point xnear ; R EPLAN drives the end-effector to xnear ; and R EPLAY executes the reframed chunk. The loop repeats until task success or the step budget is exhausted. We now present the task-agnostic functionality. 
+
+Pose Estimation from Demonstrations. GET POSE maps an observation O to the world-frame pose o of the manipulated object, the reference that conditions both R ETRIEVE and R EFRAME .Crucially, RE4 does not require accurate absolute object pose: every downstream use is relative ,distances between poses in R ETRIEVE and rigid transforms between them in R EFRAME . Any es-timator that yields a consistent estimate across demonstrations therefore suffices. In image-based settings, this steps crucially also constitutes the entirety of our training overhead. Details of the training are included in the Appendix but its key properties will be highlighted. Here, we posit that it is sufficient to not train a general-purpose object pose estimator. Results indicate that a task specific training, using only demonstration data—no object geometry or mesh, no supervision, and only the information contained in D. This makes use of mode information for prehensile cases. 
+
+Prehensile. For tasks involving rigid attachment to objects (i.e., grasping), we observe that G ET -POSE can be learned in a self-supervised fashion, from the demonstration data alone ; observation data and agent states. We generalise learning an estimator fθ : O 7 → ˆpo in Appendix B. 
+
+Non-prehensile. When the object is never grasped, the mode-based anchor is unavailable and pose estimation is substantially harder: the demonstrator’s end-effector never coincides with the object, so action data alone does not pin down an object frame. We do not claim to solve non-prehensile pose estimation in general. Instead, we observe that grounded, task-specific estimators are sufficient for RE4’s relative-pose requirement: given modest task metadata about the task, a lightweight estimator recovers proves sufficient to recover a consistent object frame. We evaluate this in the Push-T setting. 5Retrieve. RETRIEVE chooses which demonstration to follow and where to follow and the mode-augmented trajectories ˆπ of Sec 3.1, it returns a single source frame j⋆ ∈ dnear ∈ D through a two-stage lookup, with the manipulation mode as a hard filter ensuring that only frames with matching modes are admissible. This filter is exactly what keeps the downstream retrieval within a single manipulation mode. With ℓq a distance over the full object-augmented state and ℓo a distance over the object, pose alone, the stages compose per demo and cross-demo lookups : (i) the eef and object distance ℓq is minimized per demo to yield one frame per demo to yield a set K; then (ii) the demo dnear corresponding to the demo frame j⋆, out of the set K obtained in the first step, which minimizes only object distance ℓo is returned. 
+
+Reframe. REFRAME (details in Appendix) instantiates the object-centric trajectory ˆπo of sec-tion 3.1 at the current object, producing both the chunk to replay and its entry point. It pre-serves the object-relative agent pose Tr o→x ≜ o−1x as  oq −1xnear =  oj⋆ −1xj⋆
+
+, so the set-point xnear = oq Tr oj⋆ →xj⋆ is exactly the connection target πNN (1) . With the object-pose delta 
+
+δ ≜ oq (oj⋆
+
+)−1.In Transit ( ˆπMtransit  
+
+> o
+
+), the object is world-fixed, so δ carries the demonstrator onto our object: 
+
+xnear = δ x j⋆
+
+and ˆak = δ a j⋆ 
+
+> k
+
+. For Transfer ( ˆπMtransfer  
+
+> o
+
+), the object is held and the goal world-fixed, so we carry our agent onto the demonstrator with δ−1, holding the grasp transform Tr o×→x×
+
+fixed; the chunk then replays unchanged. 
+
+Replan. REPLAN realises the mode-aware connection πNN of section 3.1: a path from the cur-rent state q (= πNN (0) ) to the reframed set-point xnear (= πNN (1) ), which we solve with standard motion planning. The active mode sets the constraint the connection must respect—in Mtransit 
+
+the object pose is held fixed (the eef moves without disturbing the object — implemented us-ing RRT [28] for Push-T state-based); in Mtransfer the grasp transform Tr o×→x× is preserved. Because R ETRIEVE admits only same-mode frames, the cross-mode case—which has no simple connection—never arises. The Mtransfer connection presupposes the object is actually held; a failed grasp violates that in-variant and strands the agent in Mtransfer . It is straightforward to detect and handle this failure in execution, bypassing retrieval and reset to a fallback state, here chosen trivially to be initial state. 
+
+Replay. REPLAY consumes the replan connection as well as the suffix of the retrieved demon-stration. At this stage, the executor stitches together the connection plan and a replay horizon from the transformed relative demonstration. 
+
+# 5 Experiments 
+
+5.1 Benchmarks 
+
+We benchmark four tasks across two suites. Push-T [29] is a planar ( SE (2) ) task in which an agent guides a 2D T-block to a fixed goal pose. Lift, Can, and Square [30] are 6-DoF end-effector manipulation tasks in SE (3) whose grasping phases induce distinct manipulation modes . Each task has associated expert demonstrations (Appendix C). We evaluate two variants per task: (i) state-based , observing the proprioceptive state x together with the ground-truth object pose o; and (ii) image-based , observing a single agent-view camera feed together with x. In both, the action space is the agent’s absolute pose. 
+
+Baselines. We compare our method against several STOA approaches, including Streaming Flow Policy [5], Diffusion Policy [3] and Geometry aware Imitation Policy [9]. As per previous work [5, 9, 3], we benchmark two sampling process for each Diffusion Model—Denosing Diffusion Probablistic Models (DDPM) & Denosing Diffusion Implict Models (DDIM)—at 100 and 10 in-ference steps respectively [3]. Each method is trained on an RTX 4090, as per instructions on public repositories—further implementation details can be found in Appendix D. 6Table 1: Performance over 100 seeded runs. Push-T reports average maximum coverage; RoboMimic (Lift, Can, Square) reports success rate. For each task, the left column is state-based and the right column is image-based.                                                            
+
+> Push-T [29] Lift [30] Can [30] Square [30] Method State Image State Image State Image State Image DDPM-100 [3] 0.894 0.798 1.0 1.0 0.98 0.97 0.91 0.83 DDIM-10 [3] 0.901 0.826 1.0 1.0 0.97 0.97 0.91 0.79 SFP [5] 0.838 0.696 ––––––GPI [9] 0.912 0.624 1.0 0.90 0.28 0.48 0.81 0.51 RE2 (Ablation) 0.255 0.304 0.69 0.65 0.29 0.69 0.25 0.37
+> RE4 (Ours) 0.919 0.883 1.0 1.0 0.95 0.98 0.95 0.85
+
+RE4 Implementation. We instantiate the RE4 framework defined in Sec 4 per task, specialising each module to the task space X . Push-T [29]. The image-based variant estimates object pose without learning—a centroid from a colour mask for position, and orientation from the rotation-as-shift property of the log-polar transform [31]. R EFRAME operates in SE (2) and R EPLAN uses RRT [28]. Robomimic [30]. The weighted ℓq is a sum of two pose distances—one between object poses and one between object-frame end-effector poses—each combining an L2 translation term with a geodesic SO (3) rotation term; the across-demo ℓo uses the object-pose term alone. Object pose is produced by a learned encoder (a pretrained ResNet-18 [32] with a linear head) trained under our self-supervised, mode-conditioned objective (Appendix B). R EPLAN is a closed-loop eef bridge, and the manipulation mode follows directly from the gripper state. See Appendix D.1 for more details. 
+
+Evaluation Methodology. We report results averaged over from 100 independently seeded en-vironment initialisations, per task. For Push-T [29], in line with previous work [3], we measure maximum coverage per episode—where coverage is target area IoU—taking the mean across all seeds. For Robomimic [30], we report average success rate. 
+
+5.2 Results 
+
+Figure 3: Sparse Observations: Mean coverage vs. maximum horizon in Im-age based Push-T. On 75 environment initialisations that are sparsely covered by D, RE4 maintains clear dominating behavior, highlighting robustness. 
+
+RE4 matches or exceeds baseline policies. Across every task and modality, RE4 attains task performance on par with or above the strongest generative/parametric base-line. The margin is largest in the image setting: on image-based Push-T [29], RE4 reaches an average coverage of 
+
+0.883 , against 0.826 for the best diffusion sampler [3] and 0.624 for GPI [9], indicating that pose-aware refram-ing recovers performance that purely retrieval-based in-terpolation (GPI) loses under image observations. On the Robomimic tasks RE4 is competitive on Lift [30] and Can [30] and strongest on the harder Square [30] task. 
+
+Ablation confirms motivation. Removing R EFRAME 
+
+and R EPLAN from the loop (RE2 ablation) sharply degrades performance, confirming these stages are principly motivated. On Push-T [29] the ablation collapses to roughly a third of RE4’s score, and the same ∼3× gap reopens on the harder Square [30]. The deficit is far smaller on the simpler Lift and on image-based Can [30]. Notably, on Can both RE4 and the ablation perform better from images than from state—the only task where the image variant leads. 75.2.1 Sparse Data Regimes 
+
+We quantify how robust RE4 is compared to the DDPM [3] and DDIM [3] under these scenario by simulation sparse observations and sparse demonstrations. 
+
+Sparse Observations. An observation is sparse when it lies far—under the retrieval metric—from every demonstration observation Oi ∈ D , i.e. in a low-coverage region of the demonstration prior. Using image-based Push-T as a testbed, we deliberately induce it by evaluating over 75 environment initialisations that maximise the minimum distance to the demonstration set (Appendix E), and eval-uate RE4 against Diffusion Policy [3] on these poorly covered initialisations. As Fig 3 shows, RE4 outperforms significantly. We show the effect of increasing the maximum horizon up to 500. Table 2: Sparse Demonstrations : full set vs. first 
+
+50 demos, over 100 seeds, for state- and image-based observations. Mean coverage reported.                      
+
+> State Image Method N=50 N=all N=50 N=all
+> DDPM-100 0.531 0.894 0.609 0.798 DDIM-10 0.507 0.901 0.579 0.826
+> RE4 (Ours) 0.781 0.919 0.733 0.883
+
+Sparse Demonstrations. Complementarily in Tab 2, we induce sparsity in the demon-strations themselves rather than the initial states: we restrict the dataset to its first 50 
+
+trajectories—roughly a quarter of the full Push-T set [29]—at both training and, for RE4, retrieval time. We compare the full dataset (N =206 ) against this restricted set ( N =50 )over 100 independent seeds, on the Image & State variants of Push-T [29] reporting mean convergence. RE4 outperforms across the board. 
+
+RE4 excels in sparse data domain. Across observation and demonstration sparsity, RE4 observes smaller performance drops. In sparse observation analysis, RE4 reached strong scores at an earlier 
+
+Tmax , roughly 5x stronger at the Tmax = 200 mark. Interestingly, Diffusion Policy [3] appears to trend upward after Tmax = 300 . In sparse demonstrations, expectedly Diffusion Policy suffers, while RE4 appears to hold strong, showing promising robustness. 
+
+# 6 Limitations 
+
+Pose estimation sits at the heart of RE4: it conditions the retrieval metric dq and the R EFRAME 
+
+transform, so estimation error propagates. While our self-supervised estimator proved sufficiently accurate across the Robomimic [30] tasks, we have not evaluated it on a diverse enough set of objects to claim general applicability—particularly for non-prehensile interactions, where no grasp anchors the object frame and estimation is substantially harder. We posit that this limitation is a prompt to motivate focus on pose estimation from demonstrations. We show compelling evidence that this task is distinct from the general purpose pose estimation and may prove useful within principled frame-works like RE4. Further, multiobject manipulation settings need enumeration and bookkeeping of the manipulation modes. This again both a limitation and an opportunity to use the mode-aware reasoning to plug in multimodal rollouts in multiobject settings. The current scope limits to contact-based affordances, while richer affordances or deformable interactions are out of scope. Extensive real-robot trials will need to validate generalizable observations beyond benchmarks. 
+
+# 7 Discussion 
+
+In this work we have presented several simple first principle ideas borrowed from theories of manip-ulation to reconstruct a modular framework composed of four key steps of retrieve, reframe, replan, and replay. Results indicate promising performance in imitation learning benchmarks that outper-form baselines, while additionally expressing interpretability (from our retrieval), lightweight train-ing (only image-based pose estimation from demonstration), and robustness to sparse data regimes. Future work will explore more integrated combinations of learned modules, topological properties of demonstrations, and planning (motion and multimodal) to compose hybrid extensible architectures that may balance the best of planning, search, and imitation. 8References 
+
+[1] M. T. Mason. Toward robotic manipulation. Annual Review of Control, Robotics, and Au-tonomous Systems , 1(1):1–28, 2018. [2] A. Correia and L. A. Alexandre. A survey of demonstration learning. Robotics and Au-tonomous Systems , 182:104812, 2024. [3] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song. Diffusion policy: Visuomotor policy learning via action diffusion. The International Journal of Robotics Research , 2024. [4] D. Wang, S. Hart, D. Surovik, T. Kelestemur, H. Huang, H. Zhao, M. Yeatman, J. Wang, R. Walters, and R. Platt. Equivariant diffusion policy. In 8th Annual Conference on Robot Learning , 2024. URL https://openreview.net/forum?id=wD2kUVLT1g .[5] S. Jiang, X. Fang, N. Roy, T. Lozano-P´ erez, L. P. Kaelbling, and S. Ancha. Streaming flow policy: Simplifying diffusion/flow policies by treating robot trajectories as flow trajectories. In ICRA 2025 Workshop: Beyond Pick and Place , 2025. URL https://openreview.net/ forum?id=ay5lYpmywr .[6] T. Bonnaire, R. Urfin, G. Biroli, and M. M´ ezard. Why diffusion models don’t memorize: The role of implicit dynamical regularization in training. Advances in Neural Information Processing Systems , 38:141266–141286, 2026. [7] C. He, X. Liu, G. S. Camps, G. Sartoretti, and M. Schwager. Demystifying diffusion policies: Action memorization and simple lookup table alternatives, 2025. URL https://arxiv.org/ abs/2505.05787 .[8] P. Vitiello, K. Dreczkowski, and E. Johns. One-shot imitation learning: A pose estimation per-spective. In 7th Annual Conference on Robot Learning , 2023. URL https://openreview. net/forum?id=w5ONmpgnfG .[9] Y. Li, N. Darwiche, A. Razmjoo, S. Liu, Y. Du, A. Ijspeert, and S. Calinon. Geometry-aware policy imitation, 2025. URL https://arxiv.org/abs/2510.08787 .[10] J. Kuffner and J. Xiao. Motion for manipulation tasks. In Springer Handbook of Robotics ,pages 897–930. Springer, 2016. [11] K. Hauser and J.-C. Latombe. Multi-modal motion planning in non-expansive spaces. The International Journal of Robotics Research , 29(7):897–915, 2010. [12] Z. Kingston, M. Moll, and L. E. Kavraki. Decoupling constraints from sampling-based plan-ners. In Robotics Research: The 18th International Symposium ISRR , pages 913–928. Springer, 2019. [13] M. Dogar and S. Srinivasa. A framework for push-grasping in clutter. Robotics: Science and systems VII , 1:65–72, 2011. [14] E. R. Vieira, D. Nakhimovich, K. Gao, R. Wang, J. Yu, and K. E. Bekris. Persistent homology for effective non-prehensile manipulation. In 2022 International Conference on Robotics and Automation (ICRA) , pages 1918–1924. IEEE, 2022. [15] Z. Kingston, C. Chamzas, and L. E. Kavraki. Using experience to improve constrained plan-ning on foliations for multi-modal problems. In 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 6922–6927. IEEE, 2021. [16] A. J. Ijspeert, J. Nakanishi, H. Hoffmann, P. Pastor, and S. Schaal. Dynamical movement primitives: learning attractor models for motor behaviors. Neural computation , 25(2):328– 373, 2013. 9[17] S. Sobti, R. Shome, S. Chaudhuri, and L. E. Kavraki. A sampling-based motion planning framework for complex motor actions. In 2021 IEEE/RSJ International Conference on Intelli-gent Robots and Systems (IROS) , pages 6928–6934. IEEE, 2021. [18] B. Wen, W. Yang, J. Kautz, and S. Birchfield. Foundationpose: Unified 6d pose estimation and tracking of novel objects. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 17868–17879, 2024. [19] H. Shen, J. Zhang, B. Xiong, R. Hu, S. Chen, Z. Wan, X. Wang, Y. Zhang, Z. Gong, G. Bao, C. Tao, Y. Huang, Y. Yuan, and M. Zhang. Efficient diffusion models: A survey. Transactions on Machine Learning Research , 2025. ISSN 2835-8856. URL https://openreview.net/ forum?id=wHECkBOwyt . Survey Certification. [20] A. Prasad, K. Lin, J. Wu, L. Zhou, and J. Bohg. Consistency policy: Accelerated visuomotor policies via consistency distillation. In Robotics: Science and Systems , 2024. [21] J. Pari, N. Shafiullah, S. Arunachalam, and L. Pinto. The surprising effectiveness of represen-tation learning for visual imitation. 06 2022. doi:10.15607/RSS.2022.XVIII.010. [22] N. Di Palo and E. Johns. On the effectiveness of retrieval, alignment, and replay in manipula-tion. IEEE Robotics and Automation Letters , 9(3):2032–2039, 2024. [23] Y. Huang, J. Silv´ erio, L. Rozo, and D. G. Caldwell. Generalized task-parameterized skill learning. In 2018 IEEE international conference on robotics and automation (ICRA) , pages 5667–5674. IEEE, 2018. [24] G. Franzese, R. Prakash, C. Della Santina, and J. Kober. Generalizable motion policies through keypoint parameterization and transportation maps. IEEE Transactions on Robotics , 2025. [25] J. Sosa and D. Hogg. Self-supervised 3d human pose estimation from a single image. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 4788–4797, 2023. [26] T. Pan, R. Shome, and L. E. Kavraki. Task and motion planning for execution in the real. IEEE Transactions on Robotics , 40:3356–3371, 2024. [27] R. Shome, W. N. Tang, C. Song, C. Mitash, H. Kourtev, J. Yu, A. Boularias, and K. E. Bekris. Towards robust product packing with a minimalistic end-effector. In IEEE International Con-ference on Robotics and Automation (ICRA) , 2019. [28] S. M. LaValle and J. J. Kuffner Jr. Randomized kinodynamic planning. The international journal of robotics research , 20(5):378–400, 2001. [29] P. Florence, C. Lynch, A. Zeng, O. A. Ramirez, A. Wahid, L. Downs, A. Wong, J. Lee, I. Mor-datch, and J. Tompson. Implicit behavioral cloning. In Conference on robot learning , pages 158–168. PMLR, 2022. [30] A. Mandlekar, D. Xu, J. Wong, S. Nasiriany, C. Wang, R. Kulkarni, L. Fei-Fei, S. Savarese, Y. Zhu, and R. Mart´ ın-Mart´ ın. What matters in learning from offline human demonstrations for robot manipulation. In Conference on Robot Learning (CoRL) , 2021. [31] G. Wolberg and S. Zokai. Robust image registration using log-polar transform. URL http: //www-cs.engr.ccny.cuny.edu/~wolberg/pub/icip00.pdf .[32] K. He, X. Zhang, S. Ren, and J. Sun. Identity mappings in deep residual networks. In European conference on computer vision , pages 630–645. Springer, 2016. [33] Y. Zhou, C. Barnes, J. Lu, J. Yang, and H. Li. On the continuity of rotation representations in neural networks. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 5745–5753, 2019. 10 [34] S. Ross, G. Gordon, and D. Bagnell. A reduction of imitation learning and structured predic-tion to no-regret online learning. In Proceedings of the fourteenth international conference on artificial intelligence and statistics , pages 627–635. JMLR Workshop and Conference Pro-ceedings, 2011. [35] K. Sridhar, S. Dutta, D. Jayaraman, J. Weimer, and I. Lee. Memory-consistent neural networks for imitation learning. In International Conference on Learning Representations , volume 2024, pages 45160–45185, 2024. 11 A RE4 Algorithms 
+
+Algorithm 2 REFRAME 
+
+Require: frame j⋆ with (oj⋆
+
+, x j⋆
+
+, a j⋆
+
+> 1: h
+
+); query q with (oq , x q ); mode m
+
+1: δ ← oq (oj⋆
+
+)−1 ▷ object-pose delta: demo → query 
+
+2: if m = Mtransit then ▷ object fixed in world; transport demo into query’s object frame 
+
+3: xnear ← δ · xj⋆
+
+4: ˆak ← δ · aj⋆ 
+
+> k
+
+, k = 1 , . . . , h 
+
+5: else ▷ m = Mtransfer ; object moves with agent, world-fixed goal 
+
+6: xnear ← δ−1 · xq ▷ express current agent in demo’s object frame 
+
+7: ˆa1: h ← aj⋆
+
+> 1: h
+
+8: end if 
+
+9: return ˆa1: h, x near ▷ return actions and target agent position 
+
+# B Prehensile Pose Estimation 
+
+For tasks involving rigid attachment to objects (i.e., grasping), we observe that G ET POSE can be learned in a self-supervised fashion, from the demonstration data alone; observation data and agent states. We generalise learning an estimator fθ : O 7 → ˆpo, conditioned on manipulation mode below. 
+
+Foundation. For a given task space X , let P ⊃ X be the space of poses (nominally SE(3)), equipped with a metric ℓ : P × P → R≥0. We denote ∆( p, p ′) as the relative pose between p, p ′ ∈ P .
+
+Anchors. The mode discontinuity yields, for each demonstration d, a grasp frame g(d) = min { i ∈Dd : mi = Mtransfer } at which the end-effector coincides with a graspable object pose. We define the demonstration anchor p⋆d ≜ r g(d)ee . We observe anchoring pre-grasp predictions to p⋆d, rather than strictly the end-effector, is critical in disambiguating the regression target from the end-effector’s own position. 
+
+Absolute regression. Each frame regresses onto an absolute target that is the co-incident end-effector (i.e., agent position) when grasped Mtransfer and the demonstration anchor otherwise 
+
+Mtransit . Loss function Labs described below. 
+
+Labs (θ) = X
+
+> d
+
+X
+
+> i∈D d
+
+ℓ fθ (Oi), y i
+
+, yi =
+
+(r i 
+
+> ee
+
+mi = Mtransfer ,p⋆d mi = Mtransit . (1) 
+
+Same-demonstration relative consistency. For frame pairs within a demonstration, the predicted relative pose matches the end-effector’s when grasped, and vanishes when not. Loss function Lrel 
+
+described below. 
+
+Lrel (θ) = X
+
+> d
+
+" X 
+
+> (i,j )∈D 2
+> d
+> mi=mj=Mtransfer
+
+ℓ ∆( fθ (Oi), f θ (Oj )) , ∆( r i
+
+> ee
+
+, r j
+
+> ee
+
+)
+
++ X 
+
+> (i,j )∈D 2
+> d
+> mi=mj=Mtransit
+
+ℓ ∆( fθ (Oi), f θ (Oj )) , I #
+
+,
+
+(2) where I is the identity transform: the Mtransit case encodes a static object while the gripper ap-proaches, the Mtransfer case a rigid grasp that moves the object with the gripper. 
+
+Cross-demonstration consistency. Pre-grasp predictions from demonstrations whose anchors co-incide are tied together ( within an anchor radius ρ). Loss function Lcross described below. This yields a demo-invariant object frame for cross-demonstration retrieval and reframing. 12 Lcross (θ) = X 
+
+> (d,d ′), i ∈M transit (d), i ′∈M transit (d′)
+> ∥p⋆d−p⋆d′∥<ρ
+
+ℓ fθ (Oi), f θ (Oi′ ), (3) An estimator minimising a combination of above targets L = λabs Labs + λrel Lrel + λcross Lcross ,provides the basis for a model capable of recovering pose transformations between oioj —using no object model or privileged state. In practice we use λabs =1 (split 0.3/0.7 grasp/pre-grasp), λrel =0 .8
+
+(split 0.5/0.3 zero-/grasp-delta), λcross =0 .5; translation and rotation terms in ℓ are weighted 10:1 
+
+(m 2 : rad). 
+
+# C Expert Data 
+
+Single human expert data was used for Push-T [29] and Robomimic [3] tasks, sourced from 
+
+diffusion-policy.cs.columbia.edu/data/training/ . Each Robomimic task (lift, can, square) contains 200 expert demonstrations, while Push-T contains 206 demonstrations. We use all demonstrations for checkpoints training and rollout memory across all benchmarks—excluding the sparse demonstration experiment section 5.2.1, where only the first 50 for Push-T are used. 
+
+# D Implementation Details 
+
+In the sections below, we label implementation details for RE4—and all other methods bench-marked. Training and inference details are also outlined. 
+
+D.1 RE4 D.1.1 Robomimic 
+
+Below we outline details our RE4 Robomimic [30] implementation. 
+
+Manipulation Mode We define manipulation mode Mtransfer when last action gripper state is set, 
+
+Mtransit otherwise. 
+
+Pose Estimation We estimate the manipulated object’s pose with a manipulation-mode based loss framework (section B) involving: per-demo absolute anchoring at the grasp discontinuity ( ℓabs , split into grasp/pre-grasp terms), same-demo relative consistency ( ℓrel , zero- and grasp-delta variants), and cross-demo anchoring ( ℓcross ). No ground-truth object poses are used; supervision comes en-tirely from recorded end-effector trajectories. The estimator is a feed-forward CNN. An ImageNet-pretrained ResNet-18 backbone maps the 84 ×
+
+84 agentview image (center-cropped to 76 ) to a global-pooled 512 -D feature, which a linear layer projects to a 256 -D embedding. A single linear head reads out the pose as a translation t ∈ R3 and a 6-D rotation [33] decoded to R ∈ SO (3) . The embedding doubles as the retrieval descriptor used in section 4. We train for 20 epochs with AdamW (lr = 3 × 10 −4, weight decay 10 −4). 
+
+Retrieve For Robomimic, we define a scale-normalised Euclidean translation term and a geodesic 
+
+SO (3) rotation term for both the op and xp. The full-state distance dq is a weighted sum of the target-pose distance and the object-frame end-effector distance, so the first stage matches both the target’s pose and the gripper’s pose relative to it; the across-demo stage then scores on dp alone. 
+
+Replan REFRAME produces a retrieved action chunk whose first waypoint sits at the target start pose xnear , but the agent’s current end-effector is generally somewhere else. Before replaying the chunk we bridge : a short closed-loop phase that servos the end-effector from where it is to xnear 
+
+using the same absolute OSC controller as replay. Each step emits an absolute pose setpoint toward 
+
+xnear and the bridge terminates once the end-effector is within a position/orientation tolerance. 13 Failure Identification To enable reset within R EPLAN , we define FAILURE as a finger-joint sepa-ration ∥qfinger l − qfinger r ∥ < 0.01 in Mtransfer mode, a proxy for an unsuccessful grasp. 
+
+D.1.2 Push-T 
+
+Unlike the prehensile Robomimic tasks, where the gripper state cleanly partitions the rollout into 
+
+Mtransit and Mtransfer segments, Push-T [29] is a planar, non-prehensile pushing task: the agent never grasps the T-block, so every frame belongs to Mtransit . This collapses the mode filter, restricts REFRAME to a single SE(2) transport, and lets us recover the block pose in closed form rather than from a learned encoder. 
+
+Pose Estimation We estimate the T-block pose in closed form, with no learned network. The block is segmented by colour thresholding the RGB frame and keeping the largest connected com-ponent; its pixel centroid maps to a world position through a fixed pixel-to-world affine calibration. Orientation exploits the rotation-as-shift property of the log-polar transform [31]: we resample the mask in log-polar coordinates about its centroid, so a rotation of the block becomes a circular trans-lation along the angular axis. Cross-correlating this map against a single anchor frame via the FFT, the rotation is read off directly as the angular shift at the correlation peak. The only ground-truth consumed is the task-defined goal pose, used once to calibrate the anchor; every per-frame estimate is otherwise derived purely from the image. 
+
+Retrieve For Push-T, dq is an L2 distance over the min–max-normalised 5-D state (x, p o) (agent position + block pose); the across-demo do restricts to the 3-D block sub-vector. An ε-tolerance on 
+
+do filters per-episode candidates before the stage-1 argmin. 
+
+Replan REPLAN for Push-T solves a planar collision-free x → xnear problem with the T-block treated as a static obstacle (the transit constraint). We use a Rapidly-exploring Random Tree (RRT) [28]: a sampling-based planner that incrementally grows a tree of obstacle-free configurations rooted at the current pusher position, repeatedly extending the nearest tree node by a bounded step toward a uniformly sampled point (with goal-bias to encourage convergence). The result is a polyline from 
+
+x to xnear that the executor consumes as a sequence of absolute waypoints. We use a 15 world-unit step, a 15 world-unit pusher keepout radius around the estimated T pose, and a 1000 -iteration budget. When the direct segment between x and xnear is itself collision-free we short-circuit the search and execute that segment directly. 
+
+D.2 Diffusion Policy 
+
+Consistent with reported benchmarking, we train image based diffusion checkpoints for 3000 epochs & state based for 4500 [3]. Training scripts from official repository are replicated. Both variants use the paper’s [3] chunk schedule: observation horizon To = 2 , prediction horizon 
+
+Tp = 16 , action horizon Ta = 8 . The noise schedule is DDPMScheduler with a squared-cosine 
+
+β and ε-prediction (clipped samples); the 10-step DDIM is constructed from the trained 100-step DDPM scheduler at inference. State variants regress 2-D (Push-T) or 7-D (Robomimic) actions from the flat state vector; image variants encode each camera with ResNet-18 (BN → GN) + SpatialSoft-max ( K = 32 ) and concatenate with the proprioceptive state. The denoiser is ConditionalUnet1D with sinusoidal time embedding (scale 1). Training: AdamW (lr = 10 −4, weight decay 10 −6), cosine LR with 500-step warm-up, EMA power 0.75 .
+
+D.3 SFP 
+
+Push-T state and image. The public reference implementation [5] ships only a state-based Push-T variant (and no Robomimic variant), so for the image setting we attempt to faithfully recreate the image version using the information available in the repository: we reuse the same Push-T image encoder as DP and keep the (To, T p, T a) = (2 , 16 , 8) chunk schedule, sampler settings, and 14 Table 3: Training time (minutes). For each task, the left column is state-based and the right is image-based. DDPM and DDIM share a trained model, so their training times are identical.                                            
+
+> Push-T Lift Can Square Method State Image State Image State Image State Image Diffusion (DDPM/DDIM) 414m 489m 89m 291m 214m 413m 221m 434m SFP 9m 86m ––––––GPI 0m 31m 0m 6m 014m 019m RE4 (Ours) 0m 0m 0m 3m 0m 8m 0m 20m
+
+streaming dynamics-coefficient at the repository’s defaults [3, 5]. For the state experiments we use the shipped configuration: 1000 epochs at a batch size of 1024 , AdamW (lr = 1e −4, weight decay 
+
+1e −6), a cosine learning-rate schedule with 500 linear warmup steps, and an exponential moving average of the weights (power = 0 .75 ) used for inference. Both the deterministic and stochastic variants use σ = 0 .1 (with σ0 = σ1 = 0 .1 in the stochastic case). Our reconstructed image variant follows the same training recipe. We could not find any implementation or instructions for SFP on Robomimic; the original paper reports only state-based Push-T results and provides no Robomimic variant in its public reposi-tory. Lacking a faithful implementation and any implementation guidelines, we omit SFP from our Robomimic experiments. 
+
+D.4 GPI 
+
+We use GPI’s [9] default hyperparameters across all experiments: K=3 nearest neighbours, σ=0 .01 
+
+Gaussian noise on the normalised query, and softmax temperature inherited from the official repos-itory [9]. The action horizon is H=1 for state inputs (reactive, paper-recommended) and H=4 for vision inputs (matches the repository’s vision policy). For Robomimic, only the xyz channel is blended by the GPI flow; the rotation and gripper channels are copied from the top-1 neighbour’s recorded action, since a weighted sum of rotvecs is not a rotation. The vision encoder is a ResNet-18 (BN →GN) trained from scratch with MSE supervision on the ground-truth object-state vector. For the state-based Robomimic port, we additionally apply the PushT-style recent-state suppression 
+
+(window 25 ) used by GPI’s official StateGPIPolicy—without it, the flow stalls at a pre-grasp fixed point on Can/Square and the gripper never closes [9]. 
+
+D.5 Training time 
+
+All checkpoints were trained on a single NVIDIA GeForce RTX 4090 (24 GB) GPU, provisioned through RunPod. Per-model training times are reported in table 3. 
+
+# E Sparse Data Benchmarks 
+
+Imitation-learning policies are well known to degrade once they encounter states far from the demon-strated distribution, where errors compound [34]; retrieval-based methods are especially exposed, since by construction they reuse the nearest demonstration frame and have nothing fall back on when no demonstration is nearby [35]. 
+
+E.1 Sparse Observation Experiment 
+
+To make this regime measurable, we evaluate Push-T on adversarially-sparse initial conditions: scenes whose object pose maximises the distance to every demonstration’s object pose. Formally, let so = po ∈ SE (2) denote the object pose and D the demonstration support. The coverage of a candidate scene is the distance to its nearest demonstration frame: 
+
+ρ(so) = min  
+
+> i∈D
+
+∥so − sio∥, (4) 15 and the K probed scenes are the K poses with the largest ρ, subject to a minimum-separation constraint that prevents the K picks from clustering in a single tail: 
+
+{s⋆k}Kk=1 = top-K arg max ρ(so). (5) We find these by sweeping a 50 3 grid over the min-max-normalised (x, y, θ ) object-pose space (computed from D, padded by 2 cm in position and 0.15 rad in yaw to admit out-of-support gaps), and greedily selecting the K candidates with the largest ρ that respect the separation constraint. Sparsity is measured over the object alone : for each s⋆k we then draw J pusher positions uniformly across the workspace, rejecting samples whose disc overlaps the T-block keepout. The resulting 
+
+K · J scenes isolate the regime where the scene is hard to retrieve from, with the agent’s starting position randomised conditional on each. In section 5.2 we use K = 25 block poses and J = 3 pusher positions per pose for the Push-T sparse-observation experiments, yielding 75 probed initial conditions per benchmark seed-set. For each of these initial conditions we report mean coverage across 10 different maximum-step budgets, ranging over [50 , 500] in 50 -step intervals. The standard Push-T benchmark fixes a single horizon (maxsteps = 200 ) [29] and reports maximum coverage at that cutoff, which conflates two distinct failure modes: a policy that never makes progress and a policy that makes progress but needs more time to finish. Sweeping the budget instead traces the full coverage-versus-time curve for each method, so we can see not just whether a policy recovers from an adversarially—sparse start but how quickly . This is the quantity that matters in the sparse regime, where the relevant question is whether a method can eventually recover at all once it is pushed off the demonstration manifold. The sweep reveals a trend that the single-cutoff benchmark hides: at the standard maxsteps = 200 , RE4 is substantially stronger than both diffusion baselines, reflecting faster and more reliable recovery from out-of-support scenes. As the budget grows toward maxsteps = 500 , however, the gap narrows—DP (both DDPM-100 and DDIM-10) progressively catches up, indicating that the diffusion policies are largely able to reach comparable coverage given enough time, but are markedly slower to do so from sparse initial conditions. 
+
+E.2 Sparse Demonstration Experiment 
+
+As an alternative way to probe the sparse-data regime, we vary the number of demonstrations avail-able at training time. Specifically, we retrain both Diffusion Policy and RE4 on Push-T (state and image) using strictly the first N = 50 trajectories, and additionally restrict RE4’s retrieval memory to the same N = 50 demonstrations, so that no information leaks in through retrieval. We then evaluate RE4, DDIM-10, and DDPM-100 over 100 independently sampled random seeds, for both the state and image observation settings. These results are compared directly against checkpoints trained on the full demonstration set ( N = all = 206 ) and evaluated on the identical 100 seeds. Across both sparse regimes—sparse initial conditions and sparse demonstrations—RE4 degrades more gracefully than Diffusion Policy, exhibiting a milder drop in coverage relative to its own full-data performance. 16
