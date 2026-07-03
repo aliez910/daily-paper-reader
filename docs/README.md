@@ -6,101 +6,95 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-02
-- 运行时间：2026-07-02 18:50:49 UTC
+- 最新运行日期：2026-07-03
+- 运行时间：2026-07-03 18:48:39 UTC
 - 运行状态：成功
-- 本次总论文数：26
-- 精读区：15
+- 本次总论文数：24
+- 精读区：13
 - 速读区：11
 
 ### 今日简报（AI）
-- 今日共生成 26 篇推荐（精读 15 篇，速读 11 篇）
-- 精读：《Decoupling Semantics and Geometric Grounding: Spatial Visual Prompts for Language-Conditioned Imitation Learning》（9.0/10）, 《SSI-Policy: Learning Structured Scene Interfaces for Vision-Language Robotic Manipulation》（9.0/10）
-- 速读：《Memory Retrieval in Visuomotor Policies for Long-Horizon Robot Control》（8.0/10）, 《Reflective VLA: In-Context Action Consequences Make VLAs Generalize》（8.0/10）, 《ROAD-VLA: Robust Online Adaptation via Self-Distillation for Vision-Language-Action Models》（8.0/10）
+- 今日共生成 24 篇推荐（精读 13 篇，速读 11 篇）
+- 精读：《FurnitureVLA: Learning Long-Horizon Bimanual Furniture Assembly with Vision-Language-Action Model》（10.0/10）, 《Improving Vision-Language-Action Model Fine-Tuning with Structured Stage and Keyframe Supervision》（9.0/10）
+- 速读：《SSI-Policy: Learning Structured Scene Interfaces for Vision-Language Robotic Manipulation》（8.0/10）, 《SSI-Policy: Learning Structured Scene Interfaces for Vision-Language Robotic Manipulation》（8.0/10）, 《PAMAE: Phase-Aware-MoE Action Experts Towards Reliable Flow-Matching Vision-Language-Action Policies》（8.0/10）
 - 这些结果覆盖了当下较热的方向，建议先看精读区论文的关键问题与方法。
-- 详情：[/202607/02/README](/202607/02/README)
+- 详情：[/202607/03/README](/202607/03/README)
 
 ### 精读区论文标签
-1. [Decoupling Semantics and Geometric Grounding: Spatial Visual Prompts for Language-Conditioned Imitation Learning](/202607/02/2606.25360v1-decoupling-semantics-and-geometric-grounding-spatial-visual-prompts-for-language-conditioned-imitation-learning)  
+1. [FurnitureVLA: Learning Long-Horizon Bimanual Furniture Assembly with Vision-Language-Action Model](/202607/03/2607.01212v1-furniturevla-learning-long-horizon-bimanual-furniture-assembly-with-vision-language-action-model)  
+   标签：评分：10.0/10、query:rob-il
+   evidence：用于长时域双臂家具组装的VLA
+2. [Improving Vision-Language-Action Model Fine-Tuning with Structured Stage and Keyframe Supervision](/202607/03/2606.26801v1-improving-vision-language-action-model-fine-tuning-with-structured-stage-and-keyframe-supervision)  
    标签：评分：9.0/10、query:rob-il
-   evidence：提出基于空间视觉提示的解耦架构，用于语言条件下的机器人操纵模仿学习。
-2. [SSI-Policy: Learning Structured Scene Interfaces for Vision-Language Robotic Manipulation](/202607/02/2606.26800v2-ssi-policy-learning-structured-scene-interfaces-for-vision-language-robotic-manipulation)  
+   evidence：通过阶段和关键帧辅助监督改进VLA模型微调
+3. [PhysReflect-VLA: Physical Feasibility and Self-Reflective Regulation for Reliable Vision-Language-Action Policies](/202607/03/2606.27146v1-physreflect-vla-physical-feasibility-and-self-reflective-regulation-for-reliable-vision-language-action-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：提出统一的RGB仅中间表征用于视觉-语言机器人操纵，实现了精确的空间定位与任务感知推理。
-3. [Improving Vision-Language-Action Model Fine-Tuning with Structured Stage and Keyframe Supervision](/202607/02/2606.26801v1-improving-vision-language-action-model-fine-tuning-with-structured-stage-and-keyframe-supervision)  
+   evidence：带物理可行性评估和自反思的闭环VLA策略
+4. [Direct Action-Head Injection of A Grounded 3D Point Unlocks Spatial and Task Generalization](/202607/03/2606.27663v1-direct-action-head-injection-of-a-grounded-3d-point-unlocks-spatial-and-task-generalization)  
    标签：评分：9.0/10、query:rob-il
-   evidence：为操纵任务中的VLA模型微调提供阶段和关键帧结构化监督
-4. [PAMAE: Phase-Aware-MoE Action Experts Towards Reliable Flow-Matching Vision-Language-Action Policies](/202607/02/2606.27144v1-pamae-phase-aware-moe-action-experts-towards-reliable-flow-matching-vision-language-action-policies)  
+   evidence：基于3D点注入的视觉-语言-动作模型提升空间和任务泛化
+5. [TAP-VLA: Tactile Annotation Prompting for Vision Language Action Models](/202607/03/2606.29089v1-tap-vla-tactile-annotation-prompting-for-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：用于多阶段操纵中可靠VLA动作生成的阶段感知混合专家模块
-5. [Human2Any: Human-to-Robot Transfer via Constraint-Aware Compositional Planning](/202607/02/2606.28813v1-human2any-human-to-robot-transfer-via-constraint-aware-compositional-planning)  
+   evidence：基于触觉标注提示的视觉-语言-动作模型用于接触丰富的操作
+6. [Event-VLA: Action-Conditioned Event Fusion for Robust Vision-Language-Action Model](/202607/03/2606.29384v1-event-vla-action-conditioned-event-fusion-for-robust-vision-language-action-model)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过物体交互先验从人类到机器人的迁移
-6. [CORE: Common Outcome Regularities from Action-Free Visual Demonstrations for Robot Manipulation](/202607/02/2606.29517v1-core-common-outcome-regularities-from-action-free-visual-demonstrations-for-robot-manipulation)  
+   evidence：事件增强的视觉-语言-动作模型用于光照变化下的鲁棒操纵
+7. [Training Vision-Language-Action Models with Dense Embodied Chain-of-Thought Supervision](/202607/03/2606.30552v2-training-vision-language-action-models-with-dense-embodied-chain-of-thought-supervision)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从无动作视觉演示中提取共同结果规律用于机器人模仿学习
-7. [OpenSPM: An Environment-Transferable Robotic Key Spatial Pose Memory and Closed-Loop High-Frequency Flow-Matching Action Generation Model](/202607/02/2606.29936v1-openspm-an-environment-transferable-robotic-key-spatial-pose-memory-and-closed-loop-high-frequency-flow-matching-action-generation-model)  
+   evidence：具有密集具身思维链监督的端到端VLA模型用于跨实体迁移
+8. [From Grasps to Dexterity: Large-Scale Grasp Pretraining for Dexterous Manipulation](/202607/03/2606.30749v1-from-grasps-to-dexterity-large-scale-grasp-pretraining-for-dexterous-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：空间位姿记忆与流匹配动作生成实现闭环机器人操作
-8. [WARP: Whole-Body Retargeting for Learning from Offline Human Demonstrations](/202607/02/2606.29940v1-warp-whole-body-retargeting-for-learning-from-offline-human-demonstrations)  
+   evidence：基于抓取预训练的层次化模仿学习用于灵巧操作
+9. [3D HAMSTER: Bridging Planning and Control in Hierarchical Vision Language Action Models through 3D Trajectory Guidance](/202607/03/2606.31329v1-3d-hamster-bridging-planning-and-control-in-hierarchical-vision-language-action-models-through-3d-trajectory-guidance)  
    标签：评分：9.0/10、query:rob-il
-   evidence：从人类演示进行全身重定位用于模仿学习
-9. [Training Vision-Language-Action Models with Dense Embodied Chain-of-Thought Supervision](/202607/02/2606.30552v1-training-vision-language-action-models-with-dense-embodied-chain-of-thought-supervision)  
+   evidence：基于3D轨迹指导的分层视觉语言动作模型用于端到端机器人控制
+10. [UniTacVLA: Unified Tactile Understanding and Prediction in Vision Language Action Models](/202607/03/2606.31723v1-unitacvla-unified-tactile-understanding-and-prediction-in-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：端到端视觉-语言-动作模型，使用具身思维链实现跨本体机器人控制
-10. [Training Vision-Language-Action Models with Dense Embodied Chain-of-Thought Supervision](/202607/02/2606.30552v2-training-vision-language-action-models-with-dense-embodied-chain-of-thought-supervision)  
+   evidence：在VLA模型中统一触觉理解用于灵巧操作
+11. [Human-as-Humanoid: Enabling Zero-Shot Humanoid Learning from Ego-Exo Human Videos with Human-Aligned Embodiments](/202607/03/2606.32009v1-human-as-humanoid-enabling-zero-shot-humanoid-learning-from-ego-exo-human-videos-with-human-aligned-embodiments)  
    标签：评分：9.0/10、query:rob-il
-   evidence：稠密具身思维链用于跨本体VLA模型训练
-11. [ChronoFlow-Policy: Unifying Past-Current-Future Interaction Flow in Visuomotor Policy Learning](/202607/02/2606.31493v1-chronoflow-policy-unifying-past-current-future-interaction-flow-in-visuomotor-policy-learning)  
+   evidence：从人类视频学习用于类人机器人操作的VLA模型
+12. [Unleashing More Actions via Action Compositional Training for VLA Models](/202607/03/2607.00351v1-unleashing-more-actions-via-action-compositional-training-for-vla-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过稀疏3D关键点统一过去-现在-未来交互的视觉运动策略学习
-12. [RoboTacDex: A Dexterous Visual-Tactile-Action Dataset for Humanoid Manipulation](/202607/02/2606.31836v1-robotacdex-a-dexterous-visual-tactile-action-dataset-for-humanoid-manipulation)  
+   evidence：对VLA模型进行动作组合训练以提升模仿学习泛化性
+13. [Guided Action Flow: Q-Guided Inference for Flow-Matching Vision-Language-Action Policies](/202607/03/2607.02092v1-guided-action-flow-q-guided-inference-for-flow-matching-vision-language-action-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：大规模灵巧操纵数据集用于基准测试
-13. [Unleashing More Actions via Action Compositional Training for VLA Models](/202607/02/2607.00351v1-unleashing-more-actions-via-action-compositional-training-for-vla-models)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：通过动作组合训练提升VLA模型在机器人操纵中的泛化能力
-14. [ABot-M0.5: Unified Mobility-and-Manipulation World Action Model](/202607/02/2607.00678v1-abot-m05-unified-mobility-and-manipulation-world-action-model)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：统一的移动-操纵世界动作模型，用于视觉-语言-动作策略
-15. [Language-Critique Imitation Learning from Suboptimal Demonstrations](/202607/02/2607.01225v1-language-critique-imitation-learning-from-suboptimal-demonstrations)  
-   标签：评分：9.0/10、query:rob-il
-   evidence：使用语言批评从次优演示中进行模仿学习
+   evidence：流匹配VLA策略的引导推理以提升操纵成功率
 
 ### 速读区论文标签
-1. [Memory Retrieval in Visuomotor Policies for Long-Horizon Robot Control](/202607/02/2606.25136v1-memory-retrieval-in-visuomotor-policies-for-long-horizon-robot-control)  
+1. [SSI-Policy: Learning Structured Scene Interfaces for Vision-Language Robotic Manipulation](/202607/03/2606.26800v1-ssi-policy-learning-structured-scene-interfaces-for-vision-language-robotic-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：视运动策略中的记忆检索用于长期控制
-2. [Reflective VLA: In-Context Action Consequences Make VLAs Generalize](/202607/02/2606.25215v1-reflective-vla-in-context-action-consequences-make-vlas-generalize)  
+   evidence：统一RGB-only中间表征用于视觉语言机器人操作的视觉到动作映射。
+2. [SSI-Policy: Learning Structured Scene Interfaces for Vision-Language Robotic Manipulation](/202607/03/2606.26800v2-ssi-policy-learning-structured-scene-interfaces-for-vision-language-robotic-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：Reflective VLA利用观测-动作-结果三元组进行决策以提升泛化
-3. [ROAD-VLA: Robust Online Adaptation via Self-Distillation for Vision-Language-Action Models](/202607/02/2606.25800v1-road-vla-robust-online-adaptation-via-self-distillation-for-vision-language-action-models)  
+   evidence：用于视觉-语言机器人操作的结构化场景接口
+3. [PAMAE: Phase-Aware-MoE Action Experts Towards Reliable Flow-Matching Vision-Language-Action Policies](/202607/03/2606.27144v1-pamae-phase-aware-moe-action-experts-towards-reliable-flow-matching-vision-language-action-policies)  
    标签：评分：8.0/10、query:rob-il
-   evidence：提出基于优势引导自蒸馏的VLA模型在线适应方法
-4. [In-Context World Modeling for Robotic Control](/202607/02/2606.26025v2-in-context-world-modeling-for-robotic-control)  
+   evidence：用于可靠流匹配视觉-语言-动作策略的相位感知专家混合
+4. [LA4VLA: Learning to Act without Seeing via Language-Action Pretraining](/202607/03/2606.27295v2-la4vla-learning-to-act-without-seeing-via-language-action-pretraining)  
    标签：评分：8.0/10、query:rob-il
-   evidence：面向VLA机器人控制的上下文世界建模
-5. [GRAFT: Graph-Based Affordance Transfer via Part Correspondence](/202607/02/2606.25241v1-graft-graph-based-affordance-transfer-via-part-correspondence)  
+   evidence：面向VLA模型的语言-动作预训练以降低对视觉捷径的依赖
+5. [Inference-Time Robot Behavior Steering through Physically-Aware Reconfiguration of Task-Structure](/202607/03/2606.26588v1-inference-time-robot-behavior-steering-through-physically-aware-reconfiguration-of-task-structure)  
    标签：评分：7.0/10、query:rob-il
-   evidence：基于图的零样本操纵通用方法
-6. [Action ControlNet: A Lightweight Delay-Aware Adapter for Smooth Asynchronous Control in Vision-Language-Action Models](/202607/02/2606.25985v1-action-controlnet-a-lightweight-delay-aware-adapter-for-smooth-asynchronous-control-in-vision-language-action-models)  
+   evidence：机器人视觉运动策略的推理时行为引导
+6. [E-TTS: A New Embodied Test-Time Scaling Framework for Robotic Manipulation](/202607/03/2606.27268v1-e-tts-a-new-embodied-test-time-scaling-framework-for-robotic-manipulation)  
    标签：评分：7.0/10、query:rob-il
-   evidence：面向VLA模型操控的延迟感知适配器实现平滑控制
-7. [In-Context World Modeling for Robotic Control](/202607/02/2606.26025v1-in-context-world-modeling-for-robotic-control)  
+   evidence：基于视觉语言验证器的机器人操作测试时缩放框架
+7. [LA4VLA: Learning to Act without Seeing via Language-Action Pretraining](/202607/03/2606.27295v1-la4vla-learning-to-act-without-seeing-via-language-action-pretraining)  
    标签：评分：7.0/10、query:rob-il
-   evidence：使VLA模型能够从交互历史中推断系统配置，提升对未见场景的泛化能力。
-8. [RMTL: Reinforced Micro-task Learning for Long-Horizon Manipulation with VLM Rewards](/202607/02/2606.26175v1-rmtl-reinforced-micro-task-learning-for-long-horizon-manipulation-with-vlm-rewards)  
+   evidence：用于VLA模型的语言-动作预训练，减少视觉依赖
+8. [Keypose Exploration: Efficient Automatic Trajectory Labelling and Cross-Embodiment Policy Transfer](/202607/03/2606.29028v1-keypose-exploration-efficient-automatic-trajectory-labelling-and-cross-embodiment-policy-transfer)  
    标签：评分：7.0/10、query:rob-il
-   evidence：基于VLM奖励的强化微任务学习
-9. [Inference-Time Robot Behavior Steering through Physically-Aware Reconfiguration of Task-Structure](/202607/02/2606.26588v1-inference-time-robot-behavior-steering-through-physically-aware-reconfiguration-of-task-structure)  
+   evidence：自动关键位标注和关键位引导的扩散策略用于操作任务
+9. [RelAfford6D: Relational 6D Affordance Graphs for Constraint-Driven Robotic Manipulation](/202607/03/2606.27036v1-relafford6d-relational-6d-affordance-graphs-for-constraint-driven-robotic-manipulation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：测试时行为导向用于已学习的机器人策略
-10. [Learning Transferable Dynamics Priors from Action to World Modeling](/202607/02/2606.29501v1-learning-transferable-dynamics-priors-from-action-to-world-modeling)  
+   evidence：关系六维功能图用于约束驱动操作
+10. [WARP-RM: A Warp-Augmented Relative Progress Reward Model for Data Curation](/202607/03/2606.28320v1-warp-rm-a-warp-augmented-relative-progress-reward-model-for-data-curation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：动作条件下的世界模型用于机器人操作动力学
-11. [Multisensory Continual Learning: Adapting Pretrained Visuomotor Policies to Force](/202607/02/2606.30988v2-multisensory-continual-learning-adapting-pretrained-visuomotor-policies-to-force)  
+   evidence：用于模仿学习数据策展的自监督进度奖励模型。
+11. [SIR: Structured Image Representations for Explainable Robot Learning](/202607/03/2606.30101v1-sir-structured-image-representations-for-explainable-robot-learning)  
    标签：评分：6.0/10、query:rob-il
-   evidence：多感官持续学习适应预训练视觉运动策略
+   evidence：结构化图像表示用于可解释机器人策略学习
 
 
 <div class="dpr-home-promo-card">
