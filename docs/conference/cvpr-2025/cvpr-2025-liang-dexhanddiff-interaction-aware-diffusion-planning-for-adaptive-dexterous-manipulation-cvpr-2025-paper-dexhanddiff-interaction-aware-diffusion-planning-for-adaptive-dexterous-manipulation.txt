@@ -1,0 +1,530 @@
+Title: DexHandDiff: Interaction-aware Diffusion Planning for Adaptive Dexterous Manipulation
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2025/papers/Liang_DexHandDiff_Interaction-aware_Diffusion_Planning_for_Adaptive_Dexterous_Manipulation_CVPR_2025_paper.pdf
+
+Published Time: Sun, 18 May 2025 21:17:04 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# DexHandDiff: Interaction-aware Diffusion Planning for Adaptive Dexterous Manipulation 
+
+## Zhixuan Liang 1,2† Yao Mu 1 Yixiao Wang 2 Tianxing Chen 1 Wenqi Shao 1
+
+## Wei Zhan 2 Masayoshi Tomizuka 2‡ Ping Luo 1‡ Mingyu Ding 21The University of Hong Kong 2University of California, Berkeley 
+
+{zxliang, ymu, pluo }@cs.hku.hk {yixiao wang, wzhan, tomizuka, myding }@berkeley.edu 
+
+https://dexdiffuser.github.io/ 
+
+## Abstract 
+
+Dexterous manipulation with contact-rich interactions is crucial for advanced robotics. While recent diffusion-based planning approaches show promise for simple ma-nipulation tasks, they often produce unrealistic ghost states (e.g., the object automatically moves without hand con-tact) or lack adaptability when handling complex sequen-tial interactions. In this work, we introduce DexHand-Diff, an interaction-aware diffusion planning framework for adaptive dexterous manipulation. DexHandDiff mod-els joint state-action dynamics through a dual-phase diffu-sion process which consists of pre-interaction contact align-ment and post-contact goal-directed control, enabling goal-adaptive generalizable dexterous manipulation. Addition-ally, we incorporate dynamics model-based dual guidance and leverage large language models for automated guid-ance function generation, enhancing generalizability for physical interactions and facilitating diverse goal adapta-tion through language cues. Experiments on physical in-teraction tasks such as door opening, pen and block re-orientation, object relocation, and hammer striking demon-strate DexHandDiff’s effectiveness on goals outside train-ing distributions, achieving over twice the average success rate (59.2% vs. 29.5%) compared to existing methods. Our framework achieves an average of 70.7% success rate on goal adaptive dexterous tasks, highlighting its robustness and flexibility in contact-rich manipulation. 
+
+## 1. Introduction 
+
+Dexterous manipulation, a cornerstone of advanced robotics with applications from service robotics to industrial au-tomation, remains a challenging problem despite advances 
+
+> †
+
+This work was done during Zhixuan’s visit to UC Berkeley. 
+
+> ‡
+
+Corresponding authors. shuo                
+
+> Open the door to 30 °
+> Interaction -aware Guidance No Interaction Guidance
+> (b) Our DexHandDiff
+> Instruction
+> Goal Guidance
+> …
+> Open the door to 30 °Instruction
+> Goal Guidance
+> 𝑠 !
+> "##$
+> 𝑠 !
+> %&'"
+> 𝑎 !
+> %&'"
+> 𝑠 (
+> "##$
+> 𝑠 (
+> %&'"
+> 𝑎 (
+> %&'"
+> 𝑠 )
+> "##$
+> 𝑠 )
+> %&'"
+> 𝑎 )
+> %&'"
+> …
+> Contact Guidance
+> (a) Goal -guided Diffuser
+> no interaction
+> hinge rotate by itself
+> Dreamed 𝑠 !""# changes, but 𝑠 $%&! not,
+> causing ghost states and wrong actions
+> contact first
+> 𝑠 !""# and 𝑠 $%&! couple together , not only more
+> feasible, but adapts to new goals more precisely
+> 𝑠 !
+> "##$
+> 𝑠 !
+> %&'"
+> 𝑠 (
+> "##$
+> 𝑠 (
+> %&'"
+> 𝑠 )
+> "##$
+> 𝑠 )
+> %&'"
+> hand & door
+> move together
+> Rendered by setting states frame by frame. Not actually happens in simulation. Door Open Pen Reorient Hammer Nail Object Relocate Block Manipulate
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100 Success Rate (%)
+
+(c) Performance Comparison on Physical Interaction Tasks 
+
+> Diffuser Conditional DP DexHandDiff (Ours)
+
+Figure 1. (a) Previous diffusers directly apply goal guidance to object states, which causes ghost states, where objects appear to move independently without hand contact-a physically impossi-ble scenario. (b) DexHandDiff introduces contact guidance that jointly influences both hand/object states and hand actions, while maintaining tight state-action coupling. It prevents ghost states, and enables precise goal adaptation. (c) Quantitative comparisons with previous methods on goal-shifted interaction tasks. 
+
+in reinforcement learning (RL) [2, 4, 8, 47, 52] and im-itation learning [23, 34]. Recently, diffusion-based plan-ning [1, 14, 24, 28] has emerged as a promising new repre-sentative of imitation learning, capable of learning intricate motion trajectories from demonstration data for smoother and more adaptable control. However, current diffusion ap-proaches are primarily designed for simpler gripper-based This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 1745 (one Degree of Freedom) manipulation tasks, focusing on either trajectory completion or action replay by reaching target positions sequentially. They fall short in dexterous hand manipulation requiring part-aware precise interaction and exhibiting rich contact dynamics through multi-finger control and in-hand adjustment. More specifically, existing diffusion on action mod-els [14, 56] ( i.e . models generating actions) excel in well-defined tasks but often lack generalizability in adapting to complex or new tasks with flexible interaction require-ments. They necessitate continual data collection for new goal configurations even within the same dynamics, limit-ing their effectiveness in contact-rich interactions. In con-trast, diffusion on state methods [1, 24, 37], including those adapted from video diffusion models for imitation learn-ing [6, 16], will produce unrealistic “ghost states” in inter-action tasks. As shown in Fig. 1 and Fig. 2, the visual-izations are rendered by setting states frame by frame with predicted output from state-based methods, and show ob-jects react independently of physical contact ( e.g . drawers opening on their own before the manipulator reaches them), which cannot actually happen and would result in failure. This issue arises because the object states can’t be directly controlled. Actions must first influence dexterous hand’s states before impacting the object, revealing the importance of modeling state transitions for physics-driven interactions. Thus, we propose DexHandDiff, an interaction-aware diffusion model tailored for adaptive dexterous manipu-lation that exhibits goal shifts or cost function variations while maintaining similar dynamics. DexHandDiff mod-els joint state-action dynamics that takes the state output to guide and constrain the action output with realistic physi-cal behavior. A dynamics model-based dual guide is incor-porated to maintain coherence with dynamics observed in training data. It addresses the action-state consistency chal-lenge first identified in Diffuser [24] which however priori-tized generated state over action, as shown in Fig. 1. Specifically, DexHandDiff adopts a goal-adaptive diffu-sion mechanism with dual-phase process. 1) At first, pre-contact phase, it guides the manipulator to align with the object’s key contact point, such as a handle or the center of object, ensuring stable alignment before initiating physical interaction. 2) In the subsequent post-contact phase, it in-troduces joint guidance over both the manipulator and the object states, enabling fine-grained control to achieve the target state for the object. This sequential approach inte-grates both action diffusion that prevents premature influ-ence on the object’s state before contact, and state diffusion that ensures effective goal alignment throughout. By gen-erating states and actions in an interaction-aware manner, DexHandDiff produces more coherent and realistic trajec-tories suited to complex tasks like tool using. Furthermore, to automate guidance function design, DexHandDiff intro-duces an approach using large language models in the text-to-reward paradigm, that can generalize across diverse goals and cost functions via language cues. We conduct experiments on multiple dexterous manipu-lation tasks to evaluate DexHandDiff’s effectiveness, cov-ering both in-domain and goal-adaptability challenges, e.g ., adapting to new goal “door closing” from “90-degree door opening” training data. Results with up to 70.0% success rate on the 30-degree door task (vs. the next best 16.7% for Diffusion Policy) and 46.7% on the hammer nail half-drive task (vs. the next best 33.3% for Decision Diffuser), con-firm DexHandDiff’s robustness and adaptability in captur-ing complex hand-object-environment interactions. In summary, DexHandDiff advances adaptive dexterous manipulation by: 1) We propose the first interaction-aware, goal-adaptive diffusion planner for dexterous manipulation, modeling manipulator-object-environment dependencies to handle sequential tasks with complex state transitions. 2) By jointly modeling state-action behaviors with dynamics-based dual guidance and LLM-based interaction guidance, DexHandDiff sets a new standard for adaptive planning in dexterous manipulation and for the first time extends text-to-reward concepts to diffusers. 3) Experimental valida-tion on diverse dexterous manipulation tasks, demonstrat-ing its robustness and adaptability. DexHandDiff achieves over twice the average success rate of the next best method (59.2% vs. 29.5%) across goal-directed tasks. 
+
+## 2. Related Works 
+
+Dexterous Manipulation. Dexterous manipulation [12, 13, 19, 20, 32, 40, 42, 45, 48, 50] with multi-fingered hands en-ables complex tasks in unstructured environments by mim-icking human hand flexibility. Initially, traditional methods using trajectory optimization and precise dynamics mod-els [36, 41], struggled with high-dimensional action spaces and contact-rich dynamics. This led to the adoption of rein-forcement learning (RL) [10, 41, 52, 58] for handling com-plex, high-DOF (degree of freedom) interactions. However, RL requires extensive online exploration and carefully de-signed reward functions [11, 36] where inadequate reward shaping can hardly learn and it limits adaptability [55, 57]. Demonstration-based methods [57] reduce sample com-plexity, but they struggle to generalize across sequential, contact-rich tasks. Our DexHandDiff addresses these chal-lenges by explicitly modeling hand-object-environment in-teractions, enabling goal-adaptive planning without intri-cate reward shaping, thus allowing for more efficient learn-ing in complex, sequential tasks. 
+
+Diffusion-based Planning Methods. Planning with diffu-sion models has become prominent in imitation learning for robotic manipulation [1, 9, 14, 24, 28–30, 37]. Classifier-guided methods [24, 28] used task-specific classifiers to 1746 condition policies, while classifier-free ones integrated task variations within diffusion model [1]. However, classifier-free methods lack flexibility for zero-shot explicit condi-tioning tasks due to reliance on training data configura-tions. DexHandDiff addresses this by performing classifier-guided diffusion over both state and action spaces, enabling precise interaction and rich-contact dynamics planning for more realistic, complex and adaptable manipulation. 
+
+LLM-based Robot Policy Code Generation. Recent works [7, 27, 35, 51] have demonstrated the potential of LLMs in generating executable code for robotics tasks. Code as Policies [27] showed LLMs can effectively trans-late high-level task descriptions into functional robot con-trol programs. Eureka [33] and Text2Reward [54] further advanced this direction by generating crucial parameters or complete reward functions from language descriptions, demonstrating well-structured prompts with comprehensive environment information can enable reliable reward shap-ing. Our work extends this text-to-code paradigm to imi-tation learning through diffusers. DexHandDiff provides a natural interface for LLM code generation through its guid-ance function formulation, bridging the gap between task specification and behavioral policies to learn. 
+
+## 3. Preliminary 
+
+3.1. Diffusion Model as Policy 
+
+We formulate the dexterous manipulation planning prob-lem within the Markov Decision Process (MDP) frame-work [39], defined as M = ( S, A, T , R, γ ). The objective is to find an optimal action sequence a∗ 
+
+> 0: T
+
+that satisfies: 
+
+a∗ 
+
+> 0: T
+
+= arg max 
+
+> a0: T
+
+J (s0, a0: T ) = arg max 
+
+> a0: T
+> T
+
+X
+
+> t=0
+
+γtR(st, at),
+
+(1) where state transitions follow st+1 = T (st, at).Following [1, 24], we leverage diffusion models to ad-dress this planning problem by treating state and action tra-jectories τ as sequential data. The reverse process of dif-fusion learns to denoise trajectories from a standard normal distribution through conditional probability pθ (τ i−1 | τ i).The model is trained to maximize the likelihood:             
+
+> pθ
+>  τ0=
+> Z
+> p
+> 
+> τNNY
+> i=1
+> pθ
+> 
+> τi−1|τi
+> dτ1: N,(2)
+
+with the optimization objective inspired by ELBO, 
+
+θ∗ = arg min  
+
+> θ
+
+−Eτ 0
+
+log pθ
+
+ τ 0 . (3) For practical implementation, we adopt the simplified surrogate loss [22] that focuses on predicting the noise term: 
+
+Ldenoise (θ) = Ei, τ 0∼q,ϵ ∼N [|| ϵ − ϵθ (τ i, i )|| 2]. (4) 
+
+3.2. Classifier-free Conditional Diffusion Policy 
+
+To generate high-reward trajectories, classifier-free guid-ance [15] has been transferred from image to trajectory gen-eration [1]. This approach incorporates guidance signals 
+
+y(τ ) directly in the noise prediction model by: 
+
+ˆϵ = ϵθ (τ i, ∅, i ) + ω(ϵθ (τ i, y, i ) − ϵθ (τ i, ∅, i )) , (5) where ω controls the guidance strength, and ∅ denotes the absence of conditioning. During sampling, trajectories are generated with the predicted modified noise ˆϵ.
+
+3.3. Classifier-guided Diffusion Policy 
+
+Different from classifier-free diffusion models that condi-tion relying solely on implicit representations within the training data, classifier-guided approach, enables direct re-ward or goal conditioning through gradient-based guidance. For reward maximization, it introduces trajectory opti-mality Ot at timestep t, following a Bernoulli distribution where p(Ot = 1) = exp( γtR(st, at)) . The diffusion pro-cess can be naturally extended to incorporate conditioning by sampling from perturbed distributions: 
+
+˜pθ (τ ) = p(τ | O 1: T = 1) ∝ pθ (τ )p(O1: T = 1 | τ ) (6) Under Lipschitz conditions on p(O1: T | τ i) [17], the reverse diffusion process follows: 
+
+pθ (τ i−1 | τ i, O1: T ) ≈ N (τ i−1; μθ + αΣg, Σ) , (7) where the guidance gradient g is: 
+
+g = ∇τ log p(O1: T | τ )|τ =μθ
+
+=
+
+> T
+
+X
+
+> t=0
+
+γt∇st,at R(st, at)|(st,at)= μt = ∇τ J (μθ ). (8) For discrete goal conditioned tasks, the constraint can be simplified by directly substituting conditional values at each diffusion timestep i ∈ { 0, 1, ..., N }.
+
+## 4. Analysis of Diffusion-based Planning Meth-ods for Interaction-intensive Tasks 
+
+Current diffusion-based methods are widely adopted for robotic manipulation but reveal significant limitations when applied to dexterous, sequential interaction tasks. Table 1 provides an overview of prominent diffusion-based meth-ods (including Diffuser [24], Decision Diffuser [1], Diffu-sion Policy [14] and our DexHandDiff), categorizing each by their conditioning approach, action generation method, and goal adaptability. In this section, we analyze these chal-lenges across three key dimensions. 
+
+Action-only Diffusion is Limited in Explicit State Con-ditioning. Existing diffusion on action models like Dif-fusion Policy (DP) [14], excel in providing precise, con-sistent action control, benefiting from extensive training data and bypassing errors from inverse kinematics. They yield high performance when training data is sufficient and diverse. However, for tasks requiring variant multi-stage goals, action-only diffusion lacks the flexibility to perform explicit state guidance at intermediate stages, like aligning hand and object state at pre-grasp stage, hurting the adapt-ability of the whole planner. For example, DP trained on 1747 Method Diffusion on State or Action Diffusion Condition Type Action Gen Method Goal Adaptability No Ghost States Interaction Aware                                
+
+> Diffuser [24] State Classifier-Guided Inverse Dyn ✓××
+> Decision Diffuser [1] State Classifier-Free Inverse Dyn ×(if diverse data, then ✓)××
+> Diffusion Policy [14] Action Classifier-Free Direct ×(if diverse data, then ✓)✓×
+> DexHandDiff (Ours) State & Action Classifier-Guided Direct ✓✓✓
+
+Table 1. Comparison of diffusion-based approaches for robot manipulation. Quantitative results on door-opening are shown in Sec. 6. 
+
+data with opening the door to 90 degrees hardly adapt to open 30 or 60 degrees. 
+
+Ghost States in State-only Diffusion for Sequential In-teraction. While state-based diffusion models offer the ad-vantage of flexible goal specification, it is only effective in fully actuated tasks where all degrees of freedom (DoF) are directly controllable, such as MuJoCo [24, 46], and gripper pick-and-place (requiring only end-effector position con-trol) [1, 14] tasks. In such scenarios, all states of the system can be manipulated directly. However, in contact-rich inter-action task where indirect control exists, such as striking a nail with a hammer using a dexterous hand, additional un-controllable DoFs, like the hammer head and nail positions, must be changed through transitions from the states of the hand. Applying generation across all states, including those of objects beyond the hand, will result in unrealistic “ghost states” where objects appear to move independently of con-tact but actually cannot, as illustrated in Fig. 1 and Fig. 2. 
+
+Classifier-free vs. Classifier-guided Adaptability. Classi-fier free diffusion models, valued for not requiring external classifiers, encode task variations directly within the model. This structure is effective for tasks with constrains in ob-served configurations, but with limited goal adaptability in zero-shot or new-task scenarios. For instance, in the push-T task, DP cannot directly adapt to new target positions due to the fixed goal in training data. In contrast, classifier-guided methods, such as ours, mitigate this limitation by of-fering adaptable, gradient-based guidance, enabling direct conditioning on new goals or rewards, enhancing flexibility across a range of tasks. 
+
+## 5. Method 
+
+5.1. Interaction-aware Diffusion-based Planning 
+
+To address these limitations, we propose DexHandDiff, an interaction-aware diffusion planning framework (Fig. 3), maintaining physical consistency and enabling flexible goal adaptation for dexterous manipulation. 
+
+Joint State-Action Diffusion Model. Our approach builds upon classifier-guided diffusion policies. But we jointly diffuse over the concatenated state-action space τ =[( a0, s0), (a1, s1), ..., (aT , sT )] , where state s includes both hand (24 joint angles and 3 position offsets) and task-specific object states ( i.e . door hinge angle, pen pose etc .), and action a represents changes in controllable states (only Task: Open Door. Ghost State: The door's hinge generates a ghost state  
+
+> where the door opens by itself, moving towards the hand.
+> Task: Pen Re -orientation. Ghost State: The pen autonomously rotates
+> to the target orientation without any hand manipulation, and finally, the
+> fingers move to grip the pen in the designated state.
+> no interaction
+> turn by itself
+> no finger interaction
+> rotate by itself
+> finger only to grip
+
+Figure 2. Demonstration of ghost states on the pen reorien-tation task. The visualizations are rendered by setting predicted states frame by frame, which cannot actually happen and will lead to failure. The pen appears to autonomously rotate to the de-sired pose without any hand manipulation, and the fingers look like moving to grasp the pen at the last frame. 
+
+hand joints and positions). This design choice directly addresses the above men-tioned limitations: (1) By including states in the diffu-sion process, we enable explicit state conditioning and goal specification, overcoming the limitations of action-only ap-proaches; (2) By classifier-guided diffusion, we allow flex-ible goal adaptation without exhaustive training data; (3) By jointly modeling states and actions, we maintain their physical coupling and prevent ghost states through carefully designed guidance. With denoised states guiding the gener-ated actions, we effectively balance the state conditioning and action precision. 
+
+Extended Behavior Model and Energy Function. Ac-cording to Eq. 6, the standard conditional diffusion follows: 
+
+˜pθ (τ ) ∝ pθ (τ )p(O1: T = 1 | τ ) ∝ pθ (τ )h(τ ), (9) where we generalize p(O1: T = 1 | τ ) as a behavior model 
+
+h(τ ). Then we further generalize this formulation through a product of experts framework [21], where each expert rep-resents a specific behavior model: 
+
+˜pθ (τ ) ∝ pθ (τ )
+
+> n
+
+Y
+
+> i=1
+
+hi(τ ). (10) 
+
+From the energy function perspective, each behavior model encoding task-specific objectives or constraints is: 
+
+hi(τ , c ) = 1
+
+R e−εi(τ ,c )dτ e−εi(τ ,c ), (11) 
+
+where εi(τ , c ) represents the energy function for the i-th guidance objective, with c denoting task-specific condi-tions. This formulation allows combining multiple objec-tives ( e.g ., reaching the target state while maintaining phys-ical consistency) via their respective guidance functions. Under appropriate smoothness conditions, the guidance gradient g in the reverse diffusion process (Eq. 7) can be decomposed as the sum of individual guidance gradients: 1748 𝜖 !"## (𝑠 , 𝑠 $%&' )         
+
+> Diverse goal
+> 𝜖 &'($) (𝑠 ,𝑠 #%)*&#* )
+> 𝜖 +,) =𝑠 *-.−𝒯 𝑠 *,𝑎 */
+> 𝜖 01)&'*, (𝑠 ,𝑎 )
+
+𝝉 𝒊 
+
+𝝉 𝒊 ,𝟏                              
+
+> 𝑎 !𝑠 !
+> 𝑎 "𝑠 "
+> 𝑎 #𝑠 #
+> 𝑎 #$"𝑠 #$"
+> 𝑎 %𝑠 %
+> 𝜖 +,) =𝑠 *-.−𝒯 𝑠 *,𝑎 */
+> …
+> …
+> 𝜏 !
+> &'"
+> 𝜏 "
+> &'"
+> 𝜏 %
+> &'"
+> 𝜏 #$"
+> &'"
+> 𝜏 #
+> &'"
+> Diffusion Process
+> Gradient Guidance
+> DexHandDiff
+> …
+> … …
+> 𝜖 2()$13 (𝑠 )
+> During Interaction
+> 𝑝 /4𝝉 ∝𝑝 4𝝉 2ℎ(𝜏
+> )
+> (5.
+> 𝑔 =∇6log 2ℎ(𝜏
+> )
+> (5.
+> =−:∇6𝜖 ((𝜏 ,𝑐 )
+> )
+> (5.
+
+Extended Behavior Model             
+
+> Before Interaction
+> 𝒔 =(only)
+> Hand
+> Generated Trajectory Real Action Taking
+> 𝑠 #'"
+> 𝑎 #'"
+> 𝑠 #$"
+> 𝑎 #$"
+> 𝑠 #
+> 𝑎 #𝑎 #$(
+> 𝑠 #$(
+> 𝑠 7&)+
+> Object 𝑠 %89
+> 𝑎 #$)
+> 𝑠 #$)
+> …
+> 𝑠 #$"
+> Contact Point 𝒔 𝒉𝒂𝒏𝒅 −𝒔 𝒄𝒐𝒏𝒕𝒂𝒄𝒕 =𝜹
+> 𝒔 𝒉𝒂𝒏𝒅
+> 𝒔 =𝒔 𝒉𝒂𝒏𝒅 𝒔 𝒐𝒃𝒋 &
+
+Figure 3. Framework of DexHandDiff. DexHandDiff employs joint state-action diffusion with interaction-aware guidance. Before interaction (top middle), guidance aligns the hand to the object contact point. Upon contact (bottom middle), additional guidance steers both hand and object states towards the goal (“&” means state concatenation at input level), enforcing physical constraints and avoiding ghost states. A learned dynamics model further ensures consistency between states and actions. Our DexHandDiff utilizes extended behavior model to aggregate multiple condition terms to guide the diffusion process. 
+
+g = ∇τ log 
+
+> n
+
+Y
+
+> i=1
+
+hi(τ ) = 
+
+> n
+
+X
+
+> i=1
+
+∇τ log hi(τ ) = −
+
+> n
+
+X
+
+> i=1
+
+∇τ εi(τ , c ).
+
+This enables integration of multiple guidance signals, each addressing different aspects of the interaction task, while maintaining a coherent optimization objective. 
+
+Dynamics-aware Generation. A key challenge in joint state-action diffusion is maintaining consistency between generated states and actions [24]. Our method addresses this through a learned dynamics model trained on demon-stration data, constraining state-action generation via addi-tional loss in diffusion training and serving as a guide in inference. By penalizing state-action pairs that violate ob-served dynamics, this guidance ensures our model main-tains both state conditioning benefits and action feasibility. 
+
+εdyn (τ ) = |st+1 − T (st, at)|2, (12) 
+
+where T (s, a) is a separately trained dynamics model to ensure physically plausible motion patterns. 
+
+Manipulation after Contact Task Guidance. For manip-ulation after contact tasks such as door opening and tool using, DexHandDiff employs a dual-phase interaction ap-proach that acknowledges the fundamentally different na-ture of interaction before and after contact establishment. The framework automatically determines the phase transi-tion based on the distance between the palm position and the designated contact point on the object, applying a smooth transition mask to blend between phases. In the pre-grasp phase, our method focuses on guiding the manipulator to stably align with the contact point while preventing premature object movement. We engineer two primary guidance components: 1) Alignment guidance ϵalign 
+
+that directs the end-effector towards precise contact point while maintaining natural approaching trajectory; 2) Dy-namics consistency guidance ϵdyn .Upon establishing contact (determined by palm-object proximity), the post-grasp phase activates additional guid-ance mechanisms: 1) Goal-directed guidance ϵsucc that steers the coupled hand-object system towards target con-figurations; 2) Physical constraint guidance ϵpenalty that prevents unrealistic state changes ( e.g ., limiting per-step changes in both door hinge and latch angles); 3) Continued dynamics guidance ϵdyn to maintain motion feasibility. Therefore, the guidance energy function follows, 
+
+ϵ =
+
+nϵpre = ϵalign + ϵdyn if |shand − scontact | > δ 1
+
+ϵpost = ϵsucc + ϵdyn + ϵpenalty otherwise  (13) 
+
+where shand and scontact represents the states of dexter-ous hand and object contact point ( e.g . door latch, ham-mer handle etc .) respectively, and δ1 is a small threshold. The separated design of grasp proposal guidance ( ϵalign ) and task achieving guidance ( ϵsucc ) mirrors successful policies in prior work [47, 52], effective for dexterous manipulation. Besides, the ϵpenalty ensures continuous object state transi-tions, corresponding to 
+
+hpenalty ≜ 1 − H(|st+1  
+
+> obj
+
+− stobj | − δ2), (14) where δ2 is another small threshold and H(·) is the Heav-iside step function [49]. Then ϵpenalty can be obtained by applying Eq. 11, becoming a Dirac delta function that di-rectly sets value when satisfying the constraints. 
+
+In-hand Manipulation Task Guidance. For tasks primar-ily involving in-hand manipulation (e.g., pen spinning, ob-ject reorientation), where objects are typically already in hand or quickly transition to in-hand states, we employ a simplified single-phase guidance structure: 1) Goal state guidance ϵsucc for achieving target object configurations; 2) Active finger motion guidance to ensure realistic object ma-nipulation; 3) Dynamics consistency guidance ϵdyn to main-tain physical plausibility; 4) Physical constraint guidance 1749 ϵpenalty that prevents unrealistic state changes.          
+
+> ϵ=ϵgoal +ϵfinger +ϵdyn +ϵpenalty .(15)
+
+Specially, we define the behavior model that encourages active finger involvement as,       
+
+> hfinger (τ, t ) = H(|st+1
+> finger-joints −st
+> finger-joints | − δ3),(16)
+
+where st 
+
+> finger-joints
+
+is the state vector of all finger joints at planning step t. δ3 is the third small threshold. H(·) is also the Heaviside step function. This specialized handling prevents unrealistic “ghost states”, as discussed in Sec. 4. 
+
+5.2. LLM-Based Guidance Generation 
+
+The design of task-specific guidance functions for diffusion policies traditionally requires significant manual effort, par-ticularly for diverse dexterous manipulation tasks. To ad-dress this challenge, we leverage a two-stage Large Lan-guage Model (LLM) process for automated guidance gen-eration, adopting text-to-reward paradigm [33, 54]. 
+
+Overall Pipeline. First, we feed the LLM with a 6-part tem-plate (including function purpose, guidance structure, en-vironment description, function prototype, task instruction and few-shot hints) and public documents on simulation environments [38, 41] to generate task-specific prompts. Then, the generated task prompts are queried to another LLM to write guidance function code. Only few-shot hints require specific refinement, reducing human trial-and-error times from about 20 (for hand-craft energy function design) to around 5 while maintaining DexHandDiff performance. 
+
+Environment Description. Our approach employs a com-prehensive Pythonic environment abstraction that captures the complete interaction system. It encapsulates detailed robot joint configurations, and object-environment specifi-cations from public documents, enabling LLM to generate precise guidance functions that account for the full com-plexity of dexterous manipulation tasks. 
+
+Other Details. As previous works [54], once the guidance function code is generated, we execute the code in inter-preter. This step may give us valuable feedback, e.g ., syn-tax errors and runtime errors. We utilize the feedback from code execution as a tool for ongoing refinement within the LLM. Besides, our approach uses few-shot hints instead of examples to allow the model to access relevant functions and best practices without direct examples. Each guidance component is normalized over the trajectory horizon to en-sure balanced contributions across objectives while preserv-ing their temporal structure. Detailed examples of prompts and generated guidance functions are shown in Appx. E. 
+
+## 6. Experiments 
+
+We evaluate our DexHandDiff on five challenging dexter-ous manipulation tasks with four from Adroit Hand [41] and one from Shadow Hand environment [38]. Both environ-ments feature a 24-joint Shadow Hand simulator with up to 30 degrees of freedom, designed to closely match the hard-ware setting [44]. Detailed explanations of the five tasks are provided in Appendix B. We use the expert demonstrations collected by teleoperation from D4RL [18] for Adroit tasks (Door, Hammer, Pen and Relocate). However, Shadow Hand environment does not provide demonstration data, so we employ TQC+HER [3, 26] to collect 5000 expert trajec-tories for the Block Rotate-Z task. 
+
+6.1. Performance Comparisons on Goal Adaptabil-ity in Interaction-Aware Tasks 
+
+We evaluate DexHandDiff in the Door environment to test its goal adaptability across various target angles. Specifi-cally, we require the planners to open the door to 30, 50, 70, 90 and 110 degrees, as well as close the door (reversal task). Note that the training data only includes 90-degree door-opening demonstrations. For some of these tasks, we ad-just the environment settings, such as expanding the door’s range of motion, to satisfy the evaluation requirements. We compare DexHandDiff with five baselines: two classifier-guided methods (Diffuser [24] with Goal Inpaint-ing that sets discrete goal states, and Diffuser with Guided Sampling that leverages continuous gradients for fine con-trol), two classifier-free methods (Decision Diffuser [1] and Diffusion Policy [14] that apply diffusion on states and actions respectively), and a variant of DexHandDiff (de-noted DexHandDiff-disc.) that uses goal inpainting. To enhance classifier-free methods’ learning of goal condition, we use the difference between the current door angle and target angle as the condition, rather than a fixed 90 ◦ target. The results are shown in Tab. 2. Classifier-free meth-ods perform well on the 90 ◦ task, but their success declines sharply on new target angles, indicating limited adaptabil-ity to out-of-distribution targets. Classifier-guided methods demonstrate moderate but consistent performance across goal-adaptive tasks yet their overall success rates remain suboptimal due to imprecise state-action relation modeling in the policy. Our DexHandDiff achieves consistently high success rates across nearly all tasks. The slightly lower per-formance ( 90 .0% ) on the training task (90 ◦) compared to classifier-free methods stems from our additional guidance for adaptation. When ablating this, DexHandDiff achieves 
+
+96 .7±4.7% success rate on Open 90 ◦, which is a reasonable trade-off for better generalization. Averaging a 59.2% suc-cess rate, over twice that of the next best method (29.5%), DexHandDiff demonstrates robust adaptability across both in-domain and goal-adaptive scenarios. Besides, we also observe a trend that goals closer to the original training data don’t have higher success rates than others. We suppose it’s because when target angle is close to training, learned dynamics often override guidance. We observed 8 out of 14 failures in 30 tries in 70 ◦ task opened to 90 ◦ instead, supporting our hypothesis. This learned bias 1750 Method Condition Open 30 ◦ Open 50 ◦ Open 70 ◦ Open 90 ◦ Open 110 ◦ Close Door Average Diffuser [24] Goal Inpainting 16 .7 ±4.7 16 .7 ±12 .5 6.7 ±4.7 56 .7 ±9.4 10 .0 ±8.2 0 17 .8
+
+Diffuser [24] Guided Sampling 10 .0 ±8.2 26 .7 ±17 .0 10 .0 ±4.7 63 .3 ±18 .7 6.7 ±9.4 60.0 ±8.2 29 .5
+
+Decision Diffuser [1] Embedding 0 3.3 ±4.7 16 .7 ±4.7 100 ±0 30.0 ±8.2 0 25 .0
+
+Diffusion Policy [14] Embedding 16 .7 ±4.7 3.3 ±4.7 13 .3 ±12 .5 100 ±0 3.3 ±4.7 0 22 .8
+
+DexHandDiff-disc. Goal Inpainting 46 .7 ±4.7 13 .3 ±9.4 53.3 ±4.7 20 .0 ±8.2 6.7 ±4.7 0 23 .3
+
+DexHandDiff (Ours) Guided Sampling 70.0 ±8.2 56.7 ±4.7 53.3 ±8.2 90 .0 ±8.2 26.7 ±14 .1 58.3 ±13 .4 59.2 
+
+Table 2. Success rates (in %) of different diffusion-based approaches in Adroit Hand [41] environment. All models were trained on the Open 90° task only, and we test their adaptability to other task goals in Adroit Door environment. All results and standard deviation are calculated over 3 tries for 10 random seeds. Best methods and those within 5% of the best are highlighted in bold .                                                                              
+
+> Environment Task Diffuser [24] (Inpaint) Conditional DP [1, 14] DexHandDiff (Ours)
+> Door Open 90 ◦56 .7±9.4100 ±090 .0±8.2
+> Door Open 30 ◦16 .7±4.716 .7±4.770.0 ±8.2
+> Pen Full Re-orientation 10 .0±080 .0±8.293.3 ±4.7
+> Pen Half-side Re-orientation 3.3±4.723 .3±9.440.0 ±8.2
+> Hammer Nail Full Drive 53 .3±9.476 .7±9.490.0 ±8.2
+> Hammer Nail Half Drive 23 .3±12 .533 .3±4.746.7 ±12 .5
+> Relocate Full Relocation 56 .7±4.796.7 ±4.796.7 ±4.7
+> Relocate Half-side Relocation 53 .3±4.786 .7±12 .593.3 ±4.7
+> Manipulate Block Rotate-Z 36 .7±12 .540 .0±8.250.0 ±8.2
+> Manipulate Block Half-side Rotate-Z 30 .0±026 .7±4.736.7 ±4.7
+> Average 34.0 58.0 70.7
+
+Table 3. Overall performance of dexterous manipulation with goal adaptability on multiple environments and tasks. We compare our method with one classifier-guided baseline and one classifier-free baseline. The results are calculated over 3 tries for 10 random seeds. 
+
+is harder to correct than for more distant angles. 
+
+6.2. Evaluation on Various Dexterous Tasks 
+
+To evaluate the cross-task adaptability and goal-oriented performance of DexHandDiff, we test it across multiple dexterous manipulation tasks in Door, Pen, Hammer, Re-locate and Block environments, as summarized in Tab. 3. In addition to the Door task, the Pen task involve aligning a pen to the specified orientation, with a particularly chal-lenging goal-adaptability variant, Half-side Re-orientation, where training data includes only right-hemisphere orien-tations while test goals require left-hemisphere rotations. Similarly, the Block Rotate-Z and Object Relocation tasks have block’s half-side variant trained on positive goal yaw angles but tested on negative ones and object’s target right-half table training but left-half testing. The Nail Half Drive requires the hand to drive a nail and stop halfway before retracting, testing control precision for partial goals. We compare DexHandDiff with two baselines: Dif-fuser [24] (Inpainting), using classifier-guided goal inpaint-ing as in the previous section, and Conditional DP [1, 14], a classifier-free approach with state diffusion for Door, Ham-mer and Relocate tasks while action diffusion for Pen and Block tasks, as modeling dynamics for these tasks are par-ticularly challenging, making direct action generation more effective than state-based diffusion. As shown in Tab. 3,                
+
+> Adapt Tasks Door 30 ◦Door 70 ◦Pen Half Hammer Half Relocate Half Diffuser [24] 4.19 4.03 5.23 4.01 5.48
+> DexHandDiff 2.92 2.38 2.76 2.41 3.22
+
+Table 4. Quantitative results for preventing ghost states over 3 tries. (Conditional DP is not included due to its action-only.) 
+
+DexHandDiff consistently achieves superior results across both in-domain and goal-adaptive tasks. Although condi-tional DP demonstrates 23.3% on the challenging pen half-side re-orientation, leveraging the inherent multi-modality and anisotropy of diffusion models, DexHandDiff still per-forms better (40.0%). These results underscore DexHand-Diff’s robustness and adaptability across a range of tasks, demonstrating generalization on familiar goals and novel configuration challenges. 
+
+6.3. Validation for Preventing Ghost States 
+
+We measured L2 distance between predicted and simulated hand-object states (normalized per dimension for fair com-parison) in Tab. 4. DexHandDiff nearly halves baseline’s gap across tasks, illustrating its ghost-state reduction effect. 
+
+6.4. Ablation on LLM-based Guidance Generation 
+
+Table 5 presents results for different guidance methods on goal adaptability tasks. All three methods are based on the same joint state-action diffusion model. The Human Craft approach reflects our above results with manually de-1751 Train Data (Right Half) Inference (Left Half Re -orientation) Pen Aligned, Hand Stabilizes     
+
+> Train Data (Open 90 °)Inference (Open 30 °) Door Held in Position, Hand Released Train Data (Full Drive) Inference (Half Drive) Nail Partially Driven, Hammer Retracts
+> Train Data (Goal Yaw Positive) Inference (Goal Yaw Negative)
+
+Figure 4. Visualization results of goal-adaptive tasks by DexHandDiff. For each task, training data sample (with orange stroke) is followed by inference on novel goals beyond the training data. In the Door task, DexHandDiff guides the door to new target angle (30 ◦)and holds the door in position when the hand releases, which cannot be attained by simply truncating actions from 90 ◦ training data .DexHandDiff avoids ghost states and achieves better goal adaptability.                     
+
+> Task Na¨ ıve Guide Human Craft LLM Gen
+> Door Open 30 ◦070 .0±8.240 .0±8.2
+> Pen Half-side Re-orien 20 .0±8.240 .0±8.226 .7±4.7
+> Hammer Half Nail 20 .0±8.246 .7±12 .543 .3±9.4
+
+Table 5. Ablation study on LLM-based guidance generation. 
+
+signed guidance. LLM Gen generate guidance functions with Claude Sonnet 3.5 [5]. And Na¨ ıve Guide directly guides the object to the goal, corresponding to ghost-state existing baseline. Results indicate that both Human Craft and LLM Gen significantly outperform Na¨ ıve Guide across tasks, with Human Craft achieving the highest success rates. 
+
+6.5. Ablation Study of DexHandDiff Framework 
+
+We analyze the contribution of each component in Dex-HandDiff through ablation studies (Tab. 6), across multiple door-opening tasks (open 30 ◦, 50 ◦, 70 ◦, and 90 ◦), using the same training checkpoint for fair comparison. The base-line Diffuser[24] uses a basic goal-guidance strategy, while Dyn-guide enhances it with dynamics guidance for bet-ter state-action consistency. Joint S&A adopts joint state-action denoising like DexHandDiff but retains naive goal guidance. DexHandDiff incorporates all components and achieves the highest success rate of 67.5%, significantly outperforming the other configurations and demonstrating the effectiveness of our full design. 
+
+6.6. Visualizations 
+
+We visualize the behavior of DexHandDiff across vari-ous goal-adaptive dexterous tasks in Fig. 4. DexHand-Diff ensures realistic contact by aligning hands with con-tact points first using joint dynamics modeling, eliminating ghost states. Notably, for example, DexHandDiff guides the door to new target angle and holds the door steady when the hand releases , which cannot be achieved by policies trained with slicing 90 ◦ data. These results underscore DexHand-Diff’s ability to maintain physically realistic interactions while adapting to novel goals.                                 
+
+> Method Goal Guidance Dynamics Guide Joint State Action Interact Mechanism Overall SR No-guide ××××24 .1
+> Diffuser [24] ✓×××27 .5
+> Dyn-guide ✓✓××27 .5
+> Joint S&A ✓×✓×30 .8
+> Dyn+Joint ✓✓✓×31 .7
+> DexHandDiff ✓✓✓✓67.5
+
+Table 6. Ablation study on DexHandDiff framework. We report the average success rates (overall SR) on Adroit Door environment over open 30 ◦, 50 ◦, 70 ◦ and 90 ◦ tasks. 
+
+6.7. Efficiency 
+
+We test the control frequency of DexHandDiff on an RTX 3090 with receding horizon set as 8 for all tasks except Door (32 instead). The control frequency are reported below.           
+
+> Task Door Pen Hammer Relocate Block Freq. 5.04 Hz 5.88 Hz 5.86 Hz 5.78 Hz 6.92 Hz
+
+Table 7. Control command frequency over 10 tries. 
+
+Besides, our lightweight model (3.96M params, 3.27 GFLOPS) can be further accelerated via DPM Solver++ [31] (4x speedup) and command interpolation (reaching 36 Hz), sufficient for real robot control. 
+
+## 7. Conclusion 
+
+This work presents DexHandDiff, an interaction-aware dif-fusion planner for adaptive dexterous manipulation. By modeling joint state-action dynamics and incorporating a dual-phase diffusion mechanism, it addresses action-state consistency issues, including the “ghost state” and gener-alization problems observed in previous diffusion methods. DexHandDiff’s design enables it to handle intricate multi-contact interactions through a pre-contact alignment and a post-contact control. We believe its potential to advance the field toward diverse dexterous tasks while remaining grounded in real physics and dynamics. 
+
+Future Work can investigate deployment with hand states sensed and object poses estimated by vision models. 1752 Acknowledgements 
+
+This paper is partially supported by the General Research Fund of Hong Kong No.17200622 and 17209324. 
+
+## References 
+
+[1] Anurag Ajay, Yilun Du, Abhi Gupta, Joshua B Tenenbaum, Tommi S Jaakkola, and Pulkit Agrawal. Is conditional gen-erative modeling all you need for decision making? In The Eleventh International Conference on Learning Representa-tions , 2023. 1, 2, 3, 4, 6, 7 [2] Ilge Akkaya, Marcin Andrychowicz, Maciek Chociej, Ma-teusz Litwin, Bob McGrew, Arthur Petron, Alex Paino, Matthias Plappert, Glenn Powell, Raphael Ribas, et al. Solving rubik’s cube with a robot hand. arXiv preprint arXiv:1910.07113 , 2019. 1 [3] Marcin Andrychowicz, Filip Wolski, Alex Ray, Jonas Schneider, Rachel Fong, Peter Welinder, Bob McGrew, Josh Tobin, OpenAI Pieter Abbeel, and Wojciech Zaremba. Hind-sight experience replay. Advances in neural information pro-cessing systems , 30, 2017. 6 [4] OpenAI: Marcin Andrychowicz, Bowen Baker, Maciek Chociej, Rafal Jozefowicz, Bob McGrew, Jakub Pachocki, Arthur Petron, Matthias Plappert, Glenn Powell, Alex Ray, et al. Learning dexterous in-hand manipulation. The Inter-national Journal of Robotics Research , 39(1):3–20, 2020. 1 [5] Anthropic. Claude 3.5 sonnet, 2024. Available at: 
+
+https://www.anthropic.com/news/claude-3-5-sonnet . 8 [6] Chi-Lam Cheang, Guangzeng Chen, Ya Jing, Tao Kong, Hang Li, Yifeng Li, Yuxiao Liu, Hongtao Wu, Jiafeng Xu, Yichu Yang, et al. Gr-2: A generative video-language-action model with web-scale knowledge for robot manipulation. 
+
+arXiv preprint arXiv:2410.06158 , 2024. 2 [7] Junting Chen, Yao Mu, Qiaojun Yu, Tianming Wei, Silang Wu, Zhecheng Yuan, Zhixuan Liang, Chao Yang, Kaipeng Zhang, Wenqi Shao, et al. Roboscript: Code generation for free-form manipulation tasks across real and simulation. 
+
+arXiv preprint arXiv:2402.14623 , 2024. 3 [8] Tao Chen, Jie Xu, and Pulkit Agrawal. A system for gen-eral in-hand object re-orientation. In Conference on Robot Learning , pages 297–307. PMLR, 2022. 1 [9] Tianxing Chen, Yao Mu, Zhixuan Liang, Zanxin Chen, Shijia Peng, Qiangyu Chen, Mingkun Xu, Ruizhen Hu, Hongyuan Zhang, Xuelong Li, et al. G3flow: Generative 3d semantic flow for pose-aware and generalizable object ma-nipulation. arXiv preprint arXiv:2411.18369 , 2024. 2 [10] Yuanpei Chen, Tianhao Wu, Shengjie Wang, Xidong Feng, Jiechuan Jiang, Zongqing Lu, Stephen McAleer, Hao Dong, Song-Chun Zhu, and Yaodong Yang. Towards human-level bimanual dexterous manipulation with reinforcement learn-ing. Advances in Neural Information Processing Systems ,35:5150–5163, 2022. 2 [11] Yuanpei Chen, Yiran Geng, Fangwei Zhong, Jiaming Ji, Jiechuang Jiang, Zongqing Lu, Hao Dong, and Yaodong Yang. Bi-dexhands: Towards human-level bimanual dexter-ous manipulation. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2023. 2 [12] Zerui Chen, Shizhe Chen, Cordelia Schmid, and Ivan Laptev. Vividex: Learning vision-based dexterous manipula-tion from human videos. arXiv preprint arXiv:2404.15709 ,2024. 2 [13] Zoey Qiuyu Chen, Karl Van Wyk, Yu-Wei Chao, Wei Yang, Arsalan Mousavian, Abhishek Gupta, and Dieter Fox. Dextransfer: Real world multi-fingered dexterous grasp-ing with minimal human demonstrations. arXiv preprint arXiv:2209.14284 , 2022. 2 [14] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action dif-fusion. The International Journal of Robotics Research , page 02783649241273668, 2023. 1, 2, 3, 4, 6, 7 [15] Prafulla Dhariwal and Alexander Nichol. Diffusion models beat gans on image synthesis. Advances in neural informa-tion processing systems , 34:8780–8794, 2021. 3, 1 [16] Yilun Du, Sherry Yang, Bo Dai, Hanjun Dai, Ofir Nachum, Josh Tenenbaum, Dale Schuurmans, and Pieter Abbeel. Learning universal policies via text-guided video genera-tion. Advances in Neural Information Processing Systems ,36, 2024. 2 [17] William Feller. On the theory of stochastic processes, with particular reference to applications. In Selected Papers I ,pages 769–798. Springer, 2015. 3 [18] Justin Fu, Aviral Kumar, Ofir Nachum, George Tucker, and Sergey Levine. D4rl: Datasets for deep data-driven rein-forcement learning. arXiv preprint arXiv:2004.07219 , 2020. 6[19] Abhishek Gupta, Justin Yu, Tony Z Zhao, Vikash Kumar, Aaron Rovinsky, Kelvin Xu, Thomas Devlin, and Sergey Levine. Reset-free reinforcement learning via multi-task learning: Learning dexterous manipulation behaviors with-out human intervention. In 2021 IEEE International Confer-ence on Robotics and Automation (ICRA) , pages 6664–6671. IEEE, 2021. 2 [20] Tairan He, Zhengyi Luo, Xialin He, Wenli Xiao, Chong Zhang, Weinan Zhang, Kris Kitani, Changliu Liu, and Guanya Shi. Omnih2o: Universal and dexterous human-to-humanoid whole-body teleoperation and learning. arXiv preprint arXiv:2406.08858 , 2024. 2 [21] Geoffrey E Hinton. Training products of experts by mini-mizing contrastive divergence. Neural computation , 14(8): 1771–1800, 2002. 4 [22] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising dif-fusion probabilistic models. Advances in neural information processing systems , 33:6840–6851, 2020. 3 [23] Wenlong Huang, Igor Mordatch, Pieter Abbeel, and Deepak Pathak. Generalization in dexterous manipulation via geometry-aware multi-task learning. arXiv preprint arXiv:2111.03062 , 2021. 1 [24] Michael Janner, Yilun Du, Joshua Tenenbaum, and Sergey Levine. Planning with diffusion for flexible behavior syn-thesis. In International Conference on Machine Learning ,pages 9902–9915. PMLR, 2022. 1, 2, 3, 4, 5, 6, 7, 8 1753 [25] Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In International Conference on Learning Representations , 2015. 3 [26] Arsenii Kuznetsov, Pavel Shvechikov, Alexander Grishin, and Dmitry Vetrov. Controlling overestimation bias with truncated mixture of continuous distributional quantile crit-ics. In International Conference on Machine Learning , pages 5556–5566. PMLR, 2020. 6 [27] Jacky Liang, Wenlong Huang, Fei Xia, Peng Xu, Karol Hausman, Brian Ichter, Pete Florence, and Andy Zeng. Code as policies: Language model programs for embodied control. In 2023 IEEE International Conference on Robotics and Au-tomation (ICRA) , pages 9493–9500. IEEE, 2023. 3 [28] Zhixuan Liang, Yao Mu, Mingyu Ding, Fei Ni, Masayoshi Tomizuka, and Ping Luo. Adaptdiffuser: Diffusion mod-els as adaptive self-evolving planners. In International Con-ference on Machine Learning , pages 20725–20745. PMLR, 2023. 1, 2 [29] Zhixuan Liang, Yao Mu, Hengbo Ma, Masayoshi Tomizuka, Mingyu Ding, and Ping Luo. Skilldiffuser: Interpretable hi-erarchical planning via skill abstractions in diffusion-based task execution. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 16467– 16476, 2024. [30] Zhixuan Liang, Yao Mu, Yixiao Wang, Fei Ni, Tianxing Chen, Wenqi Shao, Wei Zhan, Masayoshi Tomizuka, Ping Luo, and Mingyu Ding. Dexdiffuser: Interaction-aware dif-fusion planning for adaptive dexterous manipulation. arXiv preprint arXiv:2411.18562 , 2024. 2 [31] Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongx-uan Li, and Jun Zhu. Dpm-solver++: Fast solver for guided sampling of diffusion probabilistic models. arXiv preprint arXiv:2211.01095 , 2022. 8 [32] Zhengyi Luo, Jinkun Cao, Sammy Christen, Alexander Winkler, Kris Kitani, and Weipeng Xu. Grasping di-verse objects with simulated humanoids. arXiv preprint arXiv:2407.11385 , 2024. 2 [33] Yecheng Jason Ma, William Liang, Guanzhi Wang, De-An Huang, Osbert Bastani, Dinesh Jayaraman, Yuke Zhu, Linxi Fan, and Anima Anandkumar. Eureka: Human-level reward design via coding large language models. arXiv preprint arXiv:2310.12931 , 2023. 3, 6 [34] Priyanka Mandikal and Kristen Grauman. Dexvip: Learning dexterous grasping with human hand pose priors from video. In Conference on Robot Learning , pages 651–661. PMLR, 2022. 1 [35] Yao Mu, Junting Chen, Qing-Long Zhang, Shoufa Chen, Qiaojun Yu, GE Chongjian, Runjian Chen, Zhixuan Liang, Mengkang Hu, Chaofan Tao, et al. Robocodex: Multimodal code generation for robotic behavior synthesis. In Forty-first International Conference on Machine Learning , 2024. 3 [36] Anusha Nagabandi, Kurt Konolige, Sergey Levine, and Vikash Kumar. Deep dynamics models for learning dexter-ous manipulation. In Conference on Robot Learning , pages 1101–1112. PMLR, 2020. 2 [37] Fei Ni, Jianye Hao, Yao Mu, Yifu Yuan, Yan Zheng, Bin Wang, and Zhixuan Liang. Metadiffuser: Diffusion model as conditional planner for offline meta-rl. In International Con-ference on Machine Learning , pages 26087–26105. PMLR, 2023. 2 [38] Matthias Plappert, Marcin Andrychowicz, Alex Ray, Bob McGrew, Bowen Baker, Glenn Powell, Jonas Schneider, Josh Tobin, Maciek Chociej, Peter Welinder, Vikash Kumar, and Wojciech Zaremba. Multi-goal reinforcement learning: Challenging robotics environments and request for research, 2018. 6 [39] Martin L Puterman. Markov decision processes: discrete stochastic dynamic programming . John Wiley & Sons, 1994. 3[40] Yuzhe Qin, Yueh-Hua Wu, Shaowei Liu, Hanwen Jiang, Rui-han Yang, Yang Fu, and Xiaolong Wang. Dexmv: Imitation learning for dexterous manipulation from human videos. In 
+
+European Conference on Computer Vision , pages 570–587. Springer, 2022. 2 [41] Aravind Rajeswaran, Vikash Kumar, Abhishek Gupta, Giu-lia Vezzani, John Schulman, Emanuel Todorov, and Sergey Levine. Learning complex dexterous manipulation with deep reinforcement learning and demonstrations. arXiv preprint arXiv:1709.10087 , 2017. 2, 6, 7 [42] Aravind Rajeswaran, Vikash Kumar, Abhishek Gupta, Giu-lia Vezzani, John Schulman, Emanuel Todorov, and Sergey Levine. Learning complex dexterous manipulation with deep reinforcement learning and demonstrations. arXiv preprint arXiv:1709.10087 , 2017. 2 [43] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-net: Convolutional networks for biomedical image segmen-tation. In Medical Image Computing and Computer-Assisted Intervention–MICCAI 2015: 18th International Conference, Munich, Germany, October 5-9, 2015, Proceedings, Part III 18 , pages 234–241. Springer, 2015. 3 [44] Shadow Robot Company. Shadow robot. https://www. shadowrobot.com/ , 2024. Accessed: 2024-11-14. 6 [45] Aravind Sivakumar, Kenneth Shaw, and Deepak Pathak. Robotic telekinesis: Learning a robotic hand imita-tor by watching humans on youtube. arXiv preprint arXiv:2202.10448 , 2022. 2 [46] Emanuel Todorov, Tom Erez, and Yuval Tassa. Mujoco: A physics engine for model-based control. In 2012 IEEE/RSJ international conference on intelligent robots and systems ,pages 5026–5033. IEEE, 2012. 4 [47] Weikang Wan, Haoran Geng, Yun Liu, Zikang Shan, Yaodong Yang, Li Yi, and He Wang. Unidexgrasp++: Im-proving dexterous grasping policy learning via geometry-aware curriculum and iterative generalist-specialist learning. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 3891–3902, 2023. 1, 5 [48] Chen Wang, Haochen Shi, Weizhuo Wang, Ruohan Zhang, Li Fei-Fei, and C Karen Liu. Dexcap: Scalable and portable mocap data collection system for dexterous manipulation. 
+
+arXiv preprint arXiv:2403.07788 , 2024. 2 [49] Eric W Weisstein. Heaviside step function. 
+
+https://mathworld. wolfram. com/ , 2002. 5 [50] Zehang Weng, Haofei Lu, Danica Kragic, and Jens Lun-dell. Dexdiffuser: Generating dexterous grasps with diffu-sion models. arXiv preprint arXiv:2402.02989 , 2024. 2, 1 1754 [51] Chengyue Wu, Yixiao Ge, Qiushan Guo, Jiahao Wang, Zhix-uan Liang, Zeyu Lu, Ying Shan, and Ping Luo. Plot2code: A comprehensive benchmark for evaluating multi-modal large language models in code generation from scientific plots. 
+
+arXiv preprint arXiv:2405.07990 , 2024. 3 [52] Tianhao Wu, Yunchong Gan, Mingdong Wu, Jingbo Cheng, Yaodong Yang, Yixin Zhu, and Hao Dong. Unidexfpm: Uni-versal dexterous functional pre-grasp manipulation via dif-fusion policy. arXiv preprint arXiv:2403.12421 , 2024. 1, 2, 5[53] Yuxin Wu and Kaiming He. Group normalization. In Pro-ceedings of the European conference on computer vision (ECCV) , pages 3–19, 2018. 3 [54] Tianbao Xie, Siheng Zhao, Chen Henry Wu, Yitao Liu, Qian Luo, Victor Zhong, Yanchao Yang, and Tao Yu. Text2reward: Reward shaping with language models for re-inforcement learning. In The Twelfth International Confer-ence on Learning Representations , 2024. 3, 6 [55] Chunmiao Yu and Peng Wang. Dexterous manipulation for multi-fingered robotic hands with reinforcement learning: A review. Frontiers in Neurorobotics , 16:861825, 2022. 2 [56] Tony Z Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manipulation with low-cost hardware. arXiv preprint arXiv:2304.13705 , 2023. 2[57] Bohan Zhou, Haoqi Yuan, Yuhui Fu, and Zongqing Lu. Learning diverse bimanual dexterous manipula-tion skills from human demonstrations. arXiv preprint arXiv:2410.02477 , 2024. 2 [58] Henry Zhu, Abhishek Gupta, Aravind Rajeswaran, Sergey Levine, and Vikash Kumar. Dexterous manipulation with deep reinforcement learning: Efficient, general, and low-cost. In 2019 International Conference on Robotics and Au-tomation (ICRA) , pages 3651–3657. IEEE, 2019. 2 1755

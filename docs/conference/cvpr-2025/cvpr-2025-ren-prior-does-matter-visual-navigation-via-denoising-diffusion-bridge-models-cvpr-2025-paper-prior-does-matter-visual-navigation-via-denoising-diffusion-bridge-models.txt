@@ -1,0 +1,402 @@
+Title: Prior Does Matter: Visual Navigation via Denoising Diffusion Bridge Models
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2025/papers/Ren_Prior_Does_Matter_Visual_Navigation_via_Denoising_Diffusion_Bridge_Models_CVPR_2025_paper.pdf
+
+Published Time: Mon, 19 May 2025 12:08:50 GMT
+
+Number of Pages: 11
+
+Markdown Content:
+# Prior Does Matter: Visual Navigation via Denoising Diffusion Bridge Models 
+
+# Hao Ren 1, Yiming Zeng 1, Zetong Bi 1, Zhaoliang Wan 1, Junlong Huang 2, Hui Cheng 1* 1School of Computer Science and Engineering, Sun Yat-sen University 
+
+> 2
+
+# School of Intelligent Systems Engineering, Sun Yat-sen University 
+
+# Abstract 
+
+Recent advancements in diffusion-based imitation learn-ing, which shows impressive performance in modeling mul-timodal distributions and training stability, have led to sub-stantial progress in various robot learning tasks. In visual navigation, previous diffusion-based policies typically gen-erate action sequences by initiating from denoising Gaus-sian noise. However, the target action distribution often diverges significantly from Gaussian noise, leading to re-dundant denoising steps and increased learning complex-ity. Additionally, the sparsity of effective action distribu-tions makes it challenging for the policy to generate accu-rate actions without guidance. To address these issues, we propose a novel, unified visual navigation framework lever-aging the denoising diffusion bridge models named NaviB-ridger. This approach enables action generation by initi-ating from any informative prior actions, enhancing guid-ance and efficiency in the denoising process. We explore how diffusion bridges can enhance imitation learning in visual navigation tasks and further examine three source policies for generating prior actions. Extensive experi-ments in both simulated and real-world indoor and out-door scenarios demonstrate that NaviBridger accelerates policy inference and outperforms the baselines in generat-ing target action sequences. Code is available at https: //github.com/hren20/NaiviBridger .
+
+# 1. Introduction 
+
+Visual navigation [5, 44, 58, 60] is vital for mobile robots, allowing them to reach targets like images or locations using visual observation. Previous methods typically consist of a global planner that provides high-level instructions or sub-goals, often leveraging large language models [10, 35, 43] or topological maps [50], to guide a local planner that gen-erates feasible local paths in real time. Imitation learning from expert demonstrations for local path planning [45, 53] is emerging as a promising research direction, with advan-        
+
+> *Corresponding author: Hui Cheng (chengh9@mail.sysu.edu.cn). Prior Target Prior Target
+> Noise Target Noise Target
+> Gaissian Sampling Denoising Process Target Action
+> Prior Sampling Bridge Denoising Target Action
+
+Figure 1. Visual representation overview of the local path gener-ation process. The top row shows the actions generated through vanilla diffusion models denoising from Gaussian noise. The bot-tom row illustrates actions generated using proposed NaviBridger, which leverage prior information to effectively guide the denoising bridge model towards the target action. This comparison demon-strates the importance of incorporating prior knowledge in achiev-ing stable and accurate navigation. 
+
+tages in modeling multimodal distributions and capturing sequence correlation. Despite the significant progress of generative model-based local planners, this field faces two major issues due to the characteristics of generative models. First, substan-tial distributional discrepancies between the Gaussian noise, typically used in these models, and the robot’s target ac-tion distribution lead to redundant denoising steps during inference. Second, the sparsity of desired actions makes it challenging for the policy to generate accurate actions, es-pecially when denoising starts from chaotic random noise. Together, these issues increase computational costs and de-grade overall performance. As Oscar Wilde stated, ”Without order, nothing can ex-ist; without chaos, nothing can evolve,” prompting an in-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 12100 triguing question: Could a structured, task-specific distri-bution serve as the starting point for denoising in diffu-sion models rather than relying on chaotic Gaussian noise? This idea aligns with optimal transport theory, which ad-dresses translations between arbitrary distributions [12, 52], and has been successfully applied in diffusion models for paired-data tasks like image translation [28] and restoration [56]. However, diffusion bridge methods cannot be directly applied in robot learning tasks such as visual navigation, where no inherent source distribution exists to derive the target distribution. Therefore, the key challenge lies in con-structing a suitable initial distribution and adapting the dif-fusion bridge techniques specifically for visual navigation. To address this, we introduce NaviBridger , a novel, uni-fied visual navigation framework that leverages Denoising Diffusion Bridge Models (DDBM) [59]. NaviBridger rede-fines action generation by initiating from informative prior actions rather than random Gaussian noise, enhancing guid-ance and efficiency in the denoising process. We analyze its application in imitation learning, presenting key computa-tional formulas, and provide a theoretical analysis revealing a crucial insight: the quality of the target action distribu-tion improves when derived from a more suitable source distribution. Based on this insight, We introduce various initialization methods tailored to different source distribu-tion types, including uninformative noise priors, informa-tive handcrafted priors, and learning-based priors, with a detailed discussion of the advantages and limitations. Nav-iBridger also unifies previous visual navigation methods that relied on traditional diffusion models, and maintains compatibility with Gaussian noise when no suitable source distribution prior is available. NaviBridger is, to our knowl-edge, the first work to explore diffusion bridge models for visual navigation. Our contributions are as follows: 
+
+• General Framework for Visual Navigation : We intro-duce NaviBridger, a visual navigation framework based on the denoising diffusion bridge model, which uses prior actions instead of Gaussian noise as the initial input, achieving an effective balance between performance and computational efficiency. This framework can be easily adapted to a variety of imitation learning tasks. 
+
+• Theoretical Analysis of Source Distributions : We the-oretically analyze the impact of source distributions on diffusion-based model performance, presenting tailored methods for generating prior source actions, including Gaussian, rule-based, and learning-based priors. 
+
+• Comprehensive Evaluation of NaviBridger : We con-ducted a comprehensive evaluation of our method across various scenarios and tasks, examining the effectiveness of the framework and the key design decisions of various source distributions and denoising steps. Experimental results show that NaviBridger exceeds baseline models across multiple scenarios. 
+
+# 2. Related Work 
+
+Diffusion Models [22, 46] have rapidly advanced in areas such as conditional generation [15, 21], faster training [48], and theoretical refinements [26, 49]. Their strong gener-ative capabilities are widely applied in image restoration [31], image translation [40], and text-to-image generation [38]. Recently, diffusion models have shown potential in decision-making fields like reinforcement learning [61] and imitation learning [1, 24]. Diffusion bridges, initially a tool in probability theory, have evolved into a key approach in generative modeling [29, 47]. [41] laid the groundwork, and [17] explored dif-fusion bridges conditioned on fixed start and endpoints. Recent work extends these ideas by applying Doob’s h-transform for bridging arbitrary distributions [29]. [28] pro-poses reversing Brownian Bridges for distribution transla-tion in discrete time, while [59] constructs bridge models using VP and VE diffusion processes in continuous time. 
+
+Visual Navigation . Traditional navigation approaches [6, 7, 33] typically divide the navigation task into three main components: mapping [8, 37], localization [9, 55], and path planning [54], with each element showing con-siderable advancements in recent studies. However, the modular design can lead to cumulative information loss and rely heavily on precise measurements. Since Zhu et al. [60] pioneered the training of agents in simulated envi-ronments, learning-based visual navigation has progressed rapidly [2, 4, 10, 16, 32]. [60] employed deep reinforcement learning to address visual navigation challenges for image-based target search in small indoor simulation scenarios. Subsequent research has focused on improving visual repre-sentation by incorporating supplementary information[23], auxiliary tasks[39], or optimized networks [57]. By con-trast, recent works such as [19, 30, 44] emphasize naviga-tion tasks in real-world robotic systems, aiming to achieve zero-shot or few-shot navigation. ViNT [45] introduced a foundational model based on topological mapping for long-range navigation tasks and implemented the generation of latent subgoal images using diffusion models. Most recently, state-conditioned diffusion models for imitation learning in planning are particularly powerful[13, 24, 51]. NoMaD [50] incorporates diffusion models into visual navigation, enabling the direct generation of ac-tions and achieving robust performance and enhanced mul-timodal representations. However, these approaches rely on standard diffusion models that denoise progressively from an initial Gaussian noise distribution. For more complex ac-tion spaces, this ”sampling from an initial Gaussian state” approach often demands additional denoising steps [11]. Furthermore, since the Gaussian distribution differs signif-icantly from the target action distribution, fitting the model to the target distribution becomes more challenging, poten-tially reducing the quality of generated actions [14, 34]. 12101 0a at 1at  aT
+
+
+
+
+
+> Observations Goal Image Transformer Encoder  z
+> Gaussian Prior Learning-based Prior Rule-based Prior Sample Confidence Length
+
+  
+
+> Target Action Source Action Linear
+> abax b
+> Diffusion Bridge Prior Generation FiLM Condition Feature Extraction
+
+
+
+  
+
+> tctc
+> Image
+> Action Embed Action: a t
+> Conv1D
+> ...
+> a ) (tE
+> Conv1D T
+
+Figure 2. NaviBridger Overview . The policy takes RGB observations and a goal image, extracting features via a Transformer encoder. The FiLM condition module applies learned conditions to improve path accuracy, while the prior generation module ensures the policy outputs better aligns with target actions, starting from alternative prior actions generated using optional prior policies. 
+
+# 3. Preliminaries 
+
+Diffusion Process : A diffusion process gradually adds noise to data, translating it from an initial distribution  p0
+
+to a simpler, typically Gaussian distribution  pT = N (0 , I ).This forward process is modeled by the stochastic differen-tial equation (SDE): 
+
+dxt = f (xt, t )dt + g(t)dwt, (1) where  f is the drift function,  g(t) is the diffusion coeffi-cient, and  wt represents the Wiener process. The reverse process, which removes noise to reconstruct data, is governed by the reverse-time SDE: 
+
+dxt = [ f (xt, t ) − g(t)2∇xt log p(xt)] dt + g(t)d ¯wt, (2) where  ∇xt log p(xt) is the score function. Diffusion Models generate images by progressively adding noise to data and then training neural networks to reverse this process, removing noise to recreate the original image. However, diffusion models are limited because they can only transport complex data distributions to a standard Gaussian distribution. Building upon the study of stochastic differential equations, using a diffusion process to map data to a known fixed endpoint is achievable through Doob’s h-transform. 
+
+Diffusion Bridge : A diffusion bridge extends the dif-fusion process by interpolating between two fixed distribu-tions, ensuring the generated data transitions from a starting distribution to a specified endpoint. The forward process which is expanded from Eq.(1) of diffusion bridge is ex-pressed as: 
+
+dxt = [ f (xt, t ) + g(t)2h(xt, t, y, T )] dt + g(t)dwt, (3) where h(xt, t, y, T ) = ∇xt log p(xT | xt) xt=x, xT =y is the Doob’s h-transform ensures approximation to the target distribution  y at time  T .
+
+Denoising Diffusion Bridge Models (DDBM) : DDBMs generalize diffusion models by enabling transport between paired distributions, using reverse-time SDE or probability flow ODE. For the reverse diffusion bridge, the SDE is: 
+
+dxt = [ f (xt, t ) − g(t)2(s(xt, t, y, T )
+
+− h(xt, t, y, T ))] dt + g(t)d ¯wt, (4) where s(xt, t, y, T ) = ∇xt log q(xt | xT ) xt=x, xT =y is the score function,  h(xt, t, y, T ) ensures the transition to the target distribution. DDBM employs the sampling distribu-tion q(xt | x0, x T ) as an approximation for the challenging-to-obtain distribution q(xt | xT ), offering a defined expres-sion for q(xt | x0, x T ) and reparameterizing it to facilitate denoising (details provided in the Appendix). DDBMs use denoising score matching to learn the score function: 
+
+Lθ = Ext,x0,t 
+
+w(t)∥sθ (xt,xT ,t )−∇ xt log q(xt|x0,xT )∥2
+
+(5) where w(t) indicates the weight scheduler of the loss. This method allows DDBMs to translate between distri-butions effectively, expanding the scope of diffusion mod-els to a wide range of generative tasks. More details about DDBM refer to the Appendix. 12102 4. Methodology 
+
+Motivated by the preceding discussion, we propose a novel approach, Navibridger. Instead of relying on sampling and denoising within a fixed Gaussian noise space, our method transforms this process into a denoising procedure that maps from an observation-based arbitrary source dis-tribution policy πs to a target distribution policy π. Navib-ridger consists of three core components: a feature extrac-tion module, a prior action generation module, and a denois-ing diffusion bridge module. The architecture illustration is shown in Fig. 2. In visual navigation, the objective is to design a control policy π that allows a robot to execute target-oriented nav-igation effectively. The inputs to this policy consist of the robot’s current and past visual observation sequence, de-noted by O = {It}Tt=T −p, along with a future action se-quence a = {Wt}T +nt=T . Here, p represents the past time window. The policy can also incorporate a goal image Ig ,specifying the navigation target. Each observation Ii is mapped to a feature vector ϕ(Ii), which is subsequently processed by a Transformer encoder to produce a contex-tual vector ct in the usual way. The context vector ct is input into the prior action generation module to produce the source action as ∈ πs associated with It. The diffusion bridge model translates this source action into the desired target action a ∈ π.
+
+4.1. Diffusion Bridge for Imitation Learning 
+
+In the imitation learning framework based on DDBM, the model employs a reverse diffusion process to progressively adjust the initial action distribution continuously, resulting in an action trajectory that satisfies the target requirements. Specifically, the DDBM reverse diffusion process for imita-tion learning can be described as follows: 
+
+dat =[ f (at, t ) − g2(t)( s(at, t, aT , T )
+
+− h(at, t, aT , T ))] dt + g(t)d ˆwt, (6) where  f (at, t ) denotes the drift term,  g(t) is the diffusion coefficient,  s(at, t, aT , T ) represents the score function that gives the conditional score at time  t for the current state 
+
+at relative to the target state  a0, and  h(at, t, aT , T ) is the Doob’s  h-transform, applied to adjust the diffusion path, thereby ensuring a controlled transition from  as to  aT .
+
+h(at, t, aT , T ) is a function of ∇at log p(aT | at) ,which is approximated by q(at | a0, aT ):
+
+q(at | a0, aT ) = N (ˆ μt, ˆσ2 
+
+> t
+
+I), (7) 
+
+ˆμt = SNR T
+
+SNR t
+
+αt
+
+αT
+
+aT + αta0(1 − SNR T
+
+SNR t
+
+), (8) 
+
+ˆσ2 
+
+> t
+
+= σ2 
+
+> t
+
+(1 − SNR T
+
+SNR t
+
+), (9) where αt and σt denote predefined signal and noise sched-ules, with the signal-to-noise ratio at time t given by SNR t = α2 
+
+> t
+
+/σ 2 
+
+> t
+
+. With the reparametrization of Elucidat-ing Diffusion Models, score function s(a, t, aT , T ) can be expressed as: 
+
+∇at log q(at|aT ) ≈ s(Dθ , at, t, aT , T )= at − ( SN R T 
+
+> SN R t
+> αt
+> αT
+
+aT + αtDθ (at, t, aT )(1 − SN R T 
+
+> SN R t
+
+)) 
+
+σ2 
+
+> t
+
+(1 − SN R T 
+
+> SN R t
+
+) ,
+
+(10) here, Dθ (at, t, aT ) denotes the output of the network. Based on the above inferences, we developed a foun-dational imitation learning framework utilizing diffusion bridges. This approach theoretically enables action sam-pling by transferring samples aT from the source distribu-tion πs to the target distribution π, with neural networks employed to learn the reverse denoising process. 
+
+4.2. Prior Policy Design 
+
+Previous research on diffusion bridge models has primar-ily focused on tasks like image translation and style trans-fer, which involve paired input-output tasks where the input corresponds to a source distribution sample. Compared to Gaussian noise, a well-defined source distribution offers an informative prior, often yielding more accurate outcomes. However, in imitation learning tasks, such as visual nav-igation, the target action is not inherently paired with an ini-tial action. In this section, we present the theoretical foun-dation for designing the source distribution and introduce three distinct strategies for generating the source distribu-tion specifically for visual navigation tasks. 
+
+Error Bound Analyzing : For a diffusion process to be effective, the initial source distribution must resemble the target distribution. If there is a significant discrepancy be-tween the two, the diffusion process will require more ex-tensive adjustments per step, amplifying drift, and score correction, thus increasing the probability of error in the likelihood flow ODE or SDE. Consider the error of the model denoising process. 
+
+Ea0 [∥at − a0∥2]. This error is driven by the difference be-tween the target distribution  π(a0) and the source distribu-tion  πs(aT ), which can be represented using the Kullback-Leibler (KL) divergence as: 
+
+DKL (πs(aT )∥π(a0)) = 
+
+Z
+
+πs(aT ) log πs(aT )
+
+π(a0) daT . (11) This KL divergence measures how much information is ”lost” if we approximate  π(a0) by  πs(aT ). A more minor divergence indicates a smaller amount of drift, and noise adjustment will be necessary for the DDBM to match the target. A probability flow ODE controls the evolution of 12103 samples in a DDBM: 
+
+dat
+
+dt = f (at, t )−g2(t)
+
+ 12 s(at, t, aT , T ) − h(at, t, aT , T )
+
+
+
+(12) where  s(at, t, aT , T )−h(at, t, aT , T ) represents the adjust-ment needed to shift  at closer to  a0. The error bound for the model’s convergence to  aT can be formulated as: 
+
+Eat,a0
+
+∥at − a0∥2 ≤ C · DKL (πs(aT )∥π(a0)) , (13) where  C is a constant that depends on factors such as the noise schedule  g(t) and the time duration  T . Hence, the er-ror bound shows that the closer the source distribution  qsource 
+
+is to the target distribution  qtarget , the lower the error bound for the DDBM, resulting in a more accurate diffusion pro-cess and improved model performance. 
+
+Prior Action Generation : As previously discussed, a source distribution that closely approximates the target dis-tribution results in improved policy performance, under-scoring the importance of an effective prior policy. A toy model is presented in Fig. 3. For the sake of comparison, we propose the following three methods for generating the prior action: 
+
+• Gaussian Prior: As an uninformative prior, we select Gaussian white noise, consistent with that used in stan-dard diffusion, as the source distribution, serving as the initial state in the denoising process. This choice facili-tates direct comparison with methods based on the origi-nal diffusion approach. 
+
+• Rule-based Prior: We employ a simple, fully connected layer to map the contextual vector ct to the action space, enabling the extraction of relevant low-dimensional fea-tures for action generation. The prior action is preset as a parabolic path passing through the current position, de-termined based on the predicted path length d and move-ment behavior classification (straight, left turn, right turn, U-turn to the right, and U-turn to the left). Detailed infor-mation can be found in the Appendix. 
+
+• Learning-based Prior: This method involves generating prior actions by utilizing expert data and learning models. We use a lightweight conditional variational autoencoder (CVAE) as our learning model to achieve a lightweight design while maintaining effective generation. The obser-vations  O are fed into the CVAE to produce correspond-ing actions. We aim for the model to effectively capture the significant correlations between observations and ac-tions, thereby enabling a more efficient acquisition of the source distribution with reduced computational costs. These methods for prior action generation are read-ily adaptable to other tasks related to imitation learning. Through a comparative analysis of these methods, we seek to assess the potential advantages of the diffusion bridge. Step=0 Step=4 Step=8 Step=12 Step=16 Step=20 Target 
+
+> DDBM, EMD=0.0085 DDBM, EMD=0.0695
+> DDBM, EMD=1.025
+> Figure 3. DDBM trained on 2D synthetic data. The leftmost side represents the source distribution, and the rightmost side repre-sents the target distribution. The distance between the source dis-tribution and the target distribution increases from top to bottom. As the EMD increases, the required approximation steps increase while model performance progressively declines.
+
+4.3. Traing Details 
+
+Denoising Network : We utilize a 1-D temporal CNN, con-ditioned on the ct derived from observations, to iteratively denoise with the prior action aT serving as the initial in-put. The network is modulated by ct through Feature-wise Linear Modulation (FiLM) [36] and performs k iterations of denoising, following an approach similar to that of [13]. 
+
+Loss Function : The loss function in our architecture comprises the diffusion bridge loss Lb, the prior action gen-eration loss Lp, and a temporal distance loss Ld designed for high-level planning (following [50]). The diffusion bridge loss Lb is calculated by a weighted Mean Square Error (MSE) loss function: 
+
+Lb = Eat,a0,aT ,t 
+
+w(t)∥a0 − Dθ (at, t, aT )∥2 , (14) The prior action generation loss Lp is categorized into rule-based and learning-based approaches. The rule-based approach uses a fully connected layer to generate a coarse action. It is accompanied by a classification task that clas-sifies the action based on its movement direction (details in the Appendix). Thus, the loss function consists of an action prediction loss computed by Mean Squared Error (MSE) and a classification loss based on cross-entropy: 
+
+Lrule p = −λc
+
+X pc log(ˆ pc) + λa
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+∥ˆai − ai∥2, (15) where pc represents the one-hot encoding of the ground truth class label, while ˆpc denotes the predicted probability. Additionally, a signifies the expert action, and ˆa represents the predicted action by the FC layer. The terms λc and λa
+
+denote the respective weights for the loss functions. The learning-based approach employs the Conditional Variational Autoencoder (CVAE) model to efficiently gen-erate actions in a lightweight manner, with the associated 12104 Table 1. Quantitative comparison between the proposed method with baselines in simulation environments 
+
+Scene Method Basic Task Adaptation Task Length (m) Collision Success Length (m) Collision Success Indoor 
+
+(2D-3D-S) ViNT [45] 151.1 ± 31.590 1.02 68% 19.9 ± 0.314 1.58 28% NoMaD [50] 147.9 ± 26.475 0.74 86% 20.3 ± 0.243 1.32 32% Gaussian Prior 148.7 ± 28.538 0.72 82% 19.8 ± 0.317 0.98 64% Rule-based Prior 163.57 ± 48.658 2.51 62% 19.0 ± 1.39 0.84 44% Learning-based Prior 143.7 ± 25.175 0.61 92% 19.3 ± 0.34 0.41 88% Outdoor 
+
+(Citysim) ViNT [45] 254.8 ± 63.597 0.78 20% 67.5 ± 26.320 0.41 38% NoMaD [50] 248.6 ± 67.679 0.58 22% 68.3 ± 26.315 0.34 52% Gaussian Prior 244.8 ± 62.749 0.62 34% 68.9 ± 24.656 0.35 50% Rule-based Prior 276.1 ± 83.721 3.59 14% 71.8 ± 30.856 0.59 28% Learning-based Prior 237.7 ± 59.476 0.51 44% 63.5 ± 20.659 0.30 64% 
+
+loss function defined as follows: 
+
+Lcvae p = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+∥ˆai − ai∥2 + KL (ˆ π(z|O , a)∥π(z|O )) ,
+
+(16) where ˆπ(·) represents the posterior distribution of actions, while π(·) represents the prior. The temporal distance loss Ld quantifies the interval count between the target image and the current image within a discretized timeline: 
+
+Ld = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+∥f (ct,i ) − di∥2, (17) where f (ct,i ) represents the prediction of temporal dis-tance, and di represents the ground truth. In summary, the loss function is defined as: 
+
+L = λbLb + λpLp + λdLd, (18) where λb, λp and λd denote the respective weights for the loss functions. 
+
+# 5. Experiments 
+
+In this section, we comprehensively evaluate our method through simulated and real-world experiments in indoor and outdoor environments. The following sections provide an overview of the experimental setup, experiment results, and ablation studies. 
+
+5.1. Experimental Setup 
+
+Datasets . Our method and all baseline methods were trained on the same dataset to ensure a fair comparison. Following the approach in [50], the training data includes samples collected from diverse environments and various robotic platforms, incorporating data from RECON [42], SCAND [25], GoStanford [18], and SACSoN [20]. The dataset consists of sequences of consecutive image frames along with their corresponding positional information, pro-viding comprehensive scene diversity. 
+
+Baselines . We selected two state-of-the-art (SOTA) image-based visual navigation algorithms, NoMaD [50] and ViNT [45], for comparison. To examine the effect of inte-grating diffusion bridges on policy diffusion, we chose No-MaD, the first approach to apply policy diffusion to visual navigation tasks, which utilizes a standard diffusion policy model [13]. Additionally, we included ViNT, a regression-based model incorporating CNN and self-attention mech-anisms, to compare the performance of generative and re-gression models in visual navigation tasks. 
+
+Metrics . We report three evaluation metrics in our ex-periments to comprehensively assess the performance of the diffusion bridge-based visual navigation method: 
+
+Length : For paths that complete the task, we calculate the path lengths’ mean and variance to assess the navigation paths’ efficiency and consistency. 
+
+Collision : The average number of collisions per trial, which serves as an indicator of navigation safety. 
+
+Success Rate : The success rate under consistent conditions. A trial is considered a failure if the robot does not reach the target position, becomes stuck due to collisions, or exceeds the time limit. 
+
+Implementation details . We trained the model for 30 epochs using a learning rate 0.0001 and a batch size 256 (224 for learning-based methods). The training process, conducted on a single NVIDIA RTX TITAN GPU, took approximately 30 hours. For DDBM, we employed a VE model with parameters  σ0 = σT = 0 .5 and a default sam-pling step count of  k = 10 .
+
+Evaluation Settings . To validate the effectiveness of the proposed method, we conducted comparative experiments in a simulated environment, benchmarking against base-line methods and performing ablation studies. These ex-periments were conducted in both indoor and outdoor set-tings. Furthermore, we evaluated the models on a robotic platform to assess their practical performance. The model 12105 Step=0 Step=2 Step=4 Step=6 Step=8 Step=10       
+
+> NoMaD
+> (DDPM)
+> Ours with
+> Rule -based Prior
+> (DDBM)
+> Ours with
+> Model -based Prior
+> (DDBM)
+> Step=0 Step=2 Step=4 Step=6 Step=8 Step=10
+> Simulation Real World
+
+Figure 4. Comparison of navigation performance in simulation and real-world environments. NaviBridger with rule-based and model-based priors (DDBM) generates smoother, more stable paths compared to NoMaD (DDPM), demonstrating improved alignment with the target trajectory over denoising steps. 
+
+operates on Nvidia Jetson Orin AGX deployed on the robot with RGB-only input. 
+
+5.2. Results 
+
+We conduct simulated experiments in two types of scenar-ios(Visualized in appendix): i) Indoor (Stanford 2D-3D-S [3]) ii) Outdoor (Gazebo citysim [27]). In each scenario, we examine both basic and changed environments. The ba-sic environment denotes a scenario where the test environ-ment matches the configuration of the topological map, al-lowing us to evaluate long-distance navigation capabilities. The changed environment includes scenarios with obstacles in the test area that are not depicted in the topological map, aimed at testing the system’s adaptability when the environ-ment deviates from the mapped layout. Fig. 4 includes visualizations of the denoising process in both simulated indoor environments and real-world envi-ronments. For detailed configurations of the robot in both simulations and the physical setup, please refer to the Ap-pendix. It can be observed that the DDPM-based method begins denoising from Gaussian noise, with most of the de-noising process dedicated to constraining noise unsuitable for the action space into the action space, and only in the final few steps does it constrain the actions required by the task. In contrast, our method starts from a favorable initial state, achieving stable actions after only a few denoising steps, such as 2 to 4. Even when starting with Gaussian noise, our model reaches a stable action output in fewer de-noising steps. This demonstrates that a rich prior signifi-cantly enhances the convergence of policy diffusion. More-over, under the DDBM framework, even when using unin-formed Gaussian noise as the source distribution, the de-noising approximate rate is substantially faster than that of the DDPM-based method. The experimental results of the proposed method com-pared to the baseline in the simulation environment are pre-sented in Table 1. The learning-based prior method demon-strates optimal performance across various tasks and sce-narios. The Gaussian prior method performs similarly to the DDPM-based NoMaD method, outperforming the base-line in the basic task within the outdoor scenario and the adaptation task within the indoor scenario. The rule-based method, on the other hand, only exceeds the baseline in the indoor adaptation task. These findings suggest that well-designed prior information can significantly improve the effectiveness of diffusion models, whereas poorly de-signed priors may impair model performance in specific scenarios. The rule-based method requires careful design of prior rules, which can yield significant improvements in some particular scenarios but generally lacks strong gen-eralization across diverse conditions. When appropriate prior actions are unavailable, Gaussian noise is an accept-able initial distribution. A practical approach involves ob-taining learned prior actions from a lightweight model and then generating actions through a diffusion bridge, offering a more versatile and robust solution. The learning-based method shows notable improvements in adaptation tasks and outdoor scenarios, indicating a solid capacity for gen-eralization in complex and dynamic environments. In con-trast, the DDPM-based method demonstrates comparatively weaker performance. 
+
+5.3. Ablation Studies 
+
+The impact of denoising steps on model learning . Ta-ble 2 shows the training results under different denoising step conditions, comparing the DDPM-based method and NaviBridger based on a Gaussian prior. We present the minimum mean squared error between the predicted action and the expert action on the training set and test sets of four datasets, along with the average ranking of each model across five items. Our method is closer to the expert tra-jectory in terms of overall data scale. Observing the trend, as the denoising steps decrease, the difference between the DDPM-based method’s predicted trajectory and the expert trajectory increases significantly. In contrast, the difference between NaviBridger and a Gaussian prior remains rela-tively stable. This is also reflected in the average ranking; regardless of the number of denoising steps, Navibridger 12106 consistently achieves a better ranking, with minimal varia-tion in average ranking as the denoising steps change. Con-versely, the DDPM-based method shows generally lower rankings with more considerable fluctuations. 
+
+NoMaD (DDPM) Gaussian Prior 
+
+k = 10 7 4 1 10 7 4 1
+
+Train 1.38 1.27 1.14 2.16 0.27 0.28 0.30 0.30 
+
+Recon 1.19 1.10 0.97 1.43 0.88 0.91 0.89 0.98 
+
+Sacson 1.74 1.73 1.65 3.13 1.65 1.43 1.61 1.52 
+
+SCAND 0.72 0.76 0.71 1.17 0.59 0.69 0.63 0.61 
+
+Go Stanford 4.12 3.47 3.46 3.89 3.47 3.44 3.22 3.32 
+
+Average Rank 7.0 6.0 4.4 7.8 2.4 2.6 2.4 2.8 
+
+Table 2. Comparison of the mean square error between DDBM and vanilla diffusion model in predicting actions and expert ac-tions in training sets and different test sets. 
+
+Prior Method Length (m) Collision Success Gaussian Source – 2.12 0% Target 19.8 ± 0.317 0.98 64% 
+
+Rule-based Source 28.1 ± 5.942 1.77 8% Target 19.0 ± 1.390 0.84 44% 
+
+Learning-based Source 24.8 ± 1.35 1.49 20% Target 19.3 ± 0.340 0.41 88% 
+
+Table 3. Performance metrics of visual navigation tasks across dif-ferent source priors: evaluation of policy effectiveness for source-target action mapping. 
+
+The effect of source distribution and the role of dif-fusion bridge . Table 3 compares the navigation perfor-mance of the proposed method in an indoor adaptation task by examining prior actions sampled from different source distributions and the target actions obtained through de-noising. As the prior generation method transitions from random to ordered and from heuristic-based to expert data-driven approaches, the success rate of navigation using only the prior actions shows some improvement, although it re-mains pretty low. After bridge denoising, the navigation success rate improves markedly. The experiments indicate that more informative prior actions contribute to better per-formance. At the same time, the diffusion bridge effectively transforms less effective prior actions into higher-quality target actions, thereby enhancing overall performance. 
+
+Less denoising steps and the same performance. The line chart as shown in Fig 5 illustrates the relationship be-tween denoising steps, success rate, and inference time for visual navigation under different prior settings—Learning-based Prior DDBM, Gaussian Prior DDBM, and DDPM. Success rate, represented on the left vertical axis, generally increases as denoising steps progress, with the Learning-based Prior DDBM consistently achieving the highest suc-cess rates, peaking around 90% at 10 denoising steps. In 1 4 7 10 
+
+> Denoising Steps
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> Success Rate (%)
+> 20
+> 40
+> 60
+> 80
+> 100
+> Inference Time (ms)
+> Success Rate (Learning-based Prior DDBM)
+> Success Rate (Gaussian Prior DDBM)
+> Success Rate (DDPM)
+> Inference Time (DDBM)
+> Inference Time (DDPM)
+
+Figure 5. Success rate and inference time comparison across denoising steps. Learning-based and Gaussian priors in DDBM show higher success rates than DDPM, with learning-based priors achieving the best performance. DDBM also demonstrates faster inference times as denoising steps increase. 
+
+contrast, the Gaussian Prior DDBM shows a moderate suc-cess rate that fluctuates slightly, while DDPM achieves a lower success rate overall. The inference time indicated on the right vertical axis increases linearly with the denoising steps, and the time required by DDBM is longer than that of DDPM under the same denoising steps. Learning-based Prior DDBM demonstrates a more favorable balance be-tween high success rate and moderate inference time, sug-gesting it is more efficient and reliable for visual navigation tasks than the Gaussian Prior DDBM and DDPM. 
+
+# 6. Conclusion 
+
+This paper proposes a novel diffusion bridge-based frame-work for visual navigation. Our method advances pol-icy generation by enabling translations across arbitrary dis-tributions based on informative prior actions rather than the random Gaussian noise. Our theoretical analysis de-tails fundamental principles, formulas, and the influence of source distributions on performance, along with an analysis of error lower bounds. Experimental results demonstrate a substantial increase in success rates and a reduction in col-lisions compared to baseline models in simulated environ-ments. By exploring different strategies for source distri-bution generation and denoising steps, our method achieves greater robustness, more stability, and faster action gener-ation than vanilla diffusion policy models, expanding the potential of policy diffusion in imitation learning. However, although the results demonstrate a certain ex-tent of generalization to dynamic scenarios, the scenario becomes more complex if high-speed moving objects are present, necessitating faster response or adaptive strategies. 
+
+Acknowledgment . This work is supported by the China National Key R&D Program (2022YFB3903804). 12107 References 
+
+[1] Anurag Ajay, Yilun Du, Abhi Gupta, Joshua Tenenbaum, Tommi Jaakkola, and Pulkit Agrawal. Is conditional gen-erative modeling all you need for decision-making? arXiv preprint arXiv:2211.15657 , 2022. 2 [2] Ziad Al-Halah, Santhosh Kumar Ramakrishnan, and Kristen Grauman. Zero experience required: Plug & play modular transfer learning for semantic visual navigation. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 17031–17041, 2022. 2 [3] Iro Armeni, Sasha Sax, Amir R Zamir, and Silvio Savarese. Joint 2d-3d-semantic data for indoor scene understanding. 
+
+arXiv preprint arXiv:1702.01105 , 2017. 7 [4] Edward Beeching, Jilles Dibangoye, Olivier Simonin, and Christian Wolf. Learning to plan with uncertain topological maps. In European Conference on Computer Vision , pages 473–490. Springer, 2020. 2 [5] Francisco Bonin-Font, Alberto Ortiz, and Gabriel Oliver. Vi-sual navigation for mobile robots: A survey. Journal of in-telligent and robotic systems , 53:263–296, 2008. 1 [6] Johann Borenstein and Yoram Koren. Real-time obstacle avoidance for fast mobile robots. IEEE Transactions on sys-tems, Man, and Cybernetics , 19(5):1179–1187, 1989. 2 [7] Johann Borenstein, Yoram Koren, et al. The vector field histogram-fast obstacle avoidance for mobile robots. IEEE transactions on robotics and automation , 7(3):278–288, 1991. 2 [8] Cesar Cadena, Luca Carlone, Henry Carrillo, Yasir Latif, Davide Scaramuzza, Jos´ e Neira, Ian Reid, and John J Leonard. Past, present, and future of simultaneous localiza-tion and mapping: Toward the robust-perception age. IEEE Transactions on robotics , 32(6):1309–1332, 2016. 2 [9] Athanasios Chalvatzaras, Ioannis Pratikakis, and Angelos A Amanatiadis. A survey on map-based localization techniques for autonomous vehicles. IEEE Transactions on intelligent vehicles , 8(2):1574–1596, 2022. 2 [10] Kevin Chen, Junshen K Chen, Jo Chuang, Marynel V´ azquez, and Silvio Savarese. Topological planning with transform-ers for vision-and-language navigation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 11276–11286, 2021. 1, 2 [11] Kaiqi Chen, Eugene Lim, Kelvin Lin, Yiyang Chen, and Harold Soh. Behavioral refinement via interpolant-based policy diffusion. arXiv preprint arXiv:2402.16075 , 2024. 2 [12] Yongxin Chen, Tryphon Georgiou, and Michele Pavon. En-tropic and displacement interpolation: a computational ap-proach using the hilbert metric. SIAM Journal on Applied Mathematics , 76(6):2375–2396, 2016. 2 [13] Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action dif-fusion. The International Journal of Robotics Research , page 02783649241273668, 2023. 2, 5, 6 [14] Valentin De Bortoli, James Thornton, Jeremy Heng, and Ar-naud Doucet. Diffusion schr¨ odinger bridge with applications to score-based generative modeling. Advances in Neural In-formation Processing Systems , 34:17695–17709, 2021. 2 [15] Prafulla Dhariwal and Alexander Nichol. Diffusion models beat gans on image synthesis. Advances in neural informa-tion processing systems , 34:8780–8794, 2021. 2 [16] Yilun Du, Chuang Gan, and Phillip Isola. Curious repre-sentation learning for embodied intelligence. In Proceedings of the IEEE/CVF International Conference on Computer Vi-sion , pages 10408–10417, 2021. 2 [17] Jeremy Heng, Valentin De Bortoli, Arnaud Doucet, and James Thornton. Simulating diffusion bridges with score matching. arXiv preprint arXiv:2111.07243 , 2021. 2 [18] Noriaki Hirose, Fei Xia, Roberto Mart´ ın-Mart´ ın, Amir Sadeghian, and Silvio Savarese. Deep visual mpc-policy learning for navigation. IEEE Robotics and Automation Let-ters , 4(4):3184–3191, 2019. 6 [19] Noriaki Hirose, Dhruv Shah, Ajay Sridhar, and Sergey Levine. Exaug: Robot-conditioned navigation policies via geometric experience augmentation. In 2023 IEEE Inter-national Conference on Robotics and Automation (ICRA) ,pages 4077–4084. IEEE, 2023. 2 [20] Noriaki Hirose, Dhruv Shah, Ajay Sridhar, and Sergey Levine. Sacson: Scalable autonomous control for social nav-igation. IEEE Robotics and Automation Letters , 2023. 6 [21] Jonathan Ho and Tim Salimans. Classifier-free diffusion guidance. arXiv preprint arXiv:2207.12598 , 2022. 2 [22] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising dif-fusion probabilistic models. Advances in neural information processing systems , 33:6840–6851, 2020. 2 [23] Yicong Hong, Yang Zhou, Ruiyi Zhang, Franck Dernon-court, Trung Bui, Stephen Gould, and Hao Tan. Learning navigational visual representations with semantic map su-pervision. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 3055–3067, 2023. 2 [24] Michael Janner, Yilun Du, Joshua Tenenbaum, and Sergey Levine. Planning with diffusion for flexible behavior synthe-sis. In Proceedings of the 39th International Conference on Machine Learning , pages 9902–9915, 2022. 2 [25] Haresh Karnan, Anirudh Nair, Xuesu Xiao, Garrett War-nell, S¨ oren Pirk, Alexander Toshev, Justin Hart, Joydeep Biswas, and Peter Stone. Socially compliant navigation dataset (scand): A large-scale dataset of demonstrations for social navigation. IEEE Robotics and Automation Letters ,2022. 6 [26] Tero Karras, Miika Aittala, Timo Aila, and Samuli Laine. Elucidating the design space of diffusion-based generative models. Advances in neural information processing systems ,35:26565–26577, 2022. 2 [27] Nathan Koenig and Andrew Howard. Design and use paradigms for gazebo, an open-source multi-robot simula-tor. In 2004 IEEE/RSJ international conference on intelli-gent robots and systems (IROS)(IEEE Cat. No. 04CH37566) ,pages 2149–2154. Ieee, 2004. 7 [28] Bo Li, Kaitao Xue, Bin Liu, and Yu-Kun Lai. Bbdm: Image-to-image translation with brownian bridge diffusion models. In Proceedings of the IEEE/CVF conference on computer vi-sion and pattern Recognition , pages 1952–1961, 2023. 2 [29] Xingchao Liu, Lemeng Wu, Mao Ye, and Qiang Liu. Let us build bridges: Understanding and extending diffusion gener-ative models. arXiv preprint arXiv:2208.14699 , 2022. 2 12108 [30] Antonio Loquercio, Ana I Maqueda, Carlos R Del-Blanco, and Davide Scaramuzza. Dronet: Learning to fly by driv-ing. IEEE Robotics and Automation Letters , 3(2):1088– 1095, 2018. 2 [31] Andreas Lugmayr, Martin Danelljan, Andres Romero, Fisher Yu, Radu Timofte, and Luc Van Gool. Repaint: Inpainting using denoising diffusion probabilistic models. In Proceed-ings of the IEEE/CVF conference on computer vision and pattern recognition , pages 11461–11471, 2022. 2 [32] Arjun Majumdar, Gunjan Aggarwal, Bhavika Devnani, Judy Hoffman, and Dhruv Batra. Zson: Zero-shot object-goal navigation using multimodal goal embeddings. Advances in Neural Information Processing Systems , 35:32340–32352, 2022. 2 [33] Giuseppe Oriolo, Marilena Vendittelli, and Giovanni Ulivi. On-line map building and navigation for autonomous mobile robots. In Proceedings of 1995 IEEE international confer-ence on robotics and automation , pages 2900–2906. IEEE, 1995. 2 [34] Jinseong Park, Seungyun Lee, Woojin Jeong, Yujin Choi, and Jaewook Lee. Leveraging priors via diffusion bridge for time series generation. arXiv preprint arXiv:2408.06672 ,2024. 2 [35] Sang-Min Park and Young-Gab Kim. Visual language navi-gation: A survey and open challenges. Artificial Intelligence Review , 56(1):365–427, 2023. 1 [36] Ethan Perez, Florian Strub, Harm De Vries, Vincent Du-moulin, and Aaron Courville. Film: Visual reasoning with a general conditioning layer. In Proceedings of the AAAI con-ference on artificial intelligence , 2018. 5 [37] Hao Ren, Mingwei Wang, Wenpeng Li, Chen Liu, and Mengli Zhang. Adaptive patchwork: Real-time ground seg-mentation for 3d point cloud with adaptive partitioning and spatial-temporal context. IEEE Robotics and Automation Letters , 8(11):7162–7169, 2023. 2 [38] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 10684–10695, 2022. 2 [39] Pascal Roth, Julian Nubert, Fan Yang, Mayank Mittal, and Marco Hutter. Viplanner: Visual semantic imperative learn-ing for local navigation. In 2024 IEEE International Confer-ence on Robotics and Automation (ICRA) , pages 5243–5249. IEEE, 2024. 2 [40] Chitwan Saharia, William Chan, Huiwen Chang, Chris Lee, Jonathan Ho, Tim Salimans, David Fleet, and Mohammad Norouzi. Palette: Image-to-image diffusion models. In 
+
+ACM SIGGRAPH 2022 conference proceedings , pages 1–10, 2022. 2 [41] Simo S¨ arkk¨ a and Arno Solin. Applied stochastic differential equations . Cambridge University Press, 2019. 2 [42] Dhruv Shah, Benjamin Eysenbach, Gregory Kahn, Nicholas Rhinehart, and Sergey Levine. Rapid exploration for open-world navigation with latent goal models. arXiv preprint arXiv:2104.05859 , 2021. 6 [43] Dhruv Shah, Bła˙ zej Osi´ nski, Sergey Levine, et al. Lm-nav: Robotic navigation with large pre-trained models of lan-guage, vision, and action. In Conference on robot learning ,pages 492–504. PMLR, 2023. 1 [44] Dhruv Shah, Ajay Sridhar, Arjun Bhorkar, Noriaki Hirose, and Sergey Levine. Gnm: A general navigation model to drive any robot. In 2023 IEEE International Conference on Robotics and Automation (ICRA) , pages 7226–7233. IEEE, 2023. 1, 2 [45] Dhruv Shah, Ajay Sridhar, Nitish Dashora, Kyle Stachow-icz, Kevin Black, Noriaki Hirose, and Sergey Levine. Vint: A foundation model for visual navigation. arXiv preprint arXiv:2306.14846 , 2023. 1, 2, 6 [46] Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan, and Surya Ganguli. Deep unsupervised learning using nonequilibrium thermodynamics. In International confer-ence on machine learning , pages 2256–2265. PMLR, 2015. 2[47] Vignesh Ram Somnath, Matteo Pariset, Ya-Ping Hsieh, Maria Rodriguez Martinez, Andreas Krause, and Charlotte Bunne. Aligned diffusion schr¨ odinger bridges. In Uncer-tainty in Artificial Intelligence , pages 1985–1995. PMLR, 2023. 2 [48] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denoising diffusion implicit models. arXiv preprint arXiv:2010.02502 , 2020. 2 [49] Yang Song, Jascha Sohl-Dickstein, Diederik P Kingma, Ab-hishek Kumar, Stefano Ermon, and Ben Poole. Score-based generative modeling through stochastic differential equa-tions. arXiv preprint arXiv:2011.13456 , 2020. 2 [50] Ajay Sridhar, Dhruv Shah, Catherine Glossop, and Sergey Levine. Nomad: Goal masked diffusion policies for nav-igation and exploration. In 2024 IEEE International Con-ference on Robotics and Automation (ICRA) , pages 63–70. IEEE, 2024. 1, 2, 5, 6 [51] Julen Urain, Niklas Funk, Jan Peters, and Georgia Chal-vatzaki. Se (3)-diffusionfields: Learning smooth cost func-tions for joint grasp and motion optimization through diffu-sion. In 2023 IEEE International Conference on Robotics and Automation (ICRA) , pages 5923–5930. IEEE, 2023. 2 [52] C´ edric Villani et al. Optimal transport: old and new .Springer, 2009. 2 [53] Qiaoyun Wu, Xiaoxi Gong, Kai Xu, Dinesh Manocha, Jingx-uan Dong, and Jun Wang. Towards target-driven visual nav-igation in indoor scenes via generative imitation learning. 
+
+IEEE Robotics and Automation Letters , 6(1):175–182, 2020. 1[54] Liang Yang, Juntong Qi, Dalei Song, Jizhong Xiao, Jianda Han, and Yong Xia. Survey of robot 3d path planning algo-rithms. Journal of Control Science and Engineering , 2016 (1):7426913, 2016. 2 [55] Yuri DV Yasuda, Luiz Eduardo G Martins, and Fabio AM Cappabianco. Autonomous visual navigation for mobile robots: A systematic literature review. ACM Computing Sur-veys (CSUR) , 53(1):1–34, 2020. 2 [56] Conghan Yue, Zhengwei Peng, Junlong Ma, and Dongyu Zhang. Enhanced control for diffusion bridge in image restoration. arXiv preprint arXiv:2408.16303 , 2024. 2 12109 [57] Kuo-Hao Zeng, Luca Weihs, Ali Farhadi, and Roozbeh Mot-taghi. Pushing it out of the way: Interactive visual naviga-tion. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , pages 9868–9877, 2021. 2 [58] Tianyao Zhang, Xiaoguang Hu, Jin Xiao, and Guofeng Zhang. A survey of visual navigation: From geometry to embodied ai. Engineering Applications of Artificial Intelli-gence , 114:105036, 2022. 1 [59] Linqi Zhou, Aaron Lou, Samar Khanna, and Stefano Ermon. Denoising diffusion bridge models. In The Twelfth Interna-tional Conference on Learning Representations , 2024. 2 [60] Yuke Zhu, Roozbeh Mottaghi, Eric Kolve, Joseph J Lim, Ab-hinav Gupta, Li Fei-Fei, and Ali Farhadi. Target-driven vi-sual navigation in indoor scenes using deep reinforcement learning. In 2017 IEEE international conference on robotics and automation (ICRA) , pages 3357–3364. IEEE, 2017. 1, 2 [61] Zhengbang Zhu, Hanye Zhao, Haoran He, Yichao Zhong, Shenyu Zhang, Haoquan Guo, Tingting Chen, and Weinan Zhang. Diffusion models for reinforcement learning: A sur-vey. arXiv preprint arXiv:2311.01223 , 2023. 2 12110
