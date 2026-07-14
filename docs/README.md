@@ -6,145 +6,145 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-13
-- 运行时间：2026-07-13 18:49:30 UTC
+- 最新运行日期：2026-07-14
+- 运行时间：2026-07-14 18:10:02 UTC
 - 运行状态：成功
-- 本次总论文数：29
-- 精读区：18
+- 本次总论文数：35
+- 精读区：24
 - 速读区：11
 
 ### 今日简报（AI）
-<think>The user wants me to act as a daily report editor and output a concise Chinese summary in 3 sentences or fewer. Let me analyze the data:
+<think>
+The user wants me to act as a daily report editor and output a concise Chinese summary in 3 lines based on the given data. Let me analyze:
 
-- Date: 2026-07-13
-- Status: Success
-- Total: 29 papers
-- Deep read: 18 papers
+- Date: 2026-07-14
+- Total: 35 papers
+- Deep read: 24 papers
 - Quick read: 11 papers
+- Top deep reads (9.0/10): RoboDojo benchmark, Simple-to-Complex structured demonstrations for VLA
+- Top quick reads (8.0/10): KAM-WM, Geometry-Aware Motion Latents, DSWAM
 
-Looking at the deep read list, I notice it's very short - only 2 entries (and they appear to be duplicates of the same paper). The quick read list has 3 entries. This seems like an incomplete data extraction, but I should work with what's given.
+Theme: Robot manipulation / generalist robot policies / VLA learning
 
-The key paper appearing prominently is "RoboDojo: A Unified Sim-and-Real Benchmark for Comprehensive Evaluation of Generalist Robot Manipulation Policies" with high scores (9.0/10).
+Line 1: Headline-style summary
+Line 2: Most notable directions
+Line 3: Next-step suggestion for general readers
 
-Other notable papers:
-- XS-VLA: about lightweight robotic control using spatial distillation and latent flow matching (8.0/10)
-- HALO-WA: Hybrid-Attention for world-action models with online RL (8.0/10)
-
-The theme seems to be about robotics - robot manipulation policies, robot control, and robot learning approaches.
-
-Let me craft 3 concise sentences in Chinese:
-
-1) One sentence summarizing what was done today, suitable for a headline
-2) One sentence with the 1-2 most noteworthy directions/conclusions
-3) One sentence with next-step suggestions for ordinary readers
-
-Sentence 1 (Headline): Today's focus on robot manipulation and control, with RoboDojo standing out as a key benchmark
-
-Sentence 2 (Key directions): RoboDojo provides unified sim-and-real evaluation for generalist robot policies; lightweight VLA models and world-action models are emerging trends
-
-Sentence 3 (Next step suggestion): For readers, focus on RoboDojo for benchmarking methodology and lightweight VLA approaches for practical deployment
-
-Let me refine these to be punchy and concrete:
-
-1) 今日精读 18 篇、速读 11 篇，聚焦机器人操作与控制方向，其中 RoboDojo 以 9.0 分领跑。
-2) 值得关注的两条主线：RoboDojo 提供通用机器人策略的仿真-真机统一评测基准，XS-VLA 与 HALO-WA 分别探索轻量化视觉-语言-动作模型与世界-动作模型的在线强化学习。
-3) 建议读者优先阅读 RoboDojo 了解评测范式，再按需深入轻量化部署与世界模型方向。
-
-This is 3 sentences, concise, specific, and based on actual data. Let me make sure it's not too long.</think>
-
-今日精读 18 篇、速读 11 篇，聚焦机器人操作与通用策略评测方向，其中 RoboDojo 以 9.0 分领跑。值得关注的两条主线：RoboDojo 提供通用机器人策略的仿真-真机统一评测基准，XS-VLA 与 HALO-WA 则分别探索轻量化视觉-语言-动作模型及世界-动作模型的在线强化学习。建议普通读者优先读 RoboDojo 掌握评测范式，再按需深入轻量化部署与世界模型方向。
-- 详情：[/202607/13/README](/202607/13/README)
+Let me write 3 concise, attractive lines.
+</think>
+今日从 35 篇论文中筛出 24 篇精读、11 篇速读，聚焦通用机器人操作策略与视觉-语言-动作学习。
+最值得关注的是"统一仿真-真实基准"和"由简到繁的演示结构"两大方向，RoboDojo 提供了评估通用策略的标准化平台，而分级演示显著提升了 VLA 模型的泛化能力。
+建议读者优先精读 RoboDojo 论文以了解当前通用机器人操作的能力边界，并关注演示数据组织方式对策略学习的影响。
+- 详情：[/202607/14/README](/202607/14/README)
 
 ### 精读区论文标签
-1. [RoboDojo: A Unified Sim-and-Real Benchmark for Comprehensive Evaluation of Generalist Robot Manipulation Policies](/202607/13/2607.04434v1-robodojo-a-unified-sim-and-real-benchmark-for-comprehensive-evaluation-of-generalist-robot-manipulation-policies)  
+1. [RoboDojo: A Unified Sim-and-Real Benchmark for Comprehensive Evaluation of Generalist Robot Manipulation Policies](/202607/14/2607.04434v3-robodojo-a-unified-sim-and-real-benchmark-for-comprehensive-evaluation-of-generalist-robot-manipulation-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向通用机器人操控策略评估的统一仿真与真实基准
-2. [RoboDojo: A Unified Sim-and-Real Benchmark for Comprehensive Evaluation of Generalist Robot Manipulation Policies](/202607/13/2607.04434v2-robodojo-a-unified-sim-and-real-benchmark-for-comprehensive-evaluation-of-generalist-robot-manipulation-policies)  
+   evidence：面向通用机器人操作策略的综合仿真与真实基准
+2. [Simple-to-Complex Structured Demonstrations for Vision-Language-Action Learning](/202607/14/2607.04591v1-simple-to-complex-structured-demonstrations-for-vision-language-action-learning)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向通用机器人操作策略的统一仿真-真机评测基准
-3. [CAC-VLA: Context-Gated Action Conditioning for Vision-Language-Action Models](/202607/13/2607.04816v1-cac-vla-context-gated-action-conditioning-for-vision-language-action-models)  
+   evidence：面向VLA模仿学习的由简到繁结构化示范策略
+3. [SEAM: Smooth Execution of Action-Chunked Motion for Vision-Language-Action Policies](/202607/14/2607.04609v1-seam-smooth-execution-of-action-chunked-motion-for-vision-language-action-policies)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向通用机器人操纵的上下文门控动作条件化视觉-语言-动作框架
-4. [InternVLA-A1.5: Unifying Understanding, Latent Foresight, and Action for Compositional Generalization](/202607/13/2607.04988v1-internvla-a15-unifying-understanding-latent-foresight-and-action-for-compositional-generalization)  
+   evidence：面向视觉-语言-动作策略的无训练推理时平滑动作块执行方法
+4. [CAC-VLA: Context-Gated Action Conditioning for Vision-Language-Action Models](/202607/14/2607.04816v1-cac-vla-context-gated-action-conditioning-for-vision-language-action-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人操纵的统一视觉-语言-动作模型
-5. [From Foundation to Application: Improving VLA Models in Practice](/202607/13/2607.06403v1-from-foundation-to-application-improving-vla-models-in-practice)  
+   evidence：面向通用机器人操作的上下文门控动作条件VLA模型
+5. [InternVLA-A1.5: Unifying Understanding, Latent Foresight, and Action for Compositional Generalization](/202607/14/2607.04988v1-internvla-a15-unifying-understanding-latent-foresight-and-action-for-compositional-generalization)  
    标签：评分：9.0/10、query:rob-il
-   evidence：具备跨任务跨本体泛化与扩展动作空间的VLA基础模型
-6. [SIEVE: Structure-Aware Data Selection for Imitation Learning with VLA Models](/202607/13/2607.06442v1-sieve-structure-aware-data-selection-for-imitation-learning-with-vla-models)  
+   evidence：融合潜前瞻的VLA模型用于组合泛化操作
+6. [From Fixed to Free Cameras: Calibration-Free View-Robust Vision-Language-Action Model](/202607/14/2607.05396v1-from-fixed-to-free-cameras-calibration-free-view-robust-vision-language-action-model)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向VLA模型模仿学习的结构感知数据选择方法
-7. [Pelican-VLA 0.5: Attending Before Acting Benefits Generalization](/202607/13/2607.06655v1-pelican-vla-05-attending-before-acting-benefits-generalization)  
+   evidence：面向机器人操纵的视觉-语言-动作模型
+7. [Training-Free Acceleration for Vision-Language-Action Models with Action Caching and Refinement](/202607/14/2607.06370v1-training-free-acceleration-for-vision-language-action-models-with-action-caching-and-refinement)  
    标签：评分：9.0/10、query:rob-il
-   evidence：统一的视觉-语言-动作模型实现跨机器人本体的注意力级泛化
-8. [Pelican-VLA 0.5: Attending Before Acting Benefits Generalization](/202607/13/2607.06655v2-pelican-vla-05-attending-before-acting-benefits-generalization)  
+   evidence：面向通用 VLA 模型的免训练加速方法
+8. [SIEVE: Structure-Aware Data Selection for Imitation Learning with VLA Models](/202607/14/2607.06442v1-sieve-structure-aware-data-selection-for-imitation-learning-with-vla-models)  
    标签：评分：9.0/10、query:rob-il
-   evidence：统一视觉-语言-动作模型通过瓶颈注意力实现跨本体泛化
-9. [NativeMEM: Native Memory Compression for Long-Horizon Robotic Manipulation](/202607/13/2607.06678v1-nativemem-native-memory-compression-for-long-horizon-robotic-manipulation)  
+   evidence：面向VLA模型模仿学习的结构化数据选择方法
+9. [Lift3D-VLA: Lifting VLA Models to 3D Geometry and Dynamics-Aware Manipulation](/202607/14/2607.06564v1-lift3d-vla-lifting-vla-models-to-3d-geometry-and-dynamics-aware-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向长时程机器人操作的视觉-语言-动作模型
-10. [WAM-TTT: Steering World-Action Models by Watching Human Play at Test Time](/202607/13/2607.06988v2-wam-ttt-steering-world-action-models-by-watching-human-play-at-test-time)  
+   evidence：面向通用机器人操作的 3D 几何感知 VLA 模型
+10. [PriGo: Test-Time Primitive Guidance to Diffusion and Flow Policies for Adaptive Robotic Manipulation](/202607/14/2607.07076v1-prigo-test-time-primitive-guidance-to-diffusion-and-flow-policies-for-adaptive-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：通过测试时训练从人类视频引导世界-动作模型
-11. [PriGo: Test-Time Primitive Guidance to Diffusion and Flow Policies for Adaptive Robotic Manipulation](/202607/13/2607.07076v1-prigo-test-time-primitive-guidance-to-diffusion-and-flow-policies-for-adaptive-robotic-manipulation)  
+   evidence：面向自适应机器人操作的扩散/流模仿学习策略与原语引导
+11. [Dual Latent Memory in Vision-Language-Action Models for Robotic Manipulation](/202607/14/2607.07608v1-dual-latent-memory-in-vision-language-action-models-for-robotic-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人操作的模仿学习扩散/流策略测试时引导
-12. [Dual Latent Memory in Vision-Language-Action Models for Robotic Manipulation](/202607/13/2607.07608v1-dual-latent-memory-in-vision-language-action-models-for-robotic-manipulation)  
+   evidence：面向机器人操纵的视觉-语言-动作模型
+12. [Understanding and Mitigating the Video-Action Generalization Gap via Temporal Ratio](/202607/14/2607.08127v1-understanding-and-mitigating-the-video-action-generalization-gap-via-temporal-ratio)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人操作的潜在记忆原生VLA框架
-13. [LEEVLA: Seeing What Matters in Latent Environment Evolution for Vision-Language-Action](/202607/13/2607.08182v1-leevla-seeing-what-matters-in-latent-environment-evolution-for-vision-language-action)  
+   evidence：分析视频-动作模型在端到端机器人控制中的泛化差距
+13. [LEEVLA: Seeing What Matters in Latent Environment Evolution for Vision-Language-Action](/202607/14/2607.08182v1-leevla-seeing-what-matters-in-latent-environment-evolution-for-vision-language-action)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向复杂动态操纵的漂移引导动态优先级 VLA 架构
-14. [SkillPlug: Unsupervised Skill Mining for Few-Shot Adaptation in Robotic Manipulation](/202607/13/2607.08354v1-skillplug-unsupervised-skill-mining-for-few-shot-adaptation-in-robotic-manipulation)  
+   evidence：具有环境演化感知能力的视觉-语言-动作模型
+14. [TFP: Temporally Conditioned Memory-Fusion Policies for Visuomotor Learning](/202607/14/2607.08283v1-tfp-temporally-conditioned-memory-fusion-policies-for-visuomotor-learning)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向机器人操纵的可迁移视觉运动模仿策略与技能库
-15. [EgoWAM: World Action Models Beyond Pixels with In-the-Wild Egocentric Human Data](/202607/13/2607.08436v1-egowam-world-action-models-beyond-pixels-with-in-the-wild-egocentric-human-data)  
+   evidence：面向阶段依赖型视觉运动操作的记忆融合 VLA 策略
+15. [FabriVLA: A Lightweight Vision-Language-Action Model for Precise Multi-Task Manipulation](/202607/14/2607.08575v2-fabrivla-a-lightweight-vision-language-action-model-for-precise-multi-task-manipulation)  
    标签：评分：9.0/10、query:rob-il
-   evidence：利用野生自我中心人类数据训练世界动作模型用于机器人操纵
-16. [FabriVLA: A Lightweight Vision-Language-Action Model for Precise Multi-Task Manipulation](/202607/13/2607.08575v1-fabrivla-a-lightweight-vision-language-action-model-for-precise-multi-task-manipulation)  
+   evidence：在 Meta-World MT50 上基准评测的多任务 VLA 模型
+16. [Native Video-Action Pretraining for Generalizable Robot Control](/202607/14/2607.08639v1-native-video-action-pretraining-for-generalizable-robot-control)  
    标签：评分：9.0/10、query:rob-il
-   evidence：轻量通用VLA在50项操控任务上达到90%成功率
-17. [FabriVLA: A Lightweight Vision-Language-Action Model for Precise Multi-Task Manipulation](/202607/13/2607.08575v2-fabrivla-a-lightweight-vision-language-action-model-for-precise-multi-task-manipulation)  
+   evidence：面向机器人控制的原生视频-动作预训练基础模型
+17. [TS-Mask VLA: 2D Temporal-Spatial Masking for Vision-Language-Action Model with Effective Bridging](/202607/14/2607.09818v1-ts-mask-vla-2d-temporal-spatial-masking-for-vision-language-action-model-with-effective-bridging)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向多任务精密操作的轻量视觉-语言-动作模型
-18. [Native Video-Action Pretraining for Generalizable Robot Control](/202607/13/2607.08639v1-native-video-action-pretraining-for-generalizable-robot-control)  
+   evidence：面向机器人操控的VLA框架与时空掩码
+18. [More Structure, Not More Capacity: Object-Centric Representations for Visuomotor Imitation Learning](/202607/14/2607.09825v1-more-structure-not-more-capacity-object-centric-representations-for-visuomotor-imitation-learning)  
    标签：评分：9.0/10、query:rob-il
-   evidence：面向具身智能从零构建的原生视频-动作基础模型
+   evidence：面向视觉运动模仿学习的物体中心表征方法
+19. [Dual-Process Atomic Skill Learning: Decoupling Semantic Reasoning and Real-Time Control](/202607/14/2607.10625v1-dual-process-atomic-skill-learning-decoupling-semantic-reasoning-and-real-time-control)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：面向复杂组合式机器人操作任务的语言条件模仿学习
+20. [Action Map Policy: Learning 3D Closed-loop Manipulation via Pixel Classification](/202607/14/2607.10706v1-action-map-policy-learning-3d-closed-loop-manipulation-via-pixel-classification)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：面向闭环机器人操纵的图像空间像素分类策略
+21. [SegDiff: Segmented Trajectory Diffusion for Consistent and Adaptive Robot Manipulation](/202607/14/2607.11027v1-segdiff-segmented-trajectory-diffusion-for-consistent-and-adaptive-robot-manipulation)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：基于分段轨迹扩散的闭环视觉运动模仿学习策略
+22. [VIA: Visual Interface Agent for Robot Control](/202607/14/2607.11119v1-via-visual-interface-agent-for-robot-control)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：利用基础模型实现通用机器人控制的视觉接口智能体
+23. [Pix2Act: Image-Space Manipulation Policies with Equivariant Augmentation](/202607/14/2607.11167v1-pix2act-image-space-manipulation-policies-with-equivariant-augmentation)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：面向机器人操纵的视觉到动作映射模仿学习方法
+24. [See like a Robot: Robot-Centric Pointmaps for Vision-Language-Action Models](/202607/14/2607.11498v1-see-like-a-robot-robot-centric-pointmaps-for-vision-language-action-models)  
+   标签：评分：9.0/10、query:rob-il
+   evidence：VLA模型从视觉观测和语言预测机器人动作
 
 ### 速读区论文标签
-1. [XS-VLA: Coupling Coarse-grained Spatial Distillation with Latent Flow Matching for Lightweight Robotic Control](/202607/13/2607.04171v1-xs-vla-coupling-coarse-grained-spatial-distillation-with-latent-flow-matching-for-lightweight-robotic-control)  
+1. [KAM-WM: Kinematic Affordance Maps from Latent World Models for Robot Manipulation](/202607/14/2607.04652v1-kam-wm-kinematic-affordance-maps-from-latent-world-models-for-robot-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：结合空间蒸馏与流匹配的轻量级端到端机器人控制VLA模型
-2. [HALO-WA: Hybrid-Attention Latent-Guided Online Reinforcement Learning for World-Action Models](/202607/13/2607.04265v1-halo-wa-hybrid-attention-latent-guided-online-reinforcement-learning-for-world-action-models)  
+   evidence：基于视觉可供性条件扩散策略的少样本操作
+2. [Geometry-Aware Motion Latents for Learning Robust Manipulation Policies](/202607/14/2607.04714v1-geometry-aware-motion-latents-for-learning-robust-manipulation-policies)  
    标签：评分：8.0/10、query:rob-il
-   evidence：面向通用机器人操作的世界-动作模型在线自适应
-3. [RoboDojo: A Unified Sim-and-Real Benchmark for Comprehensive Evaluation of Generalist Robot Manipulation Policies](/202607/13/2607.04434v3-robodojo-a-unified-sim-and-real-benchmark-for-comprehensive-evaluation-of-generalist-robot-manipulation-policies)  
+   evidence：面向端到端视觉运动操作的几何感知运动潜变量
+3. [DSWAM: A Dual-System World Action Foundation Model for Fine-Grained Robot Manipulation](/202607/14/2607.04927v1-dswam-a-dual-system-world-action-foundation-model-for-fine-grained-robot-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：面向通用机器人操作策略的统一仿真与真实基准
-4. [Simple-to-Complex Structured Demonstrations for Vision-Language-Action Learning](/202607/13/2607.04591v1-simple-to-complex-structured-demonstrations-for-vision-language-action-learning)  
+   evidence：面向细粒度操作的双系统世界动作基础模型并与VLA对比
+4. [Cortex: A Bidirectionally Aligned Embodied Agent Framework for Long-horizon Manipulation](/202607/14/2607.05377v1-cortex-a-bidirectionally-aligned-embodied-agent-framework-for-long-horizon-manipulation)  
    标签：评分：8.0/10、query:rob-il
-   evidence：面向VLA模仿学习的演示数据组织策略
-5. [SoftVTBench: A Safety-Aware Visuo-Tactile Benchmark for Physically Constrained Robotic Manipulation of Deformable Objects](/202607/13/2607.04234v1-softvtbench-a-safety-aware-visuo-tactile-benchmark-for-physically-constrained-robotic-manipulation-of-deformable-objects)  
+   evidence：面向通用长时操作的双向对齐VLM-VLA框架
+5. [PRISM: Personalized Robotic Dataset Generation via Image-based Scene and Motion Synthesis](/202607/14/2607.04880v1-prism-personalized-robotic-dataset-generation-via-image-based-scene-and-motion-synthesis)  
    标签：评分：7.0/10、query:rob-il
-   evidence：提供视觉-触觉基准以评测操控策略在物理约束下的安全性
-6. [KAM-WM: Kinematic Affordance Maps from Latent World Models for Robot Manipulation](/202607/13/2607.04652v1-kam-wm-kinematic-affordance-maps-from-latent-world-models-for-robot-manipulation)  
+   evidence：面向VLA策略学习的用户场景个性化数据集生成流程
+6. [RoboTALES: Learning Reasoning-Guided Robot Policies via Task-Aligned Simulated Futures](/202607/14/2607.06018v1-robotales-learning-reasoning-guided-robot-policies-via-task-aligned-simulated-futures)  
    标签：评分：7.0/10、query:rob-il
-   evidence：少样本示教学习中从世界模型提取运动可供性条件扩散策略
-7. [Geometry-Aware Motion Latents for Learning Robust Manipulation Policies](/202607/13/2607.04714v1-geometry-aware-motion-latents-for-learning-robust-manipulation-policies)  
+   evidence：通过任务对齐仿真未来学习视觉运动策略
+7. [Optimal Transport Q-Learning for Flow Policy Steering and Acceleration](/202607/14/2607.06262v1-optimal-transport-q-learning-for-flow-policy-steering-and-acceleration)  
    标签：评分：7.0/10、query:rob-il
-   evidence：从视觉点云演化中学习运动潜在表征并映射到操作动作
-8. [From Fixed to Free Cameras: Calibration-Free View-Robust Vision-Language-Action Model](/202607/13/2607.05396v1-from-fixed-to-free-cameras-calibration-free-view-robust-vision-language-action-model)  
+   evidence：面向 VLA 机器人控制的流策略加速与引导
+8. [GeoProp: Grounding Robot State in Vision for Generalist Manipulation](/202607/14/2607.07101v1-geoprop-grounding-robot-state-in-vision-for-generalist-manipulation)  
    标签：评分：7.0/10、query:rob-il
-   evidence：免标定的视角鲁棒 VLA 模型用于端到端操作控制
-9. [ACE: Agentic Control for Embodied Manipulation via Zero-shot Workflow Reasoning](/202607/13/2607.04162v1-ace-agentic-control-for-embodied-manipulation-via-zero-shot-workflow-reasoning)  
+   evidence：通过本体感知与视觉对齐将机器人状态锚定于视觉,用于通用操作
+9. [RynnWorld-Teleop: An Action-Conditioned World Model for Digital Teleoperation](/202607/14/2607.06558v2-rynnworld-teleop-an-action-conditioned-world-model-for-digital-teleoperation)  
    标签：评分：6.0/10、query:rob-il
-   evidence：通过掩码介导的视觉-动作接口连接语义推理与物理控制
-10. [ACE-Brain-0.5: A Unified Embodied Foundational Model for Physical Agentic AI](/202607/13/2607.04426v1-ace-brain-05-a-unified-embodied-foundational-model-for-physical-agentic-ai)  
+   evidence：面向模仿学习的远程操作数据生成
+10. [Multi-Agent Robotic Control with Onboard Vision-Language Models](/202607/14/2607.07403v1-multi-agent-robotic-control-with-onboard-vision-language-models)  
    标签：评分：6.0/10、query:rob-il
-   evidence：面向通用物理智能体的统一具身基础模型，覆盖感知、规划与动作
-11. [PRISM: Personalized Robotic Dataset Generation via Image-based Scene and Motion Synthesis](/202607/13/2607.04880v1-prism-personalized-robotic-dataset-generation-via-image-based-scene-and-motion-synthesis)  
+   evidence：在多用途移动操纵器上部署视觉-语言-动作模型完成仓库任务
+11. [APIVOT: Adaptive Planning with Interleaved Vision-Language Thoughts](/202607/14/2607.08024v1-apivot-adaptive-planning-with-interleaved-vision-language-thoughts)  
    标签：评分：6.0/10、query:rob-il
-   evidence：面向VLA策略在个性化环境中部署的数据集生成端到端管线
+   evidence：面向机器人长时序操作的视觉-语言规划
 
 
 <div class="dpr-home-promo-card">
