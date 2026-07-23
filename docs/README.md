@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-07-22</span>
+      <span class="dpr-home-dashboard-kicker">2026-07-23</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 25 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>14</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-07-22 18:08:49 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-23 18:33:43 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,19 +62,23 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in 3 sentences based on the provided data. Let me analyze:</p>
-<p>23 papers total, 12 deep reads, 11 quick reads</p>
-<p>Top paper: Xiaomi-Robotics-1 (10/10) - VLA model with 100K+ hours of real-world data</p>
-<p>Second: Mixture of Frames Policy (9/10) - bimanual mobile manipulation</p>
-<p>Other notable: Worlds in One Demo (8/10) - synthetic data for mobile manipulation</p>
-<p>Generalizable VLA Finetuning (8/10) - representation anchoring</p>
-<p>Semantic Anchoring for Robotic Action (8/10) - action representations</p>
-<p>The theme is clearly about VLA (Vision-Language-Action) models and robotics manipulation, with emphasis on data scaling, multi-frame action denoising, and synthetic data for open-world tasks.</p>
+<p>&lt;think&gt;The user wants a daily report summary in Chinese, 3 sentences max, based on the given recommendation data. Let me analyze:</p>
+<p>Date: 2026-07-23</p>
+<p>Status: Success</p>
+<p>Total: 25 papers</p>
+<p>Deep read: 14</p>
+<p>Quick read: 11</p>
+<p>Deep read list: Xiaomi-Robotics-1 (10.0), Generalizable VLA Finetuning (9.0)</p>
+<p>Quick read list: Semantic Anchoring (8.0), Learning Forward &amp; Reverse Skills (8.0), GigaWorld-Policy-0.5 (8.0)</p>
+<p>The theme is clearly robotics, specifically VLA (Vision-Language-Action) models and robotic manipulation. Key highlights:</p>
+<p>Xiaomi&#x27;s robotics foundation model with massive real-world data (100K+ hours) - top score</p>
+<p>VLA finetuning methods for generalization</p>
+<p>Multiple papers on robotic manipulation with anchoring/skill learning</p>
 <p>Let me write 3 concise Chinese sentences:</p>
-<p>Title-sensory overview</p>
-<p>Key directions/conclusions worth focusing on</p>
+<p>Today&#x27;s overview - title worthy</p>
+<p>Most worth-watching direction/conclusion (1-2 points)</p>
 <p>Next-step suggestion for general readers&lt;/think&gt;</p>
-<p>今天从 23 篇候选中精选 12 篇深读，焦点集中在具身智能的大模型与数据驱动范式，尤其是 VLA 视觉-语言-动作模型在真实数据规模化与多帧去噪策略上的突破。最值得看的是小米开源的 10 万小时级真实轨迹 VLA 模型，以及面向双臂移动操作的 Mixture of Frames 去噪策略，前者证明数据规模仍是具身大模型的天花板，后者则展示了多帧融合在提升动作稳定性上的实用价值。普通读者可关注&quot;高质量真实数据 + 多帧动作建模&quot;这一主线，等待跨平台开源权重与可复现的评测基准出现后再做深入跟进。</p>
+<p>今日共筛 25 篇机器人/操作学习论文，其中 14 篇精读、11 篇速读，焦点高度集中在视觉-语言-动作（VLA）大模型与真实数据驱动的机器人策略学习。最值得关注的进展是：小米发布基于 10 万小时真实轨迹的 Xiaomi-Robotics-1，以工业级数据规模推动通用机器人基座模型落地；同期多篇工作围绕表征锚定与正反技能学习，提出更高效的 VLA 微调与可泛化操作方案。对于关注具身智能的读者，下一步可重点跟踪大厂开源基座模型的代码与权重，并尝试将其与轻量级微调框架结合，复现小样本场景下的跨任务迁移效果。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -83,12 +87,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">12 篇</strong>
+    <strong class="dpr-home-dashboard-count">14 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Xiaomi-Robotics-1: Scaling Vision-Language-Action Models with over 100K Hours of Real-World Trajectories">Xiaomi-Robotics-1: Scaling Vision-Language-Action Models with over 100K Hours of Real-World Trajectories</span></li><li><span class="dpr-home-dashboard-paper-title" title="Mixture of Frames Policy: Multi-Frame Action Denoising for Bimanual Mobile Manipulation">Mixture of Frames Policy: Multi-Frame Action Denoising for Bimanual Mobile Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="VistaVLA: Geometry- and Semantic-Aware 3D Gaussian-Grounded VLA for Robotic Manipulation">VistaVLA: Geometry- and Semantic-Aware 3D Gaussian-Grounded VLA for Robotic Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Xiaomi-Robotics-1: Scaling Vision-Language-Action Models with over 100K Hours of Real-World Trajectories">Xiaomi-Robotics-1: Scaling Vision-Language-Action Models with over 100K Hours of Real-World Trajectories</span></li><li><span class="dpr-home-dashboard-paper-title" title="Generalizable VLA Finetuning via Representation Anchoring and Language-Action Alignment">Generalizable VLA Finetuning via Representation Anchoring and Language-Action Alignment</span></li><li><span class="dpr-home-dashboard-paper-title" title="Industrial Dexterity Benchmark: A Hardware-Software Benchmarking Platform for Industrial Dexterous Manipulation">Industrial Dexterity Benchmark: A Hardware-Software Benchmarking Platform for Industrial Dexterous Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>14</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -99,7 +103,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Worlds in One Demo: A Synthetic Data Engine for Learning Open-World Mobile Manipulation">Worlds in One Demo: A Synthetic Data Engine for Learning Open-World Mobile Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Generalizable VLA Finetuning via Representation Anchoring and Language-Action Alignment">Generalizable VLA Finetuning via Representation Anchoring and Language-Action Alignment</span></li><li><span class="dpr-home-dashboard-paper-title" title="Semantic Anchoring for Robotic Action Representations">Semantic Anchoring for Robotic Action Representations</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Semantic Anchoring for Robotic Action Representations">Semantic Anchoring for Robotic Action Representations</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Forward &amp; Reverse Skills from a Single Unfinished Demonstration for Constrained Manipulation Tasks">Learning Forward &amp; Reverse Skills from a Single Unfinished Demonstration for Constrained Manipulation Tasks</span></li><li><span class="dpr-home-dashboard-paper-title" title="GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch">GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
