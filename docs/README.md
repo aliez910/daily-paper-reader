@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-07-24</span>
+      <span class="dpr-home-dashboard-kicker">2026-07-25</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 22 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-07-24 18:17:51 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-25 18:03:29 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,22 +62,34 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to create a daily summary in Chinese based on the provided data. Let me analyze:</p>
-<p>Date: 2026-07-24</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output 3 sentences in Chinese based on the given data. Let me analyze:</p>
+<p>Date: 2026-07-25</p>
 <p>Status: Success</p>
-<p>Total: 22 papers</p>
-<p>Deep read: 11 papers</p>
+<p>Total: 23 papers</p>
+<p>Deep read: 12 papers</p>
 <p>Quick read: 11 papers</p>
-<p>Top deep reads: RoboTTT (10/10), Action QFormer (9/10) - both about VLA models, context scaling, structured representation for robot policies</p>
-<p>Quick reads: DiMaS (distribution matching for VLA), Reflex (real-time VLA), FoMoVLA (visual foresight + motion for VLA)</p>
-<p>Theme: VLA (Vision-Language-Action) models for robotics, with focus on context scaling, representation shaping, distribution matching, real-time control, and motion guidance.</p>
-<p>Let me write 3 lines:</p>
-<p>Title-catching summary</p>
-<p>Most noteworthy directions/conclusions (1-2)</p>
-<p>Next-step suggestion for general readers&lt;/think&gt;</p>
-<p>今日精选 22 篇机器人与具身智能论文，其中 11 篇深度阅读，重点聚焦视觉-语言-动作（VLA）模型在上下文扩展与结构化表征上的突破。</p>
-<p>最值得关注的方向：RoboTTT 通过测试时训练实现机器人策略的上下文规模化（10 分力荐），Action QFormer 则在动作监督下重塑 VLA 的结构化表征（9 分），二者共同指向&quot;让 VLA 模型更好理解长时序任务结构&quot;这一核心命题。</p>
-<p>下一步建议：若你关注具身智能落地，可优先读 RoboTTT 与 Reflex（实时流式推理），前者解决复杂任务泛化，后者解决部署延迟痛点，对工程实践最具参考价值。</p>
+<p>Top deep read papers (both 10.0/10):</p>
+<p>AC-VLA: Robust Out-of-Distribution Action Execution via Compositional Learning</p>
+<p>GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</p>
+<p>Quick read highlights (8.0/10):</p>
+<p>Foresight Residual RL for Long-Horizon Robot Manipulation with VLA Models</p>
+<p>Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion</p>
+<p>Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation</p>
+<p>Theme: Robot manipulation / VLA models / OOD robustness / diffusion policies</p>
+<p>Let me craft 3 sentences:</p>
+<p>Title-style summary - what&#x27;s the overall theme</p>
+<p>Most noteworthy directions/findings (1-2)</p>
+<p>Next step suggestion for general readers</p>
+<p>Let me draft:</p>
+<p>今日共筛选 23 篇论文，重点聚焦机器人操作中的视觉-语言-动作（VLA）模型与分布外鲁棒性主题。</p>
+<p>最值得看的是组合学习提升 OOD 动作执行（AC-VLA）以及可解释可纠错的视觉注意力机制（GuidedAttention），两者均达到满分；长视域残差强化学习与异步多模态扩散策略也值得关注。</p>
+<p>建议关注如何把可解释注意力与组合式策略结合，以提升真实场景中的鲁棒性与安全性。</p>
+<p>Let me refine to make it more engaging and within 3 lines:</p>
+<p>今日 23 篇论文聚焦机器人操作与视觉-语言-动作（VLA）模型，12 篇精读、11 篇速读，主题集中在分布外鲁棒性与策略学习。</p>
+<p>最值得看的是组合学习驱动的 OOD 动作执行（AC-VLA）和可解释可纠错的视觉注意力（GuidedAttention），双双满分；长视域残差强化学习与异步多模态扩散策略也颇具亮点。</p>
+<p>建议关注将可解释注意力与组合式策略融合，提升真实场景的鲁棒性与安全性。</p>
+<p>This is good. Let me make it tighter and more specific.&lt;/think&gt;</p>
+<p>今日 23 篇论文聚焦机器人操作与视觉-语言-动作（VLA）模型，精读 12 篇、速读 11 篇，主题集中在分布外鲁棒性与策略学习。组合学习驱动的 OOD 动作执行（AC-VLA）与可解释可纠错的视觉注意力（GuidedAttention）双双拿下满分，长视域残差强化学习与异步多模态扩散策略也颇具亮点。建议关注将可解释注意力与组合式策略融合，以提升真实场景中的鲁棒性与安全性。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -86,12 +98,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">12 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="RoboTTT: Context Scaling for Robot Policies">RoboTTT: Context Scaling for Robot Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="Action QFormer: Structured Representation Shaping under Action Supervision in Vision-Language-Action Models">Action QFormer: Structured Representation Shaping under Action Supervision in Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Towards Human-like Physical Intelligence: LifelongVision-Language-Action Learning for Robotic Manipulation">Towards Human-like Physical Intelligence: LifelongVision-Language-Action Learning for Robotic Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AC-VLA: Robust Out-of-Distribution Action Execution via Compositional Learning">AC-VLA: Robust Out-of-Distribution Action Execution via Compositional Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="RoboTTT: Context Scaling for Robot Policies">RoboTTT: Context Scaling for Robot Policies</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -102,7 +114,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DiMaS: Distribution Matching for Steering Vision-Language-Action Models">DiMaS: Distribution Matching for Steering Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Reflex: Real-Time VLA Control through Streaming Inference">Reflex: Real-Time VLA Control through Streaming Inference</span></li><li><span class="dpr-home-dashboard-paper-title" title="FoMoVLA: Bridging Visual Foresight and Motion Guidance for Vision-Language-Action Models">FoMoVLA: Bridging Visual Foresight and Motion Guidance for Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Foresight Residual RL for Long-Horizon Robot Manipulation with Vision-Language-Action Models">Foresight Residual RL for Long-Horizon Robot Manipulation with Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion">Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion</span></li><li><span class="dpr-home-dashboard-paper-title" title="Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation">Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
