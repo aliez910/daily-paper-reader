@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-07-25</span>
+      <span class="dpr-home-dashboard-kicker">2026-07-26</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 17 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-07-25 18:03:29 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-26 17:54:39 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,34 +62,27 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output 3 sentences in Chinese based on the given data. Let me analyze:</p>
-<p>Date: 2026-07-25</p>
-<p>Status: Success</p>
-<p>Total: 23 papers</p>
-<p>Deep read: 12 papers</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in Chinese based on the provided recommendation data. Let me analyze the data:</p>
+<p>Date: 2026-07-26</p>
+<p>Total: 17 papers</p>
+<p>Deep read: 6 papers</p>
 <p>Quick read: 11 papers</p>
-<p>Top deep read papers (both 10.0/10):</p>
-<p>AC-VLA: Robust Out-of-Distribution Action Execution via Compositional Learning</p>
-<p>GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</p>
-<p>Quick read highlights (8.0/10):</p>
-<p>Foresight Residual RL for Long-Horizon Robot Manipulation with VLA Models</p>
-<p>Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion</p>
-<p>Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation</p>
-<p>Theme: Robot manipulation / VLA models / OOD robustness / diffusion policies</p>
-<p>Let me craft 3 sentences:</p>
-<p>Title-style summary - what&#x27;s the overall theme</p>
-<p>Most noteworthy directions/findings (1-2)</p>
-<p>Next step suggestion for general readers</p>
-<p>Let me draft:</p>
-<p>今日共筛选 23 篇论文，重点聚焦机器人操作中的视觉-语言-动作（VLA）模型与分布外鲁棒性主题。</p>
-<p>最值得看的是组合学习提升 OOD 动作执行（AC-VLA）以及可解释可纠错的视觉注意力机制（GuidedAttention），两者均达到满分；长视域残差强化学习与异步多模态扩散策略也值得关注。</p>
-<p>建议关注如何把可解释注意力与组合式策略结合，以提升真实场景中的鲁棒性与安全性。</p>
-<p>Let me refine to make it more engaging and within 3 lines:</p>
-<p>今日 23 篇论文聚焦机器人操作与视觉-语言-动作（VLA）模型，12 篇精读、11 篇速读，主题集中在分布外鲁棒性与策略学习。</p>
-<p>最值得看的是组合学习驱动的 OOD 动作执行（AC-VLA）和可解释可纠错的视觉注意力（GuidedAttention），双双满分；长视域残差强化学习与异步多模态扩散策略也颇具亮点。</p>
-<p>建议关注将可解释注意力与组合式策略融合，提升真实场景的鲁棒性与安全性。</p>
-<p>This is good. Let me make it tighter and more specific.&lt;/think&gt;</p>
-<p>今日 23 篇论文聚焦机器人操作与视觉-语言-动作（VLA）模型，精读 12 篇、速读 11 篇，主题集中在分布外鲁棒性与策略学习。组合学习驱动的 OOD 动作执行（AC-VLA）与可解释可纠错的视觉注意力（GuidedAttention）双双拿下满分，长视域残差强化学习与异步多模态扩散策略也颇具亮点。建议关注将可解释注意力与组合式策略融合，以提升真实场景中的鲁棒性与安全性。</p>
+<p>Top deep read papers:</p>
+<p>&quot;GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning&quot; (10.0/10)</p>
+<p>&quot;Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation&quot; (9.0/10)</p>
+<p>Top quick read papers (all 8.0/10):</p>
+<p>&quot;Foresight Residual RL for Long-Horizon Robot Manipulation with Vision-Language-Action Models&quot;</p>
+<p>&quot;Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion&quot;</p>
+<p>&quot;Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation&quot;</p>
+<p>Theme: Robot manipulation, VLA (Vision-Language-Action) models, humanoid robots, imitation learning, diffusion policies, world models.</p>
+<p>I need to output:</p>
+<p>A catchy title-like summary of today&#x27;s content</p>
+<p>The most noteworthy 1-2 directions/conclusions</p>
+<p>A next-step suggestion for general readers</p>
+<p>Let me craft this in 3 lines of plain Chinese text.&lt;/think&gt;</p>
+<p>今天精选 17 篇机器人操作与 VLA 前沿研究，聚焦可解释视觉注意力、人形机器人闭环操控、长视域残差强化学习与异步多模态扩散策略等方向。</p>
+<p>最值得关注：一是 GuidedAttention 让模仿学习获得可纠错的视觉焦点机制（10/10），二是 Persistent 3D Object Tokens 让类人机器人实现可验证的移动操控闭环（9/10），共同指向&quot;更可信、更可解释&quot;的具身智能落地路径。</p>
+<p>建议普通读者优先阅读 GuidedAttention 一文，它揭示了当前机器人为何在分布外场景容易翻车，以及如何用注意力干预低成本地修复，对理解 VLA 模型的鲁棒性瓶颈非常有帮助。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -98,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">12 篇</strong>
+    <strong class="dpr-home-dashboard-count">6 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AC-VLA: Robust Out-of-Distribution Action Execution via Compositional Learning">AC-VLA: Robust Out-of-Distribution Action Execution via Compositional Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="RoboTTT: Context Scaling for Robot Policies">RoboTTT: Context Scaling for Robot Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation">Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="FM-VLA: Force-based Memory for Vision-Language-Action Models in Contact-Rich Manipulation">FM-VLA: Force-based Memory for Vision-Language-Action Models in Contact-Rich Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>6</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
