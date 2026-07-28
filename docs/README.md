@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-07-27</span>
+      <span class="dpr-home-dashboard-kicker">2026-07-28</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 18 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 22 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>7</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>11</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-07-27 18:26:05 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-28 18:14:04 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,21 +62,35 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a daily report summary in Chinese, based on the given recommendation data. I need to output 3 sentences:</p>
-<p>A headline-style summary of what was done today</p>
-<p>The most noteworthy 1-2 directions/conclusions</p>
-<p>A suggestion for next steps (for general readers)</p>
-<p>Let me analyze the data:</p>
-<p>Date: 2026-07-27</p>
-<p>Total: 18 papers</p>
-<p>Deep read: 7</p>
-<p>Quick read: 11</p>
-<p>Top deep reads: Asynchronous Multimodal Diffusion Policy (9.0), Closing the Loop in Humanoid VLA (9.0)</p>
-<p>Quick reads: Test-Time Scaling for World Action Models (8.0), RynnBrain 1.1 (8.0), Patch Policy (8.0)</p>
-<p>The theme seems to be about embodied AI / robot learning - diffusion policies, VLA models, world models, embodied foundation models. Let me craft 3 concise sentences.&lt;/think&gt;</p>
-<p>今日精选 18 篇具身智能与机器人学习前沿论文，精读 7 篇、速读 11 篇，整体聚焦多模态策略与人形机器人闭环控制。</p>
-<p>最值得关注两个方向：异步多模态扩散策略通过延迟感知融合提升实时控制鲁棒性（9.0 分），以及人形机器人 VLA 借助持久 3D 物体 token 实现可验证的运动-操作闭环（9.0 分）。</p>
-<p>下一步建议：先读精读两篇把握&quot;异步融合+闭环验证&quot;的主线，再扫速读中的世界动作模型测试时缩放和 RynnBrain 基础模型，对比自己场景中的延迟与可验证性痛点。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in Chinese based on the given data. Let me analyze:</p>
+<p>Date: 2026-07-28</p>
+<p>Status: Success</p>
+<p>Total: 22 papers</p>
+<p>Deep read: 11 papers</p>
+<p>Quick read: 11 papers</p>
+<p>Deep read highlights (with scores):</p>
+<p>&quot;GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning&quot; (10.0/10)</p>
+<p>&quot;Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation&quot; (9.0/10)</p>
+<p>Quick read (with scores):</p>
+<p>&quot;Patch Policy: Efficient Embodied Control via Dense Visual Representations&quot; (8.0/10)</p>
+<p>&quot;RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation&quot; (8.0/10)</p>
+<p>&quot;WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory&quot; (8.0/10)</p>
+<p>I need to output 3 lines:</p>
+<p>A headline-worthy summary of what was done today</p>
+<p>The 1-2 most noteworthy directions/conclusions</p>
+<p>Next-step suggestion for general readers</p>
+<p>Let me draft:</p>
+<p>今日共筛选 22 篇机器人与具身智能论文，精读 11 篇，重点聚焦视觉注意力、人形机器人 VLA 与高效具身控制三大方向。</p>
+<p>视觉注意力可解释且可纠错的模仿学习框架（10分）值得首选关注，3D 物体令牌驱动的可验证人形机器人 loco-manipulation 闭环方案（9分）也极具落地潜力。</p>
+<p>建议优先精读 GuidedAttention 原文以理解注意力纠错机制，再按需扩展到 Patch Policy 等高效表示方向，结合自身项目场景评估迁移可行性。</p>
+<p>Let me refine to be more concise and appealing:</p>
+<p>今日完成 22 篇机器人/具身智能论文筛选与精读（11 篇），围绕可解释视觉注意力、3D 人形机器人闭环与高效视觉策略三大方向集中展开。</p>
+<p>重点关注 GuidedAttention（10分）：实现 OOD 鲁棒且可纠错的视觉注意力；以及 Closing the Loop in Humanoid VLA（9分）：用持久化 3D 物体令牌让 loco-manipulation 可验证。</p>
+<p>建议读者先精读 GuidedAttention 把方法吃透，再按需延伸到 Patch Policy 等高效表示方向，结合自身任务判断是否值得工程复现。</p>
+<p>This looks good. Let me finalize.&lt;/think&gt;</p>
+<p>今日完成 22 篇机器人/具身智能论文筛选，精读 11 篇，重点围绕可解释视觉注意力、可验证人形机器人闭环与高效视觉策略三大方向集中展开。</p>
+<p>重点关注 GuidedAttention（10 分）：可解释、可纠错的视觉注意力显著提升模仿学习的 OOD 鲁棒性；以及 Closing the Loop in Humanoid VLA（9 分）：用持久化 3D 物体令牌实现可验证的人形机器人 loco-manipulation 闭环。</p>
+<p>建议优先精读 GuidedAttention 把注意力纠错机制吃透，再按需扩展到 Patch Policy 等高效表示方向，结合自身项目场景评估能否工程落地。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -85,12 +99,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">7 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion">Asynchronous Multimodal Diffusion Policy Composition via Latency-Aware Guidance Fusion</span></li><li><span class="dpr-home-dashboard-paper-title" title="Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation">Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="FM-VLA: Force-based Memory for Vision-Language-Action Models in Contact-Rich Manipulation">FM-VLA: Force-based Memory for Vision-Language-Action Models in Contact-Rich Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation">Closing the Loop in Humanoid VLA: Persistent 3D Object Tokens for Verifiable Loco-Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="FM-VLA: Force-based Memory for Vision-Language-Action Models in Contact-Rich Manipulation">FM-VLA: Force-based Memory for Vision-Language-Action Models in Contact-Rich Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>7</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -101,7 +115,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation">Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation</span></li><li><span class="dpr-home-dashboard-paper-title" title="RynnBrain 1.1: Towards More Capable and Generalizable Embodied Foundation Model">RynnBrain 1.1: Towards More Capable and Generalizable Embodied Foundation Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="Patch Policy: Efficient Embodied Control via Dense Visual Representations">Patch Policy: Efficient Embodied Control via Dense Visual Representations</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Patch Policy: Efficient Embodied Control via Dense Visual Representations">Patch Policy: Efficient Embodied Control via Dense Visual Representations</span></li><li><span class="dpr-home-dashboard-paper-title" title="RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation">RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory">WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
