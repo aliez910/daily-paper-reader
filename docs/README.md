@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-07-29</span>
+      <span class="dpr-home-dashboard-kicker">2026-07-30</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 21 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 25 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>10</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>14</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-07-29 18:30:12 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-30 18:34:19 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,37 +62,28 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise, attractive Chinese summary in 3 sentences based on the given recommendation data. Let me analyze the data:</p>
-<p>Date: 2026-07-29</p>
+<p>&lt;think&gt;The user wants a concise daily report summary in Chinese, based on the provided data. Let me analyze:</p>
+<p>Date: 2026-07-30</p>
 <p>Status: Success</p>
-<p>Total: 21 papers</p>
-<p>Deep reading: 10</p>
-<p>Quick reading: 11</p>
-<p>Top deep reading papers (9.0/10):</p>
-<p>&quot;Robots Acquire Manipulation Skills in Seconds from a Single Human Video&quot; - robots learning from single human video</p>
-<p>&quot;Emergent Compositional Skills in Mixture-of-Experts VLAs&quot; - MoE VLA models</p>
-<p>Top quick reading papers (8.0/10):</p>
-<p>&quot;STeP: Signal Temporal Logic for Precise Specifications for Action Generation with Vision Language Models&quot;</p>
-<p>&quot;RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation&quot;</p>
-<p>&quot;WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory&quot;</p>
-<p>Key themes:</p>
-<p>Robot manipulation learning from human videos (imitation/learning efficiency)</p>
-<p>Vision-Language-Action models with MoE architectures</p>
-<p>World models for robotics (WorldScape, RoboInter)</p>
-<p>Using VLMs for action generation with temporal logic</p>
-<p>Let me craft 3 sentences:</p>
-<p>Headline-style summary</p>
-<p>Most noteworthy directions</p>
-<p>Suggestion for general readers</p>
-<p>Sentence 1: 今天共筛选21篇论文，精读10篇，核心聚焦机器人学习效率与视觉-语言-动作模型的进化。</p>
-<p>Sentence 2: 最值得关注的是&quot;秒级从单个人类视频学习操作技能&quot;和&quot;混合专家VLA涌现组合能力&quot;两项突破，机器人正从数据匮乏走向高效迁移。</p>
-<p>Sentence 3: 建议关注世界模型（如WorldScape 2.0）与中间表征（RoboInter1.5）方向，这是具身智能走向通用化的关键拼图。</p>
-<p>Let me refine to be more punchy and specific:</p>
-<p>今日精选21篇论文，精读10篇，重点聚焦机器人学习效率突破与视觉-语言-动作模型的能力跃迁。</p>
-<p>最值得关注：机器人可&quot;秒级&quot;从单段人类视频学会操作技能，混合专家VLA模型涌现出组合泛化能力，具身智能正快速摆脱数据瓶颈。</p>
-<p>建议普通读者持续追踪&quot;世界模型+中间表征&quot;方向（如WorldScape 2.0、RoboInter1.5），它们是机器人走向通用推理的关键基础设施。</p>
-<p>Let me make it more natural and concise:&lt;/think&gt;</p>
-<p>今日共筛选21篇论文，精读10篇，核心聚焦机器人学习效率的跃升与视觉-语言-动作模型的范式进化。最值得看的是&quot;机器人秒级从单个人类视频学会操作&quot;和&quot;混合专家VLA涌现组合技能&quot;两大突破，具身智能正快速摆脱数据与泛化的双重瓶颈。建议普通读者持续追踪&quot;世界模型+中间表征&quot;方向（如WorldScape 2.0、RoboInter1.5），这是机器人迈向通用推理的关键基础设施。</p>
+<p>Total: 25 papers</p>
+<p>Deep read: 14</p>
+<p>Quick read: 11</p>
+<p>Top deep read papers (both 9.0/10):</p>
+<p>&quot;Robots Acquire Manipulation Skills in Seconds from a Single Human Video&quot; - robots learning from a single human video</p>
+<p>&quot;Emergent Compositional Skills in Mixture-of-Experts VLAs&quot; - MoE VLA emergent skills</p>
+<p>Notable quick reads (8.0/10):</p>
+<p>Ordered Action Tokens for Visuomotor Policy Learning</p>
+<p>N0-VTLA: Vision-Tactile-Language-Action with Latent Tactile Tokens</p>
+<p>LeapBot-WA: World-Anchor Action Models</p>
+<p>Common theme: Robot manipulation, VLA (Vision-Language-Action), multimodal learning, efficiency.</p>
+<p>Let me write 3 lines:</p>
+<p>Title-grabbing summary</p>
+<p>Top 1-2 directions/conclusions</p>
+<p>Next-step suggestion for general readers</p>
+<p>Keep it concise, specific, no fabricated info.&lt;/think&gt;</p>
+<p>今日共筛选 25 篇论文并完成 14 篇精读，核心围绕机器人操作、VLA 模型与多模态策略学习等方向展开。</p>
+<p>最值得关注的是&quot;机器人仅凭一段人类视频即可在秒级习得操作技能&quot;，以及&quot;混合专家 VLA 模型中涌现出可组合的复合能力&quot;，二者均指向更高效率、更通用的机器人学习路径。</p>
+<p>建议普通读者优先关注单视频模仿与触觉-视觉-语言多模态融合两条线索，前者可能很快进入工业演示，后者则是迈向通用机器人的关键拼图。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -101,12 +92,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">10 篇</strong>
+    <strong class="dpr-home-dashboard-count">14 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
 <ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Robots Acquire Manipulation Skills in Seconds from a Single Human Video">Robots Acquire Manipulation Skills in Seconds from a Single Human Video</span></li><li><span class="dpr-home-dashboard-paper-title" title="Emergent Compositional Skills in Mixture-of-Experts VLAs">Emergent Compositional Skills in Mixture-of-Experts VLAs</span></li><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>10</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>14</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -117,7 +108,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="STeP: Signal Temporal Logic for Precise Specifications for Action Generation with Vision Language Models">STeP: Signal Temporal Logic for Precise Specifications for Action Generation with Vision Language Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation">RoboInter1.5: A Holistic Intermediate Representation Suite for Embodied World Modeling and Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory">WorldScape Policy 2.0: Empowering Steerable World Action Modeling with Reasoning-Augmented Memory</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Ordered Action Tokens for Visuomotor Policy Learning">Ordered Action Tokens for Visuomotor Policy Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens">$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens</span></li><li><span class="dpr-home-dashboard-paper-title" title="LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments">LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
