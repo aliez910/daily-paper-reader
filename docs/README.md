@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-07-30</span>
+      <span class="dpr-home-dashboard-kicker">2026-07-31</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 25 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 27 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>14</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>16</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-07-30 18:34:19 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-07-31 18:37:39 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,28 +62,21 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a concise daily report summary in Chinese, based on the provided data. Let me analyze:</p>
-<p>Date: 2026-07-30</p>
-<p>Status: Success</p>
-<p>Total: 25 papers</p>
-<p>Deep read: 14</p>
-<p>Quick read: 11</p>
-<p>Top deep read papers (both 9.0/10):</p>
-<p>&quot;Robots Acquire Manipulation Skills in Seconds from a Single Human Video&quot; - robots learning from a single human video</p>
-<p>&quot;Emergent Compositional Skills in Mixture-of-Experts VLAs&quot; - MoE VLA emergent skills</p>
-<p>Notable quick reads (8.0/10):</p>
-<p>Ordered Action Tokens for Visuomotor Policy Learning</p>
-<p>N0-VTLA: Vision-Tactile-Language-Action with Latent Tactile Tokens</p>
-<p>LeapBot-WA: World-Anchor Action Models</p>
-<p>Common theme: Robot manipulation, VLA (Vision-Language-Action), multimodal learning, efficiency.</p>
-<p>Let me write 3 lines:</p>
-<p>Title-grabbing summary</p>
-<p>Top 1-2 directions/conclusions</p>
+<p>&lt;think&gt;The user wants a concise Chinese daily report summary in 3 lines, based on the provided data about robotics/AI papers. Let me craft this carefully.</p>
+<p>The data shows:</p>
+<p>27 papers total, 16 deep-read, 11 skim-read</p>
+<p>Top rated papers focus on Vision-Language-Action models with Mixture-of-Experts, visual attention for robot manipulation, and various world models for robotics</p>
+<p>Themes: VLA models, robot manipulation, world models, tactile models, data scaling laws</p>
+<p>Let me write 3 concise lines:</p>
+<p>Catchy title-line about today&#x27;s focus</p>
+<p>Most worth-noting direction/conclusion (1-2 papers)</p>
 <p>Next-step suggestion for general readers</p>
-<p>Keep it concise, specific, no fabricated info.&lt;/think&gt;</p>
-<p>今日共筛选 25 篇论文并完成 14 篇精读，核心围绕机器人操作、VLA 模型与多模态策略学习等方向展开。</p>
-<p>最值得关注的是&quot;机器人仅凭一段人类视频即可在秒级习得操作技能&quot;，以及&quot;混合专家 VLA 模型中涌现出可组合的复合能力&quot;，二者均指向更高效率、更通用的机器人学习路径。</p>
-<p>建议普通读者优先关注单视频模仿与触觉-视觉-语言多模态融合两条线索，前者可能很快进入工业演示，后者则是迈向通用机器人的关键拼图。</p>
+<p>Line 1: 今日聚焦机器人操作与VLA模型,共筛27篇(精读16),MoE架构与可解释视觉注意力成主线。</p>
+<p>Line 2: 最值得关注:MoE VLA展现涌现组合技能,GuidedAttention通过可纠错注意力提升分布外鲁棒性,二者指向&quot;更可解释、更可干预&quot;的机器人策略方向。</p>
+<p>Line 3: 建议关注世界-动作统一模型(WorldDiT等)与触觉原生架构,后续可观察它们在长程任务与接触密集场景的实测表现。&lt;/think&gt;</p>
+<p>今日聚焦机器人操作与 VLA 模型,共筛 27 篇(精读 16、速读 11),Mixture-of-Experts 架构与可纠错视觉注意力成为主线。</p>
+<p>最值得关注两个方向:MoE 结构的 VLA 模型涌现出组合式技能;GuidedAttention 通过可解释、可修正的注意力提升模仿学习在分布外场景的鲁棒性。</p>
+<p>下一步建议普通读者持续跟踪世界-动作统一扩散架构(如 WorldDiT)与触觉原生世界模型在长程、接触密集任务中的实测进展。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -92,12 +85,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">14 篇</strong>
+    <strong class="dpr-home-dashboard-count">16 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Robots Acquire Manipulation Skills in Seconds from a Single Human Video">Robots Acquire Manipulation Skills in Seconds from a Single Human Video</span></li><li><span class="dpr-home-dashboard-paper-title" title="Emergent Compositional Skills in Mixture-of-Experts VLAs">Emergent Compositional Skills in Mixture-of-Experts VLAs</span></li><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Emergent Compositional Skills in Mixture-of-Experts VLAs">Emergent Compositional Skills in Mixture-of-Experts VLAs</span></li><li><span class="dpr-home-dashboard-paper-title" title="GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning">GuidedAttention: Interpretable and Correctable Visual Attention for OOD-Robust Robot Manipulation via Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens">$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>14</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>16</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -108,7 +101,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Ordered Action Tokens for Visuomotor Policy Learning">Ordered Action Tokens for Visuomotor Policy Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens">$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens</span></li><li><span class="dpr-home-dashboard-paper-title" title="LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments">LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="The Curse of Precision: A Data Scaling Law for High-Precision Robotic Manipulation">The Curse of Precision: A Data Scaling Law for High-Precision Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation">$N_0$-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="WorldDiT: A Unified Diffusion Architecture for World and Action Modeling">WorldDiT: A Unified Diffusion Architecture for World and Action Modeling</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
