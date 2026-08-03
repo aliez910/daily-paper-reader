@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-02</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-03</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 27 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>16</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-02 17:54:56 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-03 18:55:05 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,15 +62,39 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a daily report summary in Chinese, 3 sentences, based on the given data. Let me analyze:</p>
-<p>Date: 2026-08-02</p>
-<p>Total: 27 papers</p>
-<p>Deep read: 16</p>
-<p>Quick read: 11</p>
-<p>Top deep reads: &quot;The Curse of Precision: A Data Scaling Law for High-Precision Robotic Manipulation&quot; (10/10), &quot;N0-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens&quot; (9/10)</p>
-<p>Top quick reads: Several robotics/vision-tactile manipulation papers</p>
-<p>The theme is clearly robotic manipulation with vision-tactile-language-action models. Let me write 3 concise sentences.&lt;/think&gt;</p>
-<p>今天从 27 篇论文中精选精读 16 篇、速读 11 篇，整体围绕&quot;机器人精细操控&quot;与&quot;视觉-触觉-语言-动作多模态模型&quot;两条主线展开。最值得关注的方向：一是高精度操控存在&quot;精度诅咒&quot;的数据扩展规律，二是视觉-触觉-语言-动作模型通过潜在触觉 token 实现了规模化迁移，两者共同指向多模态感知是突破精细操作瓶颈的关键。建议读者先精读那篇满分论文建立数据规模直觉，再对比速读中的 world model 与 Real2Sim2Real 路线，判断自己更看好端到端 VLA 还是&quot;先仿真后落地&quot;的技术路径。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary based on the given recommendation data. Let me analyze the data:</p>
+<p>Date: 2026-08-03</p>
+<p>Status: Success</p>
+<p>Total: 28 papers</p>
+<p>Deep reading: 17 papers</p>
+<p>Quick reading: 11 papers</p>
+<p>Top deep reading:</p>
+<p>N₀-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens (9.0/10)</p>
+<p>WorldDiT: A Unified Diffusion Architecture for World and Action Modeling (9.0/10)</p>
+<p>Top quick reading:</p>
+<p>N₀-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation (8.0/10)</p>
+<p>LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments (8.0/10)</p>
+<p>PAC-DP: PAC-Bayesian Diffusion Policy Learning (8.0/10)</p>
+<p>Themes I see:</p>
+<p>Tactile-native world models and VLA scaling (N₀-VTLA, N₀-TWAM)</p>
+<p>World-action models with diffusion (WorldDiT, LeapBot-WA)</p>
+<p>Diffusion policy learning with theoretical guarantees (PAC-DP)</p>
+<p>Let me write 3 concise lines in Chinese:</p>
+<p>Headline-grabbing summary of today&#x27;s focus</p>
+<p>1-2 most noteworthy directions/conclusions</p>
+<p>Next-step suggestion for general readers</p>
+<p>Let me draft:</p>
+<p>今天从28篇论文中精选17篇精读，聚焦&quot;世界模型+动作&quot;的统一架构与可扩展触觉表征。</p>
+<p>重点关注两条主线：N₀-VTLA/WorldDiT 把视觉-触觉-语言-动作塞进同一个扩散式世界模型；PAC-DP 则给扩散策略加上了 PAC-Bayes 理论保证，让&quot;学得对&quot;变得可证明。</p>
+<p>对做机器人或具身智能的读者，建议先读 N₀-VTLA 与 PAC-DP：一个拓展多模态上限，一个夯实训练可靠性。</p>
+<p>Let me refine to be more concise and catchy:</p>
+<p>今天从 28 篇中精读 17 篇，主线是&quot;世界模型 × 动作策略&quot;的统一架构与可扩展触觉表征。</p>
+<p>最值得关注：N₀-VTLA 用潜在触觉 token 把视-触-语言-动作扩展为同一套世界模型；WorldDiT 与 PAC-DP 分别从扩散架构和 PAC-Bayes 理论两端压实&quot;世界-动作&quot;学习。</p>
+<p>建议读者先读 N₀-VTLA 与 PAC-DP——前者拓多模态上限，后者给扩散策略补上可证明的训练保证。</p>
+<p>That&#x27;s good. Let me tighten it more.&lt;/think&gt;</p>
+<p>今天从 28 篇中精读 17 篇，主线是&quot;世界模型 × 动作策略&quot;的统一架构与可扩展触觉表征。</p>
+<p>最值得关注：N₀-VTLA 用潜在触觉 token 把视-触-语言-动作扩展进同一套世界模型，WorldDiT 与 PAC-DP 分别从扩散架构和 PAC-Bayes 理论两端夯实&quot;世界-动作&quot;学习。</p>
+<p>建议先读 N₀-VTLA 与 PAC-DP——前者拓展多模态上限，后者给扩散策略补上可证明的训练保证。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -79,12 +103,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">16 篇</strong>
+    <strong class="dpr-home-dashboard-count">17 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="The Curse of Precision: A Data Scaling Law for High-Precision Robotic Manipulation">The Curse of Precision: A Data Scaling Law for High-Precision Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens">$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens</span></li><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation">$N_0$-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens">$N_0$-VTLA: Scaling Vision-Tactile-Language-Action Model with Latent Tactile Tokens</span></li><li><span class="dpr-home-dashboard-paper-title" title="WorldDiT: A Unified Diffusion Architecture for World and Action Modeling">WorldDiT: A Unified Diffusion Architecture for World and Action Modeling</span></li><li><span class="dpr-home-dashboard-paper-title" title="FutureRTC: Real-Time Robot Execution with Anticipatory-Conditioned Action Chunking">FutureRTC: Real-Time Robot Execution with Anticipatory-Conditioned Action Chunking</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>16</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -95,7 +119,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="ViTacWorld: Scaling Visuo-Tactile World Models for Contact-Rich Robot Manipulation">ViTacWorld: Scaling Visuo-Tactile World Models for Contact-Rich Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Real2Sim2Real for Vision-Language-Action Manipulation: An AMD ROCm-Based Pipeline">Real2Sim2Real for Vision-Language-Action Manipulation: An AMD ROCm-Based Pipeline</span></li><li><span class="dpr-home-dashboard-paper-title" title="LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments">LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="$N_0$-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation">$N_0$-TWAM: Scaling Tactile-Native World-Action Model for Contact-Rich Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments">LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments</span></li><li><span class="dpr-home-dashboard-paper-title" title="PAC-DP: PAC-Bayesian Diffusion Policy Learning">PAC-DP: PAC-Bayesian Diffusion Policy Learning</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
