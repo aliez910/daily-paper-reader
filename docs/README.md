@@ -44,14 +44,14 @@
       <span class="dpr-home-dashboard-kicker">2026-08-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 30 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 44 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>19</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>25</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>19</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 02:39:17 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 17:44:11 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,21 +62,17 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and produce a concise Chinese summary in 3 lines based on the given data. Let me analyze the data:</p>
+<p>&lt;think&gt;The user wants me to write a Chinese daily report summary in 3 sentences based on the given data. Let me analyze:</p>
 <p>Date: 2026-08-07</p>
-<p>Total: 30 papers</p>
-<p>Deep read: 19 papers</p>
-<p>Quick read: 11 papers</p>
-<p>Top deep read scores: 9.0/10 - two papers on robot imitation learning (Counterfactual Action Sensitivity Coverage, and Cross-Embodiment Transfer via Behavior-Aligned Representations)</p>
-<p>Quick read highlights: Vision-Language-Action Models with kinematic guidance, Distributional Latent Actions, Failure Detection for Surgical Robot Imitation</p>
-<p>Theme: Robot imitation learning, VLA models, cross-embodiment transfer</p>
-<p>Let me craft 3 lines:</p>
-<p>Catchy headline summary</p>
-<p>Most noteworthy directions/conclusions (1-2)</p>
-<p>Next-step suggestion for general readers&lt;/think&gt;</p>
-<p>今日精选 30 篇论文，聚焦机器人模仿学习与视觉-语言-动作模型，19 篇深度精读中以数据高效的鲁棒模仿和跨形态迁移为两大亮点。</p>
-<p>最值得关注的方向：一是反事实动作敏感度覆盖（CASCO）显著提升数据效率与鲁棒性，二是行为对齐表征让不同机器人本体间实现知识迁移，配合运动学先验与流匹配世界模型，VLA 模型在手术等高风险场景的可靠性正快速推进。</p>
-<p>建议对相关方向感兴趣的读者，先从两篇 9.0 分精读入手理解方法全貌，再浏览速读论文补充技术细节，并关注其在真实机器人平台上的复现与开源情况。</p>
+<p>Status: Success</p>
+<p>Total: 44 papers</p>
+<p>Deep read (精读): 25 papers</p>
+<p>Quick read (速读): 19 papers</p>
+<p>Top deep reads: Two 9.0/10 papers on cross-embodiment transfer and world action models for manipulation</p>
+<p>Top quick reads: Surgical robot failure detection, world action planner, RoboBRIDGE framework (all 8.0/10)</p>
+<p>Key themes: World models, cross-embodiment transfer, robust manipulation, imitation learning</p>
+<p>Let me write 3 concise, attractive sentences in Chinese.&lt;/think&gt;</p>
+<p>今日精选 44 篇论文完成阅读，重点聚焦世界模型与跨本体迁移在机器人操控中的最新进展。最值得一看的两个方向：一是借助行为对齐表征实现跨机器人本体的高效技能迁移，二是面向视觉分布偏移的语义-时序世界动作模型显著提升操控鲁棒性。普通读者可先从 RoboBRIDGE 等模块化框架入门，理解如何把策略从仿真稳健落地到真实机器人。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -85,12 +81,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">19 篇</strong>
+    <strong class="dpr-home-dashboard-count">25 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="It&#x27;s Not Just More Demos: Counterfactual Action Sensitivity Coverage for Data-Efficient Robust Robot Imitation">It&#x27;s Not Just More Demos: Counterfactual Action Sensitivity Coverage for Data-Efficient Robust Robot Imitation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Cross-Embodiment Transfer via Behavior-Aligned Representations">Cross-Embodiment Transfer via Behavior-Aligned Representations</span></li><li><span class="dpr-home-dashboard-paper-title" title="ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts">ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Cross-Embodiment Transfer via Behavior-Aligned Representations">Cross-Embodiment Transfer via Behavior-Aligned Representations</span></li><li><span class="dpr-home-dashboard-paper-title" title="ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts">ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts</span></li><li><span class="dpr-home-dashboard-paper-title" title="TRACT: Temporally Routed Action Chunks with Chronological Phase Authority for Contact-Rich Manipulation">TRACT: Temporally Routed Action Chunks with Chronological Phase Authority for Contact-Rich Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>19</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>25</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -98,12 +94,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">19 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Explicit Kinematic Guidance from Analytic Concepts for Vision-Language-Action Models">Explicit Kinematic Guidance from Analytic Concepts for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="DLAM: Distributional Latent Actions with Temporal Constraints">DLAM: Distributional Latent Actions with Temporal Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Failure Detection for Surgical Robot Imitation Policies via Flow-Matching World Modeling">Failure Detection for Surgical Robot Imitation Policies via Flow-Matching World Modeling</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Failure Detection for Surgical Robot Imitation Policies via Flow-Matching World Modeling">Failure Detection for Surgical Robot Imitation Policies via Flow-Matching World Modeling</span></li><li><span class="dpr-home-dashboard-paper-title" title="World Action Planner: Generalizable Decision-Making with Action-Conditioned World Models">World Action Planner: Generalizable Decision-Making with Action-Conditioned World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="RoboBRIDGE: A Modular Framework for Bridging Policies to Robust Real-World Robotic Agents">RoboBRIDGE: A Modular Framework for Bridging Policies to Robust Real-World Robotic Agents</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>19</strong></span></div>
 </section>
 </div>
 
