@@ -41,7 +41,7 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-08</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-09</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
     <strong class="dpr-home-dashboard-count">共 33 篇</strong>
@@ -51,7 +51,7 @@
     <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>22</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-08 17:33:02 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-09 17:30:52 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,20 +62,20 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;Let me analyze the daily report data for 2026-08-08:</p>
+<p>&lt;think&gt;The user wants a daily report summary in Chinese, 3 lines max, based on the given data. Let me analyze:</p>
+<p>Date: 2026-08-09</p>
 <p>Total: 33 papers</p>
-<p>Deep read: 22 papers</p>
-<p>Quick read: 11 papers</p>
-<p>Top deep reads: ST-WAM (9.0) and ActFovea (9.0) - both about robotic manipulation and VLA policy safety</p>
-<p>Top quick reads: Mirror Learning, FibVLA, WCM - about reflection/learning efficiency and VLA reinforcement learning</p>
-<p>All top papers are focused on VLA (Vision-Language-Action) models and robotics manipulation, with emphasis on robustness, safety, and efficiency.</p>
-<p>Let me draft 3 lines:</p>
-<p>Headline - today&#x27;s focus on VLA and robotic manipulation robustness</p>
-<p>Key takeaways - the two top papers about distribution shift robustness and runtime safeguarding</p>
+<p>Deep read: 22, Speed read: 11</p>
+<p>Top deep reads (9.0/10): SelfWAM and DynamicWAM - both about World Action Models for robot control/manipulation</p>
+<p>Top speed reads (8.0/10): Cloud-Edge VLA models, RL Bootstrapping OpenVLA-OFT, OC-VLA++ with cross-view consistency</p>
+<p>Theme: Robot control/manipulation with World Action Models (WAM) and VLA models</p>
+<p>Let me write 3 concise lines:</p>
+<p>Headline-style overview</p>
+<p>Key directions worth attention</p>
 <p>Next step suggestion for general readers&lt;/think&gt;</p>
-<p>今日精选 33 篇中 22 篇精读，围绕 Vision-Language-Action 模型在机器人操控中的鲁棒性与安全性展开筛选。</p>
-<p>最值得关注的方向：一是 ST-WAM 用语义-时间世界动作模型应对视觉分布漂移，二是 ActFovea 在运行时通过时空视觉-动作一致性为 VLA 策略加安全护栏，二者均拿到 9.0 高分。</p>
-<p>建议普通读者先从 Mirror Learning 与 FibVLA 这两篇速读入手，用低门槛案例理解&quot;自我反思+高效采样&quot;如何提升具身智能体的稳定性，再决定是否深入精读。</p>
+<p>今日共筛选 33 篇论文并完成 22 篇精读，重点聚焦机器人世界-动作模型（WAM）与视觉-语言-动作（VLA）控制的最新进展，主题高度集中在具身智能操作方向。</p>
+<p>最值得关注的两条主线：一是 SelfWAM 与 DynamicWAM 证明统一世界-动作模型可同时实现快慢速机器人控制与动态操作；二是云边协同 VLA（Latency-Tolerant）与单目几何引导的跨视角一致性（OC-VLA++）正在突破延迟与视角鲁棒性两大落地瓶颈。</p>
+<p>建议普通读者优先读 SelfWAM 了解&quot;世界模型+动作&quot;统一范式，再看 OC-VLA++ 感受工程化技巧，即可快速建立当前具身 AI 前沿的全貌认知。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -87,7 +87,7 @@
     <strong class="dpr-home-dashboard-count">22 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts">ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts</span></li><li><span class="dpr-home-dashboard-paper-title" title="ActFovea: Runtime Safeguarding for VLA Policies via Spatiotemporal Visual-Action Consistency">ActFovea: Runtime Safeguarding for VLA Policies via Spatiotemporal Visual-Action Consistency</span></li><li><span class="dpr-home-dashboard-paper-title" title="TRACT: Temporally Routed Action Chunks with Chronological Phase Authority for Contact-Rich Manipulation">TRACT: Temporally Routed Action Chunks with Chronological Phase Authority for Contact-Rich Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="SelfWAM: A Self-Grounded Unified World Action Model for Fast Robot Control">SelfWAM: A Self-Grounded Unified World Action Model for Fast Robot Control</span></li><li><span class="dpr-home-dashboard-paper-title" title="DynamicWAM: Dual-Path Motion Conditioning for World-Action Models in Dynamic Manipulation">DynamicWAM: Dual-Path Motion Conditioning for World-Action Models in Dynamic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="DreamTrajectory: Trajectory-Guided Action Generation with World Model Alignment for Mobile Manipulation">DreamTrajectory: Trajectory-Guided Action Generation with World Model Alignment for Mobile Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>22</strong></span></div>
 </section>
@@ -100,7 +100,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Mirror Learning">Mirror Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="FibVLA: An Efficient Temporal Vision-Language-Action Model with Fibonacci Sampling">FibVLA: An Efficient Temporal Vision-Language-Action Model with Fibonacci Sampling</span></li><li><span class="dpr-home-dashboard-paper-title" title="WCM: A World Critic Model for Vision-Language-Action Reinforcement Learning">WCM: A World Critic Model for Vision-Language-Action Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Latency-Tolerant Cloud-Edge Collaborative Vision-Language-Action Models via Emergent Representational Specialization">Latency-Tolerant Cloud-Edge Collaborative Vision-Language-Action Models via Emergent Representational Specialization</span></li><li><span class="dpr-home-dashboard-paper-title" title="RL Bootstrapping of OpenVLA-OFT for a Novel Robot Embodiment">RL Bootstrapping of OpenVLA-OFT for a Novel Robot Embodiment</span></li><li><span class="dpr-home-dashboard-paper-title" title="OC-VLA++: Monocular Geometry-Guided Cross-View Consistency for Viewpoint-Robust Robotic Manipulation">OC-VLA++: Monocular Geometry-Guided Cross-View Consistency for Viewpoint-Robust Robotic Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
