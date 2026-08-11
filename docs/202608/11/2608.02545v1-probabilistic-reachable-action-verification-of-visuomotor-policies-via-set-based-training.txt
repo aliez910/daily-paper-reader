@@ -1,0 +1,952 @@
+Title: Probabilistic Reachable-Action Verification of Visuomotor Policies via Set-Based Training
+
+URL Source: https://arxiv.org/pdf/2608.02545v1
+
+Published Time: Tue, 04 Aug 2026 02:45:51 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Probabilistic Reachable-Action Verification of Visuomotor Policies via Set-Based Training 
+
+## Yanliang Huang 1, Zhuocheng Zhang 1, Peng Xie 1, Zhen Zhang 1, Wenyuan Wu 1, Majid Khadiv 1,Zhuoqi Zeng 2, Amr Alanwar 1
+
+> 1
+
+School of Computation, Information and Technology, Technical University of Munich, Munich, Germany 
+
+> 2
+
+School of Engineering, Hainan Bielefeld University of Applied Sciences, Hainan, China {yanliang.huang, zhuocheng.zhang, p.xie, zhenzhang.zhang, wenyuan.wu, majid.khadiv, alanwar}@tum.de, zhuoqi.zeng@hainan-biuh.edu.cn 
+
+Abstract 
+
+Reachability analysis for visuomotor policies is difficult be-cause large visual encoders make end-to-end set propagation computationally expensive and excessively conservative. We therefore freeze the visual encoder and confine set propaga-tion to a low-dimensional interface between it and the down-stream policy, with the interface set calibrated from held-out camera-pose perturbations. Propagating this set through the policy with zonotopes yields a terminal output-enclosure width that set-based training optimizes directly. During eval-uation, camera-pose perturbations are sampled from the pre-scribed distribution, and rollout-level split conformal calibra-tion converts the resulting action-deviation scores into a prob-abilistic reachable-action radius with finite-sample coverage. In controlled manipulation experiments, set-based training reduces this radius while preserving closed-loop task capa-bility, and matched behavior-only, observational-consistency, and pointwise-adversarial controls all leave a larger radius. 
+
+## 1 Introduction 
+
+Fixed cameras on manipulation robots drift through cali-bration residuals, mounting shifts, and thermal deformation during deployment (Lee et al. 2020; Nobre and Heckman 2020; Nimura and Adamczyk 2022). A pose shift changes the observed image and can make a learned visuomotor pol-icy produce a different action sequence for the same scene, and the largest resulting action deviation is the safety con-cern, since it may drive the end effector into unsafe regions or cause collisions. Recent robustness benchmarks confirm that camera-viewpoint perturbations substantially affect visuo-motor policies (Fei et al. 2026). This motivates verification that quantifies, before deployment, how far a camera-pose perturbation can move the commanded action. Set-based training makes the size of a propagated out-put enclosure an explicit training objective, so the trained network produces tighter enclosures that are easier to verify (Koller, Ladner, and Althoff 2025). Applying it end-to-end to a modern visuomotor policy is intractable, since propagating a set through a large visual encoder accumulates relaxation error across many layers and leaves the resulting action set both expensive to compute and too loose to be useful. Our idea is to keep the visual encoder frozen and insert a calibrated low-dimensional interface between it and the downstream policy, so that the camera-pose uncertainty is carried in a few dimensions and set propagation runs only through the small downstream policy. Set-based training then contracts the propagated output enclosure directly, which is tractable where end-to-end propagation is not. Split confor-mal calibration of the sampled action deviations then reports a radius with finite-sample coverage. Figure 1 summarizes the pipeline. Our contributions are the following. 
+
+• We decouple the frozen visual encoder from the down-stream policy through a calibrated low-dimensional in-terface and apply set-based training to the policy alone, which makes set-based verification tractable for a visuo-motor policy. 
+
+• We prove that the trained enclosure width upper-bounds the physical action deviation induced by a sampled cam-era perturbation, which links the training objective to the calibrated radius reported at deployment. 
+
+• On a manipulation benchmark under camera-extrinsic perturbation, set-based training reduces the reachable-action radius while preserving closed-loop task ca-pability, and matched behavior-only, observational-consistency, and pointwise-adversarial controls do not reproduce the reduction. 
+
+## 2 Preliminaries and Problem Formulation 
+
+Zonotopes. We represent a bounded set by a zono-tope (Kühn 1998). A zonotope with center c ∈ Rn and generator matrix G ∈ Rn×p is 
+
+Z = ⟨c, G ⟩ = {c + Gβ : β ∈ [−1, 1] p} . (1) Its coordinate-wise half-width vector is 
+
+h(Z) = |G|1, (2) and its L∞ radius is 
+
+r∞(Z) = ∥h(Z)∥∞ = max 
+
+> j
+
+X
+
+> k
+
+|Gjk |. (3) An affine map x 7 → W x + b transforms the zonotope as 
+
+W ⟨c, G ⟩ + b = ⟨W c + b, W G ⟩. (4) For a ReLU layer we use the single-neuron zonotope relax-ation, which appends one generator per crossing coordinate arXiv:2608.02545v1 [cs.RO] 3 Aug 2026 1
+
+## 2
+
+## 3   
+
+> Set-based training
+> Calibration
+> Reachable-action veri fi cation
+> Vision Encoder
+> camera-pose perturbation
+> new sampled pose
+> bottleneck Calibrated bottleneck set Flow Matching Network
+> VITA variant
+> 32-D
+> Output zonotope
+> gradient update
+> Set-based
+> VITA variant
+> split conformal
+
+→  
+
+> Set-based
+> VITA variant
+> perturbed actions
+> nominal actions
+> action step
+> action coordinate
+> nominal perturbed conformal tube
+
+Figure 1: Overview of the proposed pipeline. (1) Set-based training: an observation is mapped through the frozen vision encoder and bottleneck to a representation z. The calibrated bottleneck set Bϵ(z) = ⟨z, ϵI m⟩ is propagated through the Vision-to-Action Flow Matching Policy (VITA) (Gao et al. 2026) variant to obtain an output zonotope enclosing the actions reachable from that set. The objective reduces the enclosure width while preserving imitation performance. (2) Calibration: the trained policy evaluates nominal and camera-pose-perturbed observations. Their rollout-level action deviations are calibrated using split conformal prediction to obtain the probabilistic reachable-action radius q. (3) Probabilistic reachable-action verification: for a new camera pose sampled from the prescribed distribution, q upper-bounds the rollout-level deviation from the nominal action block with finite-sample marginal coverage at least 1 − α.to bound the relaxation error (Singh et al. 2018). Writing 
+
+rj = P 
+
+> k
+
+|Gjk |, lj = cj − rj , and uj = cj + rj for the interval induced along coordinate j, the relaxation is 
+
+ReLU #⟨c, G ⟩ = Λc+μ, [ Λ G | E ] , Λ = diag( λj ),
+
+(5) with the coordinate-wise slope λj and offset μj given by 
+
+λj =
+
+
+
+0, uj ≤ 0,
+
+1, lj ≥ 0 and uj > 0,uj
+
+uj − lj
+
+, lj < 0 < u j ,μj =
+
+
+
+0, uj ≤ 0 or lj ≥ 0,
+
+− uj lj
+
+2( uj − lj ) , lj < 0 < u j .
+
+(6) where E has one column for each crossing coordinate j with 
+
+lj < 0 < u j , equal to μj in row j and zero elsewhere. 
+
+Policy and camera-pose uncertainty. Let a denote a de-ployment state, including the scene and task information held fixed during one policy evaluation, and let v0 be the nominal camera pose. A visuomotor policy πθ produces an action block 
+
+Aθ (a, v ) ∈ RT ×d (7) when the state a is observed under camera pose v, with T
+
+action steps and d action coordinates per step. We write 
+
+Aθ (a) = Aθ (a, v 0) (8) for the nominal action block. The admissible camera-pose set is 
+
+V = {v : ∥∆rot( v)∥∞ ≤ δrot , ∥∆trans( v)∥∞ ≤ δtrans } ,
+
+(9) where δrot and δtrans specify the rotation and translation budgets. Let C ⊆ { 1, . . . , d } denote the continuous action coordinates used in the deviation metric. 
+
+Camera-pose distribution and verification target. Let 
+
+PV be the prescribed distribution supported on the bounded camera-pose set V, from which deployment poses are drawn. For a pose v ∼ PV , define the nominal-centered action devi-ation 
+
+dθ (a, v ) = max  
+
+> t, j ∈C
+
+|Aθ,tj (a, v ) − Aθ,tj (a)| . (10) The network emits the action block in normalized coordi-nates as ˜Aθ , and the policy commands Aθ,tj = sj ˜Aθ,tj + bj
+
+with per-coordinate action scale sj > 0 and offset bj , so Aθ
+
+is in the policy’s commanded action units. The offset can-cels in the nominal-centered difference, so the deviation (10) equals max t, j ∈C sj | ˜Aθ,tj (a, v ) − ˜Aθ,tj (a)| and is measured in commanded action units. 
+
+Sampling and conformal calibration. Let g denote an ex-changeable statistical unit, a rollout initialization, containing a finite set of states A(g). For each unit we draw one cam-era pose vg ∼ PV , which our experiments instantiate as the uniform law on V, independently across units, and freeze it before any policy output is read. The group score is the largest nominal-centered deviation this single sampled pose induces over the states of the unit, 
+
+Sθ (g, v g ) = max  
+
+> a∈A (g)
+
+dθ (a, v g ). (11) The verification target is 
+
+q⋆θ (α) = inf 
+
+
+
+q : Pr 
+
+> g,v
+
+[Sθ (g, v ) ≤ q] ≥ 1 − α
+
+
+
+, (12) the smallest radius the group score respects with probabil-ity at least 1 − α under the joint draw of a rollout ini-tialization and a camera pose v ∼ PV . We call q⋆θ (α)
+
+the probabilistic reachable-action radius induced by PV .We estimate q⋆θ by rollout-level split conformal calibration. Given n exchangeable calibration groups with ordered scores 
+
+S(1) ≤ · · · ≤ S(n), and assuming k ≤ n, split conformal cal-ibration at level 1 − α uses 
+
+k = ⌈(n + 1)(1 − α)⌉ , qθ = S(k). (13) For a new exchangeable group gnew with a fresh pose vnew 
+
+drawn from the same distribution, 
+
+Pr [ Sθ (gnew , v new ) ≤ qθ ] ≥ 1 − α. (14) The exchangeable unit is the pair of a rollout initialization and its sampled pose, so qθ is the split-conformal estimate of 
+
+q⋆θ .
+
+## 3 Verification-Compatible Set-Based Training 
+
+Flow-matching and diffusion policies are typically realized with a large denoising network (Chi et al. 2023), through which set propagation accumulates relaxation error layer by layer. We therefore take the downstream policy fθ to be a Vision-to-Action Flow Matching Policy (VITA) (Gao et al. 2026) variant, which realizes the action flow with a small multilayer perceptron, so a propagated set traverses few layers and its enclosure stays informative after propagation. 
+
+3.1 Interface and training objective 
+
+The verification interface is a fixed low-dimensional bottle-neck through which the bounded set enters the downstream policy. Let h map an observation oi to a bottleneck represen-tation zi = h(oi) ∈ Rm, and let fθ be the downstream policy that maps zi, together with any non-visual conditioning ui, to a normalized action block ˜Ai = fθ (zi, u i). Set-based train-ing updates the downstream parameters θ while holding the frozen map h fixed. The training objective combines an im-itation loss on ˜Ai with a width loss on the propagated set, which replaces the bottleneck representation with an inter-face set 
+
+Bi = ⟨zi, G in ⟩, (15) a zonotope centered at zi with a fixed generator matrix Gin ,whose isotropic case Gin = ϵI m appears in Figure 1, and propagates it through the same downstream policy. The gen-erator Gin is fixed before training as the 95% held-out state-level marginal quantile of the bottleneck-representation shift that perturbations v ∼ PV induce, calibrated on 180 held-out states. 
+
+Output enclosure and terminal width. The exact object the width loss contracts is the image of the interface set under the downstream policy, 
+
+Yi(θ) = { fθ (z, u i) : z ∈ B i }. (16) Let f # 
+
+> θ
+
+denote the zonotope abstract transformer that prop-agates Bi through fθ with the affine map (4) and the ReLU relaxation (5) of Section 2, giving an output zonotope 
+
+Zout  
+
+> i
+
+= f # 
+
+> θ
+
+(Bi, u i) = ⟨cout  
+
+> i
+
+, G out  
+
+> i
+
+⟩ ⊇ Y i(θ), (17) whose inclusion of Yi(θ) Proposition 1 establishes. All prop-agated outputs use the normalized coordinates defined in Section 2, where the center cout  
+
+> i
+
+, the generators Gout  
+
+> i
+
+, and the normalized nominal action ˜Ai are expressed, and sj maps each coordinate to its commanded action unit. Let Jtrain de-note the flattened step–coordinate indices of the T × d action block used by the objective, all output coordinates including the gripper channel, and sj denotes the action scale of the coordinate that flattened index j belongs to. The terminal output-enclosure width is 
+
+ρi = 1
+
+νi
+
+max 
+
+> j∈J train
+
+sj
+
+X
+
+> k
+
+Gout  
+
+> i,jk
+
+, (18) the largest scaled generator row sum over the training coordi-nates, normalized by νi = max( ∥Ai∥2, ϵ 0), the stop-gradient 
+
+L2 norm of the commanded nominal action block Ai of Sec-tion 2, with a floor ϵ0 = 10 −9. Thus ρi is a dimensionless relative enclosure width. 
+
+Adaptive width-constrained objective. We minimize the mean imitation loss subject to the mean minibatch width 
+
+¯ρM = 1
+
+> |M|
+
+P 
+
+> i∈M
+
+ρi not exceeding rtarget , and optimize this constraint with an adaptive hinge and a projected multiplier while preserving nominal behavior. The training loss couples the imitation objective with a hinge on the excess width, 
+
+L(θ, λ ) = Limitation (θ) + λ ¯ρM − rtarget 
+
+
+
+> +
+
+, (19) Algorithm 1 Set-based training through a verification inter-face. 
+
+1: Require: the frozen interface h; the downstream archi-tecture fθ unrolled into affine and ReLU # layers with frozen BatchNorm; the interface generators Gin ; the action scales sj and offsets bj of Section 2; the number of flow steps K with dt = 1 /K ; the target radius rtarget ;the dual step ηλ and cap λmax ; the optimizer Opt 
+
+2: λ ← 0
+
+3: for each minibatch M do 
+
+4: for i ∈ M do 
+
+5: zi ← h(oi), ˜Ai ← fθ (zi, u i) ▷ imitation loss input 
+
+6: Ai,tj ← sj ˜Ai,tj + bj for all t, j ▷ commanded units, Section 2 
+
+7: ⟨c, G ⟩ ← affine ⟨zi, G in ⟩ ▷ propagated set (4) 
+
+8: for τ = 0 , dt, . . . , (K − 1)d t do 
+
+9: ⟨cv , G v ⟩ ← velocity τ ⟨c, G ⟩ ▷ (4), (5) 
+
+10: ⟨c, G ⟩ ← ⟨ c + d t c v , [ G | 0 ] + d t G v ⟩ ▷ (21) 
+
+11: end for 
+
+12: ⟨cout  
+
+> i
+
+, G out  
+
+> i
+
+⟩ ← decoder ⟨c, G ⟩ ▷ Zout  
+
+> i
+
+(4), (5) 
+
+13: νi ← max( ∥Ai∥2, ϵ 0) ▷ denominator of (18) 
+
+14: ρi ← 1
+
+νi
+
+max j∈J train sj
+
+P
+
+> k
+
+|Gout 
+
+> i,jk
+
+| ▷ (18) 
+
+15: end for 
+
+16: ¯ρM ← 1
+
+> |M|
+
+P 
+
+> i∈M
+
+ρi
+
+17: L(θ, λ ) ← L imitation (θ) + λ [ ¯ ρM − rtarget ]+
+
+18: θ ← Opt( θ, ∇θ L) ▷ h and bottleneck frozen 
+
+19: λ ← Π[0 ,λ max ]
+
+ λ + ηλ(¯ ρM − rtarget ) ▷ (20) 
+
+20: end for 
+
+21: Output: trained downstream parameters θ
+
+where Limitation is the imitation loss on ˜Ai and [ x ]+ =max(0 , x ). The dual variable λ follows projected ascent on the constraint violation, 
+
+λ ← Π[0 ,λ max ]
+
+ λ + ηλ (¯ ρM − rtarget ), (20) with step size ηλ and Π[0 ,λ max ] the projection that clamps the multiplier at λmax . The downstream policy factors into affine and ReLU # layers, namely an initial latent affine map, then 
+
+K Euler flow steps x 7 → x + d t v θ,τ (x, u i) with dt = 1 /K 
+
+and a velocity subnetwork of affine and ReLU layers, then a decoder of affine and ReLU layers. Algorithm 1 summarizes the training step. 
+
+3.2 Output enclosure and variation bound 
+
+Each Euler step maps x 7 → x + d t v θ,τ (x, u i), so the same latent x appears in the increment and as the argument of the velocity network. Treating the two occurrences as indepen-dent would enlarge the enclosure, so we zero-pad Gτ to the columns of Gv and add the two matrices, which keeps one coefficient vector across both. Proposition 1 (Propagation through the downstream flow encloses the action set). Let Zi,τ = ⟨cτ , G τ ⟩ enclose the exact latent set at step τ , and let ⟨cv , G v ⟩ be the velocity-network zonotope enclosure under the affine map (4) and the relaxation (5), so that for every x = cτ + Gτ β ∈ Z i,τ there is an extension β′ of β with ∥β′∥∞ ≤ 1 and vθ,τ (x, u i) = 
+
+cv + Gv β′. Then 
+
+Zi,τ +1 = cτ + d t c v , [ Gτ | 0 ] + d t G v , (21) with [ Gτ | 0 ] the zero-padding of Gτ to the columns of Gv ,encloses every exact update x + d t v θ,τ (x, u i), and induct-ing through the K steps and the decoder transformer gives 
+
+Yi(θ) ⊆ Z out  
+
+> i
+
+.Proof. For x = cτ + Gτ β ∈ Z i,τ the padded matrix satis-fies [ Gτ | 0 ] β′ = Gτ β, and the velocity transformer enclo-sure gives vθ,τ (x, u i) = cv + Gv β′ with ∥β′∥∞ ≤ 1. Hence 
+
+x+d t v θ,τ (x, u i) = ( cτ +d t c v )+([ Gτ | 0 ]+d t G v )β′ lies in Zi,τ +1 . The source zonotope Bi is the base case, and the decoder transformer encloses its input by the same per-layer argument, so the inclusion follows by induction. □
+
+Proposition 2 (Output-variation bound). Let Yi(θ) ⊆ Z out 
+
+> i
+
+and let ρi be the terminal width (18). The normalized half-range of the exact output set over the training coordinates, 
+
+Di(θ) = 12νi
+
+sup 
+
+> y,y ′∈Y i(θ)
+
+max 
+
+> j∈J train
+
+sj |yj − y′ 
+
+> j
+
+|, (22) satisfies Di(θ) ≤ ρi. Since ˜Ai = fθ (zi, u i) ∈ Y i(θ), every interface-set output obeys 
+
+max j∈J train sj |fθ,j (z, u i) − ˜Ai,j |
+
+νi
+
+≤ 2ρi, z ∈ B i.
+
+(23) Thus minimizing ρi contracts an upper bound on the scaled action variation induced by the whole interface set. Proof. For coordinate j the interval induced by Zout  
+
+> i
+
+has half-width P
+
+> k
+
+|Gout 
+
+> i,jk
+
+|, so any y, y ′ ∈ Z out  
+
+> i
+
+⊇ Y i(θ) satisfy 
+
+|yj − y′ 
+
+> j
+
+| ≤ 2 P
+
+> k
+
+|Gout 
+
+> i,jk
+
+|. Multiplying by sj , taking the max-imum over j and the supremum over Yi(θ), and dividing by 2νi gives Di(θ) ≤ 1 
+
+> νi
+
+max j sj
+
+P
+
+> k
+
+|Gout 
+
+> i,jk
+
+| = ρi. Taking 
+
+y = fθ (z, u i) and y′ = ˜Ai, both in Yi(θ), gives (23). □
+
+3.3 From terminal width to the sampled deviation 
+
+When the perturbed bottleneck representation lies in the propagated interface set, the terminal width upper-bounds the induced physical action deviation, and a bounded-set argument turns this into a conformal statement. For a rollout initialization g and a sampled camera pose v, let 
+
+z0 
+
+> a
+
+= h(o(a, v 0)) and zva = h(o(a, v )) denote the nominal and perturbed bottleneck representations for each a ∈ A (g),where o(a, v ) is the observation at pose v. For r ≥ 0, let 
+
+Zout  
+
+> a
+
+(r) = ⟨cout  
+
+> a
+
+(r), G out  
+
+> a
+
+(r)⟩ be the output zonotope ob-tained by propagating the interface set ⟨z0
+
+> a
+
+, rI m⟩, and let 
+
+˜Aa = fθ (z0
+
+> a
+
+, u a) be the normalized nominal action block, in the same normalized coordinates as cout  
+
+> a
+
+and Gout  
+
+> a
+
+, where ua
+
+is the non-visual conditioning of that state. Define 
+
+Er (g, v ) = 
+
+n
+
+max 
+
+> a∈A (g)
+
+∥zva − z0
+
+> a
+
+∥∞ ≤ r
+
+o
+
+,Uθ (g; r) = max 
+
+> a∈A (g)
+> t, j ∈C
+
+sj
+
+ |cout  
+
+> a,tj
+
+(r) − ˜Aa,tj |
+
++ P
+
+> k
+
+|Gout 
+
+> a,tjk
+
+(r)|. (24) Every term is expressed in the raw action units of the score 
+
+Sθ through the per-coordinate scale sj , where t indexes the action time steps and j ∈ C the continuous coordinates of Section 2, and the center offset |cout  
+
+> a,tj
+
+(r) − ˜Aa,tj | accounts for the gap between the propagated center and the nominal action. Writing Uθ,a (r) = max t, j ∈C sj
+
+ |cout  
+
+> a,tj
+
+(r) − ˜Aa,tj | +
+
+P
+
+> k
+
+|Gout 
+
+> a,tjk
+
+(r)| for the per-state bound gives Uθ (g; r) = max a∈A (g) Uθ,a (r).Proposition 3 (Terminal-width bound for sampled camera perturbations). If Er (g, v ) holds, then 
+
+Sθ (g, v ) ≤ Uθ (g; r). (25) Consequently, if Pr[ Er (g, v )] ≥ 1 − γ with γ the miss prob-ability of the radius event, then for every u ≥ 0,
+
+Pr[ Sθ (g, v ) > u ] ≤ γ + Pr[ Uθ (g; r) > u ] . (26) For a sample-specific bound, set ra(v) = ∥zva − z0
+
+> a
+
+∥∞ and propagate ⟨z0
+
+> a
+
+, r a(v)Im⟩ for each a. Define 
+
+eUθ (g, v ) = max  
+
+> a∈A (g)
+
+Uθ,a 
+
+ ra(v). (27) Then Sθ (g, v ) ≤ eUθ (g, v ) for every sampled pair. Given 
+
+n exchangeable calibration pairs, let qUθ = eU(k) with k =
+
+⌈(n + 1)(1 − α)⌉. It follows that 
+
+qθ ≤ qUθ , Pr Sθ (gnew , v new ) ≤ qUθ
+
+ ≥ 1 − α. (28) The result follows from interface-set containment, Propo-sition 1, the triangle inequality with the retained center off-set, and order-statistic monotonicity. The proof is given in the supplement. The chain ρ → Uθ → qUθ holds under two conditions: 
+
+qθ and qUθ are calibrated on the same rollout-pose pairs at the same rank k, and the coordinate set C is the continuous non-gripper set the score Sθ uses. The bound is a surrogate, and the directly calibrated radius qθ stays the tighter primary result. 
+
+## 4 Experiments 
+
+4.1 Experimental Setup 
+
+We evaluate the method on the fixed-camera LIBERO-10 manipulation benchmark under camera-extrinsic perturba-tions (Liu et al. 2023). The primary controlled study uses task 3, “put the black bowl in the bottom drawer of the cabinet and close it.” All four training configurations are available on it under the same pretrained checkpoint, data, fine-tuning budget, and evaluation protocol, so only the train-ing objective differs. The four configurations are behavior-only fine-tuning, observational consistency, PGD adversarial training (Madry et al. 2018), and the proposed set-based ob-jective. Behavior-only fine-tuning holds the width multiplier 
+
+λ of Equation (19) at zero, observational consistency aligns predictions across the clean and perturbed views, and PGD adversarial training replaces the propagated width with the largest deviation a projected-gradient attack finds inside the same interface set. Each configuration is trained with three random seeds, labeled s621, s622, and s623. We addition-ally apply the baseline-versus-set-based protocol to all ten LIBERO-10 tasks. 
+
+Downstream policy architecture. All four training con-figurations use the same verification-compatible VITA vari-ant. Two components of the released architecture are replaced so that every downstream layer is an affine map or a ReLU and the zonotope transformers of Section 2 cover the prop-agated network. Evaluation-mode BatchNorm folds exactly into an affine map, whereas LayerNorm is input-dependent and cannot be folded into a fixed affine transformer. The ReLU relaxation (5) is exact on every sign-stable interval, whereas smooth activations such as GELU admit relaxations but none that is exact, so every unit contributes relaxation er-ror at every layer. We therefore replace the GELU activations with ReLU and the LayerNorm layers with BatchNorm, so relaxation error is paid only at crossing coordinates. A frozen ImageNet-pretrained ResNet18 encoder feeds a learned 32 -dimensional bottleneck, and the downstream network that set-based training updates is an affine map, a single Euler flow step with K = 1 , and an affine–ReLU decoder produc-ing the 10 × 7 action block. The full interface architecture is in the supplement. 
+
+Held-out evaluation set. All task 3 models are evaluated on held-out rollout initializations under the camera-extrinsic perturbation, none of which enters checkpoint selection or pose tuning, and at each evaluation state only the camera pose changes while the robot and scene stay fixed. The formal comparison of Table 1 and the augmentation study of Fig-ure 2 calibrate the radius on 200 initializations and report the empirical coverage on 100 held-out test initializations, with each initialization scored by the largest sampled deviation over its states. The set A(g) of each initialization holds 16 
+
+states, collected once by replaying two fixed reference-policy clean rollouts from that initialization, an augmentation-only reference checkpoint and a set-based reference checkpoint contributing eight replan-step states each. These states are stored offline as simulator states with their nominal camera parameters, so they are fixed before evaluation and shared identically across the four training configurations, and every configuration is scored on the same states under the same single sampled pose per initialization. 
+
+Camera-pose sampling. For each rollout initialization we draw one camera pose from the six-dimensional perturbation box, each coordinate independent and uniform over its bud-get, and freeze it before any model output is read. The same pose applies to every evaluation state of that initialization and to every training configuration at that seed; the three seeds are independent replications that each draw their own poses, and calibration and test initializations draw disjoint poses. 
+
+Metrics. The primary result is the rollout-level conformal radius q. Using n = 200 calibration initializations q is com-puted at the rank defined in Equation (13), reported at cov-erage levels 1 − α ∈ { 0.90 , 0.95 , 0.99 }. A configuration is behavior-valid when its closed-loop success is at least 0.85 
+
+under both clean and camera-extrinsic-perturbed conditions, which excludes action collapse. The radius uses only the continuous translation and rotation coordinates, since the gripper command is a near-discrete switch, and the gripper channel is reported separately. In the ten-task protocol each Table 1: Rollout-initialization-level 99% conformal reachable-action radius q under bounded sampled six-dimensional camera-extrinsic perturbation, on 200 calibra-tion and 100 held-out test initializations, reported per seed with the three-seed median. Each initialization draws one frozen camera pose that is shared across all four configura-tions at that seed, which differ only in the training signal. Empirical coverage on the held-out initializations is 0.99 to 
+
+1.00 . Set-based training is the tightest configuration on every seed, a median per-seed ratio of 2.09 × over behavior-only fine-tuning. The dagger marks the seed-621 PGD adversarial-training checkpoint, which fails the closed-loop behavior gate and is reported as a frontier point, excluded from the behavior-matched controls. Lower is better.                     
+
+> Training signal qs621 qs622 qs623 median Behavior-only fine-tuning 0.231 0.181 0.191 0.191 Observational consistency 0.220 0.201 0.186 0.201 PGD adversarial training 0.173 †0.138 0.114 0.138
+> Set-based training 0.111 0.113 0.077 0.111
+
+of the two compared methods is evaluated with 50 clean and 50 perturbed rollouts under matched initial states and a pre-specified episode seed. Further protocol details are in the supplement. 
+
+4.2 Calibrated Radius Reduction 
+
+Set-based training reduces the conformal radius while keep-ing the policy behavior-valid, as Table 1 shows. At the 99% 
+
+coverage level it gives a median per-seed ratio of 2.09 × over behavior-only fine-tuning, with per-seed radii in Table 1, while observational consistency stays at the behavior-only level. The empirical coverage on the 100 held-out initial-izations is 0.99 to 1.00 . Behavior-only fine-tuning, observa-tional consistency, and set-based training pass the behavior criterion on all three seeds, PGD adversarial training passes the criterion on two of three seeds, and set-based training is the tightest valid configuration on every seed. The same per-seed ordering holds at the 90% , 95% , and 99% coverage levels reported in the supplement. The reduction remains when the augmentation matches the physical threat, as Figure 2 summarizes, where the base-lines are augmentation-only policies trained separately from the matched continuation configurations of Table 1. On the rollout-initialization-level 99% radius, set-based train-ing tightens the three-seed mean from 0.301 to 0.117 under two-dimensional augmentation, a 2.56 × reduction, and from 
+
+0.171 to 0.101 under six-dimensional camera-extrinsic aug-mentation, a 1.70 × reduction, with all three six-dimensional set-based seeds behavior-valid. Because the reduction per-sists under the six-dimensional augmentation matched to the threat model, the tightening reflects the training objective. 
+
+4.3 Training Signal and Enclosure Tightness 
+
+Under the matched protocol of Section 4.1, observational consistency constrains paired outputs yet leaves the cali-brated radius at the behavior-only level. PGD adversarial 2D image augmentation 6D camera-pose augmentation 0.0 0.1 0.2 0.3 0.4 0.5 99% radius  q (lower better) 
+
+> no set training + set training 2.56 × 1.70 ×
+
+Figure 2: Rollout-initialization-level 99% conformal reachable-action radius q on the held-out Task 3 eval-uation set, comparing two augmentation protocols, two-dimensional image jitter and six-dimensional camera-extrinsic perturbation, each without and with set-based train-ing. Bars are three-seed means with individual seeds as dots, lower is better. The annotated factors are the set-versus-no-set reductions of three-seed means within each augmentation protocol, and the three-seed mean radii of each bar are given in the text. training reduces the radius on all three seeds but is behavior-valid on only two, and its seed-621 checkpoint is reported only as a frontier point. The set-based radius is smaller than the PGD radius on all three seeds. On the two behavior-valid seeds the paired ratios qPGD /q set are 1.22 and 1.48 ,and their 95% paired bootstrap intervals exclude one, so the behavior-matched comparison uses those two seeds. The two objectives differ mechanistically: PGD optimizes the largest deviation a projected-gradient attack locates, whereas set-based training optimizes an over-approximation of the en-tire interface-set output. This distinction shows in the deter-ministic enclosure. The ratio of the zonotope width to the strongest attack inside the same set has a median of 16.38 for set-based training and exceeds 500 for the three controls, so only set-based training keeps this enclosure tighter and more informative under the identical verifier, as the supplement details. This enclosure is the training surrogate for the whole interface-set output on the fixed bottleneck, while the de-ployment guarantee comes from the rollout-level conformal radius, which Proposition 3 connects to the trained width. We next evaluate the bound of Proposition 3 on the same evaluation set. The fixed training radius covers 0.76 to 1.00 
+
+of the test groups across seeds, reflecting the independently drawn poses of the three seed replications, and no covered group violates the fixed-radius bound. The sample-adaptive bound holds on every evaluated group, so qθ ≤ qUθ on all twelve checkpoints, and set-based training reduces the me-dian adaptive conformal bound qUθ by more than two orders of magnitude relative to every control, as the supplement details. This bound links the trained width to the physical score, while the directly calibrated radius qθ remains the tighter primary result. t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 024aug / set radius ratio 
+
+> both pass set only passes neither passes baseline only passes
+
+Figure 3: Ten-task breadth of set-based training. The per-task ratio of the two-dimensional image-augmentation ra-dius to the set-based radius across all ten tasks under the common two-dimensional image augmentation, colored by which methods pass the behavior criterion at the 0.85 gate, where green marks the tasks both methods pass, blue marks the tasks only set-based training passes, hatched gray marks the tasks neither method passes, and red marks the tasks only the baseline passes. The dashed line marks the all-task median and the dotted line marks a ratio of one. The task instruction for each index is listed in the supplement. 
+
+4.4 Cross-Task Results 
+
+The effect extends across tasks with a task-dependent reach. Under a common two-dimensional image augmentation ap-plied to all ten tasks, the median ratio of the augmentation-only radius to the set-based radius is 2.03 over the ten tasks, as Figure 3 shows. To separate weak baseline policies from training-induced behavior change, we apply the behavior cri-terion of Section 4.1 as a minimum task-capability require-ment, under a shared rule that selects each method’s best validation-loss checkpoint with matched initial states and a pre-specified episode seed. At this criterion the augmentation baseline is capable on the one task, task 3, whereas set-based training is behavior-valid on three tasks, tasks 2, 3, and 5, so it preserves the one baseline-capable task and recovers two further tasks that the augmentation baseline does not reach, with no task passing only under the baseline. Among the three tasks where set-based training is behavior-valid, it is tighter on tasks 2 and 5 and slightly looser on task 3, yielding a median augmentation-to-set radius ratio of 1.65 under this separate single-seed breadth protocol. The all-task median of 
+
+2.03 is descriptive and includes behavior-invalid tasks. The classification and its sensitivity to the criterion are reported in the supplement. A capacity study across three widths of the flow matching network is reported in the supplement. Direct contraction at the raw 1024-dimensional feature interface attains small training widths but does not pass the behavior criterion, as the supplement reports, which supports the compact bottleneck as the behavior-compatible interface. 
+
+## 5 Related Work 
+
+Visual robustness under camera and observation shifts. 
+
+Camera-motion smoothing and pixel-wise smoothing pro-vide certified robustness for visual perception under struc-tured camera or image perturbations, while viewpoint adver-sarial search studies the sensitivity of recognition systems to changes in three-dimensional viewpoint (Hu et al. 2023, 2024; Dong et al. 2022). Reachability-based pose estimation provides guarantees for a perception front-end by bounding the estimated camera pose from visual observations (Ladner, Shoukry, and Althoff 2026). In visuomotor learning, aug-mentation exposes policies to sampled visual transformations (Chi et al. 2023), and observational-consistency objectives regularize action predictions across perturbed observations (Luo et al. 2026). We extend this line to action-space verifi-cation. 
+
+Set-based neural verification and training. Abstract in-terpretation, zonotope domains, and convex or linear relax-ations propagate bounded inputs through neural networks to construct output enclosures (Singh et al. 2018, 2019; Wong and Kolter 2018; Zhang et al. 2018). Differentiable verifi-cation bounds have further been incorporated into certified training objectives (Mirman, Gehr, and Vechev 2018; Wong and Kolter 2018; Xu et al. 2020). Set-based training directly optimizes the size of the propagated output enclosure, im-proving the robustness and subsequent verifiability of the trained network (Koller, Ladner, and Althoff 2025). Related work extends set propagation to reinforcement-learning poli-cies, to latent spaces of learned encoders, and to neural bar-rier and Lyapunov certificates (Wendl et al. 2026; Wu et al. 2026; Kranzlmüller et al. 2026; Huang et al. 2026a). We ap-ply this line to a visuomotor policy by confining propagation to a calibrated low-dimensional interface, which keeps the enclosure informative where end-to-end propagation is not. 
+
+Conformal uncertainty quantification for control. Con-formal prediction constructs data-dependent prediction sets and thresholds with finite-sample marginal coverage and has been applied to learned control, reachability, and disturbance uncertainty in robotics (Zhao et al. 2025; Liu, Zhang, and Lin 2026; Huang et al. 2026b). Zono-conformal prediction fur-ther studies structured multi-output prediction sets and the trade-off between coverage and conservatism (Lützow et al. 2025). We apply split conformal calibration (Lei et al. 2018) to rollout-level action-deviation scores, giving a probabilistic reachable-action radius for a visuomotor policy. 
+
+## 6 Conclusion 
+
+Our study shows that the geometry of a policy’s action set under sensor uncertainty can be shaped during training once perception is decoupled from downstream set reason-ing through a calibrated low-dimensional interface, which makes a full-set training signal affordable. The distinction from pointwise adversarial training is mechanistic: the set objective constrains the entire enclosure, whereas a point-wise attack constrains only the point it locates. This mecha-nism is consistent with the smaller physical action deviations observed for set-based training. A deterministic map from the pose set to the interface set would upgrade the probabilistic radius toward an end-to-end guarantee. References 
+
+Chi, C.; Feng, S.; Du, Y.; Xu, Z.; Cousineau, E.; Burchfiel, B. C. M.; and Song, S. 2023. Diffusion Policy: Visuomotor Policy Learning via Action Diffusion. In Proceedings of Robotics: Science and Systems (RSS) .Dong, Y.; Ruan, S.; Su, H.; Kang, C.; Wei, X.; and Zhu, J. 2022. ViewFool: Evaluating the Robustness of Visual Recognition to Adversarial Viewpoints. In Advances in Neu-ral Information Processing Systems 35 (NeurIPS 2022) .Fei, S.; Wang, S.; Shi, J.; Dai, Z.; Cai, J.; Qian, P.; Ji, L.; He, X.; Zhang, S.; Fei, Z.; Fu, J.; Gong, J.; and Qiu, X. 2026. LIBERO-Plus: A Progressive Robustness Bench-mark for Visual-Language-Action Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) .Gao, D.; Zhao, B.; Lee, A.; Chuang, I.; Zhou, H.; Wang, H.; Zhao, Z.; Zhang, J.; and Soltani, I. 2026. VITA: Vision-to-Action Flow Matching Policy. In The Fourteenth Interna-tional Conference on Learning Representations (ICLR) .Hu, H.; Liu, Z.; Li, L.; Zhu, J.; and Zhao, D. 2023. Robust-ness Certification of Visual Perception Models via Camera Motion Smoothing. In Proceedings of the 6th Conference on Robot Learning (CoRL) , volume 205 of Proceedings of Machine Learning Research , 1309–1320. PMLR. Hu, H.; Liu, Z.; Li, L.; Zhu, J.; and Zhao, D. 2024. Pixel-wise Smoothing for Certified Robustness against Camera Motion Perturbations. In Proceedings of the 27th International Con-ference on Artificial Intelligence and Statistics (AISTATS) ,volume 238 of Proceedings of Machine Learning Research ,217–225. PMLR. Huang, Y.; Xie, P.; Zhang, Z.; Wu, W.; Zeng, Z.; and Alanwar, A. 2026a. Certified Set Convergence for Piecewise Affine Systems via Neural Lyapunov Functions. arXiv:2604.00286. Huang, Y.; Zhang, Z.; Xie, P.; Zeng, Z.; and Alanwar, A. 2026b. Conformalized Data-Driven Reachability Analysis with PAC Guarantees. arXiv:2603.12220. Koller, L.; Ladner, T.; and Althoff, M. 2025. Set-Based Training for Neural Network Verification. Transactions on Machine Learning Research .Kranzlmüller, M.; Koller, L.; Ladner, T.; and Althoff, M. 2026. Set-Based Training of Neural Barrier Cer-tificates for Safety Verification of Dynamical Systems. arXiv:2605.02526. Kühn, W. 1998. Rigorously computed orbits of dynamical systems without the wrapping effect. Computing , 61(1): 47– 67. Ladner, T.; Shoukry, Y.; and Althoff, M. 2026. Perception with Guarantees: Certified Pose Estimation via Reachability Analysis. In Computer Aided Verification (CAV) . To appear. Lee, T. E.; Tremblay, J.; To, T.; Cheng, J.; Mosier, T.; Kroe-mer, O.; Fox, D.; and Birchfield, S. 2020. Camera-to-Robot Pose Estimation from a Single Image. In 2020 IEEE Inter-national Conference on Robotics and Automation (ICRA) ,9426–9432. IEEE. Lei, J.; G’Sell, M.; Rinaldo, A.; Tibshirani, R. J.; and Wasser-man, L. 2018. Distribution-Free Predictive Inference for Re-gression. Journal of the American Statistical Association ,113(523): 1094–1111. Liu, B.; Zhu, Y.; Gao, C.; Feng, Y.; Liu, Q.; Zhu, Y.; and Stone, P. 2023. LIBERO: Benchmarking Knowledge Trans-fer for Lifelong Robot Learning. In Advances in Neural Information Processing Systems 36 (NeurIPS 2023) Track on Datasets and Benchmarks .Liu, W.; Zhang, F.; and Lin, Q. 2026. Robust Operational Space Control with Conformal Disturbance Bounds for Safe Redundant Manipulation. In IEEE/RSJ International Con-ference on Intelligent Robots and Systems (IROS) . To appear. Luo, J.; Wen, Y.; Bai, Y.; Song, X.; Liu, Y.; and Lin, L. 2026. RoVLA: Multi-Consistency Constraints for Robust Vision-Language-Action Models. arXiv:2605.19678. Lützow, L.; Eichelbeck, M.; Kochenderfer, M. J.; and Althoff, M. 2025. Zono-Conformal Prediction: Zonotope-Based Un-certainty Quantification for Regression and Classification Tasks. Journal of Machine Learning Research , 26(294): 1– 37. Madry, A.; Makelov, A.; Schmidt, L.; Tsipras, D.; and Vladu, A. 2018. Towards Deep Learning Models Resistant to Ad-versarial Attacks. In The Sixth International Conference on Learning Representations (ICLR) .Mirman, M.; Gehr, T.; and Vechev, M. 2018. Differen-tiable Abstract Interpretation for Provably Robust Neural Networks. In Proceedings of the 35th International Confer-ence on Machine Learning (ICML) , volume 80 of Proceed-ings of Machine Learning Research , 3578–3586. PMLR. Nimura, K.; and Adamczyk, M. 2022. Methodology for Designing an Optimal Test Stand for Camera Thermal Drift Measurements and Its Stability Verification. Sensors , 22(24): 9997. Nobre, F.; and Heckman, C. R. 2020. FastCal: Robust Online Self-Calibration for Robotic Systems. In Proceedings of the 2018 International Symposium on Experimental Robotics (ISER) , volume 11 of Springer Proceedings in Advanced Robotics , 737–747. Springer. Singh, G.; Gehr, T.; Mirman, M.; Püschel, M.; and Vechev, M. 2018. Fast and Effective Robustness Certification. In 
+
+Advances in Neural Information Processing Systems 31 (NeurIPS 2018) , 10825–10836. Singh, G.; Gehr, T.; Püschel, M.; and Vechev, M. 2019. An Abstract Domain for Certifying Neural Networks. Proceed-ings of the ACM on Programming Languages , 3(POPL): 41:1–41:30. Wendl, M.; Koller, L.; Ladner, T.; and Althoff, M. 2026. Training Verifiably Robust Agents Using Set-Based Rein-forcement Learning. Transactions on Machine Learning Re-search .Wong, E.; and Kolter, Z. 2018. Provable Defenses against Ad-versarial Examples via the Convex Outer Adversarial Poly-tope. In Proceedings of the 35th International Conference on Machine Learning (ICML) , volume 80 of Proceedings of Machine Learning Research , 5286–5295. PMLR. Wu, W.; Xie, P.; Zhang, Z.; Huang, Y.; Johansson, K. H.; and Alanwar, A. 2026. From Points to Sets: Set-Based Safety Verification in the Latent Space. arXiv:2604.05799. Xu, K.; Shi, Z.; Zhang, H.; Wang, Y.; Chang, K.-W.; Huang, M.; Kailkhura, B.; Lin, X.; and Hsieh, C.-J. 2020. Automatic Perturbation Analysis for Scalable Certified Robustness and Beyond. In Advances in Neural Information Processing Sys-tems 33 (NeurIPS 2020) .Zhang, H.; Weng, T.-W.; Chen, P.-Y.; Hsieh, C.-J.; and Daniel, L. 2018. Efficient Neural Network Robustness Cer-tification with General Activation Functions. In Advances in Neural Information Processing Systems 31 (NeurIPS 2018) ,4944–4953. Zhao, M.; Admoni, H.; Simmons, R.; Ramdas, A.; and Ba-jcsy, A. 2025. Conformalized Interactive Imitation Learning: Handling Expert Shift and Intermittent Feedback. In The Thirteenth International Conference on Learning Represen-tations (ICLR) .
+
+## A Bounded Camera-Perturbation Sampling and Conformal Rank 
+
+The evaluation perturbs the single fixed agentview cam-era inside a bounded six-dimensional box. The three rota-tion coordinates are the world-frame roll, pitch, and yaw in degrees, and the three translation coordinates are the camera-centre displacements in millimetres, so a pose off-set is v = (roll , pitch , yaw , dx, dy, dz). Each coordinate is drawn independently and uniformly, the rotations over 
+
+[−1, 1] degrees and the translations over [−1, 1] millime-tres. For each rollout initialization g we draw one offset 
+
+vg from this distribution under a fixed seed, freeze it be-fore any model output is read, and apply the same vg to every evaluation state of g and to every checkpoint and train-ing configuration. Calibration and test initializations draw disjoint independent offsets. The rollout-level score is the largest non-gripper action deviation induced by the frozen pose, Sθ (g, v g ) = max a max t,j |Aθ,tj (a, v g )−Aθ,tj (a, v 0)|
+
+over the states a of g, the prefix steps t, and the non-gripper action coordinates j, and the gripper channel is recorded separately. The conformal radius is the order statistic S(k)
+
+with k = ⌈(n + 1)(1 − α)⌉ over the calibration groups, and all boundary ties at the rank are retained. The pose mani-fest that fixes every vg , together with the calibration and test initialization indices, is released with the code. 
+
+## B Bottleneck-Set Training Radius and Architecture 
+
+Verification interface architecture. The verification in-terface is a fixed 32-dimensional linear bottleneck between a frozen visual encoder and the downstream policy. Each of the two fixed views, the agentview and the wrist eye-in-hand, passes through a frozen ImageNet-pretrained ResNet18 with frozen batch normalization, and the two 512-dimensional penultimate features concatenate into the 1024-dimensional visual feature. The bottleneck is a single linear map from 1024 to 32 dimensions with a bias term, no activation, and no output normalization, so the bottleneck representation is an affine image of the frozen feature, and the 32-dimensional representation then joins the proprioceptive state and the task embedding before the linear observation encoder. Its 32-by-1024 weight is initialized from the singular value de-composition of the base checkpoint feature-to-representation projection, and the dimension 32 is chosen from a 16, 32, 64 sweep in which 32 retains the best clean and image-jitter behavior. The base policy is trained first and the bot-tleneck is inserted afterward, so it is a post-hoc compression of an already-trained feature. The bottleneck is then trained in a first stage under image augmentation of plus or minus five degrees and plus or minus eight pixels, unfreezing only the bottleneck and the encoder while the flow and decoder stay frozen, per task, under the same behavior objective as the base policy, which combines a flow-matching term with action-encoder and flow-decoder reconstruction and a latent-consistency term, so the bottleneck reduces the propagation dimension from 1024 to 32 and is trained to reduce repre-sentation shifts induced by camera perturbations. The prop-agated downstream policy uses ReLU activations and batch normalization, replacing the smooth-activation default, so the set propagation is exact except for the single-neuron ReLU relaxation. In the contraction stage the encoder, the bottleneck, and the two BatchNorm layers are all frozen and only the downstream flow and decoder parameters are up-dated, so the interface-set calibration remains valid, and the frozen BatchNorm layers run in evaluation mode in the first stage and in contraction alike, with their statistics folded into the affine maps for propagation. Every Task-3 configuration in the main comparison shares this same frozen bottleneck. 
+
+Downstream policy architecture. The compact policy is a flow-matching policy. The downstream policy receives the 
+
+32 -dimensional bottleneck representation together with an 8-dimensional proprioceptive state and a 16 -dimensional task embedding. The downstream policy that set-based training updates and that zonotope propagation traverses is an initial latent affine map into a 512 -dimensional latent, then K Euler flow steps whose velocity subnetwork is a feedforward stack of affine and ReLU layers with frozen BatchNorm folded into the affine maps, then an affine–ReLU decoder that outputs the 10 × 7 action block, namely T = 10 steps by d = 7 
+
+coordinates. The small, medium, and large capacity tiers set the velocity subnetwork to two layers of width 512 , four layers of width 512 , and four layers of width 1024 , over the same frozen bottleneck and decoder. The reported policies use a single Euler step, so K = 1 and dt = 1 . The velocity subnetwork and the decoder both use ReLU activations and BatchNorm. The set-based training input radius ϵ is the half-width of the isotropic L∞ box Bϵ(z) that the objective perturbs around the clean standardized bottleneck representation z, carried as a zonotope. Both set-based configurations propagate the same calibrated diagonal input set of half-width 0.240 in standardized bottleneck-representation units. This training radius is itself the bottleneck-residual calibration. For each state the clean observation and a ±1 degree, ±1 millimeter perturbed observation pass through the frozen encoder and the learned 32-dimensional bottleneck, and the L∞ change Table S1: Rollout-initialization-level conformal reachable-action radius q at the 90% , 95% , and 99% coverage levels, per seed, on 200 calibration and 100 held-out test initializations under bounded sampled camera perturbation. The set-versus-control ordering and the tightening hold at every level, so the main-paper 99% result is not an artifact of a single coverage choice.                                             
+
+> Training signal seed q90 q95 q99
+> Behavior-only fine-tuning s621 0.126 0.150 0.231 s622 0.133 0.149 0.181 s623 0.119 0.143 0.191 Observational consistency s621 0.125 0.147 0.220 s622 0.137 0.159 0.201 s623 0.118 0.137 0.186 PGD adversarial training s621 0.108 0.121 0.173 s622 0.087 0.107 0.138 s623 0.081 0.088 0.114 Set-based training s621 0.075 0.085 0.111 s622 0.077 0.089 0.113 s623 0.053 0.061 0.077
+
+in the representation over 180 states, split into 120 calibra-tion and 60 test, has a split-conformal 95th percentile of 
+
+0.240 in bottleneck-representation units with the held-out test residual at the same scale. The calibration initializations are the held-out extrinsic-residual states 35 through 49, fixed before contraction training and disjoint from the checkpoint-selection states on initializations 0 through 17, so the train-ing radius is a held-out residual quantile computed from data. The shared radius ϵ = 0 .240 is a held-out state-level marginal residual quantile that defines the training interface, and its rollout-initialization-level coverage is reported separately in the Proposition 3 empirical support. 
+
+## C Held-Out Evaluation Set and Initialization-Level Coverage 
+
+The held-out Task 3 evaluation set of the main text is the rollout-initialization population of the sampled-camera pro-tocol. The rollout initialization is the conformal unit, and each initialization is scored by the worst sampled deviation over its states under its frozen camera pose. On 200 calibra-tion and 100 held-out test initializations, split conformal at rank k = ⌈(200 + 1)(1 − α)⌉ gives the per-seed radii of the main-paper table at the 99% level, and Table S1 lists all three levels. Set-based training is the tightest configuration on every seed at every level, a median 2.09 × tightening over behavior-only fine-tuning at the 99% level, and the empirical coverage on the 100 held-out initializations is 0.99 to 1.00 .The set-versus-control ordering and the near-twofold tight-ening are unchanged across the 90% , 95% , and 99% levels. Algorithm S1 states this rollout-level calibration in pseu-docode. 
+
+Algorithm S1 Rollout-level conformal calibration under bounded camera-perturbation sampling.  
+
+> 1:
+
+Require: frozen policy πθ ; bounded camera-pose distri-bution PV ; an initialization-grouped calibration and test split Gcal , Gtest with group contexts A(g); level α 
+
+> 2:
+
+for each group g ∈ G cal ∪ G test do  
+
+> 3:
+
+draw vg ∼ PV and freeze it ▷ one pose per initialization, before any model output  
+
+> 4:
+
+for each context a ∈ A (g) do  
+
+> 5:
+
+Aθ (a) ← Aθ (a, v 0) ▷ nominal action block  
+
+> 6:
+
+end for  
+
+> 7:
+
+Sθ (g) ← max a∈A (g) dθ (a, v g ) ▷ deviation at the frozen pose, group score (statistical unit)  
+
+> 8:
+
+end for  
+
+> 9:
+
+k ← ⌈ (|G cal | + 1)(1 − α)⌉ 
+
+> 10:
+
+qθ ← k-th smallest of {Sθ (g) : g ∈ G cal } ▷ ties kept  
+
+> 11:
+
+dcov ← |{ g ∈ G test : Sθ (g) ≤ qθ }| / |G test | ▷ coverage check  
+
+> 12:
+
+Output: radius qθ ; empirical coverage dcov  
+
+> 13:
+
+Guarantee: a new exchangeable group gnew with a fresh pose vnew ∼ PV has Sθ (gnew , v new ) ≤ qθ with proba-bility at least 1 − α
+
+## D Shared Interface Set and Behavior-Valid Selection 
+
+The fixed shared input set. All three seeds of the six-dimensional set-based configuration are trained using the same fixed input set, the isotropic bottleneck box 0.240 I32 
+
+of half-width 0.240 in standardized bottleneck-representation units. This box is a single training-time input set that is identi-cal across the three seeds and is larger and more conservative than any per-seed radius fit to each seed’s pretrained check-point, so every seed is contracted against the same fixed conservative choice. With this single shared box, all three seeds reach the 0.85 behavior gate. 
+
+Seed-specific recalibration sensitivity. As a sensitivity variant, we instead recalibrate the contraction box per seed from each seed’s pretrained checkpoint bottleneck residual. This seed-specific box is smaller than the shared box on some seeds and causes one seed to fall below the behavior gate, so the seed-specific variant is behavior-valid on two of three seeds. The larger shared box therefore gives better behav-ior than the tighter seed-specific box, which we record as a non-monotone training result. The reported six-dimensional set-based configuration uses the shared box, and the seed-specific variant is this sensitivity ablation. 
+
+Observational-consistency configuration and a two-dimensional-affine ablation. The observational-consistency configuration of the main-paper table is trained under the same six-dimensional camera-extrinsic threat as the set-based configuration. It shares the pretrained checkpoint, the six-dimensional camera-extrinsic perturba-tion cache, the training budget, the checkpoint schedule, and the behavior-gated selection with the set-based config-uration, and it differs only in the training objective, which is the RoVLA and Pi-model consistency penalty at the fixed weight 0.3 with the set-based width loss disabled and frozen BatchNorm and bottleneck. All three seeds pass the behavior gate, at clean and camera-extrinsic success 
+
+0.88 and 0.94 , 0.96 and 0.92 , and 0.94 and 0.94 , and their per-seed q90 , q95 , and q99 are the observational-consistency rows of Table S1. Under this matched six-dimensional threat the consistency radius stays at the behavior-only level, while set-based training contracts it. The consistency penalty pulls the clean-view and perturbed-view actions together without directly contracting the full interface-set output enclosure, whereas the set-based objective contracts that enclosure. Under the matched threat, only the set-based objective produces the observed tightening. A separate two-dimensional-affine consistency control, trained under in-plane image augmentation, is behavior-valid on only one of three seeds. 
+
+PGD adversarial-training configuration. The PGD adversarial-training configuration shares the pretrained checkpoint, the six-dimensional camera-extrinsic cache, the training budget, the checkpoint schedule, and the behavior-gated selection with the set-based configuration under the identical adaptive Lagrangian, and it differs only in the penalty, which replaces the zonotope terminal width with the largest non-gripper action deviation that a projected-gradient attack attains inside the same interface set Bϵ(z) = ⟨z, ϵI 32 ⟩.The inner attack runs forty sign-gradient ascent steps from four random restarts, with step size 2.5/40 in the normal-ized generator coordinates α ∈ [−1, 1] 32 and each step pro-jected back onto the interface box, and the penalized devia-tion is normalized by the commanded nominal action norm 
+
+νi exactly as the terminal width is. This training-time in-ner attack is distinct from the enclosure-tightness evaluation attack, which runs fifty restarts of one hundred steps. 
+
+Checkpoint schedule selection. Each seed exposes a fixed epoch schedule over epochs 40, 80, 120, 160, and 200, and for every schedule entry we record its training terminal width, its dual weight, and its clean and camera-extrinsic behavior gate. The selected checkpoint is the behavior-valid sched-ule entry with the smallest training terminal width, and no best-loss checkpoint is used. The reported six-dimensional set-based radii follow from this selection under the shared fixed input set. The behavior gate uses the same fifty clean and fifty camera-extrinsic rollout episodes over initializations 0 through 49 that the paper reports for each configuration. Be-cause these episodes are also used for checkpoint selection, the reported behavior success is not an independent held-out estimate. A separate re-evaluation of the set-based con-figuration, on fifty clean and fifty camera-extrinsic rollouts drawn from a disjoint three-hundred-initialization pool with the Task-3 checkpoints fixed and fresh episode randomness, keeps every set-based seed behavior-valid, with held-out clean and camera-extrinsic success 0.88 /0.92 , 0.88 /0.98 ,and 0.86 /0.94 for the three seeds against the checkpoint-selection estimates 0.94 /0.94 , 0.88 /0.92 , and 0.88 /0.86 ,each difference within the binomial half-width of the fifty-rollout estimate. The reported radius q is separate, since the behavior gate and the radius selection use held-out initializa-tions disjoint from the calibration and test sets, so q remains Table S2: The ten LIBERO-10 tasks with their exact bench-mark language instructions and the short names used in the figures. Task indices are counted from zero in the default benchmark order. Task 3 is the primary controlled study.                       
+
+> task short name language instruction t0 soup + sauce put both the alphabet soup and the tomato sauce in the basket t1 cheese + butter put both the cream cheese box and the butter in the basket t2 stove + moka pot turn on the stove and put the moka pot on it t3 bowl in drawer put the black bowl in the bottom drawer of the cabinet and close it t4 two mugs put the white mug on the left plate and put the yellow and white mug on the right plate t5 book in caddy pick up the book and place it in the back compartment of the caddy t6 mug + pudding put the white mug on the plate and put the chocolate pudding to the right of the plate t7 soup + cheese put both the alphabet soup and the cream cheese box in the basket t8 two moka pots put both moka pots on the stove t9 mug in microwave put the yellow and white mug in the mi-crowave and close it
+
+an independent held-out result. 
+
+## E Ten-Task Breadth Table 
+
+Table S2 lists the exact benchmark language instruction and the short figure name for each of the ten tasks, read from the LIBERO-10 task map in the default benchmark order. Table S3 lists the full ten-task breadth that the main-paper results figure summarizes, with the matched clean and camera-extrinsic success rates of both methods. The two ra-tios near one, on tasks 3 and 6, indicate similar radii for the two methods under this single-seed protocol. Under a uniform best-checkpoint selection, a matched behavior eval-uation of fifty clean and fifty camera-extrinsic rollouts over shared initial states with a pre-specified episode seed, and the 0.85 minimum task-capability criterion, the augmenta-tion baseline is capable on the one task, task 3. Set-based training is behavior-valid on tasks 2, 3, and 5, so it preserves the one baseline-capable task and recovers two further tasks, while neither method clears the criterion on the remaining tasks 0, 1, 4, 6, 7, 8, and 9. Table S4 reports how this classi-fication varies with the criterion, and at the looser 0.70 gate the augmentation baseline is additionally capable on tasks 2, 5, and 9. The Task 3 row here uses this ten-task protocol with a single seed on held-out initial states 45 through 49. 
+
+Cross-task behavior preservation. We group the ten tasks by which methods pass the behavior gate at the 0.85 min-imum task-capability criterion. Both methods pass on task 3, only set-based training passes on tasks 2 and 5, no task passes only under the augmentation baseline, and neither method passes on the remaining tasks 0, 1, 4, 6, 7, 8, and 9. Table S3: Ten-task breadth over held-out initial states under the fixed two-dimensional reference augmentation protocol. The clean and camera-extrinsic columns are matched 50+50 
+
+closed-loop rollout success rates for the augmentation-only baseline and for set-based training. The q columns are the rollout-initialization-level 99% sampled conformal radius and are unchanged by the criterion. A method satisfies the minimum task-capability criterion when both its clean and camera-extrinsic closed-loop success rates are at least 0.85 ,and the same criterion is applied to both methods. The me-dian augmentation-to-set-based radius ratio over all ten tasks is 2.03 as a descriptive summary. 
+
+task aug. c/e set c/e aug. q set q ratio category t0 0.60/0.58 0.30/0.34 0.132 0.048 2.73 neither t1 0.42/0.52 0.44/0.42 0.137 0.083 1.66 neither t2 0.84/0.90 0.92/0.96 0.147 0.089 1.65 set-based only t3 0.98/1.00 0.94/0.92 0.250 0.293 0.85 both methods t4 0.68/0.74 0.42/0.50 0.180 0.075 2.40 neither t5 0.96/0.84 0.96/0.92 0.163 0.050 3.25 set-based only t6 0.42/0.38 0.68/0.62 0.134 0.119 1.12 neither t7 0.78/0.66 0.48/0.62 0.430 0.084 5.13 neither t8 0.28/0.32 0.14/0.12 0.086 0.084 1.04 neither t9 0.78/0.74 0.60/0.62 0.161 0.053 3.02 neither 
+
+Table S4: Threshold sensitivity of the ten-task minimum task-capability classification. The criterion applies the same clean and camera-extrinsic floor to both the augmentation-only baseline and set-based training. Capable counts the tasks the baseline clears, both counts the capable tasks set-based training also clears, and baseline-only counts the capable tasks set-based training does not clear. The main paper uses the 0.85 gate. Recomputed from the released result artifact. 
+
+gate capable both base-only both/cap. base-only tasks 0.70 4 3 1 3/4 t9 0.75 3 3 0 3/3 none 0.80 3 3 0 3/3 none 
+
+0.85 1 1 0 1/1 none 0.90 1 1 0 1/1 none 
+
+Figure S1 shows the paired behavior of the two methods on every task, and Table S4 reports how the classification varies with the criterion, where the baseline-only set is task 9 alone at the 0.70 gate and is empty from the 0.75 gate upward, so it is empty at the 0.85 main gate. 
+
+## F Capacity Tiers 
+
+On the main-text sampled-camera protocol, the selected behavior-valid configuration for each capacity tier reaches a rollout-initialization-level 99% radius q of 0.105 at the small tier, 0.060 at the medium tier, and 0.034 at the large tier, each tier about 1.7 times tighter than the one below, as Figure S2 shows. These tiers differ in propagated width, training target, and selected checkpoint together, so the ordering describes the frontier of selected behavior-valid configurations across architecture scales and not a pure capacity effect. t0 t1 t2 t3 t4 t5 t6 t7 t8 t9  
+
+> 0.0 0.2 0.4 0.6 0.8 1.0 min(clean, true-extrinsic) success
+> 0.85 gate
+> Baseline vs set-based behavior per task (hollow = augmentation baseline, filled = set-based)
+> both methods pass set-based only passes neither method passes baseline only passes
+
+Figure S1: Ten-task behavior dumbbell. For each task the hollow marker is the augmentation baseline and the filled marker is set-based training, both at the minimum of clean and camera-extrinsic success over fifty rollouts each, with the two methods connected. The dashed line is the 0.85 gate. Color encodes which methods pass the gate, where green marks the tasks both methods pass, blue marks the tasks only set-based training passes, red marks the tasks only the baseline passes, and gray marks the tasks neither method passes. The augmentation-only category is empty at this gate. All ten tasks are shown. S M L0.00 0.05 0.10 Task-3  q99  0.105 0.060 0.034 
+
+Figure S2: Capacity frontier of set-based training. The Task 3 rollout-initialization-level 99% conformal radius q across the small, medium, and large capacity tiers of the flow matching network, each tier about 1.7 times tighter than the one below. 
+
+## G Terminal-Width Bound and Conformal Bridge 
+
+Proposition 3 is stated in the main text, and we give its proof here. It bounds the physical action-deviation score 
+
+Sθ (g, v ) by the propagated width quantity Uθ (g; r) on the coverage event Er (g, v ), gives the tail bound with the miss probability γ, and, with the sample-specific radius 
+
+ra(v) = ∥zva − z0
+
+> a
+
+∥∞, yields the unconditional pointwise bound Sθ (g, v ) ≤ eUθ (g, v ) and the conformal ordering 
+
+qθ ≤ qUθ at a shared rank k. The empirical support below reports the fixed-radius coverage as an empirical quantity on held-out groups, and the directly calibrated radius qθ stays the tighter primary result. 
+
+Proof of Proposition 3. With the notation of the main text, on Er (g, v ) each perturbed representation zva lies in ⟨z0
+
+> a
+
+, rI m⟩, so by Proposition 1 the decoded action lies in Zout  
+
+> a
+
+(r) and every entry obeys |fθ,tj (zva , u a) −
+
+cout  
+
+> a,tj
+
+(r)| ≤ P
+
+> k
+
+|Gout 
+
+> a,tjk
+
+(r)|. The triangle inequality then gives |fθ,tj (zva , u a) − ˜Aa,tj | ≤ |cout  
+
+> a,tj
+
+(r) − ˜Aa,tj | +
+
+P
+
+> k
+
+|Gout 
+
+> a,tjk
+
+(r)|, and multiplying by sj and taking the max-imum over t, over j ∈ C , and over a ∈ A (g) gives the coverage-conditional bound Sθ (g, v ) ≤ Uθ (g; r). The tail bound Pr[ Sθ (g, v ) > u] ≤ γ + Pr[ Uθ (g; r) > u] fol-lows from {Sθ > u} ⊆ Ecr ∪ { Uθ > u}. Choosing 
+
+ra(v) = ∥zva − z0
+
+> a
+
+∥∞ makes the inclusion hold for every sampled pair, so the same entry bound taken over t and j ∈ C 
+
+gives max t, j ∈C sj |fθ,tj (zva , u a) − ˜Aa,tj | ≤ Uθ,a (ra(v)) for each a, and taking the maximum over a ∈ A(g) gives 
+
+Sθ (g, v ) ≤ max a Uθ,a (ra(v)) = eUθ (g, v ). Pointwise or-dering Si ≤ eUi implies the same ordering of their k-th order statistics, and split conformal calibration of eU gives the con-formal ordering qθ ≤ qUθ with Pr[ Sθ (gnew , v new ) ≤ qUθ ] ≥
+
+1 − α. □
+
+Empirical support. We evaluate the bound on the same 
+
+200 calibration and 100 test rollout initializations and the same frozen camera poses as the main study, over the twelve Task-3 checkpoints. For each clean state the in-terface set Ba = ⟨za, ϵI 32 ⟩ at the fixed training radius 
+
+ϵ = 0 .240 is propagated with the same DeepZ transformer that produces the training width, which gives the output zonotope Zout  
+
+> a
+
+and hence Uθ (g). The bottleneck residual 
+
+∥h(o(a, v g )) − h(o(a, v 0)) ∥∞ and the physical score Sθ are read directly from the sampled-camera evaluation. Table S5 reports the result. The empirical training-radius coverage on the 100 test groups ranges from 0.76 to 1.00 across seeds, matching the separately reported interface-set coverage. On the covered groups 0 groups violate Sθ ≤ Utrain , and on all groups 0 groups violate the adaptive bound Sθ ≤ Uadapt ,consistent with Proposition 3 and its adaptive specialization. Set-based training reduces the median propagated bound by more than two orders of magnitude at the 99% level rela-tive to every control, from a set-based median q99 (Utrain )
+
+of 2.1 against roughly 1.01e+03 for the behavior-only and observational-consistency controls and 743.4 for PGD ad-versarial training, with the per-seed Utrain and Uadapt values in Table S5. The direct sampled score q99 (S) stays near 0.1
+
+to 0.2 for every method. Applying split conformal calibra-tion to the adaptive bound at the same 99% rank as qθ gives the conformal quantity qUθ , and qθ ≤ qUθ holds on all twelve checkpoints, with median qUθ near 1.9 for set-based train-ing against 950.4 for the behavior-only and observational-consistency controls and 686.8 for PGD adversarial training. The bound is a conservative over-approximation because it adds the full-set interval half-width P
+
+> k
+
+|Gout 
+
+> a,jk
+
+| to the center offset |cout  
+
+> a,j
+
+− ˜Aa,j |, both larger than the single sampled resid-ual that the score Sθ measures, so it supports the mechanism that contracting the terminal width lowers a provable upper bound on the physical action deviation. 
+
+## H Tightness of the Deterministic Output Enclosure 
+
+Proposition 1 establishes that the DeepZ propagation returns an over-approximation of the action set induced by an inter-face set, so every action reachable from that set lies inside the returned enclosure. This section measures how tight that en-closure is on the twelve Task-3 camera checkpoints, by com-paring the DeepZ terminal half-width against the strongest Table S5: Empirical support for the coverage-conditional ac-tion bound of Proposition 3, on the same 200 calibration and 
+
+100 test rollout initializations and frozen camera poses as the main study, over the twelve formal checkpoints. Coverage is the empirical fraction of the 100 test groups whose bottleneck residual stays within the fixed training radius ϵ = 0 .240 . The violation columns count groups with S > U beyond 10 −6,for Utrain on the covered groups and the adaptive Uadapt 
+
+on all groups. U and S are in raw action units and the unit is the rollout group. The dagger marks the behavior-invalid seed-621 PGD frontier. The direct conformal radius q is the primary result and is not replaced by U .                                                                                   
+
+> Method seed cov. viol. tr q99 Utr viol. ad q99 Uad q99 S
+> Set-based s621 1.00 01.57 01.19 0.111 s622 0.76 02.60 03.29 0.113 s623 0.92 02.15 01.91 0.077 Behavior-only s621 1.00 01.01e+03 0936.55 0.231 s622 0.76 0602.46 0826.47 0.181 s623 0.92 01.02e+03 01.22e+03 0.191 Consistency s621 1.00 01.01e+03 0938.85 0.220 s622 0.76 0695.27 0962.04 0.201 s623 0.92 01.03e+03 01.23e+03 0.186 PGD s621 †1.00 0745.21 0686.76 0.173 s622 0.76 0316.70 0421.67 0.138 s623 0.92 0743.39 0888.05 0.114
+
+deviation that a projected-gradient attack attains inside the same interface set. 
+
+Protocol. Each checkpoint is verified at the interface set Bϵ(z) = ⟨z, ϵI 32 ⟩ with the shared calibrated radius 
+
+ϵ = 0.240 , which is identical across configurations be-cause the bottleneck is frozen during every continuation. The evaluation covers 12 checkpoints, which are the set-based, behavior-only, observational-consistency, and PGD adversarial-training configurations across three seeds, with the seed-621 PGD checkpoint reported as a behavior-invalid frontier point, and 15 matched anchors per checkpoint drawn from the shared held-out observation bundle, which gives 180 checkpoint-anchor evaluations. The 15 anchors are shared across all checkpoints, so the 180 evaluations reuse the same 15 unique anchors, each verified under 12 checkpoints. The attack runs fifty restarts of one hundred steps inside the interface set, and a random baseline draws one thousand sam-ples, both scored as the largest non-gripper deviation over the action block in raw physical action units, which is the same coordinate and scale as the DeepZ half-width. 
+
+Enclosure check. Proposition 1 establishes that the enclo-sure contains the reachable action set. Consistent with it, every projected-gradient and random lower bound falls in-side the DeepZ enclosure across all 180 checkpoint-anchor evaluations, so the enclosure holds empirically at every eval-uation. 
+
+Result. Table S6 reports the enclosure width against the two lower bounds. For the set-based checkpoints the DeepZ enclosure is informative, with a per-configuration median DeepZ-to-PGD ratio of 16.38 and per-seed values from 16.04 to 16.98. For each control objective the same verifier returns a far looser enclosure, with per-configuration median ratios Table S6: Tightness of the deterministic output enclosure on the twelve formal Task-3 camera checkpoints, the set-based, behavior-only, observational-consistency, and PGD adversarial-training configurations across three seeds. Each checkpoint is evaluated at its 15 matched anchors under the shared isotropic interface set Bϵ(z) = ⟨z, ϵI 32 ⟩ with 
+
+ϵ = 0 .240 , giving 180 checkpoint-anchor evaluations in raw physical action units over the six continuous non-gripper coordinates. DeepZ width is the terminal half-width, and the PGD and random columns are the strongest-attack and random lower bounds. The DeepZ/PGD columns give the median, seventy-fifth, and ninetieth percentile of the ratio over the 15 anchors. The dagger marks the behavior-invalid seed-621 PGD frontier checkpoint.                                                                                                         
+
+> config. seed DeepZ width PGD random DeepZ/PGD med p75 p90 PGD/random Set-based s621 3.314 0.188 0.088 16.4 27.1 30.6 2.18 Set-based s622 1.740 0.104 0.040 17.0 24.3 31.5 2.46 Set-based s623 2.498 0.157 0.069 16.0 25.9 31.0 2.56 Behavior-only s621 691.088 0.760 0.302 932.8 1082.4 1145.4 2.58 Behavior-only s622 321.210 0.623 0.225 508.7 636.8 707.7 2.68 Behavior-only s623 649.899 0.619 0.292 1041.9 1186.9 1279.6 2.30 Consistency s621 693.287 0.745 0.308 934.6 1052.2 1154.3 2.62 Consistency s622 371.421 0.635 0.237 585.4 705.5 752.9 2.67 Consistency s623 652.502 0.624 0.297 1045.8 1199.4 1293.9 2.23 PGD s621 †506.025 0.448 0.197 1224.4 1353.7 1543.2 2.36 PGD s622 170.987 0.263 0.099 663.9 797.1 855.3 2.41 PGD s623 482.824 0.398 0.172 1238.8 1298.0 1361.2 2.41
+
+of 933 for behavior-only fine-tuning, 935 for observational consistency, and 1224 for PGD adversarial training, all above 500. The set-based enclosure widths stay within a few raw action units, whereas the three control enclosure widths are in the hundreds, so an optimized pointwise adversarial objec-tive attains a comparable sampled radius without producing an informative deterministic enclosure. Every checkpoint-anchor pair satisfies the enclosure relations, with the DeepZ width at least the projected-gradient lower bound and at least the random lower bound on all 180 evaluations. This reading is a deterministic statement about the eval-uated interface sets and the output enclosure DeepZ returns for them, and the conformal radius q of the main text pro-vides the complementary probabilistic statement over camera poses. The same training signal that tightens the conformal radius also yields an informative deterministic output en-closure, whereas the control objectives leave that enclosure orders of magnitude looser under the identical verifier. 
+
+## I Raw-1024 Bottleneck-Role Ablation 
+
+Set-based training on the raw 1024-dimensional feature inter-face is trainable and reaches the requested terminal radii, but every tested pressure and checkpoint fails the closed-loop be-havior gate. At the loose target, the best checkpoint reaches 0.500/0.480 clean and camera-extrinsic success, while the tighter targets reach zero success in both modes. No raw-feature contraction row is therefore eligible for action-radius evaluation. Together with the behavior-valid 32-dimensional pipeline, this result supports the learned bottleneck as a behavior-preserving set interface in the evaluated compact-policy setting. Table S7: Central training configuration, fixed before eval-uation. The same settings apply to the behavior-only fine-tuning, observational-consistency, and set-based configura-tions, which differ only in the training objective and share the pretrained checkpoint, cache, checkpoint schedule, and behavior gate. 
+
+Setting Value Policy flow-matching compact policy Encoder / bottleneck frozen 1024 -d encoder, learned 32 -d bot-tleneck (both frozen at contraction) Training-set radius ϵ 0.240 , effective generator Geff =0.240 I32 
+
+Terminal ρ max j
+
+ sj
+
+P 
+
+> k
+
+|Gjk | /ν i, mean over an-chors, in commanded action units, with sj
+
+the per-coordinate de-normalization scale and νi the commanded nominal action norm Reported channel q over continuous coordinates, gripper tracked separately Optimizer AdamW, lr 5 × 10 −5, weight decay 10 −4,global grad clip 1.0
+
+Batch size 192 behavior, 2 set Dual variable rate 0.01 , clamp [0 , 100] 
+
+Target radius rtarget per capacity tier (small 0.25 , medium and large 1.0)BatchNorm running statistics frozen during contrac-tion Checkpoint schedule epochs 40 , 80 , 120 , 160 , 200 of 220 , se-lect behavior-valid then min ρ
+
+Behavior gate 0.85 clean and 0.85 camera-extrinsic, 
+
+50 + 50 episodes Camera sampling one frozen uniform pose per initializa-tion over [−1, 1] deg and mm, agentview, shared across configurations Seeds three training seeds s621, s622, s623, fixed per-episode seed formula Selection budget no reported evaluation initialization en-ters the training-radius calibration or checkpoint selection 
+
+## J Reproducibility Configuration 
+
+All entries are fixed before any state-level evaluation and recorded in the experiment configuration. 
+
+## K Compute 
+
+Training one policy configuration runs in about fourteen min-utes on one GPU for 220 epochs of 120 steps. The sampled-camera perturbation evaluation over the 200 calibration and 
+
+100 test initializations, together with the behavior rollouts of fifty clean and fifty camera-extrinsic episodes per candidate, are the dominant evaluation cost. Every experiment runs on a single NVIDIA H200 GPU with 144 GB of memory, under Rocky Linux 9.8. The software stack is Python 3.10 , PyTorch 
+
+2.2 with CUDA 12 .1, and NumPy 1.26 , with the LIBERO 
+
+0.1.1 benchmark built on robosuite 1.4 and MuJoCo 3.7.

@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-10</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-11</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 29 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>18</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-10 17:56:48 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-11 17:53:31 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,19 +62,21 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 sentences or fewer. Let me analyze the data:</p>
-<p>Date: 2026-08-10</p>
-<p>Total: 29 papers</p>
-<p>Deep reading: 18 papers</p>
-<p>Skim reading: 11 papers</p>
-<p>Top deep reads (both 9.0/10): DynamicManip and AffordTrajDP - both about dynamic manipulation/robotic manipulation</p>
-<p>Top skim reads (8.0/10): DynamicWAM, OC-VLA++, Hermite Curves - all about robotic manipulation/VLA models</p>
-<p>The theme is clearly about robotic manipulation, especially dynamic manipulation and visuomotor policies/VLA models.</p>
-<p>Let me craft 3 sentences:</p>
-<p>A headline-grabbing summary</p>
-<p>The most noteworthy directions/findings (1-2)</p>
-<p>Next-step suggestion for general readers&lt;/think&gt;</p>
-<p>今日精选 29 篇机器人操控相关论文，精读 18 篇，主题集中在动态操控与视觉-语言-动作模型的最新进展。DynamicManip（9.0）展示了从单次静态演示中学会动态操控的能力，AffordTrajDP（9.0）则通过动态可供性引导大幅提升了视动策略的泛化性，是今天最值得关注的两个方向。建议感兴趣的读者优先阅读这两篇精读论文，再延伸到 Hermite 曲线作为轨迹先验等工作，进一步追踪动态操控与轨迹建模的融合趋势。</p>
+<p>&lt;think&gt;</p>
+<p>The user wants a daily report summary in Chinese, 3 sentences max, based on the given data. No markdown, no JSON. Let me craft it based on the provided data.</p>
+<p>Key info:</p>
+<p>Date: 2026-08-11</p>
+<p>Total: 23 papers</p>
+<p>Deep read: 12, Skim: 11</p>
+<p>Top picks (9.0): AffordTrajDP (affordance-guided visuomotor policy), Look Where It Matters (adaptive visual refinement for VLA)</p>
+<p>Other highlights (8.0): DynamicManip (dynamic manipulation from static demo), Multi-View Unified Camera Fields (multi-camera VLA), ChainVLA (long-horizon manipulation via chained VLA queries)</p>
+<p>All papers seem to be about robotic manipulation / VLA (Vision-Language-Action) models. Theme: robot manipulation policy learning, VLA models, affordance, long-horizon tasks, multi-view.</p>
+<p>Let me write 3 sentences:</p>
+<p>Overview/title sentence</p>
+<p>Most notable directions/findings</p>
+<p>Next step suggestion for general readers</p>
+<p>&lt;/think&gt;</p>
+<p>今日精选 23 篇机器人操控与视觉-语言-动作（VLA）策略相关论文，重点聚焦 12 篇精读，其中 AffordTrajDP 的可供性引导策略与 Look Where It Matters 的自适应视觉精修共同拿下 9.0 高分，成为今日最值得关注的两个方向。整体趋势显示，操控研究正从静态示范、单一视角向动态交互、长时序链式推理与多相机统一表征等更复杂、更贴近真实场景的能力迈进。对普通读者而言，若想跟进具身智能前沿，建议优先关注&quot;长时序任务分解+多视角感知&quot;这一组合方向，这两条线索很可能成为下一代家用与工业机器人的关键能力。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -83,12 +85,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">18 篇</strong>
+    <strong class="dpr-home-dashboard-count">12 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DynamicManip: Enabling Dynamic Manipulation from a Single Static Demonstration">DynamicManip: Enabling Dynamic Manipulation from a Single Static Demonstration</span></li><li><span class="dpr-home-dashboard-paper-title" title="AffordTrajDP: Dynamic Affordance-Guided Visuomotor Policy Learning for Robotic Manipulation">AffordTrajDP: Dynamic Affordance-Guided Visuomotor Policy Learning for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="ReTouch: Empowering Contact-Rich Dexterous Manipulation with Online-Refined Tactile Prediction">ReTouch: Empowering Contact-Rich Dexterous Manipulation with Online-Refined Tactile Prediction</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AffordTrajDP: Dynamic Affordance-Guided Visuomotor Policy Learning for Robotic Manipulation">AffordTrajDP: Dynamic Affordance-Guided Visuomotor Policy Learning for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Look Where It Matters: Adaptive Visual Refinement for Vision-Language-Action Models">Look Where It Matters: Adaptive Visual Refinement for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Panorama-Aware VLA for Mobile Manipulation with Whole-Body Teleoperation">Learning Panorama-Aware VLA for Mobile Manipulation with Whole-Body Teleoperation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>18</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -99,7 +101,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DynamicWAM: Dual-Path Motion Conditioning for World-Action Models in Dynamic Manipulation">DynamicWAM: Dual-Path Motion Conditioning for World-Action Models in Dynamic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="OC-VLA++: Monocular Geometry-Guided Cross-View Consistency for Viewpoint-Robust Robotic Manipulation">OC-VLA++: Monocular Geometry-Guided Cross-View Consistency for Viewpoint-Robust Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Hermite Curves as Trajectory Priors for Vision-Language-Action Models">Hermite Curves as Trajectory Priors for Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DynamicManip: Enabling Dynamic Manipulation from a Single Static Demonstration">DynamicManip: Enabling Dynamic Manipulation from a Single Static Demonstration</span></li><li><span class="dpr-home-dashboard-paper-title" title="Multi-View Unified Camera Fields: Geometry-Shaped Action-Facing Representations for RGB-Only Multi-Camera VLA Policies">Multi-View Unified Camera Fields: Geometry-Shaped Action-Facing Representations for RGB-Only Multi-Camera VLA Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="ChainVLA: Chaining Vision-Language-Action Queries through a Unified Execution State for Long-Horizon Manipulation">ChainVLA: Chaining Vision-Language-Action Queries through a Unified Execution State for Long-Horizon Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
