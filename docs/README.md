@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-11</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-12</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-11 17:53:31 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-12 17:44:49 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,21 +62,24 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;</p>
-<p>The user wants a daily report summary in Chinese, 3 sentences max, based on the given data. No markdown, no JSON. Let me craft it based on the provided data.</p>
-<p>Key info:</p>
-<p>Date: 2026-08-11</p>
-<p>Total: 23 papers</p>
-<p>Deep read: 12, Skim: 11</p>
-<p>Top picks (9.0): AffordTrajDP (affordance-guided visuomotor policy), Look Where It Matters (adaptive visual refinement for VLA)</p>
-<p>Other highlights (8.0): DynamicManip (dynamic manipulation from static demo), Multi-View Unified Camera Fields (multi-camera VLA), ChainVLA (long-horizon manipulation via chained VLA queries)</p>
-<p>All papers seem to be about robotic manipulation / VLA (Vision-Language-Action) models. Theme: robot manipulation policy learning, VLA models, affordance, long-horizon tasks, multi-view.</p>
-<p>Let me write 3 sentences:</p>
-<p>Overview/title sentence</p>
-<p>Most notable directions/findings</p>
-<p>Next step suggestion for general readers</p>
-<p>&lt;/think&gt;</p>
-<p>今日精选 23 篇机器人操控与视觉-语言-动作（VLA）策略相关论文，重点聚焦 12 篇精读，其中 AffordTrajDP 的可供性引导策略与 Look Where It Matters 的自适应视觉精修共同拿下 9.0 高分，成为今日最值得关注的两个方向。整体趋势显示，操控研究正从静态示范、单一视角向动态交互、长时序链式推理与多相机统一表征等更复杂、更贴近真实场景的能力迈进。对普通读者而言，若想跟进具身智能前沿，建议优先关注&quot;长时序任务分解+多视角感知&quot;这一组合方向，这两条线索很可能成为下一代家用与工业机器人的关键能力。</p>
+<p>&lt;think&gt;The user wants a daily summary in Chinese, 3 sentences max, based on the given data. Let me craft it:</p>
+<p>Title-sensory summary of what was done today</p>
+<p>Most noteworthy direction/conclusion with 1-2 papers</p>
+<p>Next-step suggestion for general readers</p>
+<p>Data:</p>
+<p>Date: 2026-08-12</p>
+<p>Total: 28 papers</p>
+<p>Deep read: 17, Speed read: 11</p>
+<p>Top scored deep reads (9.0): &quot;How Should Vision-Language-Action Models Use Proprioceptive State?&quot; and &quot;Unified Visuomotor Targets: Supervising VLAs Beyond Physical Actions&quot;</p>
+<p>Speed reads (8.0): Ego2Robot, ValueFormer, Hierarchical Imitation Learning</p>
+<p>Let me write:</p>
+<p>今日聚焦VLA模型架构与训练范式，精读17篇、速读11篇，覆盖本体感知整合、视觉运动目标统一等前沿方向。</p>
+<p>最值得关注的两条主线：一是VLA如何更有效地利用本体感知状态，二是将监督信号从物理动作扩展到统一的视觉运动目标，二者均指向&quot;超越纯动作预测&quot;的下一代策略学习框架。</p>
+<p>建议普通读者优先阅读两篇9.0精读文，关注&quot;感知-动作&quot;耦合与&quot;目标空间&quot;设计这两个切入点，跟踪机器人基础模型的演进趋势。</p>
+<p>Let me refine to make it more concise and engaging.&lt;/think&gt;</p>
+<p>今日聚焦VLA（视觉-语言-动作）模型架构与训练范式升级，精读17篇、速读11篇，集中探讨机器人基础模型的下一个突破口。</p>
+<p>最值得关注的两条主线：VLA如何更聪明地利用本体感知状态，以及将监督目标从单一动作扩展到统一视觉运动信号，两篇9.0精读均指向&quot;超越纯动作预测&quot;的策略学习新框架。</p>
+<p>建议普通读者优先看两篇高分精读，重点关注&quot;感知-动作耦合&quot;与&quot;目标空间重构&quot;这两个切口，跟踪机器人基础模型从执行器向理解器演进的趋势。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -85,12 +88,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">12 篇</strong>
+    <strong class="dpr-home-dashboard-count">17 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AffordTrajDP: Dynamic Affordance-Guided Visuomotor Policy Learning for Robotic Manipulation">AffordTrajDP: Dynamic Affordance-Guided Visuomotor Policy Learning for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Look Where It Matters: Adaptive Visual Refinement for Vision-Language-Action Models">Look Where It Matters: Adaptive Visual Refinement for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Learning Panorama-Aware VLA for Mobile Manipulation with Whole-Body Teleoperation">Learning Panorama-Aware VLA for Mobile Manipulation with Whole-Body Teleoperation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="How Should Vision-Language-Action Models Use Proprioceptive State?">How Should Vision-Language-Action Models Use Proprioceptive State?</span></li><li><span class="dpr-home-dashboard-paper-title" title="Unified Visuomotor Targets: Supervising VLAs Beyond Physical Actions">Unified Visuomotor Targets: Supervising VLAs Beyond Physical Actions</span></li><li><span class="dpr-home-dashboard-paper-title" title="CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention">CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -101,7 +104,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DynamicManip: Enabling Dynamic Manipulation from a Single Static Demonstration">DynamicManip: Enabling Dynamic Manipulation from a Single Static Demonstration</span></li><li><span class="dpr-home-dashboard-paper-title" title="Multi-View Unified Camera Fields: Geometry-Shaped Action-Facing Representations for RGB-Only Multi-Camera VLA Policies">Multi-View Unified Camera Fields: Geometry-Shaped Action-Facing Representations for RGB-Only Multi-Camera VLA Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="ChainVLA: Chaining Vision-Language-Action Queries through a Unified Execution State for Long-Horizon Manipulation">ChainVLA: Chaining Vision-Language-Action Queries through a Unified Execution State for Long-Horizon Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Ego2Robot: Scalable Robot Data Synthesis from Egocentric Human Data">Ego2Robot: Scalable Robot Data Synthesis from Egocentric Human Data</span></li><li><span class="dpr-home-dashboard-paper-title" title="ValueFormer: A Causal Transformer Value Function with Stage-Aware Labels for Semi-Autonomous Vision-Language-Action Policies">ValueFormer: A Causal Transformer Value Function with Stage-Aware Labels for Semi-Autonomous Vision-Language-Action Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="A Hierarchical Approach to Imitation Learning for Manipulation Tasks Requiring Time Varying Forces">A Hierarchical Approach to Imitation Learning for Manipulation Tasks Requiring Time Varying Forces</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
