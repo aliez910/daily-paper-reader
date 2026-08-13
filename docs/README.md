@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-12</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-13</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 27 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>16</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-12 17:44:49 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-13 17:59:08 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,24 +62,19 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a daily summary in Chinese, 3 sentences max, based on the given data. Let me craft it:</p>
-<p>Title-sensory summary of what was done today</p>
-<p>Most noteworthy direction/conclusion with 1-2 papers</p>
-<p>Next-step suggestion for general readers</p>
-<p>Data:</p>
-<p>Date: 2026-08-12</p>
-<p>Total: 28 papers</p>
-<p>Deep read: 17, Speed read: 11</p>
-<p>Top scored deep reads (9.0): &quot;How Should Vision-Language-Action Models Use Proprioceptive State?&quot; and &quot;Unified Visuomotor Targets: Supervising VLAs Beyond Physical Actions&quot;</p>
-<p>Speed reads (8.0): Ego2Robot, ValueFormer, Hierarchical Imitation Learning</p>
-<p>Let me write:</p>
-<p>今日聚焦VLA模型架构与训练范式，精读17篇、速读11篇，覆盖本体感知整合、视觉运动目标统一等前沿方向。</p>
-<p>最值得关注的两条主线：一是VLA如何更有效地利用本体感知状态，二是将监督信号从物理动作扩展到统一的视觉运动目标，二者均指向&quot;超越纯动作预测&quot;的下一代策略学习框架。</p>
-<p>建议普通读者优先阅读两篇9.0精读文，关注&quot;感知-动作&quot;耦合与&quot;目标空间&quot;设计这两个切入点，跟踪机器人基础模型的演进趋势。</p>
-<p>Let me refine to make it more concise and engaging.&lt;/think&gt;</p>
-<p>今日聚焦VLA（视觉-语言-动作）模型架构与训练范式升级，精读17篇、速读11篇，集中探讨机器人基础模型的下一个突破口。</p>
-<p>最值得关注的两条主线：VLA如何更聪明地利用本体感知状态，以及将监督目标从单一动作扩展到统一视觉运动信号，两篇9.0精读均指向&quot;超越纯动作预测&quot;的策略学习新框架。</p>
-<p>建议普通读者优先看两篇高分精读，重点关注&quot;感知-动作耦合&quot;与&quot;目标空间重构&quot;这两个切口，跟踪机器人基础模型从执行器向理解器演进的趋势。</p>
+<p>&lt;think&gt;用户需要我根据日报数据生成3句以内的中文总结。让我分析一下数据：</p>
+<p>日期：2026-08-13</p>
+<p>总数：27篇论文</p>
+<p>精读16篇，速读11篇</p>
+<p>精读最高分9.0：CofactVLA（反事实干预去混淆VLA模型）和Explicit Language Memory（显式语言记忆用于长期规划）</p>
+<p>速读最高分8.0：Faster-WAM（高效推理的未来条件）、MobileWAM（移动操作的世界动作模型）、VLAff（视觉-语言-可供性模型）</p>
+<p>主题都围绕VLA（Vision-Language-Action）模型，这是机器人/具身智能领域。</p>
+<p>要求：</p>
+<p>标题感官的概括</p>
+<p>最值得看的1-2个方向</p>
+<p>下步建议</p>
+<p>我需要简洁但具体，不编造内容。&lt;/think&gt;</p>
+<p>今天围绕视觉-语言-动作（VLA）模型共筛读27篇，精读16篇，热点集中在去混淆、长期记忆与高效推理三条主线。最值得关注的是 CofactVLA 通过反事实干预削弱视觉-语言-动作链路中的混杂偏置，以及 Explicit Language Memory 用显式语言记忆解锁长时序规划能力，二者均拿下 9.0 分。对普通读者而言，下一步可优先关注&quot;结构化记忆+去偏训练&quot;的组合落地——这类方法既不需要海量新数据，也更容易迁移到家用机器人、辅助驾驶等真实场景，建议从开源的 WAM 系列与可供性模型入手跟踪后续工作。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -88,12 +83,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">17 篇</strong>
+    <strong class="dpr-home-dashboard-count">16 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="How Should Vision-Language-Action Models Use Proprioceptive State?">How Should Vision-Language-Action Models Use Proprioceptive State?</span></li><li><span class="dpr-home-dashboard-paper-title" title="Unified Visuomotor Targets: Supervising VLAs Beyond Physical Actions">Unified Visuomotor Targets: Supervising VLAs Beyond Physical Actions</span></li><li><span class="dpr-home-dashboard-paper-title" title="CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention">CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention">CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention</span></li><li><span class="dpr-home-dashboard-paper-title" title="Explicit Language Memory for Long-Horizon Planning in Vision-Language-Action Models">Explicit Language Memory for Long-Horizon Planning in Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="BridgeVLA++: A Data-Efficient, Generalizable, and Memory-Augmented Vision-Language-Action Framework for 3D Manipulation">BridgeVLA++: A Data-Efficient, Generalizable, and Memory-Augmented Vision-Language-Action Framework for 3D Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>16</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -104,7 +99,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Ego2Robot: Scalable Robot Data Synthesis from Egocentric Human Data">Ego2Robot: Scalable Robot Data Synthesis from Egocentric Human Data</span></li><li><span class="dpr-home-dashboard-paper-title" title="ValueFormer: A Causal Transformer Value Function with Stage-Aware Labels for Semi-Autonomous Vision-Language-Action Policies">ValueFormer: A Causal Transformer Value Function with Stage-Aware Labels for Semi-Autonomous Vision-Language-Action Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="A Hierarchical Approach to Imitation Learning for Manipulation Tasks Requiring Time Varying Forces">A Hierarchical Approach to Imitation Learning for Manipulation Tasks Requiring Time Varying Forces</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models">Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li><li><span class="dpr-home-dashboard-paper-title" title="VLAff: Vision-Language-Affordance Model for Unified Actionable Affordances">VLAff: Vision-Language-Affordance Model for Unified Actionable Affordances</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
