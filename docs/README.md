@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-13</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-14</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 27 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 26 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>16</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>15</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-13 17:59:08 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-14 17:55:42 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,19 +62,17 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;用户需要我根据日报数据生成3句以内的中文总结。让我分析一下数据：</p>
-<p>日期：2026-08-13</p>
-<p>总数：27篇论文</p>
-<p>精读16篇，速读11篇</p>
-<p>精读最高分9.0：CofactVLA（反事实干预去混淆VLA模型）和Explicit Language Memory（显式语言记忆用于长期规划）</p>
-<p>速读最高分8.0：Faster-WAM（高效推理的未来条件）、MobileWAM（移动操作的世界动作模型）、VLAff（视觉-语言-可供性模型）</p>
-<p>主题都围绕VLA（Vision-Language-Action）模型，这是机器人/具身智能领域。</p>
-<p>要求：</p>
-<p>标题感官的概括</p>
-<p>最值得看的1-2个方向</p>
-<p>下步建议</p>
-<p>我需要简洁但具体，不编造内容。&lt;/think&gt;</p>
-<p>今天围绕视觉-语言-动作（VLA）模型共筛读27篇，精读16篇，热点集中在去混淆、长期记忆与高效推理三条主线。最值得关注的是 CofactVLA 通过反事实干预削弱视觉-语言-动作链路中的混杂偏置，以及 Explicit Language Memory 用显式语言记忆解锁长时序规划能力，二者均拿下 9.0 分。对普通读者而言，下一步可优先关注&quot;结构化记忆+去偏训练&quot;的组合落地——这类方法既不需要海量新数据，也更容易迁移到家用机器人、辅助驾驶等真实场景，建议从开源的 WAM 系列与可供性模型入手跟踪后续工作。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise, attractive summary in Chinese based on the given data. The data shows:</p>
+<p>Date: 2026-08-14</p>
+<p>Total: 26 papers</p>
+<p>Deep read: 15</p>
+<p>Quick read: 11</p>
+<p>Top deep reads (both 9.0/10): JoyAI-RA 0.5 (robot manipulation learning via dual action alignment) and SpaceVLA (spatially grounded VLA for robotic manipulation)</p>
+<p>Quick reads (all 8.0/10): focused on robot manipulation topics - future wrist modeling, skill memory framework, hierarchical post-training</p>
+<p>The themes are clearly about robot manipulation and VLA (Vision-Language-Action) models. Let me craft 3 concise lines.&lt;/think&gt;</p>
+<p>今日共筛选 26 篇论文并完成 15 篇精读，重点集中在机器人操作学习与 VLA 模型方向。</p>
+<p>最值得关注的是 JoyAI-RA 0.5 通过双动作对齐机制扩展操作学习规模，以及 SpaceVLA 以用户自定义抓放锚点实现空间接地，二者均代表机器人基础模型的实用化进展。</p>
+<p>建议关注 VLA 与具身智能结合的落地路径，普通人可从&quot;机器人能否像人一样理解空间指令&quot;这一角度持续追踪后续进展。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -83,12 +81,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">16 篇</strong>
+    <strong class="dpr-home-dashboard-count">15 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention">CofactVLA: Deconfounding Vision-Language-Action Models via Counterfactual Intervention</span></li><li><span class="dpr-home-dashboard-paper-title" title="Explicit Language Memory for Long-Horizon Planning in Vision-Language-Action Models">Explicit Language Memory for Long-Horizon Planning in Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="BridgeVLA++: A Data-Efficient, Generalizable, and Memory-Augmented Vision-Language-Action Framework for 3D Manipulation">BridgeVLA++: A Data-Efficient, Generalizable, and Memory-Augmented Vision-Language-Action Framework for 3D Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="JoyAI-RA 0.5: Scaling Robot Manipulation Learning via Dual Action Alignment">JoyAI-RA 0.5: Scaling Robot Manipulation Learning via Dual Action Alignment</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpaceVLA: Spatially Grounded VLA for Robotic Manipulation with User-Authored Grasp and Place Anchors">SpaceVLA: Spatially Grounded VLA for Robotic Manipulation with User-Authored Grasp and Place Anchors</span></li><li><span class="dpr-home-dashboard-paper-title" title="In-Context VLA: Endowing Vision-Language-Action Models with Language via In-Context Post-Training and Agentic Tool Use">In-Context VLA: Endowing Vision-Language-Action Models with Language via In-Context Post-Training and Agentic Tool Use</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>16</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>15</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -99,7 +97,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models">Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li><li><span class="dpr-home-dashboard-paper-title" title="VLAff: Vision-Language-Affordance Model for Unified Actionable Affordances">VLAff: Vision-Language-Affordance Model for Unified Actionable Affordances</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="World-to-Wrist: Task-Conditioned Future Wrist Modeling for Fine-Grained Robot Manipulation">World-to-Wrist: Task-Conditioned Future Wrist Modeling for Fine-Grained Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="SkillMemo: Expert-guided Skill Memory Framework for Compositional Embodied Manipulation">SkillMemo: Expert-guided Skill Memory Framework for Compositional Embodied Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Beyond Flat Policies: Hierarchical Post-Training for Embodied Agents in Robotic Manipulation">Beyond Flat Policies: Hierarchical Post-Training for Embodied Agents in Robotic Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
