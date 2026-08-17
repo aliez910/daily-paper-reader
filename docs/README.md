@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-16</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-17</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 17 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 19 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>8</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-16 17:22:37 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-17 17:18:25 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,22 +62,25 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a Chinese daily report summary based on the given data. Let me analyze:</p>
-<p>Date: 2026-08-16</p>
-<p>Total: 17 papers</p>
-<p>Deep read: 6</p>
-<p>Speed read: 11</p>
-<p>Deep read papers (with scores): Two about robot manipulation - &quot;Skills in Weights, Memory in Code&quot; (9.0) and &quot;JEPA-WAM&quot; (9.0)</p>
-<p>Speed read papers: Vid2WAM (video diffusion into world action models, 8.0), SG-WAM (text-grounded semantic guidance, 8.0), SpeedTuning (lightweight RL for speeding up policy execution, 8.0)</p>
-<p>The theme is clearly about World Action Models (WAM) for robot manipulation. Multiple papers focus on this topic.</p>
-<p>Let me craft 3 concise, attractive lines:</p>
-<p>Headline: Today focused on World Action Models (WAM) for robot manipulation, with 17 papers reviewed.</p>
-<p>Highlight: The top scores go to hybrid memory architectures and JEPA-based stage-level prediction methods.</p>
-<p>Suggestion: For readers interested in robotics, focus on the WAM series - especially JEPA-WAM and the hybrid memory approach.</p>
-<p>Let me make it concrete and attractive.&lt;/think&gt;</p>
-<p>今日聚焦&quot;世界-动作模型（WAM）&quot;在机器人操作中的集中爆发，共筛选 17 篇论文，精读 6 篇。</p>
-<p>最值得关注的是两条主线：一是用权重存技能、代码存记忆的混合架构（9 分），二是 JEPA 阶段级联合嵌入预测的 WAM（9 分），二者都直指长程、记忆依赖的操控难题。</p>
-<p>建议普通读者先看 JEPA-WAM 与&quot;技能在权重&quot;两篇精读，再按需浏览 Vid2WAM、SG-WAM 与 SpeedTuning 三篇速读，即可把握当前机器人策略学习的最新范式。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a 3-line Chinese summary based on the provided recommendation data. Let me analyze:</p>
+<p>Date: 2026-08-17</p>
+<p>Total: 19 papers, 8 read in depth, 11 skimmed</p>
+<p>Top deep reads (9.0/10):</p>
+<p>&quot;Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation&quot; - hybrid learning combining skills in weights and memory in code for memory-dependent robot manipulation</p>
+<p>&quot;VANE: Reliable Test-Time Training for Vision-Language-Action Models via Future Visual Representation Prediction&quot; - reliable test-time training for VLA models</p>
+<p>Other notable skimmed (8.0/10):</p>
+<p>Vid2WAM: distilling video diffusion priors into world action models</p>
+<p>SpeedTuning: speeding up policy execution with lightweight RL</p>
+<p>JEPA-WAM: learning VLA policies with joint-embedding world modeling</p>
+<p>The theme today: Robot manipulation / Vision-Language-Action models, with focus on memory, test-time training, and world models.</p>
+<p>Let me craft 3 lines:</p>
+<p>Title-grabbing one-liner about today&#x27;s focus</p>
+<p>Best 1-2 directions/conclusions</p>
+<p>Next-step suggestion for general readers</p>
+<p>I need to make it catchy but specific, based only on the given data, no fabrication.&lt;/think&gt;</p>
+<p>今日聚焦具身智能与视觉-语言-动作模型，共筛 19 篇论文（精读 8 篇），机器人操控与世界模型两条主线同时升温。</p>
+<p>最值得关注：① &quot;技能存权重、记忆在代码&quot;的混合学习框架为需记忆的机器人操控提供了新思路（9.0）；② VANE 通过预测未来视觉表征实现 VLA 模型可靠的测试时训练（9.0），配合 JEPA-WAM 的联合嵌入世界建模，共同指向&quot;训练+测试+世界模型&quot;一体化趋势。</p>
+<p>建议关注具身大模型落地应用的读者，先从 VANE 与 Vid2WAM 两篇入手，前者解决可靠性，后者把视频扩散先验蒸馏成动作模型，是短期内最容易复现的两条技术路径。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -86,12 +89,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation">Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="JEPA-WAM: Stage-Level Joint-Embedding Prediction for World-Action Models in Robot Manipulation">JEPA-WAM: Stage-Level Joint-Embedding Prediction for World-Action Models in Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="StellaVLA: In-Context Structured Demonstration for Generalizable Vision-Language-Action Models">StellaVLA: In-Context Structured Demonstration for Generalizable Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation">Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="VANE: Reliable Test-Time Training for Vision-Language-Action Models via Future Visual Representation Prediction">VANE: Reliable Test-Time Training for Vision-Language-Action Models via Future Visual Representation Prediction</span></li><li><span class="dpr-home-dashboard-paper-title" title="StageWAM: Joint-Embedding Stage Prediction for World-Action Models in Robot Manipulation">StageWAM: Joint-Embedding Stage Prediction for World-Action Models in Robot Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>8</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -102,7 +105,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Vid2WAM: Distilling Video Diffusion Priors into World Action Models">Vid2WAM: Distilling Video Diffusion Priors into World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="SG-WAM: Text-Grounded and Spatial-aware Semantic Guidance for World-Action Models">SG-WAM: Text-Grounded and Spatial-aware Semantic Guidance for World-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpeedTuning: Speeding Up Policy Execution with Lightweight Reinforcement Learning">SpeedTuning: Speeding Up Policy Execution with Lightweight Reinforcement Learning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Vid2WAM: Distilling Video Diffusion Priors into World Action Models">Vid2WAM: Distilling Video Diffusion Priors into World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="SpeedTuning: Speeding Up Policy Execution with Lightweight Reinforcement Learning">SpeedTuning: Speeding Up Policy Execution with Lightweight Reinforcement Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="JEPA-WAM: Learning Vision-Language-Action Policies with Joint-Embedding World Modeling">JEPA-WAM: Learning Vision-Language-Action Policies with Joint-Embedding World Modeling</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
