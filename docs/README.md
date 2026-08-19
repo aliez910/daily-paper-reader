@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-18</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-19</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 24 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>13</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-18 17:29:42 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-19 17:17:11 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,20 +62,28 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 lines or fewer. Let me analyze the data:</p>
-<p>Date: 2026-08-18</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a 3-line Chinese summary based on the given recommendation data. Let me analyze the data:</p>
+<p>Date: 2026-08-19</p>
 <p>Status: Success</p>
-<p>Total: 24 papers</p>
-<p>Deep read: 13</p>
-<p>Quick read: 11</p>
-<p>Top deep reads: Two papers rated 9.0/10 about robot manipulation memory and VLA model action representations</p>
-<p>Quick reads: Several papers about VLA models, world models, and test-time training</p>
-<p>I need to output:</p>
-<p>A catchy headline-style summary</p>
-<p>Most noteworthy 1-2 directions/conclusions</p>
-<p>Next-step suggestion for general readers</p>
-<p>Let me craft this concisely without Markdown headers or JSON.&lt;/think&gt;</p>
-<p>今日精选 24 篇 VLA 与机器人操作前沿，13 篇深读聚焦动作表征与世界模型两大方向。最值得关注的是&quot;权重存技能、代码存记忆&quot;的混合架构，以及重建对齐动作表征的 VLA 微调思路——机器人正在从语言指令走向真正的可执行技能。下一步建议：先读两篇 9 分精读，再结合 JEPA-WAM 与 VANE 看看世界模型如何加持策略泛化，小团队可优先关注免训练的测试时自适应方案。</p>
+<p>Total: 23 papers</p>
+<p>Deep read: 12 papers</p>
+<p>Quick read: 11 papers</p>
+<p>Top deep reads (9.0/10):</p>
+<p>Surgical WAM: World-Action Model for data-efficient surgical robot learning</p>
+<p>StellaVLA: In-Context Structured Demonstration for generalizable VLA models</p>
+<p>Quick reads (8.0/10):</p>
+<p>StageWAM: Joint-embedding stage prediction for world-action models</p>
+<p>NestDex: Nested policy learning with copilot-assisted teleoperation</p>
+<p>Decoding task progress from VLA representations</p>
+<p>Themes: World-Action Models (WAM), VLA (Vision-Language-Action) models, robot manipulation, surgical robotics.</p>
+<p>Let me write 3 lines:</p>
+<p>Catchy headline summary</p>
+<p>Key directions/conclusions worth noting</p>
+<p>Next step suggestion for general readers</p>
+<p>Line 1: Today&#x27;s focus on world-action models and VLA generalization</p>
+<p>Line 2: Surgical WAM and StellaVLA are top picks</p>
+<p>Line 3: Suggestion for readers&lt;/think&gt;</p>
+<p>今日精选 23 篇聚焦&quot;世界-动作模型（WAM）&quot;与视觉-语言-动作（VLA）策略学习，其中精读 12 篇，机器人操作与泛化能力成最热主线。最值得看的是 Surgical WAM 以极少数据驱动手术机器人学习，以及 StellaVLA 用上下文结构化示例大幅提升 VLA 跨任务泛化，两者共同指向&quot;更少数据、更广迁移&quot;的下一代策略范式。建议普通读者先从 StellaVLA 的演示示例入手理解 VLA 工作流，再跟踪 StageWAM 等阶段性预测方法，关注它们如何从实验室走向真实手术与灵巧操作场景。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -84,12 +92,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">13 篇</strong>
+    <strong class="dpr-home-dashboard-count">12 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation">Skills in Weights, Memory in Code: Hybrid Learning for Memory-Dependent Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Lost in Reconstruction: Aligning Action Representations with Language in Vision-Language-Action Models">Lost in Reconstruction: Aligning Action Representations with Language in Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="StellaVLA: In-Context Structured Demonstration for Generalizable Vision-Language-Action Models">StellaVLA: In-Context Structured Demonstration for Generalizable Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Surgical WAM: A World-Action Model for Data-Efficient Surgical Robot Learning">Surgical WAM: A World-Action Model for Data-Efficient Surgical Robot Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="StellaVLA: In-Context Structured Demonstration for Generalizable Vision-Language-Action Models">StellaVLA: In-Context Structured Demonstration for Generalizable Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="G0.5: One Autoregressive Stream for Robot Reasoning and Action">G0.5: One Autoregressive Stream for Robot Reasoning and Action</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>13</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -100,7 +108,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="JEPA-WAM: Learning Vision-Language-Action Policies with Joint-Embedding World Modeling">JEPA-WAM: Learning Vision-Language-Action Policies with Joint-Embedding World Modeling</span></li><li><span class="dpr-home-dashboard-paper-title" title="VANE: Reliable Test-Time Training for Vision-Language-Action Models via Future Visual Representation Prediction">VANE: Reliable Test-Time Training for Vision-Language-Action Models via Future Visual Representation Prediction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Rethink Before You Execute: Adaptive Execution for World Action Models">Rethink Before You Execute: Adaptive Execution for World Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="StageWAM: Joint-Embedding Stage Prediction for World-Action Models in Robot Manipulation">StageWAM: Joint-Embedding Stage Prediction for World-Action Models in Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="NestDex: Nested Policy Learning with Copilot Assisted Teleoperation for Dexterous Manipulation">NestDex: Nested Policy Learning with Copilot Assisted Teleoperation for Dexterous Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Decoding Task Progress from VLA Representations">Decoding Task Progress from VLA Representations</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
