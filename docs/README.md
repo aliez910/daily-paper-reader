@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-21</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-22</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 20 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 26 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>9</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>15</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-21 17:32:41 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-22 17:23:01 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,26 +62,25 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a summary within 3 sentences in Chinese, based on the given recommendation data. Let me analyze:</p>
-<p>Date: 2026-08-21</p>
-<p>Total: 20 papers</p>
-<p>Deep reading: 9 papers</p>
-<p>Quick reading: 11 papers</p>
-<p>Top papers from deep reading: AdvDex (9.0/10) about dexterous manipulation from human demonstrations, and Evolve VLA into Agent with tool-use (9.0/10)</p>
-<p>Quick reading highlights around 8.0: Attention from Action, ContactGuard (pre-contact monitoring), Decoding Task Progress from VLA</p>
-<p>Theme: Robotic manipulation, VLA models, dexterous skills, tool use, safety/monitoring</p>
-<p>Let me write 3 concise sentences:</p>
-<p>A headline-style summary</p>
-<p>Most noteworthy directions/findings</p>
-<p>Suggestion for general readers</p>
-<p>Draft:</p>
-<p>今天精选20篇论文聚焦机器人操作与视觉-语言-动作模型，灵巧操作与智能体工具调用成为两大焦点。</p>
-<p>最值得关注的是AdvDex从人类演示中学习灵巧操作，以及将VLA模型演化为具备在线工具使用能力的智能体，代表了&quot;从示教到自主&quot;的新路径；另一组研究则关注行动条件下的视觉瓶颈与接触前安全监控，为落地可靠性提供保障。</p>
-<p>普通读者可先看AdvDex与VLA Agent两篇，了解机器人如何&quot;学得巧、做得稳&quot;的前沿思路。</p>
-<p>Let me refine to be more concise and within 3 lines:&lt;/think&gt;</p>
-<p>今日精选20篇论文聚焦机器人灵巧操作与视觉-语言-动作（VLA）模型，灵巧技能学习与智能体工具调用成为两大焦点。</p>
-<p>最值得看的是AdvDex从人类演示中学习高灵巧操作，以及将VLA模型演化为具备在线工具使用能力的智能体；同时，行动条件视觉瓶颈与接触前安全监控为落地可靠性提供了关键保障。</p>
-<p>建议普通读者优先精读AdvDex与VLA Agent两篇，直观感受机器人&quot;学得巧、用得稳&quot;的最新进展。</p>
+<p>&lt;think&gt;The user wants a daily report summary in Chinese. They want:</p>
+<p>A catchy headline-style summary of what was done today</p>
+<p>1-2 most noteworthy directions/conclusions</p>
+<p>A suggestion for next steps for general readers</p>
+<p>Looking at the data:</p>
+<p>Date: 2026-08-22</p>
+<p>Total: 26 papers</p>
+<p>Deep read: 15 papers</p>
+<p>Quick read: 11 papers</p>
+<p>Top scored deep reads: AdvDex (9.0) about dexterous manipulation from human demos, and Evolve VLA into Agent (9.0) about tool-use</p>
+<p>Top quick reads around 8.0: BICPO-VLA, Imagining Recovery, PACE</p>
+<p>All topics are about Vision-Language-Action models, robotic manipulation, and embodied AI. Let me craft 3 concise lines in Chinese.</p>
+<p>Line 1: Headline - today covered 26 papers on VLA models and dexterous manipulation</p>
+<p>Line 2: Highlight AdvDex and the tool-use VLA agent as the top picks</p>
+<p>Line 3: Suggestion - keep watching how VLA models evolve toward agent capabilities with tool use</p>
+<p>Let me write these concisely.&lt;/think&gt;</p>
+<p>今日精选 26 篇论文聚焦视觉-语言-动作模型与灵巧操作，精读 15 篇覆盖人类示教学习、在线工具调用等方向。</p>
+<p>最值得关注的两条线：AdvDex 通过联合对齐动作与对抗学习提升灵巧操作，以及将 VLA 模型演化为具备实时工具调用能力的智能体。</p>
+<p>建议持续追踪 VLA 向&quot;具身智能体&quot;的演进路径，尤其是工具调用与长时程任务中的信用分配机制。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -90,12 +89,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">9 篇</strong>
+    <strong class="dpr-home-dashboard-count">15 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
 <ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AdvDex: Learning Dexterous Manipulation from Human Demonstrations via Joint-Aligned Actions and Adversarial Learning">AdvDex: Learning Dexterous Manipulation from Human Demonstrations via Joint-Aligned Actions and Adversarial Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Evolve Vision-Language-Action Model into an Agent with On-the-fly Tool-use">Evolve Vision-Language-Action Model into an Agent with On-the-fly Tool-use</span></li><li><span class="dpr-home-dashboard-paper-title" title="Reflex: Enabling Fast and Predictive Vision-Language-Action Models for Reaction-Critical Manipulation">Reflex: Enabling Fast and Predictive Vision-Language-Action Models for Reaction-Critical Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>9</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>15</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -106,7 +105,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Attention from Action, for Action: Emergent Visual Bottlenecks for Policy Learning">Attention from Action, for Action: Emergent Visual Bottlenecks for Policy Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="ContactGuard: Pre-Contact Execution Monitoring with Action-Conditioned Latent World Models">ContactGuard: Pre-Contact Execution Monitoring with Action-Conditioned Latent World Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Decoding Task Progress from VLA Representations">Decoding Task Progress from VLA Representations</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="BICPO-VLA: Behavior-Identified Continuation Preference Optimization for Smooth Asynchronous Vision-Language-Action Control">BICPO-VLA: Behavior-Identified Continuation Preference Optimization for Smooth Asynchronous Vision-Language-Action Control</span></li><li><span class="dpr-home-dashboard-paper-title" title="Imagining Recovery: Inference-Time Counterfactual Realignment for Vision-Language-Action Models">Imagining Recovery: Inference-Time Counterfactual Realignment for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="PACE: Phase-Progress-Aware Credit for Long-Horizon Embodied Manipulation">PACE: Phase-Progress-Aware Credit for Long-Horizon Embodied Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
