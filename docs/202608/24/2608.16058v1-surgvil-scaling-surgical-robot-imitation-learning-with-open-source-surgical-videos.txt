@@ -1,0 +1,240 @@
+Title: SurgVIL: Scaling Surgical Robot Imitation Learning with Open-source Surgical Videos
+
+URL Source: https://arxiv.org/pdf/2608.16058v1
+
+Published Time: Tue, 18 Aug 2026 01:32:42 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# SurgVIL: Scaling Surgical Robot Imitation Learning with Open-source Surgical Videos 
+
+# Xinhao Chen 1, JuoTung Chen 1, Nigel Nelson 2, Antony Goldenberg 1, Jesse Haworth 1, Sean D. Huver 2, and Axel Krieger 11Laboratory for Computational Sensing and Robotics, Johns Hopkins University, United States 
+
+> 2
+
+# NVIDIA, United States August 18, 2026 
+
+Abstract 
+
+Learning-based surgical robot autonomy requires large-scale demonstrations with synchronized videos and robot actions, but such data are exceedingly rare in clinical or realistic tissue settings because robot kinematics are typically inaccessible outside controlled research systems. In contrast, phantom data collected on research platforms provide accurate action labels but lacks the visual diversity of real tissue. We propose SurgVIL, a framework for scaling surgical robot imitation learning using open-source surgical videos. SurgVIL combines kinematically labeled phantom robot demonstrations with surgical videos from open-source datasets and online sources for policy learning. Since these videos lack robot motion labels, we estimate approximate kinematics as weak supervision. We evaluate SurgVIL on two da Vinci robot tasks: needle pick-up and cholecystectomy cutting. Across ACT, π0, and Gr00t-H backbones, adding surgical videos substantially improves generalization to real-tissue and out-of-distribution settings, suggesting a scalable path from phantom training toward generalizable surgical robot policies. 
+
+Keywords: Surgical Robotics, Imitation Learning, Robotic Data Generation 
+
+# 1 Introduction 
+
+Robotic surgical autonomy has the potential to improve the consistency, precision, and accessibility of robot-assisted procedures [1]. Recent progress in surgical robotics and artificial intelligence has motivated increasing interest in au-tonomous or semi-autonomous surgical systems, ranging from perception assistance to task-level robotic execution [27]. In parallel, imitation learning and vision-language-action models have shown strong promise for learning complex robot manipulation skills from demonstrations [9, 18]. However, learning-based surgical autonomy remains strongly limited by the availability of large-scale, diverse, and accurately labeled surgical robot data. For surgical robot policy learning, the most valuable data consist of synchronized endoscopic video and robot kinematics. Such data can be collected in controlled laboratory environments using phantoms, or in simulation envi-ronments, where robot kinematics can be recorded directly from the robot system or simulator. However, collecting the same type of synchronized robot-action data in realistic surgical settings is substantially more difficult. Collecting kinematic data from clinical robotic surgery in hospital is often restricted by regulatory constraints and by robot manu-facturers. As a result, accurately labeled surgical robot datasets with clinically realistic visual diversity remain scarce. Phantom demonstrations provide reliable action labels, but they alone are often insufficient for robust generalization. A policy trained only on phantom data may perform well when evaluated on the same phantom setup, yet fail when the visual background, tissue appearance, or target configuration changes. This limitation is particularly important for surgical manipulation, where the policy must respond to subtle tool–tissue interactions and visually diverse anatomical environments. In contrast, open-source surgical videos are relatively abundant and visually diverse. Public datasets and online surgical recordings contain a wide range of surgical scenes, tissue appearances, tool poses, and camera viewpoints. However, these videos generally do not provide synchronized low-level robot action labels, preventing their direct use for robot policy learning. 1arXiv:2608.16058v1 [cs.RO] 17 Aug 2026 Figure 1: Overview of SurgVIL. The proposed framework combines accurately labeled in-house dataset collected in phantom settings with visually diverse open-source surgical videos. The trained policies are evaluated on real-tissue surgical tasks to assess generalization beyond the phantom. In this work, we propose SurgVIL , a framework for scaling surgical robot imitation learning using open-source surgical videos. The key idea is to combine two complementary data sources: kinematically labeled robot dataset collected in phantom settings and visually diverse surgical videos. For surgical videos, we generate approximate robot kinematic labels from monocular endoscopic videos as weak supervision in policy training. SurgVIL is evaluated on two da Vinci surgical robot tasks: needle pick-up and cholecystectomy cutting. For each task, we train policies using either phantom dataset alone or the dataset combining phantom demonstrations with surgical videos. We evaluate three policy backbones, including ACT, π0, and Gr00t-H, across multiple visual domains. The results show that adding surgical videos substantially improves generalization beyond the phantom environment, while largely preserving in-domain performance. Our contributions are as follows: A dual-source surgical imitation learning framework that combines accurately labeled phantom robot demonstrations with visually diverse surgical videos labeled using estimated kinematics; A video-to-action labeling pipeline that converts monocular endoscopic videos into weak robot-action dataset; A task-specific perception module for the needle task that estimates needle position and orientation from endoscopic video frames, enabling an optional input for policy learning; Extensive robot evaluation across two surgical tasks, three policy backbones, and multiple phantom and ex vivo settings. 
+
+# 2 Related Works 
+
+# 2.1 Autonomous Robotic Surgery 
+
+Autonomous robotic surgery has been studied as a path toward more consistent and precise procedures. Prior surveys have summarized autonomy levels in surgical robotics from no autonomy to robot assistance and full autonomy [5, 12]. Early demonstrations of autonomous soft-tissue surgery showed the feasibility of supervised autonomous suturing, hemostasis, and tissue manipulation [25, 19, 23]. These systems demonstrate the potential of surgical autonomy, but often rely on specialized sensing, planning, or control. More recently, learning-based approaches have been explored for surgical robot autonomy. Surgical Robot Transformer (SRT) and SRT-H showed that imitation learning can be applied to da Vinci surgical manipulation tasks by using visual observations and relative robot actions [10, 9]. In parallel, reinforcement-learning and simulation-based methods have investigated demonstration-guided exploration, decision-transformer policies, and generalized sim-to-real task autonomy for surgical robots [7, 4, 15]. These works show the promise of learning-based surgical autonomy, but scalable data collection remains a central bottleneck. Recent work has begun to explore surgical robot policy learning from simulated videos using world models [6]. While this direction is promising, such approaches require substantial computational resources to realistically model clinical settings. Policies trained in simulation also suffer from a sim-to-real gap, and robust transfer to real surgical robot systems remains difficult. In contrast, our work focuses on using existing open-source surgical videos to improve surgical robot policy generalization. 22.2 Robot Imitation Learning Policies 
+
+Imitation learning has become a strong paradigm for robot manipulation, especially when expert demonstrations are available. Action Chunking Transformer (ACT) predicts future action chunks and temporally ensembles them, improving consistency for fine-grained manipulation [30]. Large-scale imitation-learning policies show that transformer and diffusion backbones can benefit from pretraining on diverse robot trajectories [13]. Vision-language-action (VLA) models have recently emerged as general-purpose robot policy backbones. RT-2 showed that vision-language pretraining can be transferred to robot control by representing actions as tokens [32]. π0 uses a pretrained vision-language model backbone and a flow-matching action expert to produce continuous robot actions [2]. OpenVLA demonstrates open-source VLA training on diverse robot demonstrations [11]. In the medical robotics domain, GR00T-H is a medical robotics foundation model trained on Open-H-Embodiment [18]. These models show that large-scale pretraining can improve robot policy learning, but their performance still depends on the relevance of downstream tasks and domains. Rather than proposing a new policy architecture, we study how to improve surgical robot policy generalization based on these pretrained models. 
+
+# 2.3 Learning Robot Policies from Videos 
+
+A growing body of work in general robotics has explored how large-scale human or internet videos can improve robot learning. Many works, including R3M [17] and VIP [16], uses videos primarily for general representation or reward pretraining. Other works use human videos more directly for policy learning, either by extracting plans from human videos, pretraining generative robot policies on videos, or co-training policies with human and robot demonstrations [28, 8]. More recent methods further combine trajectories derived from human videos with robot data to reduce the cost of data collection [14]. These works show that visually diverse videos can provide useful information for robot policy learning. However in this study, the domain gap is not between human body and robot, but between controlled phantom settings and realistic surgical scenes. We therefore estimate tool kinematics from surgical videos and combine these labeled videos with phantom robot dataset for policy training. 
+
+# 3 Methods 
+
+# 3.1 Dataset Construction 
+
+Two representative surgical tasks are considered in this study: needle pick-up and cholecystectomy cutting. These tasks are selected because they involve visually guided object interaction, precise control, and distinct surgical scenarios. Both tasks are executed using a da Vinci surgical robot. In the needle pick-up task (needle task), a large needle driver localizes, grasps, and lifts a surgical needle from the surface. In the cholecystectomy cutting task (chole task), curved scissors approach the clipped target tissue, align with the cutting site, and execute a cutting motion while avoiding other tissue. Three surgical clips have been placed on the target tubular structure, which may be either the cystic duct or the cystic artery. For each task, two types of datasets are constructed: an “in-house dataset” and a “video dataset”. The in-house datasets were collected using a dVRK-Si robot under controlled experimental conditions, as shown in Figure 1. For the needle task, 1,000 demonstrations were performed on a suture pad using a large needle driver. For the chole task, 700 demonstrations were collected on a gallbladder phantom using curved scissors. During data collection, the robot was teleoperated to complete each task while synchronized endoscopic images, wrist-camera images, and robot kinematic data were recorded. Because the kinematic labels were obtained directly from the robot system, they were treated as accurate action labels. To increase dataset diversity, the poses of the phantom, needle, lighting conditions, and the initial pose of the surgical tool were frequently adjusted during data collection. However, because these datasets were collected on phantoms, their visual appearance differs from the ex vivo and in vivo surgical scenes. Open-source surgical videos contain the endoscopic view but do not initially provide synchronized robot kinematics. Therefore, we generate approximate kinematic labels from video using the proposed labeling pipeline described in Section 3.3 to build the video dataset. Although the video-derived labels are less accurate than labels directly from robot, they provide more informative supervision than using videos alone and can serve as useful augmentation during policy training. For needle pick-up, the video dataset was primarily curated from the SurgVU dataset [31], SAR-RARP50 [21], and additional online videos showing da Vinci needle pick-up under endoscopic view, resulting in 500 episodes. For cholecystectomy cutting, the video dataset was curated from videos in the ImitateCholec dataset [9], resulting in 3Figure 2: Flow chart for the dataset preparation, dual-source policy training and evaluation 700 episodes. The video dataset includes diverse clinical settings and provides more realistic tissue appearance and tool–tissue interactions than the in-house phantom dataset. 
+
+# 3.2 Tool and Needle Segmentation 
+
+For policies evaluated on the needle task, we additionally consider an optional needle pose input. Policies with the “ PO” suffix receive the 2D needle center and the local tangent direction at that point. These are estimated from the first frame of each demonstration and are kept fixed throughout the episode. To obtain this information, we train a lightweight network based on U-net [24] to segment the surgical tool and needle. Details of the segmentation work are provided in the Appendix. The tool segmentation mask is used in the video-to-action labeling pipeline, whereas the needle segmentation mask is further processed using a curve-fitting algorithm to remove the attached suture thread and estimate the needle center point and the tangent direction. 
+
+# 3.3 Video-to-Action Labeling Pipeline 
+
+The video-to-action labeling pipeline is built on a differentiable rendering-based framework for estimating surgical tool kinematics from monocular surgical videos. Given a monocular video, the pipeline uses a trained differentiable rendering policy to optimize the pose of a renderable tool model such that the rendered tool appearance matches the input frame. Although prior differentiable rendering methods, such as SurgiPose [3], provide an effective way to extract kinematics from surgical videos, they may produce position errors greater than 1 cm, temporally inconsistent pose estimates, and do not support all required surgical instruments. We therefore extends its applicability to additional surgical instruments and introduce a new design that improves the accuracy. 
+
+Lt = λssim 
+
+ 1 − SSIM  Iren  
+
+> t
+
+, I obs 
+
+> t
+
+ + λdice LDice 
+
+ M ren  
+
+> t
+
+, M obs 
+
+> t
+
+ + λtemp ρ (ξt − ξt−1) , (1) Eq. 1 shows the loss function with a temporal term. Here Iren t and Iobs t denote the rendered and observed images. M ren t
+
+and M obs t are the segmentation masks. The estimated tool pose is represented as Tt ∈ SE (3) . Here, SSIM loss measures the structural similarity, and the Dice loss compares the segmentation masks. The vector ξt = log (T −1
+
+> t−1
+
+Tt) represents the relative rigid-body motion between two frames in the Lie algebra. The temporal term penalizes abrupt changes in acceleration, encouraging smooth trajectories over time. We use the Charbonnier penalty ρ(x) = p∥x∥22 + ϵ2. We further correct the systematic depth bias using a post-hoc calibration model, which fit an affine mapping between the estimated depth zest and the ground-truth depth zgt : zgt ≈ az est + b. The calibration parameters a and b are obtained using the whole training set. The final calibrated pose sequence is converted into action labels by computing frame-to-frame relative motion. These video-derived action labels are used as weak supervision for policy training. We also extended this pipeline to support the curved scissors instrument using a custom CAD model, which is required for the chole task. 43.4 Dual-source Policy Training 
+
+We train the policies using two dataset described above: the in-house dataset and the video dataset, as shown in Figure 2. This design encourages the policy to learn task execution from the in-house dataset while learning tool and tissue appearance variations from the video dataset. Before training, we apply a shared action normalization to both datasets. To reduce the effect of outliers, particularly in the video dataset, each action component is clipped at the 98th percentile before normalization. The video dataset is temporally resampled with a speed factor of 1.2 to better match the motion speed distribution of the in-house dataset. The tasks are formulated as a conditional action prediction problem. At time step t, the policy receives a center endoscopic image Iet , a wrist camera image Iwt , and a task label input lt. To unify the input format across datasets, we replace the unavailable wrist image in the video dataset with a learned missing-view token mw. During training on the in-house dataset, we additionally apply wrist-camera dropout with probability 0.25 , replacing with the same token mw.This encourages robustness to missing views and reduces over-reliance on the wrist camera. The policy fθ predicts the relative robot action ˆat as 
+
+ˆat = fθ
+
+
+
+Iet , ˜Iwt , l t
+
+
+
+, ˆat = [∆ pt, ∆qt, g t] (2) where ˜Iwt is either Iwt or mw, ∆pt ∈ R3 is the translational displacement, ∆qt ∈ R4 is the rotation quaternion, and gt
+
+is the jaw angle. The input order is fixed, with the endoscopic image first, followed by the wrist-camera input. At each training step, we independently sample two mini-batches of equal size from both datasets. The two mini-batches are processed by the same policy network with shared parameters. Let Bh denote the in-house mini-batch and Bv denote the video mini-batch. The training objective is a weighted combination of the two losses: 
+
+L = Lpolicy (Bh) + λv Lpolicy (Bv ), (3) where Lpolicy is the imitation loss used by each backbone, and λv controls the contribution of video dataset. We set 
+
+λv = 0 .5, selected from candidate values {0.1, 0.25 , 0.5, 0.75 , 1.0} based on validation loss. This weighting keeps the in-house dataset as the primary source of accurate action supervision while allowing the policy to benefit from the visual diversity of the video dataset. We use the same dual-source training procedure for all evaluated policy backbones: ACT [30], π0 [2], and Gr00t-H [18]. These models are used as representative imitation-learning and vision-language-action policy architectures. ACT is used as standard imitation learning backbone; π0 provides a general-purpose VLA policy backbone; while Gr00t-H provides a medical foundation VLA backbone. For all three backbones, the policy input consists of the endoscopic image, the wrist-camera input or missing-view token, and the task label. The output action follows the same relative action format defined in Eq. 2. All implementation details specific to each backbone are provided in the Appendix. 
+
+# 4 Experiments and Results 
+
+# 4.1 Experiment Setup 
+
+The experiments are designed to answer three questions. First, does adding surgical video data improve policy generalization to visually realistic and out-of-domain surgical scenes? Second, is the improvement due to the visual 
+
+Figure 3: Experimental Setup. The evaluation was conducted on a dVRK-Si robot system, with an additional wrist camera mounted on the surgical instrument. 5diversity of the video data rather than only the increased number of training episodes? Third, is the benefit consistent across different policy backbones and tasks? All policies are evaluated on a dVRK-Si surgical robot, as shown in the Figure 3. For the needle task, the robot uses a large needle driver to grasp and lift a surgical needle. Policies are evaluated on three settings: suture pad, porcine liver and gallbladder, and chicken breast with fake blood. The suture pad matches the in-house dataset environment. The porcine liver and gallbladder setting is visually similar to the video dataset, while the chicken breast with fake blood setting represents a more challenging out-of-domain background. For the chole task, the robot uses curved scissors to cut the target tissue region. Similarly, policies are evaluated in three settings: gallbladder phantom, normal ex vivo gallbladder, and abnormal ex vivo gallbladder. The phantom setting matches the in-house training environment. The normal ex vivo setting is considered in-domain with respect to the video dataset, as the cystic duct appears on the left side of the camera view in both settings. The abnormal ex vivo setting includes cases where the cystic duct and cystic artery are either spatially switched or not fully dissected, evaluating out-of-domain generalization. 
+
+# 4.2 Video-to-Action Labeling Accuracy 
+
+We evaluated the video-to-action labeling pipeline on robot datasets with kinematic labels to assess the accuracy and generalization of the pose estimation results. The large needle driver model was evaluated on the SurgRIPE dataset [29], while the curved scissors model was evaluated on the ImitateCholec dataset [9]. The large needle driver achieves 
+
+6.3 ± 1.7 mm position error and 4.12 ± 1.55 ◦ orientation error. This result is overall better than the methods in the SurgRIPE challenge. For the curved scissors, the error is 9.5 ± 2.8 mm and 7.01 ± 2.43 ◦. The error comparison with earlier methods are in the appendix and additional visualizations are provided in Appendix. 
+
+# 4.3 Training Configurations 
+
+We evaluate three policy backbones: ACT, π0, and Gr00t-H. For each backbone, we train policies using either only the in-house dataset or a combination of the in-house dataset and the video dataset. The notation (x + y) denotes training with x episodes of in-house dataset and y episodes of video dataset. For the needle task, we evaluate (500 + 0) and 
+
+(500 + 500) for all three backbones. To separate the effect of visual diversity from the effect of simply increasing the number of training episodes, we additionally train an (1000 + 0) setting, using the same total number of episodes as (500 + 500) . We also evaluate an auxiliary input, denoted as P O , where the policy receives the needle center point and its tangent vector estimated from the first frame. This input is not updated during execution. For the chole task, we evaluate (700 + 0) and (700 + 700) for all three backbones. All policies are trained using the same action representation, observation format, and dual-source training procedure described in Sec. 3.4. Each policy is evaluated for 20 independent trials in each test setting. The primary metric is the number of successful trials out of 20, and corresponding success rate. For the needle task, a trial is considered successful if the robot grasps the needle and lifts it from the surface. For the chole task, a trial is considered successful if the robot completes the intended cutting motion on the target tissue without hurting non-target tissue. If a trial does not complete the task within 40 seconds or exhibits behavior likely to damage the tissue, it is manually terminated and counted as a failure. During evaluation, all policies are tested sequentially under the same settings. The tissue pose and robot starting pose are then changed for the next evaluation round to ensure a fair comparison across policies. 
+
+# 4.4 Evaluation on Needle Task 
+
+Figure 4 reports the needle task results. Comparing the six matched policy pairs trained with (500 + 0) and (500 + 500) ,adding the video dataset substantially improves average generalization to ex vivo and out-of-domain settings. The average success rate increases by 29.2% on porcine liver and gallbladder, and by 14.2% on chicken breast with fake blood. The average success rate on the suture pad decreases by only 1.7%, indicating that adding video data improves generalization while largely preserving performance in the phantom environment. The optional needle state input further improves performance. Across the six matched comparisons, adding the initial needle state increases the average success rate by 8.3% on the suture pad, 10.8% on porcine liver and gallbladder, and 12.5% on chicken breast with fake blood. These results show that the initial needle position and orientation provide useful task information. However, this input does not replace the benefit of visually diverse video training data. Under the same input setting, policies trained with (500 + 500) still outperform their (500 + 0) counterparts on tissue-based backgrounds. 6Figure 4: Needle task results on (a) Suture pad, (b) Porcine liver and gallbladder, and (c) Chicken breast with fake blood. The results are also listed as table in the Appendix. 
+
+Figure 5: Chole task results on (a) Phantom, (b) Normal ex vivo tissue, and (c) abnormal ex vivo tissue. The results are also listed as table in the Appendix. Importantly, increasing the amount of in-house phantom data alone does not produce the same improvement. Comparing (500 + 0) and (1000 + 0) across all backbones, adding more in-house data slightly improves performance on the suture pad but decreases performance on other settings. This suggests that additional phantom data may further specialize the policy to the phantom environment rather than improve visual generalization. Therefore, the improvement from (500 + 500) cannot be explained by the episodes of dataset alone, it is primarily associated with the visual diversity introduced by the video dataset. 
+
+# 4.5 Evaluation on Chole Task 
+
+Figure 5 reports the chole task results. Comparing the three policies trained with (700 + 0) and the three policies trained with (700 + 700) , adding the video dataset consistently improves performance on both ex vivo evaluation settings. The average success rate increases by 41.7% on normal ex vivo tissue and by 23.3% on OOD tissue. The average success rate on the gallbladder phantom increases slightly by 3.3%. This indicates that adding the video dataset substantially improves generalization to realistic tissue settings while largely preserving performance in the phantom environment. The improvement is consistent across all three policy backbones, which show that the benefit of video dataset is not limited to a specific policy architecture. Moreover, because the chole task uses a different instrument and requires direct interaction with deformable tissue, the results suggest that video dataset can improve policy generalization beyond a single task. We did not include the (1400 + 0) setting in the chole task, as the needle task’s results showed that increasing the amount of in-house data alone did not improve performance. 
+
+# 5 Discussion and Limitations 
+
+Overall, the results support the central hypothesis of SurgVIL, that surgical videos can serve as a scalable source for surgical robot policy learning. Across two surgical tasks, three policy backbones, and multiple visual domains, adding surgical videos substantially improves generalization to real-tissue and out-of-distribution settings. The results also 7show that this gain cannot be explained by data volume alone. Considering the three policy backbones, ACT benefits most from video data. This suggests that video can substantially improve a standard imitation learning backbone. Gr00t-H shows smaller relative gains likely due to prior surgical pretraining on large surgical robot dataset. But adding the video dataset still improves its generalization in most ex vivo settings. π0 achieves relatively lower performance than other policies. These results suggest that general robot pretraining alone may be insufficient for precise surgical manipulation tasks, and that larger surgical training dataset is required for large model to bridge the domain gap. This work has several limitations. First, although the proposed labeling pipeline achieves better performance than prior methods, the kinematic labels still contain noise, which can limit policy performance. Second, this work focuses on demonstrating the value of combining surgical video data. Although the results show clear gains, the final success rates in ex vivo and OOD settings are still not close to saturation. Further improvements in label accuracy, policy architecture, and larger-scale surgical video curation are still needed to achieve higher success rates. Third, the experiments are conducted on the same dVRK-Si system. It does not test transfer across different robot systems, camera, or operating room setups. Fourth, the evaluation uses 20 trials per condition. Although this provides a practical measure of the real robot performance, evaluations with more trials would provide stronger quantitative analysis. 
+
+# 6 Conclusion 
+
+In this work, we presented SurgVIL, a dual-source imitation learning framework for surgical robot policy learning. SurgVIL combines kinematically labeled phantom robot data with visually diverse open-source surgical videos for policy learning. This design addresses a central data bottleneck in surgical robot learning: dataset with robot action are difficult to collect in realistic surgical settings, while open-source surgical videos are relatively abundant but lack kinematics. We evaluated SurgVIL on two da Vinci surgical robot tasks: needle pick-up and cholecystectomy cutting. Across ACT, π0, and Gr00t-H backbones, adding surgical video improved policy generalization to ex vivo and out-of-domain settings while largely preserving performance in the phantom environment. The needle task further showed that the improvement cannot be explained by additional data volume alone. These results support that open-source surgical videos can serve as a scalable source of useful training data for surgical robot policy learning. 8References 
+
+[1] Aleks Attanasio, Bruno Scaglioni, Elena De Momi, Paolo Fiorini, and Pietro Valdastri. Autonomy in surgical robotics. Annual Review of Control, Robotics, and Autonomous Systems , 4(1):651–679, 2021. [2] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. Pi0: A vision-language-action flow model for general robot control. 
+
+arXiv preprint arXiv:2410.24164 , 2024. [3] Juo-Tung Chen, XinHao Chen, Ji Woong Kim, Paul Maria Scheikl, Richard Jaepyeong Cha, and Axel Krieger. Surgipose: Estimating surgical tool kinematics from monocular video for surgical robot learning. In 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 20912–20919. IEEE, 2025. [4] Jiawei Fu, Yonghao Long, Kai Chen, Wang Wei, and Qi Dou. Multi-objective cross-task learning via goal-conditioned gpt-based decision transformers for surgical robot task automation. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 13362–13368. IEEE, 2024. [5] Tam´ as Haidegger. Autonomy for surgical robots: Concepts and paradigms. IEEE Transactions on Medical Robotics and Bionics , 1(2):65–76, 2019. [6] Yufan He, Pengfei Guo, Mengya Xu, Zhaoshuo Li, Andriy Myronenko, Dillan Imans, Bingjie Liu, Dongren Yang, Mingxue Gu, Yongnan Ji, et al. Surgworld: Learning surgical robot policies from videos via world modeling. 
+
+arXiv preprint arXiv:2512.23162 , 2025. [7] Tao Huang, Kai Chen, Bin Li, Yun-Hui Liu, and Qi Dou. Guided reinforcement learning with efficient exploration for task automation of surgical robot. In 2023 IEEE International Conference on Robotics and Automation (ICRA) ,pages 4640–4647. IEEE, 2023. [8] Simar Kareer, Dhruv Patel, Ryan Punamiya, Pranay Mathur, Shuo Cheng, Chen Wang, Judy Hoffman, and Danfei Xu. Egomimic: Scaling imitation learning via egocentric video. In 2025 IEEE International Conference on Robotics and Automation (ICRA) , pages 13226–13233. IEEE, 2025. [9] Ji Woong Kim, Juo-Tung Chen, Pascal Hansen, Lucy Xiaoyang Shi, Antony Goldenberg, Samuel Schmidgall, Paul Maria Scheikl, Anton Deguet, Brandon M White, De Ru Tsai, et al. Srt-h: A hierarchical framework for autonomous surgery via language-conditioned imitation learning. Science robotics , 10(104):eadt5254, 2025. [10] Ji Woong Kim, Tony Z Zhao, Samuel Schmidgall, Anton Deguet, Marin Kobilarov, Chelsea Finn, and Axel Krieger. Surgical robot transformer (srt): Imitation learning for surgical tasks. In Conference on Robot Learning ,pages 130–144. PMLR, 2025. [11] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. [12] Audrey Lee, Turner S Baker, Joshua B Bederson, and Benjamin I Rapoport. Levels of autonomy in fda-cleared surgical robots: a systematic review. NPJ Digital Medicine , 7(1):103, 2024. [13] Songming Liu, Lingxuan Wu, Bangguo Li, Hengkai Tan, Huayu Chen, Zhengyi Wang, Ke Xu, Hang Su, and Jun Zhu. Rdt-1b: a diffusion foundation model for bimanual manipulation. In International Conference on Learning Representations , volume 2025, pages 29982–30009, 2025. [14] Yangcen Liu, Woo Chul Shin, Yunhai Han, Zhenyang Chen, Harish Ravichandar, and Danfei Xu. Immimic: Cross-domain imitation from human videos via mapping and interpolation. In Conference on Robot Learning ,pages 834–858. PMLR, 2025. [15] Yonghao Long, Anran Lin, Derek Hang Chun Kwok, Lin Zhang, Zhenya Yang, Kejian Shi, Lei Song, Jiawei Fu, Hongbin Lin, Wang Wei, et al. Surgical embodied intelligence for generalized task autonomy in laparoscopic robot-assisted surgery. Science Robotics , 10(104):eadt3093, 2025. 9[16] Yecheng Jason Ma, Shagun Sodhani, Dinesh Jayaraman, Osbert Bastani, Vikash Kumar, and Amy Zhang. Vip: Towards universal visual reward and representation via value-implicit pre-training. In Deep Reinforcement Learning Workshop NeurIPS 2022 .[17] Suraj Nair, Aravind Rajeswaran, Vikash Kumar, Chelsea Finn, and Abhinav Gupta. R3m: A universal visual representation for robot manipulation. In Conference on Robot Learning , pages 892–909. PMLR, 2023. [18] Nigel Nelson, Juo-Tung Chen, Jesse Haworth, Xinhao Chen, Lukas Zbinden, Dianye Huang, Alaa Eldin Abdelaal, Alberto Arezzo, Ayberk Acar, Farshid Alambeigi, et al. Open-h-embodiment: A large-scale dataset for enabling foundation models in medical robotics. arXiv preprint arXiv:2604.21017 , 2026. [19] Sahba Aghajani Pedram, Changyeob Shin, Peter Walker Ferguson, Ji Ma, Erik P Dutson, and Jacob Rosen. Autonomous suturing framework and quantification using a cable-driven surgical robot. IEEE Transactions on Robotics , 37(2):404–417, 2020. [20] Will Pryor, Yotam Barnoy, Suraj Raval, Xiaolong Liu, Lamar Mair, Daniel Lerner, Onder Erin, Gregory D Hager, Yancy Diaz-Mercado, and Axel Krieger. Localization and control of magnetic suture needles in cluttered surgical site with blood and tissue. In 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,pages 524–531. IEEE, 2021. [21] Dimitrios Psychogyios, Emanuele Colleoni, Beatrice Van Amsterdam, Chih-Yang Li, Shu-Yu Huang, Yuchong Li, Fucang Jia, Baosheng Zou, Guotai Wang, Yang Liu, et al. Sar-rarp50: Segmentation of surgical instrumentation and action recognition on robot-assisted radical prostatectomy challenge. arXiv preprint arXiv:2401.00496 , 2023. [22] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman R¨ adle, Chloe Rolland, Laura Gustafson, et al. Sam 2: Segment anything in images and videos. In 
+
+International Conference on Learning Representations , volume 2025, pages 28085–28128, 2025. [23] Florian Richter, Shihao Shen, Fei Liu, Jingbin Huang, Emily K Funk, Ryan K Orosco, and Michael C Yip. Autonomous robotic suction to clear the surgical field for hemostasis using image-based blood flow detection. 
+
+IEEE Robotics and Automation Letters , 6(2):1383–1390, 2021. [24] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-net: Convolutional networks for biomedical image segmentation. In International Conference on Medical image computing and computer-assisted intervention ,pages 234–241. Springer, 2015. [25] Hamed Saeidi, Justin D Opfermann, Michael Kam, Shuwen Wei, Simon L´ eonard, Michael H Hsieh, Jin U Kang, and Axel Krieger. Autonomous robotic laparoscopic surgery for intestinal anastomosis. Science robotics ,7(62):eabj2908, 2022. [26] Mark Sandler, Andrew Howard, Menglong Zhu, Andrey Zhmoginov, and Liang-Chieh Chen. Mobilenetv2: Inverted residuals and linear bottlenecks. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 4510–4520, 2018. [27] Samuel Schmidgall, Justin D Opfermann, Ji Woong Kim, and Axel Krieger. Will your next surgeon be a robot? autonomy and ai in robotic surgery. Science robotics , 10(104):eadt0187, 2025. [28] Hongtao Wu, Ya Jing, Chilam Cheang, Guangzeng Chen, Jiafeng Xu, Xinghang Li, Minghuan Liu, Hang Li, and Tao Kong. Unleashing large-scale video generative pre-training for visual robot manipulation. In International Conference on Learning Representations , volume 2024, pages 10641–10662, 2024. [29] Haozheng Xu, Alistair Weld, Chi Xu, Alfie Roddan, Jo˜ ao Cartucho, Mert Asim Karaoglu, Alexander Ladikos, Yangke Li, Yiping Li, Daiyun Shen, et al. Surgripe challenge: Benchmark of surgical robot instrument pose estimation. Medical Image Analysis , 105:103674, 2025. [30] Tony Z Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual manipulation with low-cost hardware. arXiv preprint arXiv:2304.13705 , 2023. 10 [31] Aneeq Zia, Max Berniker, Rogerio Nespolo, Conor Perreault, Ziheng Wang, Benjamin Mueller, Ryan Schmidt, Kiran Bhattacharyya, Xi Liu, and Anthony Jarc. Surgical visual understanding (surgvu) dataset. arXiv preprint arXiv:2501.09209 , 2025. [32] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted Xiao, Fei Xia, Jialin Wu, Paul Wohlhart, Stefan Welker, Ayzaan Wahid, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. In 
+
+Conference on Robot Learning , pages 2165–2183. PMLR, 2023. 
+
+# Appendix 
+
+# Policy Training Details 
+
+ACT: 
+
+Action Chunking Transformer (ACT) is used as a non-VLA imitation learning baseline. ACT predicts a sequence of future actions from visual observations, which allows the policy to model temporally correlated robot motions. Since ACT does not rely on a pretrained model, it provides a useful reference for evaluating whether the proposed dataset construction benefits standard visuomotor imitation learning. ACT hyperparameters 
+
+Parameter ACT for needle task ACT for chole task 
+
+Model / initialization ACT ACT Optimizer AdamW AdamW Learning rate 5 × 10 −4 5 × 10 −4
+
+Batch size 256 256 Adam β1 0.9 0.9 Adam β2 0.999 0.999 Adam ϵ 1 × 10 −8 1 × 10 −8
+
+Weight decay 1 × 10 −4 1 × 10 −4
+
+Learning-rate schedule LambdaLR LambdaLR Warmup 750 steps 1,000 steps Training steps 15,000 20,000 Hidden dimension 512 512 Feedforward dimension 3200 3200 Training chunk size 60 60 Evaluation action horizon 20 20 KL weight / β 10 10 Data FPS 30 Hz 30 Hz 
+
+π0:
+
+π0 is a vision-language-action model designed for general robot control. It builds on a pretrained vision-language model backbone and adds an action expert that predicts continuous action chunks using flow matching. This model is included to evaluate whether a general-purpose VLA policy can benefit from surgical videos. 11 π0 fine-tuning hyperparameters 
+
+Parameter π0 for needle task π0 for chole task 
+
+Model / initialization π0 π0
+
+Optimizer AdamW AdamW Learning rate 1 × 10 −4 1 × 10 −4
+
+Batch size 128 128 Adam β1 0.9 0.9 Adam β2 0.95 0.95 Adam ϵ 1 × 10 −8 1 × 10 −8
+
+Weight decay 0.1 0.1 Learning-rate schedule Cosine Cosine Warmup 1,000 steps 1,500 steps Training steps 11,000 15,000 Full fine-tuning True True Training chunk size 50 50 Evaluation action horizon 20 20 Data FPS 30 Hz 30 Hz 
+
+Gr00t-H: 
+
+Gr00t-H denotes Gr00t N1.6 further fine-tuned on a large surgical robot dataset. Similar to π0, it serves as a pretrained VLA-style policy backbone. Comparing Gr00t-H with ACT and π0 allows us to test whether the benefit of adding surgical videos is consistent across both non-VLA and pretrained VLA policy families. GR00T-H fine-tuning hyperparameters 
+
+Parameter GR00T-H for needle task GR00T-H for chole task 
+
+Model / initialization GR00T-H GR00T-H Optimizer AdamW AdamW Learning rate 2 × 10 −5 2 × 10 −5
+
+Batch size 64 64 Weight decay 1 × 10 −5 1 × 10 −5
+
+Learning-rate schedule Cosine decay Cosine decay Warmup 5% 5% Training steps 25,000 35,000 Backbone tuning LLM backbone frozen LLM backbone frozen Action horizon 50 50 Action normalization Mean/std Mean/std Random crop 95% 95% Rotation augmentation ±5◦ ±5◦
+
+Coarse pixel dropout 0.5 0.5 Color jitter brightness 0.12 0.12 Color jitter contrast 0.15 0.15 Color jitter saturation 0.15 0.15 Color jitter hue 0.02 0.02 Multi-view dropout 0.25 0.25 Gradient clipping 1.0 1.0 
+
+12 Video-to-Action Labeling Details and Results 
+
+Hyperparameters used in the video-to-action labeling loss. Parameter Description Value 
+
+λssim Weight for SSIM image similarity loss 0.5
+
+λdice Weight for Dice mask loss 1.0
+
+λtemp Weight for temporal consistency loss 0.05 
+
+ϵ Numerical stability constant in ρ(·) 1 × 10 −6
+
+The large needle driver model was evaluated on the SurgRIPE dataset [29]. We chose this dataset because it also includes a pose estimation challenge, enabling direct comparison with state-of-the-art results. The curved scissors model was evaluated on the ImitateCholec dataset [9]. Since all training data of the proposed method are synthetically generated in MuJoCo and the coefficients in post-hoc depth calibration is also calculated on this dataset, evaluating the model on real surgical videos does not introduce test set leakage. Comparison of pose estimation accuracy on large needle driver Method Position Error (mm) Orientation Error ( ◦)SurgiPose [3] 12 .0 Not reported TUDU [29] 5.8 21 .48 
+
+IGTUM [29] 5.4 10 .71 
+
+UOL [29] 8.3 17 .73 
+
+Ours method 6.3 4.12 
+
+This table reports the pose estimation error for the large needle driver of our method, SurgiPose and top three models from SurgRIPE challenge. Our method achieves 6.3 ± 1.7 mm position error, which is comparable to the IGTUM. Our method achieves an orientation error of 4.12 ± 1.55 ◦, which is substantially lower than IGTUM’s 10 .71 ◦ and other methods. Accurate orientation estimation is important for both the needle task and chole task. Moveover, among the compared methods, only our method and SurgiPose are specifically designed for pose estimation in videos, whereas the other methods are developed for single-image. As a result, these methods are much slower when applied to videos and tend to produce temporally inconsistent pose estimates across frames. Considering both overall accuracy, computational cost and temporal consistency, our proposed method achieves the best overall performance in this setting. For the curved scissors, the error is 9.5 ± 2.8 mm and 7.01 ± 2.43 ◦. The larger error observed for the curved scissors may be due to the use of a manually measured and custom-built CAD model, whereas an accurate CAD model was available for the large needle driver. To the best of our knowledge, we didn’t find prior work on kinematic estimation for curved scissors. We provide an overlay visualization on the original frame as shown in the figure. 
+
+Visualization of kinematic estimation results for curved scissors. (a) Original image, (b) Rendered image with estimated kinematics results from Mujoco, (c) Overlay the rendered outline on original image. 13 Tool and Needle Segmentation Network 
+
+To extract the image evidence required by our downstream pipeline, we train a lightweight U-Net variant to segment both the surgical tool and the needle from input endoscopic image. While the overall architecture retains the encoder plus decoder structure and skip connections of the standard U-Net [24], we modify the encoder to improve computational efficiency. The original U-Net encoder is replaced with a MobileNetV2 backbone [26], whose inverted residual blocks and depthwise separable convolutions substantially reduce the number of convolutional operations compared with standard convolution layers. This design is motivated by prior surgical needle localization work [20]. The network is trained using 60 surgical videos annotated with SAM2 [22]. The annotations provide pixel-wise labels for the surgical tool and needle in each frame, which are used as supervision for the segmentation network. Because the needle is much smaller than both the background and the tool, the training data has strong class imbalance. To address this, we optimize the network using a weighted combination of multi-class cross-entropy loss and foreground Dice loss. The cross-entropy term encourages correct pixel-wise classification across all classes, while the Dice term directly improves overlap between the predicted and ground-truth foreground regions. Applying the Dice loss to the tool and needle classes reduces the tendency of ignoring small foreground structures. The tool segmentation mask is used in the video-to-action labeling pipeline, whereas the needle segmentation mask is further processed using a curve-fitting algorithm to remove the attached suture thread and estimate the needle center point and the tangent direction, as shown in the figure. 
+
+Segmentation masks of the surgical tool and needle, together with estimated needle center point and tangent vector. 14 Full Experimental Results 
+
+> Full needle task results. Each entry reports successful trials out of 20, with success rate in parentheses.
+
+Backbone Training setting Suture pad Porcine liver/gallbladder Chicken breast/fake blood ACT (500 + 0) 17/20 (85%) 1/20 (5%) 1/20 (5%) ACT (500 + 500) 17/20 (85%) 10/20 (50%) 4/20 (20%) ACT P O (500 + 0) 17/20 (85%) 4/20 (20%) 2/20 (10%) ACT P O (500 + 500) 18/20 (90%) 13/20 (65%) 8/20 (40%) ACT (1000 + 0) 19/20 (95%) 0/20 (0%) 1/20 (5%) 
+
+π0 (500 + 0) 12/20 (60%) 2/20 (10%) 1/20 (5%) 
+
+π0 (500 + 500) 10/20 (50%) 5/20 (25%) 1/20 (5%) 
+
+π0 P O (500 + 0) 14/20 (70%) 1/20 (5%) 2/20 (10%) 
+
+π0 P O (500 + 500) 15/20 (75%) 8/20 (40%) 5/20 (25%) 
+
+π0 (1000 + 0) 13/20 (65%) 0/20 (0%) 0/20 (0%) Gr00t-H (500 + 0) 19/20 (95%) 8/20 (40%) 4/20 (20%) Gr00t-H (500 + 500) 17/20 (85%) 10/20 (50%) 7/20 (35%) Gr00t-H P O (500 + 0) 19/20 (95%) 9/20 (45%) 7/20 (35%) Gr00t-H P O (500 + 500) 19/20 (95%) 14/20 (70%) 9/20 (45%) Gr00t-H (1000 + 0) 18/20 (90%) 5/20 (25%) 4/20 (20%) Full chole task results. Each entry reports successful trials out of 20, with success rate in parentheses. Backbone Training setting Gallbladder phantom Normal ex vivo tissue Abnormal ex vivo tissue ACT (700 + 0) 16/20 (80%) 3/20 (15%) 3/20 (15%) ACT (700 + 700) 17/20 (85%) 14/20 (70%) 10/20 (50%) 
+
+π0 (700 + 0) 10/20 (50%) 0/20 (0%) 2/20 (10%) 
+
+π0 (700 + 700) 13/20 (65%) 7/20 (35%) 4/20 (20%) Gr00t-H (700 + 0) 16/20 (80%) 4/20 (20%) 5/20 (25%) Gr00t-H (700 + 700) 14/20 (70%) 11/20 (55%) 10/20 (50%) 15

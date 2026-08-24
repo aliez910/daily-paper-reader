@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-23</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-24</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 19 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-23 17:07:43 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-24 17:27:59 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,26 +62,22 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in Chinese based on the provided recommendation data. Let me analyze:</p>
-<p>Date: 2026-08-23</p>
-<p>Status: Success</p>
-<p>Total: 19 papers</p>
-<p>Deep reading: 8 papers</p>
-<p>Quick reading: 11 papers</p>
-<p>Deep reading list: Two papers about embodied AI/foundation models and VLA counterfactual realignment</p>
-<p>Quick reading list: Papers about structured action-space VLA, visuo-tactile adaptation, surgical robot imitation learning</p>
-<p>The themes I can see:</p>
-<p>Embodied AI / VLA (Vision-Language-Action) models are prominent</p>
-<p>Robotic manipulation and adaptation</p>
-<p>The top paper (10.0/10) is about scaling embodied foundation models with three-system architecture</p>
-<p>Counterfactual realignment for VLA models</p>
-<p>Surgical robotics, tactile sensing</p>
-<p>Let me write 3 concise lines:</p>
-<p>Overview/title - what was done today</p>
-<p>Most worthwhile directions/conclusions (1-2)</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a 3-line summary in Chinese based on the provided data. Let me analyze:</p>
+<p>Date: 2026-08-24</p>
+<p>Total: 23 papers</p>
+<p>Deep read: 12</p>
+<p>Quick read: 11</p>
+<p>Deep read highlights: GigaBrain-0.7 (9.0/10) about scaling embodied foundation models with three-system architecture, and Revisiting Open-Loop Execution in Robotics (9.0/10) about reactive policies</p>
+<p>Quick read highlights: EcoVLA (8.0/10) about energy-efficient VLA inference, Robo-Dopamine 2.0 (8.0/10) about process reward modeling for robotics, ViTaR (8.0/10) about visuo-tactile residual adaptation</p>
+<p>The theme seems to be robotics/embodied AI, particularly VLA (Vision-Language-Action) models.</p>
+<p>Let me craft 3 lines:</p>
+<p>A catchy title-like summary</p>
+<p>Key direction/conclusion</p>
 <p>Next step suggestion for general readers</p>
-<p>Let me craft this naturally and concisely without Markdown headers or JSON.&lt;/think&gt;</p>
-<p>今天精选 19 篇论文聚焦具身智能与机器人学习，其中 VLA 模型与机器人操作自适应成为主线，GigaBrain-0.7 以三系统架构将具身基础模型推向涌现能力（10.0/10），同时推出推理时反事实对齐方法显著提升 VLA 恢复能力（9.0/10）。最值得关注的方向是 VLA 模型的架构规模化与可恢复推理，以及结合视觉-触觉等多模态感知的机器人自适应操控，正逐步从仿真走向真实手术机器人等高价值场景。建议普通读者先从 GigaBrain-0.7 的三系统思路入门，再顺着反事实对齐这条线理解 VLA 的可靠性问题，关注具身模型从&quot;能干活&quot;到&quot;干得稳&quot;的演进趋势。</p>
+<p>I should follow the format: no Markdown headers, no JSON, just 3 lines of text.&lt;/think&gt;</p>
+<p>今日共筛选 23 篇论文（精读 12 / 速读 11），焦点集中在具身基础模型与机器人策略学习，VLA 架构与执行范式成为最热主线。</p>
+<p>最值得关注的方向：GigaBrain-0.7 用&quot;三系统架构&quot;把具身基座模型推向规模化涌现能力，同时 Open-Loop 机器人策略正被重新审视，转向更高性能的反应式闭环执行。</p>
+<p>建议读者先从 GigaBrain-0.7 入手理解&quot;系统分层 + 规模涌现&quot;的趋势，再跟进 Open-Loop 与反应式策略的对比实验，优先关注落地延迟与能效（如 EcoVLA）的实测数据。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -90,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">8 篇</strong>
+    <strong class="dpr-home-dashboard-count">12 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture">GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture</span></li><li><span class="dpr-home-dashboard-paper-title" title="Imagining Recovery: Inference-Time Counterfactual Realignment for Vision-Language-Action Models">Imagining Recovery: Inference-Time Counterfactual Realignment for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies">Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture">GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture</span></li><li><span class="dpr-home-dashboard-paper-title" title="Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies">Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="FabriMAE I Trust Myself? Self-Evaluating VLA Action Generation with Markov Attention Entropy">FabriMAE I Trust Myself? Self-Evaluating VLA Action Generation with Markov Attention Entropy</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>8</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -106,7 +102,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="StructRL: Structured Action-Space Exploration for Flow-Based VLAs">StructRL: Structured Action-Space Exploration for Flow-Based VLAs</span></li><li><span class="dpr-home-dashboard-paper-title" title="ViTaR: Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation">ViTaR: Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="SurgVIL: Scaling Surgical Robot Imitation Learning with Open-source Surgical Videos">SurgVIL: Scaling Surgical Robot Imitation Learning with Open-source Surgical Videos</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="EcoVLA: Energy-Efficient Device-Edge Co-Inference for Vision-Language-Action Models under Real-Time Constraints">EcoVLA: Energy-Efficient Device-Edge Co-Inference for Vision-Language-Action Models under Real-Time Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Robo-Dopamine 2.0: History-Conditioned and OOD-Aware Process Reward Modeling for Robotic Manipulation">Robo-Dopamine 2.0: History-Conditioned and OOD-Aware Process Reward Modeling for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="ViTaR: Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation">ViTaR: Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
