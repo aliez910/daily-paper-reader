@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-24</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-25</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 23 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 24 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>13</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-24 17:27:59 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-25 17:33:55 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,22 +62,24 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a 3-line summary in Chinese based on the provided data. Let me analyze:</p>
-<p>Date: 2026-08-24</p>
-<p>Total: 23 papers</p>
-<p>Deep read: 12</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary within 3 sentences based on the given recommendation data. Let me analyze the data:</p>
+<p>Date: 2026-08-25</p>
+<p>Total: 24 papers</p>
+<p>Deep read: 13</p>
 <p>Quick read: 11</p>
-<p>Deep read highlights: GigaBrain-0.7 (9.0/10) about scaling embodied foundation models with three-system architecture, and Revisiting Open-Loop Execution in Robotics (9.0/10) about reactive policies</p>
-<p>Quick read highlights: EcoVLA (8.0/10) about energy-efficient VLA inference, Robo-Dopamine 2.0 (8.0/10) about process reward modeling for robotics, ViTaR (8.0/10) about visuo-tactile residual adaptation</p>
-<p>The theme seems to be robotics/embodied AI, particularly VLA (Vision-Language-Action) models.</p>
-<p>Let me craft 3 lines:</p>
-<p>A catchy title-like summary</p>
-<p>Key direction/conclusion</p>
+<p>Deep read highlights: Two papers rated 9.0/10 - &quot;GigaBrain-0.7&quot; (scaling embodied foundation models) and &quot;Revisiting Open-Loop Execution in Robotics&quot; (reactive policies)</p>
+<p>Quick read highlights: Three papers rated 8.0/10 - all about robot manipulation and control (long-horizon robot manipulation, agent-centered architecture, force control for pretrained policies)</p>
+<p>Common themes: embodied AI, robotics foundation models, robot manipulation/control</p>
+<p>Let me craft the summary:</p>
+<p>A catchy headline-style sentence about what was done today</p>
+<p>The most noteworthy direction/conclusion (1-2 items)</p>
 <p>Next step suggestion for general readers</p>
-<p>I should follow the format: no Markdown headers, no JSON, just 3 lines of text.&lt;/think&gt;</p>
-<p>今日共筛选 23 篇论文（精读 12 / 速读 11），焦点集中在具身基础模型与机器人策略学习，VLA 架构与执行范式成为最热主线。</p>
-<p>最值得关注的方向：GigaBrain-0.7 用&quot;三系统架构&quot;把具身基座模型推向规模化涌现能力，同时 Open-Loop 机器人策略正被重新审视，转向更高性能的反应式闭环执行。</p>
-<p>建议读者先从 GigaBrain-0.7 入手理解&quot;系统分层 + 规模涌现&quot;的趋势，再跟进 Open-Loop 与反应式策略的对比实验，优先关注落地延迟与能效（如 EcoVLA）的实测数据。</p>
+<p>Key themes to highlight:</p>
+<p>Today&#x27;s focus: embodied foundation models and robotic policy learning</p>
+<p>Top picks: GigaBrain-0.7&#x27;s three-system architecture showing emergent capabilities, and revisiting open-loop execution toward reactive policies</p>
+<p>Both directions point to making robot policies more general, scalable, and reactive</p>
+<p>Let me write this concisely and engagingly in Chinese.&lt;/think&gt;</p>
+<p>今天精选 24 篇机器人/具身智能前沿工作，围绕&quot;基础模型规模化&quot;与&quot;策略执行范式革新&quot;两大主线展开。最值得关注的是 GigaBrain-0.7 用三系统架构把具身基础模型推向&quot;涌现能力&quot;层级，以及重审开环执行、转向更具反应性的高性能策略——两条路径都在试图打破当前机器人策略在长程任务和真实环境中的瓶颈。普通读者可以从&quot;反应式策略+分层架构&quot;这一组合入手，关注能落地长程操作的通用框架，不必追逐每一个新模型。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -86,12 +88,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">12 篇</strong>
+    <strong class="dpr-home-dashboard-count">13 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture">GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture</span></li><li><span class="dpr-home-dashboard-paper-title" title="Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies">Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="FabriMAE I Trust Myself? Self-Evaluating VLA Action Generation with Markov Attention Entropy">FabriMAE I Trust Myself? Self-Evaluating VLA Action Generation with Markov Attention Entropy</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture">GigaBrain-0.7: Scaling Embodied Foundation Models to Emergent Capabilities with a Three-System Architecture</span></li><li><span class="dpr-home-dashboard-paper-title" title="Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies">Revisiting Open-Loop Execution in Robotics: Toward Reactive, Higher-Performing Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="NebulaVLA: A Dual-Frequency Vision-Language-Action Model With Guide Action for Robotic Manipulation">NebulaVLA: A Dual-Frequency Vision-Language-Action Model With Guide Action for Robotic Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>12</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>13</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -102,7 +104,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="EcoVLA: Energy-Efficient Device-Edge Co-Inference for Vision-Language-Action Models under Real-Time Constraints">EcoVLA: Energy-Efficient Device-Edge Co-Inference for Vision-Language-Action Models under Real-Time Constraints</span></li><li><span class="dpr-home-dashboard-paper-title" title="Robo-Dopamine 2.0: History-Conditioned and OOD-Aware Process Reward Modeling for Robotic Manipulation">Robo-Dopamine 2.0: History-Conditioned and OOD-Aware Process Reward Modeling for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="ViTaR: Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation">ViTaR: Visuo-Tactile Residual Adaptation for Foundation VLA Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Don&#x27;t Drop the BATON: Long-Horizon Robot Manipulation via Agentic Subtask Exploration and Transition-aware Memory">Don&#x27;t Drop the BATON: Long-Horizon Robot Manipulation via Agentic Subtask Exploration and Transition-aware Memory</span></li><li><span class="dpr-home-dashboard-paper-title" title="Teach and Grow: An Agent-Centered Architecture for General Robot Learning">Teach and Grow: An Agent-Centered Architecture for General Robot Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="UniReflex: Plug-and-Play Force Control for Pretrained Generative Policies via Fast-Slow Reflex">UniReflex: Plug-and-Play Force Control for Pretrained Generative Policies via Fast-Slow Reflex</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
