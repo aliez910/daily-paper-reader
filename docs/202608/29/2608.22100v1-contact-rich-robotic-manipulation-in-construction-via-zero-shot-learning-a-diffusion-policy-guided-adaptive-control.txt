@@ -1,0 +1,2304 @@
+Contact-Rich Robotic Manipulation in Construction via Zero-Shot Learning: A
+Diffusion Policy-Guided Adaptive Control
+Roman Ibrahimova,∗, Salma Mozaffaria,∗, Arash Adela,∗∗
+aPrinceton University, Princeton, NJ 08544, USA
+Abstract
+Construction robotics and automation offer promising means of improving productivity, alleviating workforce shortages, and
+reducing workers’ exposure to physically demanding tasks. However, reliable contact-rich robotic assembly remains challeng-
+ing under tight tolerances, fabrication inaccuracies, and uncertain contact dynamics. To address this challenge, we present a
+framework coupling diffusion policies trained on simulation-generated pose and force/torque data with an L1-inspired adap-
+tive controller that corrects policy-predicted actions online to compensate for unmodeled contact dynamics. We benchmark the
+framework against baselines in timber joinery, pipe fitting, and sequential full-scale truss assembly. It achieves 100% success on
+single-task assemblies and 90–100% success across sequential truss assembly subtasks, with lower, more stable contact forces
+than the baselines. By enabling zero-shot sim-to-real transfer for force-aware contact-rich assembly, the framework reduces
+costly, labor-intensive real-world data collection for policy training and advances scalable, robust automation of multistage
+assembly, motivating extension to broader contact-rich manipulation tasks in construction.
+Keywords: Contact-rich manipulation, Robotic assembly, Zero-shot learning, Sim-to-real, Adaptive control, Diffusion policy,
+Construction robotics
+1. Introduction
+The construction industry accounts for a substantial share
+of global economic activity [1]. Despite its economic impor-
+tance, the industry continues to experience low productivity
+growth relative to sectors such as manufacturing [2, 3]. In ad-
+dition, the industry faces substantial workforce shortages. For
+instance, the U.S. construction industry is projected to need
+to attract 456,000 additional workers in 2027 to meet industry
+demand [4]. Construction work also involves physically de-
+manding tasks, including lifting and positioning heavy com-
+ponents, that expose workers to elevated risks of occupa-
+tional injuries and work-related musculoskeletal disorders [5–
+8]. Construction robotics and automation have therefore been
+proposed as promising means of improving productivity, al-
+leviating workforce constraints, and reducing workers’ expo-
+sure to physically demanding tasks [2, 9–12].
+Realizing these potential benefits, however, depends in
+part on robotic systems that can reliably manipulate full-
+scale building components by grasping, transporting, orient-
+ing, placing, and joining them while handling physical inter-
+actions with materials and the evolving as-built structure [12–
+14]. Within this broader domain of manipulation, assembly is
+especially critical because many building systems, including
+∗Equal contribution.
+∗∗Corresponding author.
+Email addresses: roman.ibrahimov@princeton.edu (Roman
+Ibrahimov), salma.mozaffari@princeton.edu (Salma Mozaffari),
+arash.adel@princeton.edu (Arash Adel)
+walls, floors, building services, and structural frames, are con-
+structed by joining discrete components into larger systems.
+Robotic assembly therefore offers a path toward automating
+labor-intensive and physically demanding construction tasks
+that require substantial trade expertise. Many demonstrations
+of robotic assembly in construction, as illustrated by non-
+standard brickwork and timber structures [15–19], can be ef-
+fective when calibration, planned tolerances and subsequent
+joining techniques can compensate for positioning errors and
+accumulated assembly tolerances.
+However, for assembly
+processes involving tight-fitting connections, executing pre-
+planned trajectories without feedback can be unreliable or
+result in assembly failure because fabrication inaccuracies
+and accumulated tolerances can create considerable devia-
+tions between the as-planned and as-built geometries [11, 20].
+To address this challenge, prior work in timber assembly
+has incorporated perception-based feedback and adaptive fab-
+rication to update subsequent fabrication steps and placement
+poses (i.e., positions and orientations) in response to devi-
+ations between as-planned and as-built states [11, 20–23].
+While these projects have been successful for demonstrating
+feedback-driven assembly, they mainly rely on planar face-
+to-face connections or butt joins. These approaches do not
+directly address contact-rich construction assembly involving
+high friction and tight clearances, such as mating structural
+components (e.g., framing using timber joinery) or assem-
+bling building service components (e.g., pipe fitting). In such
+tasks, tight clearances, fabrication inaccuracies, and unmod-
+eled contact dynamics can result in unreliable execution or
+assembly failure, while excessive contact forces can damage
+arXiv:2608.22100v1  [cs.RO]  22 Aug 2026
+
+
+Synthetic Data Generation
+Robot Position
+(x, y, z)
+Force/Torque
+(fx, fy, fz, τx, τy, τz)
+Policy Learning
+Real-World Deployment
+CNN-Based 
+Diffusion Policy
+Action Sequence: (∆x, ∆y, ∆z)
+Controller
+Corrected Actions
+(x, y, z), (fx, fy, fz)
+x
+y
+z
+x
+y
+z
+x
+y
+z
+Trained Policy
+`
+`
+Fig. 1. Methods overview: we generate synthetic data in simulation using the robot position at the flange center and force/torque feedback at the robot flange
+(left) to train a CNN-based diffusion policy (center), then, we develop an adaptive controller to correct the policy-predicted actions (∆x, ∆y, ∆z) of the trained
+policy, facilitating a zero-shot policy transfer and improving performance in real-world deployment (right).
+components. Successful execution therefore depends not only
+on accurate positioning but also on robust control during con-
+tact. Incorporating force feedback is thus crucial for closing
+the loop and enabling corrective actions in response to posi-
+tional and contact uncertainty during task execution.
+To address this challenge, learning-based methods have
+been explored for contact-rich assembly in construction [14,
+24].
+In particular, sensory–motor policy learning meth-
+ods learn end-to-end mappings from sensory observations,
+such as camera images and robot state, directly to robot
+actions [25–28].
+Among these methods, behavior cloning
+through diffusion policy [29] has demonstrated strong per-
+formance across diverse robotic manipulation tasks [30–
+33]. Prior research has investigated training diffusion poli-
+cies for contact-rich assembly in construction using pose and
+force/torque (F/T) feedback to mate timber joints with sub-
+millimeter clearance under fabrication uncertainty [14]. This
+prior study demonstrated the potential of diffusion-based con-
+trol policy and the contribution of F/T feedback for precise
+assembly under uncertain contact dynamics and positional
+misalignments. However, this prior research also indicated
+that training the policies required extensive expert demon-
+strations on a physical robot, making data collection time-
+intensive and contributing to degradation of the repeatedly
+assembled workpieces. Repeated physical trials may also in-
+crease equipment wear.
+Accordingly, the research presented in this paper aims
+to enable robust, force-aware contact-rich assembly of
+construction-scale components without requiring physical
+demonstrations for policy training. At this scale, real-world
+data collection is costly, time-consuming, and labor-intensive,
+and unsuccessful trials can generate excessive contact forces
+that damage workpieces and accelerate equipment wear. We
+therefore collect all policy-training data in simulation. This
+approach, however, must contend with discrepancies between
+the simulated and physical systems in component geometry,
+material properties, and contact dynamics, which can intro-
+duce a significant sim-to-real gap. To address this challenge,
+we present, evaluate, and benchmark an integrated framework
+in which a diffusion policy trained on simulation-generated
+robot position and F/T data predicts actions, while an adap-
+tive controller corrects these actions online to compensate
+for unmodeled contact dynamics and material imperfections
+(Fig. 1). The proposed framework enables zero-shot transfer
+from simulation-only policy training to force-aware execution
+of contact-rich construction assembly.
+In the following subsection, we summarize the primary
+contributions of this paper.
+1.1. Contributions
+• We introduce a scalable synthetic data generation
+pipeline that enables training diffusion policies in simu-
+lation and deploying them on a construction-scale phys-
+ical robot for contact-rich manipulation tasks.
+The
+pipeline generates diverse trajectories with robot posi-
+tion and F/T data, significantly reducing reliance on
+2
+
+
+costly, time-consuming, and labor-intensive real-world
+demonstrations.
+• We develop a control architecture that integrates learned
+diffusion policies with a controller inspired by L1
+adaptive control [34].
+The controller corrects policy-
+predicted actions online to improve robustness to mate-
+rial imperfections and unmodeled contact dynamics dur-
+ing tight-tolerance physical assembly. To the best of our
+knowledge, this paper represents one of the first develop-
+ments of this novel control architecture for construction-
+scale robotic assembly.
+• We experimentally evaluate and demonstrate that com-
+bining diffusion policy with the proposed adaptive con-
+troller enables zero-shot sim-to-real transfer with im-
+proved success rates in simulation and real. In addition
+to high task success, the framework produces lower and
+more stable contact forces, leading to safer and more
+controlled interactions. Furthermore, the framework en-
+ables large-scale simulation rollouts, allowing extensive
+testing and more representative evaluation beyond what
+is feasible with physical experiments alone.
+• In addition to single assembly tasks, we validate the
+proposed framework in a full-scale timber prefabrica-
+tion experiment where separate trained policies are de-
+ployed sequentially to assemble a gable-shaped truss
+through multiple contact-rich insertions.
+This exper-
+iment demonstrates that our proposed method can be
+integrated into a construction-scale assembly workflow
+to facilitate consecutive high-precision contact-rich sub-
+assembly tasks.
+2. Related work
+This section situates the proposed framework within four
+complementary areas of research relevant to robust, contact-
+rich robotic assembly in construction.
+First, we review
+robotic assembly in construction, tracing the progression
+from preplanned workflows to systems that use perception
+and learned policies to address fabrication uncertainty at con-
+struction scale. Second, we examine classical model-based
+approaches, including hybrid force–position, impedance, and
+variable-impedance control, which provide explicit structures
+for compliant interaction. Third, we review learning-based
+methods, with particular attention to multimodal sensory–
+motor policies and sim-to-real transfer. Fourth, we exam-
+ine learning-integrated model-based controllers that combine
+learned motion or compliance with structured force–position,
+impedance, or admittance control.
+2.1. Robotic assembly in construction
+Many prior studies in construction robotics has focused on
+assembly processes that rely primarily on accurate position-
+ing and sequencing of elements, often assuming precise cal-
+ibration with negligible uncertainties as well as simple pla-
+nar connections. Relevant examples include robotic brick-
+work realizing differentiated assemblies through repeatable
+pick-and-place operations [35]. Similar studies enable spa-
+tial and customized robotic assembly for timber and steel
+frames [16, 18, 36, 37]. These studies demonstrated the fea-
+sibility of customized, full-scale robotic assembly, but most
+provided limited online correction once contact-induced devi-
+ations emerged during execution. Such approaches are well-
+suited for assembly tasks involving loose tolerances or lim-
+ited physical interactions, where moderate deviations do not
+critically affect task success.
+In contrast, the assembly tasks involving contact-rich ma-
+nipulation, such as timber framing with tight-fitting inter-
+locking joints, introduce contact sensitivity, geometric con-
+straints, and the possibility of misalignment [38, 39]. In these
+tasks, small deviations due to inherent uncertainties such as
+calibration errors, fabrication inaccuracies, or material im-
+perfections can cause misalignment, jamming, or incomplete
+mating, making execution based only on precomputed motion
+unreliable.
+Prior work has addressed fabrication uncertainty through
+computational
+models
+of
+tolerance
+propagation
+and
+assembly-sequence
+optimization
+intended
+to
+minimize
+accumulated positional error [40]. While such approaches
+improve robustness at the planning stage, execution is
+typically carried out using predefined trajectories with
+limited real-time adjustments. As a result, there has been
+a growing shift toward closed-loop methods that leverage
+sensory feedback. Examples include iterative pose correction
+to compensate for deviations between the as-planned digital
+model and the as-built structure during multi-robot timber
+assembly [11, 20] and using computer vision for component
+pose estimation and alignment in rebar tying and wood
+assembly [21, 41]. While these methods improve planning,
+localization, or component pose correction, they do not nec-
+essarily provide online correction of actions from measured
+interaction forces during complex contact interactions.
+Recent research in construction robotics has explored ap-
+plying learned policies to contact-rich assembly. Examples
+include reinforcement learning and diffusion policy learn-
+ing from pose and force/torque feedback for assembly us-
+ing timber joinery [14, 24]; vision-based hand gesture con-
+trol for collecting intuitive demonstrations for imitation learn-
+ing [42]; reinforcement learning with domain adaptation us-
+ing real tactile images for sim-to-real cable-in-duct installa-
+tion [43]; policy learning from human demonstration videos
+for ceiling tile installation evaluated in Gazebo [9]; and imi-
+tation learning for rebar insertion and tying [44].
+The data collection methods of these studies differ sub-
+stantially. Mozaffari et al. use 400 teleoperated demonstra-
+tions collected on a physical robot [14], whereas Liang et
+al. use 85 real and 3,000 virtual human-demonstration videos
+rather than expert demonstrations collected on the robot it-
+self [9]. Duan et al. use domain adaptation with real tactile
+images to improve simulation-based reinforcement learning
+and sim-to-real transfer [43]. Learning from demonstrations
+on physical robots can therefore incur substantial data collec-
+tion cost, while simulation-based approaches reduce that bur-
+den but must still address discrepancies between the sim and
+3
+
+
+real. Physical evaluation of trained models and task-specific
+fine-tuning can also remain costly and potentially hazardous
+at construction scale because repeated contact can degrade
+materials and wear equipment. These limitations motivate
+methods that combine scalable simulation-based training with
+force-aware action correction during physical execution.
+2.2. Model-based control
+Model-based control methods for contact-rich manipula-
+tion have a long history in hybrid force–position control, mo-
+tivated by the need to regulate physical interaction under ge-
+ometric uncertainty and unmodeled contact dynamics. Early
+foundational work introduced hybrid force–position control,
+formalizing the decomposition of task space into position-
+and force-controlled subspaces to explicitly comply with con-
+tact constraints [45, 46].
+This line of research was com-
+plemented by impedance control, which framed interaction
+as the regulation of a desired mechanical impedance rather
+than precise force tracking, enabling compliant behavior to
+emerge naturally during contact [47]. Contact-rich manipula-
+tion tasks often involve distinct phases with different force
+requirements.
+Variable impedance control extends fixed-
+impedance formulations by adapting stiffness and damping
+across these phases, improving robustness in tasks such as
+peg-in-hole insertion [48].
+Nevertheless, classical model-based control formulations
+alone do not fully resolve the challenges posed by contact-
+rich manipulation under uncertainty.
+Classical hybrid and
+impedance controllers generally require predefined task
+frames, contact constraints, desired impedances, or switch-
+ing logic. Their performance can therefore depend on the
+accuracy of the task representation, the appropriateness of
+the assumed contact structure, and task-specific controller de-
+sign or tuning. Also, geometric deviations, frictional vari-
+ability, and material compliance can vary significantly across
+instances, limiting the effectiveness of fixed model assump-
+tions. More recent research projects have explored the inte-
+gration of learning-based control within model-based control
+architectures to address these challenges. These methods are
+discussed in 2.4.
+2.3. Learning-based control
+Learning-based control methods have demonstrated strong
+performance in implicitly capturing contact dynamics that are
+difficult to model analytically. Early work showed that end-
+to-end visuomotor policies trained from demonstrations can
+successfully handle complex contact dynamics without ex-
+plicit modeling [27, 49]. Additional sensing modalities can
+further improve performance when vision alone is insuffi-
+cient: Lee et al. combine vision and haptic feedback for peg
+insertion across variations in geometry and clearance [50],
+while Calandra et al. demonstrate visuo-tactile grasping and
+re-grasping rather than sustained in-contact assembly [51].
+In addition to real-world data acquisition in the previous
+studies, simulation-based learning has been explored to im-
+prove scalability.
+Techniques such as domain randomiza-
+tion with noise injection aim to bridge the sim-to-real gap
+by exposing policies to environmental variations during train-
+ing [52, 53].
+Several works have demonstrated zero-shot
+sim-to-real transfer using dynamics parameter randomization
+and sensory noise injection [54, 55]. However, accurately
+modeling contact interactions remains challenging, as com-
+monly used rigid-body contact models can exhibit inaccura-
+cies and fail to capture the complexity of real-world interac-
+tions [55, 56].
+More recently, generative modeling for policy learning,
+particularly diffusion policies, has been proposed to model
+multimodal action distributions and improve training stabil-
+ity in complex manipulation tasks learned from demonstra-
+tions [29, 30]. These methods are particularly well-suited for
+contact-rich manipulation, where multiple valid contact in-
+stances may exist for the same task, making unimodal policies
+insufficient to capture the underlying solution space [57, 58].
+Furthermore, recent work has demonstrated that diffusion-
+based policies can be extended to incorporate compliance be-
+havior, sustaining contact forces in contact-rich manipulation
+tasks [31]. Additional studies have applied these policies to
+various manipulation tasks involving contact and force feed-
+back, such as object sliding, wiping, or bimanual object ma-
+nipulation [59–61].
+However, many of these tasks involve relatively uncon-
+strained interactions, where moderate deviations in contact
+conditions can still lead to successful outcomes. In contrast,
+some contact-rich manipulation tasks, such as insertion, im-
+pose stricter geometric and contact constraints, requiring pre-
+cise alignment and sustained interaction under tight-clearance
+conditions [62]. These challenges become even more promi-
+nent in construction-scale tasks, where higher forces and ma-
+terial imperfections further complicate reliable task execu-
+tion.
+Many sensory–motor learning methods rely on time-
+consuming real-world datasets or large-scale self-supervised
+real-world interaction via trial-and-error [27, 29, 49], which
+is often impractical in construction settings due to labor cost,
+human safety, and material degradation. Furthermore, sim-
+to-real transfer remains unreliable under tight tolerances and
+unmodeled contact dynamics, limiting the direct applicabil-
+ity of purely learning-based solutions in construction-scale
+tasks [63, 64]. Additionally, many learning-based methods
+typically operate on tabletop robots in structured environ-
+ments that do not capture the combined scale, contact forces,
+material variability, and contact dynamic uncertainty of con-
+struction assembly.
+2.4. Learning-integrated model-based control
+Learning-based methods have been integrated with model-
+based control to compensate for modeling errors or optimize
+controller parameters. Beltran et al. combine reinforcement
+learning with conventional force–position controllers inte-
+grated with a fail-safe mechanism for safe deployment on
+a real rigid robot manipulator [65].
+Additionally, Khadar
+et al. develop a stability-guaranteed reinforcement learning
+approach that embeds variable impedance controllers within
+the policy parameterization and enforces Lyapunov stability
+4
+
+
+throughout learning and execution, demonstrating success-
+ful application of the peg-in-hole case study [66]. Shaw et
+al. also combine variable impedance control with Rieman-
+nian Motion Policy components for collision and joint-limit
+avoidance, improving behavior around these constraints with-
+out establishing a general safety guarantee for contact-rich
+tasks [67]. Recently, Hou et al. learn spatially and temporally
+varying approximate compliance from demonstrations and
+combine it with diffusion-guided motion to maintain contact
+modes [31]. Furthermore, integrated learning–control archi-
+tectures can also improve sim-to-real transfer in contact-rich
+tasks. For example, Zhang et al. report that direct transfer of a
+simulation-trained assembly policy using online admittance-
+residual learning increases the success rates [63].
+2.5. Summary
+The reviewed literature establishes complementary founda-
+tions for contact-rich robotic assembly. Research in robotic
+assembly in construction has demonstrated the feasibility of
+full-scale component manipulation and has progressively in-
+corporated planning, perception, and learned policies to com-
+pensate for geometric deviations and fabrication uncertainty
+in assembly tasks. However, correcting component poses or
+updating planned trajectories does not, by itself, provide on-
+line action correction based on the interaction forces that arise
+during tight-clearance mating. Model-based controllers pro-
+vide mechanisms for compliant interaction and online pose
+correction. Depending on their formulation, however, their
+performance can rely on sufficiently accurate task representa-
+tions and task-specific controller design or tuning. Learning-
+based policies, such as diffusion policies, can capture com-
+plex sensory–motor relationships that are difficult to spec-
+ify analytically.
+Nevertheless, collecting physical demon-
+strations can be costly and time-intensive for construction-
+scale tasks, while simulation-trained policies can remain sen-
+sitive to discrepancies in geometry, friction, compliance, and
+contact behavior between simulated and physical systems.
+Recent research on learning-integrated model-based control
+demonstrates that learned robot actions can be combined with
+compliant or admittance-based contact response to improve
+performance.
+3. Methods
+This section presents our framework for enabling a zero-
+shot sim-to-real policy transfer for force-aware contact-rich
+manipulation in construction. We first describe the experi-
+mental setup in real-world and simulation environments, in-
+cluding hardware and software (Section 3.1). We then in-
+troduce a pipeline for generating motion-planned trajectories
+as demonstration datasets in simulation (Section 3.2), which
+are then used to train diffusion-based policies as our baseline
+method (Section 3.3). Finally, we design an adaptive con-
+troller (Section 3.4) that corrects predicted actions from the
+baseline policies by incorporating real-time force and posi-
+tion feedback to improve execution performance, implement
+force-aware action correction, and enable zero-shot sim-to-
+real transfer.
+Fig. 2. The six-axis UR20 arm and custom end effector.
+3.1. Experimental setup
+Our experimental platform comprises a six-axis UR20
+robotic arm1 equipped with a built-in flange-mounted six-axis
+F/T sensor and a custom pneumatically actuated parallel grip-
+per 2 (Fig. 2). The UR20 arm provides a reach of 1750 mm
+and a rated payload capacity of 20 kg, with operation up to
+25 kg permitted under the boundary conditions specified by
+the manufacturer. In the experiments, the combined mass of
+the end effector and manipulated components was between 6
+and 15.2 kg. The gripper was operated at a fixed pneumatic
+pressure to maintain a stable and repeatable grasp throughout
+each trial, without online modulation of the gripping force.
+For simulations, we use NVIDIA Isaac Sim 5.0 [70]. The
+GPU-accelerated PhysX backend of Isaac Sim enables mul-
+tiple parallel simulations of contact-rich robotic manipula-
+tion, and its native support for Unified Robot Description
+Format (URDF)-based robot models and six-axis F/T sens-
+ing allows the simulated platform to construct a digital rep-
+resentation of the real hardware and the environment without
+custom physics or sensor modeling. The simulator runs on a
+dedicated workstation3 equipped with an NVIDIA RTX 5090
+GPU, an Intel Core Ultra 9 275HX processor, and 32 GB of
+RAM, enabling parallel simulation of multiple physics-based
+environments. The UR20 manipulator is modeled in Isaac
+Sim using its original kinematic and dynamic parameters ex-
+tracted from the URDF provided by Universal Robots [68].
+The custom gripper is modeled to match the real hardware,
+and a simulated six-axis rigid-body F/T sensor is integrated
+at the wrist flange to replicate the force sensing configuration
+of the physical UR20. The components used for each task
+are modeled with nominal geometric dimensions and closely
+matched material properties as their real-world counterparts
+(see Section 4.1 and Section 4.2.1 for details).
+1Universal Robot UR20 [68]
+2Schunk PSH-32-1 Parallel Gripper [69]
+3Dell Alienware 16 Area-51 Gaming Laptop [71]
+5
+
+
+The simulation therefore reproduces the nominal task ge-
+ometry and the observation and action interfaces used by the
+physical system, but it does not assume exact reproduction
+of fabrication deviations, compliance, friction, or other con-
+tact dynamics. These discrepancies constitute the sim-to-real
+mismatch addressed by the proposed adaptive controller. Af-
+ter training in simulation, the diffusion policy is deployed on
+the physical platform without task-specific fine-tuning. The
+online action corrections generated by the adaptive controller
+remained active during deployment and are part of the pro-
+posed method.
+3.2. Data collection
+We study contact-rich manipulation tasks in construction
+(details in Section 4) that require precise geometric alignment
+under contact forces and robustness to small deviations during
+real-world execution. Each task is formulated as an assembly
+problem in which the robot brings a grasped component near
+its target pre-insertion location, then uses controlled actions
+to complete the contact-rich insertion. The contact-rich phase
+is the most challenging, where small pose errors can lead to
+misalignment of mating parts, robot jamming, or task failure.
+Therefore, the process of dataset generation in simulation fo-
+cuses on producing feasible motions from varied pre-insertion
+configurations to a fully assembled state, so that the policy is
+exposed to contact and trajectory variations [72].
+We generate motion-planned demonstration datasets in the
+simulation environment of NVIDIA Isaac Sim 5.0 [70]. For
+each task, the robot arm moves a grasped male component
+into a horizontal female component rigidly mounted to a
+tabletop. For each demonstration, the robot executes a two-
+phase motion: an approach phase that moves the vertical
+component from a randomized start position to a position
+directly above the goal, followed by an insertion phase that
+drives the male into the female component.
+During each
+demonstration, we record the timestamped robot position at
+the flange center point and wrench (i.e., six-axis F/T data) at
+the flange. The end effector orientation and goal position are
+kept unchanged during demonstrations to isolate the effect of
+the contact dynamics during the high-precision insertions.
+We randomize the initial position of the gripped element
+at the beginning of the approach phase. This position is ini-
+tialized by uniformly sampling the xy coordinates within a
+disc of radius rsamp centered at the goal position (Fig. 3 (a)),
+while the vertical coordinate is perturbed around the nomi-
+nal approach heights zapp. Specifically, the initial height is
+sampled as z = zapp + δz with δz ∼U(−zmax, zmax) (Fig. 3
+(b)). The values (details in Section 4.1.2 and Section 4.2.2)
+are selected to induce sufficient variability in both trajectories
+and resultant contact forces. The variation in the initial posi-
+tion expands coverage of the state distribution during training
+and has been shown to improve the robustness of sim-to-real
+transfer [52].
+The nominal trajectories in both phases are synthesized
+at a control rate of 100 Hz and are perturbed by injecting
+low-frequency, band-limited noise. The noise is applied only
+to the lateral xy coordinates, with a maximum amplitude of
+2 mm. These values are chosen to preserve high-frequency
+contact information in the recorded data while ensuring the
+injected perturbations are large enough to induce contact be-
+tween mating components. Furthermore, the perturbations
+generate smooth and physically plausible trajectories that re-
+semble corrective motions rather than perfectly straight-line
+insertions, thereby increasing demonstration diversity and im-
+proving policy robustness to distribution shifts during train-
+ing [53, 73, 74]. The corresponding wrench measurements
+are recorded at 100 Hz with timestamps synchronized to the
+position measurements.
+The Cartesian trajectory with fixed rotations is tracked us-
+ing a differential inverse kinematics controller [75, 76] that
+outputs joint position targets at each control step. We run par-
+allel simulation environments to accelerate data collection,
+each with its own trajectory and an independently random-
+ized initial pose (Fig. 4). A constant gripper-closed command
+is applied throughout the demonstrations to maintain a rigid
+grasp.
+After collecting demonstrations, each trajectory is labeled
+as successful or failed based on the measured contact forces
+and the final robot position. A demonstration is marked as
+successful when two criteria are satisfied: (1) the insertion is
+fully completed, i.e., the vertical component reaches a pre-
+defined goal position within a Euclidean distance of 2 mm,
+and (2) the norm of the measured contact forces remains be-
+low the threshold of 1000 N throughout execution. The 2 mm
+positional tolerance accounts for small variations around the
+fully completed insertion, and the force threshold is intention-
+ally set above the forces typically observed during insertion to
+retain successful demonstrations that experience higher con-
+tact forces, thereby capturing a broader range of contact inter-
+actions. Only successful demonstrations are kept for policy
+training.
+All robot positions are transformed to the local coordinate
+frame of each environment, rendering the dataset invariant to
+the spatial configuration of parallel simulation environments.
+The timestamped robot position and wrench are then down-
+sampled to 10 Hz to reduce redundancy between consecutive
+samples and the computational cost of policy training. The
+demonstration dataset is written to a Hierarchical Data For-
+mat version 5 (HDF5) file [77]. This procedure yields a cu-
+rated dataset of successful, motion-planned trajectories with
+corresponding force measurements, which is subsequently
+used to train the diffusion policy described in the following
+section.
+3.3. Policy learning
+We train a convolutional neural network (CNN)-based dif-
+fusion policy, using a convolutional backbone for the noise
+prediction network [29]. The trained policies serve as the
+baseline for evaluation and are compared against the proposed
+method integrating the baseline with the adaptive controller
+developed in this work to improve robustness during contact-
+rich interactions, detailed in Section 3.4.
+The diffusion policy is trained on the robot position at the
+flange center point, p ∈R3, and the measured wrench at the
+6
+
+
+Fig. 3. Example of sampling for trajectory generation (a) horizontal starting offset in the xy−plane with rsamp = 5 mm, and (b) vertical starting offset and
+descending heights during the insertion phase with zapp = 60 mm and zmax = 20 mm.
+Fig. 4. Example of utilizing parallel simulation environments for large-scale data collection.
+flange, F ∈R6. Accordingly, the observation vector at a
+discrete time step k is defined as:
+o(k) =
+h
+p(k),
+F(k)
+i⊤∈R9
+(1)
+At a discrete timestep k−1, the policy π predicts a sequence
+of future robot actions upol(k : k + Tp −1) with prediction
+horizon Tp, conditional on a history of observations o(k −
+To + 1 : k) with horizon To:
+upol(k : k + Tp −1) = π(o(k −To + 1 : k))
+(2)
+The predicted robot actions upol(k) = (∆x, ∆y, ∆z) ∈R3
+are defined as relative future positions to the latest observed
+position (referred to as delta action in [30]). During policy
+evaluation, only the first Ta steps of Tp are executed to in-
+crease the re-planning frequency over the receding horizon.
+The details for policy training, evaluation criteria, as
+well as their associated parameter values, such as nois-
+ing/denoising steps K, learning rate Lr, weight decay Wd,
+batch size B, number of epochs E, To, Tp, and Ta, are pre-
+sented in Section 4.1.2.
+3.4. Adaptive controller
+At each inference step, the diffusion policy predicts a se-
+quence of actions representing the relative robot positions
+(see Section 3.3). These actions are corrected by the pro-
+posed adaptive controller (shown in Fig. 5), which is based
+on L1 adaptive control theory introduced in [34]. L1 adaptive
+control has traditionally been developed and applied in safety-
+critical dynamical systems, particularly in aerospace applica-
+tions, where fast adaptation is required to model uncertainty,
+disturbances, and changing operating conditions [78]. These
+capabilities motivate its application to contact-rich robotic
+assembly, where the robot encounters uncertain interaction
+forces, friction, material imperfections, and unmodeled con-
+tact dynamics during execution. In our proposed framework,
+the objective for the controller is to improve robustness dur-
+7
+
+
+Trained 
+Policy 
+Safety Clipping (Eq. 13) 
+Force-
+Based 
+Scaling 
+(Eq. 12)
+State Predictor (Eq. 4)
+Adaptation Law (Eq. 6, 8)
+Low-Pass Filter (Eq. 9)
+Force-Based 
+Activation 
+(Eq. 7) 
+-
++
+Control Law
+Fig. 5. Adaptive controller architecture, including state predictor (Section 3.4.1), adaptation law (Section 3.4.2), and control law (Section 3.4.3).
+ing contact by compensating for disturbances on the physical
+robot, thereby facilitating zero-shot sim-to-real transfer.
+We consider the following dynamic model in continuous
+time t:
+˙p(t) = u(t) + σ(t)
+(3)
+where p(t) ∈R3, u(t) ∈R3, and σ(t) ∈R3 are the sys-
+tem state (robot position at the flange center), control in-
+put (policy-predicted action), and unknown disturbances, re-
+spectively. This first-order model captures the relationship
+between the commanded velocity and actual motion, where
+σ(t) represents an unknown motion disturbance that captures
+discrepancies between commanded and realized end-effector
+motion. In contact-rich scenarios, these discrepancies arise
+from unmodeled contact forces, material compliance, and ge-
+ometric misalignment. The controller is aimed at tracking an
+action generated by the diffusion policy while rejecting dis-
+turbances σ(t). The controller architecture (Fig. 5) consists of
+three main components: (1) a state predictor that predicts the
+system state using a reference model, (2) an adaptation law
+that estimates disturbances from prediction errors, and (3) a
+control law that generates corrected actions using a low-pass
+filter. These components will be discussed in the following
+sections.
+3.4.1. State predictor
+The state predictor estimates the system state according to:
+˙ˆp(t) = Apred( ˆp(t) −p(t)) + Bpreducmd(t) + ˆσfiltered(t)
+(4)
+where ˆp(t) ∈R3 is the predicted state, ucmd(t) ∈R3 is the
+control command to the robot, and ˆσ filtered(t) ∈R3 is the es-
+timated disturbance. The predictor incorporates the control
+command and disturbance estimate while regulating the pre-
+diction error through the predictor bandwidth Apred = apredI,
+where I ∈R3 is the identity matrix and apred < 0. Bpred = I is
+a unit input gain as the control input directly drives the state
+rate. The first term in Eq. (4) drives ˆp(t) toward the actual
+position p(t), the second accounts for the commanded motion
+(discussed in Section 3.4.2), and the third injects the filtered
+estimated disturbance (also discussed in Section 3.4.2). This
+formulation enables the predictor to separate commanded
+motion from disturbance-induced deviations, which is crucial
+for isolating the corrections applied by the adaptive controller.
+We also impose a safety bound ∥ˆp(t)−p(t)∥≤50 mm, serving
+as a sanity check, if the predictor drifts more than 50 mm from
+the real position, we reset it to p(t) to prevent the adaptation
+from operating on unreliable predictions.
+3.4.2. Adaptation law
+The prediction error is defined as:
+e(t) = ˆp(t) −p(t)
+(5)
+This error quantifies the deviation between the predicted
+and measured states and serves as the feedback signal for dis-
+turbance estimation. The magnitude of the prediction error is
+positively correlated with the level of the unmodeled distur-
+bances. For example, when ˆσ(t) ≈σ(t), the predictor dynam-
+ics match the true system dynamics and the prediction error
+e(t) ≈0.
+8
+
+
+The disturbance estimate is updated according to:
+˙ˆσ(t) = Γe(t)α(t) −λ ˆσ(t)
+(6)
+where Γ > 0 is the adaptation gain and λ > 0 is a decay
+rate that prevents unbounded growth of the disturbance esti-
+mate. The parameter α(t) ∈[0, 1] is a force-based activation
+function that modulates the adaptation rate based on the force
+magnitude, defined as follows [79, 80]:
+α(t) = tanh
+ ||F(t)||
+F0
+!
+(7)
+where F(t) ∈R3 is the contact force extracted from the mea-
+sured wrench F(t) at the flange, ||F(t)|| is the magnitude of
+the measured force, and F0 is the activation threshold. This
+saturating nonlinearity gates adaptation based on the contact
+state. Negligible forces yield α(t) ≈0, suppressing adapta-
+tion during free-space motion, while significant contact forces
+drive α(t) ≈1, fully activating disturbance compensation dur-
+ing the contact phases. To ensure boundedness and prevent
+drift in the adaptive update, the disturbance estimate is pro-
+jected [34]:
+ˆσpro j(t) =
+
+ˆσ(t)
+if || ˆσ(t)|| ≤σmax
+ˆσ(t) σmax
+|| ˆσ(t)||
+otherwise
+(8)
+where σmax is the maximum disturbance. The projected dis-
+turbance estimate with initial condition ˆσ filtered(0) = 0 ∈R3
+is then filtered using an exponentially-weighted average [34]:
+ˆσ filtered(k + 1) = γ ˆσproj(k) + (1 −γ) ˆσfiltered(k)
+(9)
+where the filter coefficient γ is defines as:
+γ =
+ωc∆t
+1 + ωc∆t
+(10)
+with ωc = 2π fc and fc = 10 Hz, which matches the sampling
+frequency of the training dataset. This choice attenuates high-
+frequency noise in the disturbance estimate while avoiding
+excessive phase lag.
+3.4.3. Control law
+The corrected control action is computed as:
+ucorr(t) = upol(t) · β(t) + ˆσ filtered(t)
+(11)
+where β(t) is a force-based scaling factor, and ˆσfiltered(t) is the
+filtered disturbance compensation from Eq. (9). This formu-
+lation allows the controller to attenuate the policy’s predicted
+actions under high contact forces while injecting corrective
+actions to compensate for disturbances. The scaling factor re-
+duces action magnitude during high forces and is calculated
+as [81]:
+β(t) =
+1
+1 + kd||F(t)||
+(12)
+where kd > 0 is the force damping gain. This inverse re-
+lationship promotes compliance: as the magnitude of mea-
+sured contact force ||F(t)|| increases, the magnitude of the
+predicted action decreases, reducing excessive force buildup
+during contact-rich phases.
+To prevent large deviations from the nominal command,
+the corrected action is projected onto a bounded set:
+ucmd(t) = β(t) unom(t) + PU(ucorr(t) −β(t) unom(t))
+(13)
+where PU : R3 →U is a projection operator that denotes
+Euclidean projection onto U =
+n
+v ∈R3 : ∥v∥∞≤δmax
+o
+and
+ucmd is the commanded action sent to the robot. For example,
+for a given vector z = [z1, z2, z3]⊤:
+PU(z) =
+
+g(z1)
+g(z2)
+g(z3)
+,
+g(zi) =
+
+−δmax,
+zi < −δmax
+zi,
+−δmax ≤zi ≤δmax
+δmax
+zi > δmax
+(14)
+where i
+=
+1, 2, 3.
+It ensures that each component of
+the projected vector is bounded within [−δmax, δmax] . All
+continuous-time expressions are implemented in discrete time
+using a forward Euler integration scheme with sampling time
+∆t. The parameters used for the adaptive controller are sum-
+marized in Section 4.1.2.
+4. Experiments
+We evaluate our proposed method through a series of ex-
+periments conducted in simulation and real-world environ-
+ments. The experimental studies consist of two categories of
+case studies: (1) single assembly experiments on two contact-
+rich tasks with different geometries, clearances, and material
+properties (Section 4.1), and (2) a full-scale assembly experi-
+ment involving multi-stage sequential contact-rich tasks (Sec-
+tion 4.2). For each case study, we describe the task setup,
+implementation details, and evaluation metrics used to assess
+task success.
+4.1. Single assembly experiments
+This section presents two contact-rich single assembly
+tasks with the objective of evaluating and benchmarking our
+proposed method in simulation and real-world environments.
+4.1.1. Task Description
+The single assembly experiments evaluate the proposed
+framework on two contact-rich manipulation tasks: (I) verti-
+cally inserting a timber tenon into its mating mortise, and (II)
+inserting a PVC pipe segment into one socket of a three-way
+tee fitting (Fig. 6). The two tasks differ in geometry, clear-
+ance, and material properties, providing a basis to evaluate the
+proposed framework to generalize across distinct contact-rich
+assembly scenarios. Prior to each task, the robot is assumed
+to have already grasped the vertical element and positioned
+it close to a pre-insertion pose. During data collection, this
+9
+
+
+initial pre-insertion pose is randomized (Section 3.2). Dur-
+ing evaluation, the initial pose is kept constant and centered
+above the goal position at a vertical distance of 50 mm. The
+end-effector orientation, as well as the goal position, is kept
+constant during demonstrations and rollouts.
+The nominal clearance between the tenon and the mortise
+is 1 mm on each of two opposing sides, whereas the nomi-
+nal radial clearance between the PVC pipe and the inner wall
+of the fitting socket is 0.25 mm. These clearances are used
+only during evaluation in simulation and real experiments.
+The simulated setup reproduces the task-relevant geometry
+and spatial arrangement of the physical setup: both the ma-
+nipulated and mating components are modeled as rigid bod-
+ies, with the former grasped by the robot end effector and
+the latter fixed to a stationary table, as shown in Fig. 7. To
+increase the diversity of feasible trajectories in the synthetic
+demonstration dataset, we use larger clearances during data
+collection in simulation. For the timber joint, the clearance is
+maintained at 1 mm along the longer side and increased from
+1 to 1.2 mm along the shorter side; for the pipe-fitting task,
+the radial clearance is increased from 0.25 to 0.75 mm.
+Fig. 6. Single contact-rich assembly tasks in construction: mortise and tenon
+timber joint assembly (left) and pipe fitting (right).
+4.1.2. Implementation details
+For each task, we collect 1000 demonstrations in simu-
+lation using the data collection procedure described in Sec-
+tion 3.2 with rsamp = 5 mm, zapp = 60 mm, and zmax = 20 mm.
+The diffusion policies are trained exclusively on simulation
+data, and four independent models with identical parameters,
+as summarized in Table 1, are trained for each task to account
+for stochasticity during evaluation.
+We evaluate and compare the following three execution
+modes in simulation and their zero-shot transfer to the real-
+world:
+• Baseline: the predicted actions from the trained diffusion
+policies are executed without correction.
+• Ours: the baseline models are integrated with our pro-
+posed adaptive controller, which refines the policy-
+Table 1: Parameters used for policy training and execution for both tasks.
+Symbol
+Description
+Value
+Lr
+Learning rate
+2e−4
+Wd
+Weight decay rate
+1e−6
+B
+Batch size
+1024
+E
+Number of epochs
+1000
+T p
+o
+Observation horizon
+2
+Tp
+Action prediction horizon
+16
+Ta
+Action execution steps
+3
+K
+Noisin/denoising steps
+100
+predicted actions in real time using force and position
+feedback.
+• Compliant policy: the baseline models are integrated
+with a compliance controller from [50] used for bench-
+marking, which also modifies the policy output during
+execution.
+All controller states are reset at the beginning of each roll-
+out to ensure a fair comparison across all modes.
+Table 2 and Table 3 summarize the task-specific parameters
+used for the adaptive (ours) and compliance (benchmark) con-
+trollers, respectively. These parameters are manually tuned in
+simulation and remain fixed during real-world deployment.
+Simulated evaluations are carried out using a custom pipeline
+that enables parallel execution across multiple environments.
+4.1.3. Evaluation metrics
+A rollout is considered successful if the tenon reaches the
+insertion goal within a Euclidean distance of 3 mm (i.e.,
+p(t) −pgoal
+ ≤3 mm). Each rollout is executed for at most
+600 inference steps and is terminated if either the measured
+contact force in any Cartesian direction exceeds 200 N (i.e.,
+max
+
+| fx| ,
+fy
+ , | fz|
+
+> 200 N) or the robot position deviates
+more than 100 mm from the goal position. If the success con-
+dition is satisfied before termination, the rollout is marked as
+successful; otherwise, it is considered a failure.
+The performance of each execution mode is reported as the
+average success rate, computed across rollouts using 4 inde-
+pendently trained policies for each task (see Section 4.1.2).
+For each trained policy, we execute 50 rollouts in simulation
+and 10 rollouts on the real robot. As a result, for each execu-
+tion mode per task we average the success rate for 200 and 40
+rollouts in simulation and real-world, respectively.
+In addition to the average success rate, we evaluate forces,
+F ∈R3, by analyzing the distribution of maximum contact
+force magnitudes (Fmax = max ∥F∥) extracted from the mea-
+sured F/T data during each rollout. We then perform statisti-
+cal analysis to compare these distributions across methods.
+Classical one-way ANOVA [82] and the pooled two-
+sample Student’s t-test [83], assume that observations are
+independent and normally distributed with equal variances.
+However, the peak force values in real-world experiments
+exhibit pronounced right skew and heavy tails.(see Sec-
+tion 5.1.2). We therefore use a rank-based non-parametric
+10
+
+
+Fig. 7. Mortise and tenon assembly in sim and real (left) and pipe fitting in sim and real (right).
+Table 2: Parameters for our proposed adaptive controller.
+Symbol
+Description
+Timber joint
+Pipe fitting
+apred
+Predictor bandwidth constant
+-62.8
+-62.8
+Γ
+Adaptation gain
+5
+80
+λ
+Decay rate
+0.98
+0.99
+kd
+Force damping gain
+0.005
+0.005
+F0
+Force activation threshold (N)
+30
+30
+σmax
+Max disturbance (mm)
+1
+1
+δmax
+Max allowed correction (mm)
+10
+10
+Table 3: Parameters for the compliance controller adapted from [50].
+Symbol
+Description
+Timber joint
+Pipe fitting
+M
+Mass (kg)
+700
+75
+K
+Stiffness (kN/m)
+500
+0.5
+test that do not require a Gaussian distribution, but retain as-
+sumptions such as independence [84].
+To assess whether there are statistically significant differ-
+ences in the peak force distributions for each task across
+execution modes in simulation and real, we first apply the
+Kruskal-Wallis test, rank-based non-parametric tests for com-
+paring independent groups [85]. The null hypothesis is that
+the peak-force observations from the three execution modes
+follow the same distribution. Given k = 3 groups (i.e., execu-
+tion modes), the test statistic is:
+H1 =
+12
+N(N + 1)
+k
+X
+i=1
+ni¯r2
+i −3(N + 1)
+(15)
+where N = P
+i ni is the total number of observations, ni is the
+number of observations in group i, and ri is the average rank
+of the observations in group i. Tied observations are assigned
+their average rank, and the statistic is corrected for ties as:
+C = 1 −
+P
+j
+
+t3
+j −tj
+
+N3 −N
+,
+(16)
+where t j is the number of observations sharing the same value
+in the j-th set of ties. The corrected test statistic Hc = H1
+C is
+then used to compute the p-value based on its approximate
+chi-square distribution with k −1 degrees of freedom under
+the null hypothesis.
+We then conduct pairwise one-sided Mann-Whitney U
+tests [86] regardless of the Kruskal-Wallis test result to de-
+termine whether our method produces lower peak forces than
+11
+
+
+the other two execution modes. For each pairwise compari-
+son, we define the alternative hypothesis as:
+H1 : θ > 0.5
+(17)
+with θ defined as:
+θ = P(Fours
+max < Fother
+max ) + 1
+2P(Fours
+max = Fother
+max )
+(18)
+Here, θ represents the probability that a randomly selected
+rollout from our method has a lower peak force than a ran-
+domly selected one from the comparison method, with the
+ties contributing as one-half. This hypothesis tests whether
+θ exceeds 0.5. θ = 0.5 under the null hypothesis of equal
+distributions. The test statistic U is then defined as:
+U =
+n1
+X
+i=1
+n2
+X
+j=1
+h
+1(Fours
+max,i < Fother
+max,j) + 1
+21(Fours
+max,i = Fother
+max, j)
+i
+(19)
+where 1(·) is the indicator function, n1 and n2 are the number
+of observations from our method and the comparison method
+respectively. In our case, n1 = n2 for all pairwise compar-
+isons. To control the family-wise error rate across the two
+pairwise comparisons (ours vs. baseline and ours vs. compli-
+ant policy), we apply the Bonferroni correction [87], adjust-
+ing the significance threshold to α = 0.05/2 = 0.025.
+Since the statistical significance alone does not convey the
+practical magnitude of the differences, we report two com-
+plementary effect size measures: (1) The Common Language
+Effect Size (CLES) [88] is used as the primary rank-based
+effect size consistent with the Mann–Whitney U test, while
+Cohen’s d measure [89, 90] is additionally reported as a de-
+scriptive measure of the standardized difference in mean peak
+forces.
+The CLES is defined as the probability that a randomly
+selected force observation from our method is lower than one
+from the comparison method. Using the relationship to the
+Mann-Whitney U statistic, this can be expressed as [91]:
+CLES =
+U
+n1 · n2
+(20)
+A value of 0.5 indicates no tendency for either method to pro-
+duce lower forces, while values approaching 1.0 indicate that
+our method is increasingly likely to produce lower forces.
+Cohen’s d measures the standardized mean difference as:
+d = µother −µours
+sp
+,
+sp =
+r
+(sours)2 + (sother)2
+2
+(21)
+where µ and s denote the sample mean and standard devia-
+tion, respectively, and sp is the pooled standard deviation con-
+sidering n1 = n2. Positive values of d indicate that our method
+produces lower mean forces. Because Cohen’s d is based on
+the sample mean and standard deviation and can therefore be
+sensitive to skewed and heavy-tailed distributions, we inter-
+pret it as a complementary descriptive effect size rather than
+as the basis for statistical inference.
+4.2. Full-scale assembly experiment
+The full-scale assembly experiment utilizes the proposed
+framework in a multi-step timber construction case study in-
+volving three sequential contact-rich assembly tasks with dif-
+ferent geometries and contact conditions. The objective of
+this experiment is to assess the scalability of the proposed
+framework beyond isolated insertion tasks to construction-
+scale assembly involving larger components, higher contact
+forces, and sequential deployment of multiple learned poli-
+cies.
+4.2.1. Task description
+We perform the full-scale assembly of a four-member,
+gable-shaped timber truss as part of a timber-frame structure
+shown in Fig. 8. The truss comprises a bottom chord, a central
+post, and two rafters, and incorporates mortise-and-tenon and
+lap joints [92, 93]. The post and each rafter are inserted into
+corresponding mortises in the bottom chord, while each rafter
+is connected to the post near the apex through a lap joint, as
+shown in Fig. 9. This truss provides a representative building-
+scale prefabrication task involving large components, tight-
+fitting joints, and sequential assembly dependencies. It there-
+fore allows us to evaluate whether the proposed framework
+can extend beyond isolated insertion tasks to the coordinated
+assembly of a multi-component structural system. Automat-
+ing such operations could extend digital timber fabrication
+from component machining to physical assembly, support-
+ing more integrated and repeatable prefabrication workflows
+while reducing the manual handling, alignment, and fitting of
+large building components.
+For this full-scale experiment, we developed a workcell
+(Fig. 10) comprising a pickup station from which the timber
+elements are grasped and an assembly station equipped with
+three grippers that secure the bottom chord during assembly.
+Fig. 11 illustrates the assembly sequence. The bottom chord
+is first positioned and secured; the UR20 then sequentially
+assembles the post, left rafter, and right rafter. These inser-
+tions constitute the three contact-rich assembly tasks. After
+the UR20 inserts and releases the post, a second industrial
+robotic arm4 grasps it to provide stability during the subse-
+quent insertion. Once the right rafter has been inserted, the
+UR20 releases it, and the supporting robot then releases the
+post.
+In the physical truss, each mortise-and-tenon joint has a
+nominal clearance of 1 mm per side between the tenon and
+the mortise walls on two opposing sides. As in the single-
+task experiment, the clearance used in simulation is increased
+from 1.0 to 1.2 mm per side to increase the diversity of feasi-
+ble trajectories in the synthetic demonstration dataset.
+For each of the three contact-rich assembly tasks, the cor-
+responding timber element (either the post or one of the two
+rafters) is assumed to have already been grasped and posi-
+tioned at its pre-insertion pose before the robot executes the
+final insertion motion using the corresponding trained policy
+4ABB IRB 4600 [94]
+12
+
+
+Fig. 8. Full-scale assembly of a gable truss: the bottom chord contains one central mortise for the vertical post and two side mortises for the rafters; each rafter
+is also connected to the post through a lap joint. All dimensions are in millimeters.
+Fig. 9. Joint variations in the full-scale assembly of the gable truss: vertical mortise-and-tenon joint between the post and bottom chord (left), angled mortise-
+and-tenon joint between a rafter and the bottom chord (center), and lap joint between a rafter and the post (right).
+integrated with the proposed adaptive controller. The pre-
+insertion pose is kept constant and centered above the goal
+position at a vertical distance of 60 mm for the post, and
+110 mm for the rafters.
+4.2.2. Implementation details
+We train three separate diffusion policies for the three
+contact-rich tasks required for the full-scale assembly exper-
+iment described in Section 4.2.1 using 1000 demonstrations
+collected per task in simulation, with rsamp = 5 mm, zapp =
+110 mm for rafters, zapp = 60 mm for the post, and zmax =
+20 mm.
+The policy training utilizes the same parameters reported
+in Table 1, with a separate task-specific policy trained in
+simulation for each of the three insertion tasks. Compared
+with the single-assembly experiments, the larger and heav-
+ier timber elements used in the full-scale assembly can pro-
+duce greater contact forces and can reach the force threshold
+more easily. Therefore, we adjust the controller parameters to
+be less reactive to avoid excessive correction during contact
+while still providing sufficient adaptation for insertion. The
+controller parameters for this experiment are tuned on the real
+setup and reported in Table 4.
+Table 4: Parameters for our proposed adaptive controller for the full-scale
+gable assembly.
+Symbol Description
+Truss assembly
+apred
+Predictor bandwidth constant
+-62.8
+Γ
+Adaptation gain
+1
+λ
+Decay rate
+0.98
+kd
+Force damping gain
+0.001
+F0
+Force activation threshold (N)
+150
+σmax
+Max disturbance (mm)
+1
+δmax
+Max allowed correction (mm)
+10
+13
+
+
+Fig. 10. The developed workcell for the full-scale assembly experiment with pick and gripping stations.
+4.2.3. Evaluation metrics
+The quantitative evaluation of the full-scale assembly fo-
+cuses on the robustness of the individual contact-rich inser-
+tion tasks that constitute the assembly process. Each of the
+three insertion tasks introduced in Section 4.2.1, namely, the
+insertion of the post, left rafter, and right rafter, is evaluated
+through 10 independent real-world rollouts using its corre-
+sponding policy trained in simulation and the proposed adap-
+tive control framework. The rollout success criteria are con-
+sistent with Section 4.1.3; however, the force threshold is in-
+creased to 300 N to account for the larger and heavier tim-
+ber elements and higher interaction forces encountered during
+full-scale assembly.
+The resulting success rates reported in Section 5.2 provide
+a quantitative assessment of the proposed method for each
+insertion task, complementing the subsequent evaluation of
+its integration into the full truss assembly workflow.
+5. Results and discussion
+This section presents the evaluation and discussion of re-
+sults for two sets of case studies: (1) single assembly exper-
+iments for timber joint and pipe fitting, and (2) the full-scale
+truss assembly experiment.
+5.1. Single assembly experiments
+We evaluate our method against the two other execu-
+tion modes (baseline, and compliant policy) defined in Sec-
+tion 4.1.2, on the two contact-rich single assembly tasks
+(mortise and tenon timber joint and pipe fitting) introduced
+in Section 4.1.1 in both simulation and real-world settings.
+Based on the evaluation metrics detailed in Section 4.1.3,
+performance is assessed using the average success rate (Sec-
+tion 5.1.1) and statistical analysis of peak contact forces (Sec-
+tion 5.1.2).
+5.1.1. Average success rate
+Table 5 summarizes the average success rates in simulation
+and real-world for the two contact-rich manipulation tasks.
+In simulation, our proposed method consistently outperforms
+both the baseline and compliant policy for both tasks.
+For mortise and tenon assembly in simulation, the baseline
+achieves a success rate of 73%, while the compliant policy
+does not improve the average success rate. In contrast, our
+method achieves a higher success rate, indicating improved
+robustness under tight tolerances. In real-world experiments,
+the compliant policy achieves 95% success, which is close to
+the proposed method (100%). However, the proposed con-
+troller fully eliminates failure cases such as jamming and
+force-threshold violations observed in the other two methods.
+Table 5: Average success rates (%) per execution mode per task in simulation and real-world.
+Task
+Ours
+Baseline
+Compliant policy
+Environment
+Timber joint
+100
+87
+95
+Real
+Timber joint
+90
+73
+73
+Sim
+Pipe fitting
+100
+100
+100
+Real
+Pipe fitting
+73
+66
+69
+Sim
+14
+
+
+Fig. 11. Truss assembly sequence from left to right and top to bottom. First, the bottom chord is placed, followed by the post. Once the post is inserted and
+released by the UR20, the ABB arm grasps the post to provide support during the subsequent rafter assemblies. The left and right rafters are then assembled
+sequentially. After the final rafter is inserted, both the post and rafter are released.
+For the pipe fitting task, all execution modes perform sim-
+ilarly, achieving 100% success in the real-world. This in-
+dicates that the task is less sensitive to trajectory misalign-
+ment compared to the timber joint. This behavior can be at-
+tributed to the material properties of the PVC components,
+which introduce additional compliance at the contact inter-
+face. This inherent compliance allows small misalignments
+to be accommodated through minor elastic deformation and
+sliding, effectively relaxing the precision requirements during
+insertion.
+5.1.2. Force analysis
+In addition to the average success rates, we analyze the
+contact forces for the three execution modes to further high-
+light the differences between the methods. We present the
+distributions of peak contact force magnitudes, followed by a
+statistical analysis across the execution modes.
+Fig. 12 shows the distribution of the maximum con-
+15
+
+
+Fig. 12. Peak force distributions across the execution modes for both tasks in simulation and real-world settings.
+tact force magnitudes experienced during the three execu-
+tion modes in simulation and real-world for both tasks. The
+Kruskal-Wallis test indicated statistically significant differ-
+ences among the three execution modes for each task in sim-
+ulation and real. At 5% significance level, the HC statistic
+was evaluated against a chi-squared distribution with k −1 =
+3 −1 = 2 degrees of freedom (critical value = 5.99). For the
+timber joint in real, H = 39.47 with p < 0.001 and in simula-
+tion, H = 83.53 with p < 0.001. For the pipe fitting in real,
+H = 19.00 with p < 0.001, and in simulation, H = 6.99 with
+p = 0.030. Since all H values exceeded the critical values and
+all p-values are below 0.05, the null hypothesis is rejected in
+all four cases, indicating that at least one execution mode had
+a different peak force distribution for each task and experi-
+mental setting (i.e., real and sim). These results motivated the
+subsequent pairwise comparisons to identify which execution
+modes differ most. effects.
+Table 6 summarizes the descriptive statistics and pairwise
+test results across all experimental conditions. For the timber
+joint task, the proposed method consistently produces lower
+peak forces than both the baseline and compliant policy. In
+the real-world setting, the reduction compared to the compli-
+ant policy is statistically significant with a large effect size
+(pcorr < 0.001, CLES= 0.93, d = 1.60), while the differ-
+ence relative to the Baseline is not significant after correction,
+likely due to higher variance in the baseline forces. In simula-
+tion, both comparisons are highly significant (pcorr < 0.001),
+with CLES values of 0.74 and 0.72 for the baseline and com-
+pliant policy, respectively, indicating a consistent tendency
+toward lower peak forces.
+For the pipe fitting task, differences between methods are
+less pronounced, consistent with the average success rate re-
+sults in Section 5.1.1. In the real-world setting, there is no
+statistically significant evidence that the proposed method
+produces lower forces than the baseline (pcorr
+= 1.000,
+CLES= 0.43, d = −0.30), but it produces significantly lower
+forces compared to the compliant policy (pcorr = 0.004,
+CLES= 0.69, d = 0.67). In simulation, statistically signif-
+icant (pcorr = 0.186), with a negligible standardized mean
+difference (d = −0.003). The compliant-policy comparison is
+statistically significant (pcorr = 0.008); however, the effect is
+small (CLES= 0.58, d = 0.054), suggesting limited practical
+improvement.
+To summarize, these results show that the benefits of the
+proposed adaptive controller are most pronounced in tasks
+involving stiffer timber material, despite its larger geometric
+16
+
+
+Table 6: Statistical comparison of peak force magnitude Fmax (N) across methods. pcorr is the p-value after Bonferroni correction with significance levels (SL)
+defined as: *** = p < 0.001, ** = p < 0.01, * = p < 0.05, and ns = not significant.
+Fmax (N)
+One-Sided Mann-Whitney U Test
+Condition
+Method
+N
+µ
+s
+U
+pcorr
+SL
+CLES
+Cohen’s d
+Timber joint
+Real
+Ours
+40
+152.5
+5.0
+—
+—
+—
+—
+—
+Baseline
+40
+159.6
+20.0
+654.0
+0.161
+ns
+0.59
+0.477
+Compliant policy
+40
+166.0
+10.6
+107.0
+<0.001
+***
+0.93
+1.601
+Timber joint
+Sim
+Ours
+200
+101.5
+60.5
+—
+—
+—
+—
+—
+Baseline
+200
+197.1
+147.0
+10485.5
+<0.001
+***
+0.74
+0.849
+Compliant policy
+200
+191.3
+149.4
+11292.0
+<0.001
+***
+0.72
+0.786
+Pipe fitting
+Real
+Ours
+40
+70.9
+2.4
+—
+—
+—
+—
+—
+Baseline
+40
+70.2
+1.9
+917.0
+1.000
+ns
+0.43
+−0.304
+Compliant policy
+40
+72.5
+2.2
+503.0
+0.004
+**
+0.69
+0.669
+Pipe fitting
+Sim
+Ours
+200
+147.1
+167.5
+—
+—
+—
+—
+—
+Baseline
+200
+146.6
+149.1
+18471.0
+0.186
+ns
+0.54
+−0.003
+Compliant policy
+200
+154.9
+117.6
+16936.5
+0.008
+**
+0.58
+0.054
+clearance. In contrast, for the pipe fitting task with smaller
+geometric clearance, the lower stiffness and friction of PVC
+allow misalignments to be accommodated through deforma-
+tion and sliding, reducing sensitivity to control inaccuracies.
+This is consistent with the average success-rate results in Sec-
+tion 5.1.1, where all execution modes achieved similar per-
+formance for pipe fitting. As a result, differences between
+methods are less pronounced. Importantly, even when suc-
+cess rates are similar, force-based analysis reveals meaning-
+ful differences in contact quality, highlighting the importance
+of considering both task performance and contact dynamics
+when evaluating contact-rich manipulation. Lower contact
+forces may also reduce the risk of robot wear and material
+degradation, which is critical in construction applications.
+5.2. Full assembly experiment
+The results of the full-scale assembly experiment are sum-
+marized in Table 7. The proposed framework achieved 100%
+success for the post insertion, 100% success for the right
+rafter insertion, and 90% success for the left rafter insertion
+across 10 real-world rollouts per task.
+In addition to the quantitative evaluation, the full-scale
+truss assembly described in Section 4.2.1 was successfully
+completed using the proposed framework. The learned poli-
+cies, integrated with the proposed adaptive controller, enabled
+the sequential insertion of the post and two rafters into the
+bottom chord, resulting in the assembled gable truss shown
+in Fig. 11. The completed assembly remained stable after the
+robotic manipulators released the structure.
+These results demonstrate that the proposed framework can
+be extended beyond isolated insertion tasks to a construction-
+scale assembly workflow involving larger and heavier timber
+components, higher contact forces, and the sequential deploy-
+ment of multiple independently trained policies. The suc-
+cessful assembly further highlights the potential of the pro-
+posed approach for robotic execution of multi-stage timber
+construction processes.
+Table 7: Success rates for 10 rollouts per task in real-world.
+Joint Name Success rate (%)
+Environment
+Post
+100
+Real
+Left Rafter
+90
+Real
+Right Rafter
+100
+Real
+6. Conclusion
+This work presents a framework integrating policy learning
+with an adaptive controller for construction-scale contact-rich
+robotic assembly. The approach combines large-scale syn-
+thetic data generation, diffusion policy learning, and adaptive
+disturbance compensation to enable zero-shot real-world de-
+ployment. By leveraging a simulation pipeline to generate
+diverse, motion-planned trajectories with force feedback, the
+framework enables efficient robot learning without relying on
+costly real-world data collection.
+A CNN-based diffusion policy is trained to map multi-
+modal observations to nominal robot actions, while an adap-
+tive control layer refines these actions in real time using po-
+sition and force feedback. Inspired by L1 adaptive control,
+the controller estimates and compensates for residual distur-
+bances arising from unmodeled contact dynamics, friction,
+and geometric misalignment, enabling robust execution and
+zero-shot transfer, thereby bridging the sim-to-real gap.
+We first evaluate the proposed approach on two represen-
+tative contact-rich single assembly tasks: mortise and tenon
+timber joint assembly and pipe fitting. The results demon-
+strate strong performance across both simulation and real-
+world settings. In simulation, the adaptive controller consis-
+17
+
+
+tently improves success rates over both the baseline diffusion
+policy and a compliance controller, with the largest gains ob-
+served in the timber joint task. In real-world experiments, the
+proposed method achieves perfect success rates across both
+tasks, demonstrating reliable zero-shot sim-to-real transfer.
+Furthermore, a full-scale timber truss assembly experiment
+demonstrates that independently trained policies can be de-
+ployed sequentially within a multi-stage assembly workflow
+involving larger components and higher interaction forces,
+extending the framework beyond isolated insertion tasks.
+Beyond task success, analysis of peak contact forces shows
+that the proposed method consistently produces lower and
+more stable interaction forces than both the baseline and com-
+pliant policy.
+While the compliant policy often results in
+higher peak forces and a wider distribution of contact forces,
+our method yields more controlled contact behavior, particu-
+larly for timber joint assembly. These findings demonstrate
+that success rate alone does not fully characterize perfor-
+mance in contact-rich manipulation and that force-based met-
+rics provide important insight into contact quality, safety, and
+robustness. Lower contact forces also reduce the risk of robot
+wear and material damage, which is critical for reliable de-
+ployment in construction applications.
+The results further indicate that task performance is influ-
+enced by both material properties and geometric tolerances.
+Stiffer materials, such as timber, are more sensitive to mis-
+alignment and therefore benefit substantially from adaptive
+disturbance compensation. In contrast, although the pipe fit-
+ting task has smaller geometric clearances, the lower stiffness
+and friction of PVC allow misalignments to be accommo-
+dated through deformation and sliding, reducing sensitivity to
+control inaccuracies. As a result, differences between meth-
+ods are less pronounced. Nevertheless, the proposed method
+consistently improves contact quality through more stable and
+controlled interaction dynamics across both tasks.
+To summarize, this work demonstrates that integrating dif-
+fusion policy learning with an L1-inspired adaptive controller
+improves both robustness and execution quality in contact-
+rich manipulation, enabling reliable zero-shot sim-to-real
+transfer. The successful deployment of the framework in a
+full-scale timber truss assembly further demonstrates its scal-
+ability to multi-stage construction workflows involving larger
+components, higher contact forces, and sequential assembly
+operations. The results of this study highlight a practical path-
+way toward deploying construction-scale robotic systems in
+settings where real-world data collection is costly and high-
+precision execution under uncertainty is critical.
+6.1. Limitations and future work
+While the proposed method demonstrates strong perfor-
+mance in contact-rich assembly tasks, several limitations re-
+main to be addressed in future work. The current framework
+does not incorporate vision-based perception and assumes a
+fixed target pose. The framework relies on robot pose and
+force/torque measurements, which reduces the dimensional-
+ity of the input space and enables efficient training. How-
+ever, this choice may limit generalization to visually complex
+or occlusion-prone construction environments. Extending the
+framework to incorporate vision-based perception or richer
+multimodal representations would enable operation in more
+unstructured and variable settings.
+In addition, this study focuses on representative construc-
+tion assembly tasks involving mortise-and-tenon timber join-
+ery and pipe fitting, providing a controlled setting to eval-
+uate contact-rich manipulation under tight tolerances.
+Al-
+though these tasks capture key challenges associated with
+contact-rich assembly, real-world construction scenarios may
+involve more complex interactions, including multi-axis in-
+sertions, compound joint geometries, larger assembly se-
+quences, and coordination across multiple robotic operations.
+Addressing such scenarios will be important for extending
+the proposed framework to a broader range of construction
+applications.
+In particular, incorporating more expressive
+learning architectures, such as vision-language-action mod-
+els (VLAs) [95, 96], could improve generalization across task
+variations and enable adaptation to previously unseen assem-
+bly conditions and environments.
+Moreover, the controller parameters, including adaptation
+gains and filtering coefficients, are currently tuned manually.
+While this enables strong performance, it introduces addi-
+tional engineering effort and limits scalability across tasks
+and environments. Future work will explore automatic pa-
+rameter tuning strategies, such as learning-based adaptation,
+optimization-based tuning, or meta-learning, to enable more
+generalizable and self-configuring control policies [97, 98].
+Finally, while peak force analysis provides insight into con-
+tact quality, additional metrics such as energy consumption,
+insertion time, and material stress could offer a more com-
+prehensive evaluation of system performance. Expanding the
+evaluation framework along these dimensions would further
+strengthen the assessment of contact-rich manipulation sys-
+tems.
+Acknowledgements
+This research was supported by the Princeton Catalysis
+Initiative (PCI), the Andlinger Center for Energy and the
+Environment (Innovative Research in Energy and Environ-
+ment Convergence Grant), and the School of Architecture at
+Princeton University. The authors would like to thank mem-
+bers of the Adel Research Group (ARG) for their invaluable
+contributions to the hardware development and the design of
+the full-scale experiments.
+Data statement
+The data used in this study are available upon request.
+References
+[1] J.
+Mischke,
+K.
+Stokvis,
+K.
+Vermeltfoort,
+and
+B.
+Biemans,
+“Delivering on construction productivity is no longer optional,”
+McKinsey & Company, Aug. 2024. [Online]. Available:
+https:
+//www.mckinsey.com/capabilities/operations/our-insights/delivering
+-on-construction-productivity-is-no-longer-optional
+18
+
+
+[2] T. Bock, “The future of construction automation:
+Technological
+disruption and the upcoming ubiquity of robotics,” Automation in
+Construction, vol. 59, pp. 113–121, 2015. [Online]. Available:
+https://doi.org/10.1016/j.autcon.2015.07.022
+[3] J. M. D. Delgado, L. Oyedele, A. Ajayi, L. Akanbi, O. Akinade,
+M. Bilal,
+and H. Owolabi,
+“Robotics and automated systems
+in construction:
+Understanding industry-specific challenges for
+adoption,” Journal of Building Engineering, vol. 26, p. 100868, 2019.
+[Online]. Available: https://doi.org/10.1016/j.jobe.2019.100868
+[4] Associated Builders and Contractors, “ABC: Construction industry
+must attract 349,000 workers in 2026 despite macroeconomic
+headwinds,” 2026, accessed July 27, 2026. [Online]. Available:
+https://www.abc.org/News-Media/News-Releases/abc-construction-i
+ndustry-must-attract-349000-workers-in-2026-despite-macroeconom
+ic-headwinds
+[5] T. Laukkanen, “Construction work and education: occupational health
+and safety reviewed,” Construction Management and Economics,
+vol. 17, pp. 53–62, 1999. [Online]. Available: https://doi.org/10.1080/
+014461999371826
+[6] T. S. Abdelhamid and J. G. Everett,
+“Physiological demands
+during construction work,” Journal of Construction Engineering and
+Management, vol. 128, pp. 427–437, 2002. [Online]. Available:
+https://doi.org/10.1061/(ASCE)0733-9364(2002)128:5(427)
+[7] V. Arndt, D. Rothenbacher, U. Daniel, B. Zschenderlein, S. Schuberth,
+and H. Brenner,
+“Construction work and risk of occupational
+disability: a ten year follow up of 14 474 male workers,” Occupational
+and Environmental Medicine, vol. 62, pp. 559–566, 2005. [Online].
+Available: https://doi.org/10.1136/oem.2004.018135
+[8] S. Hwang and S. Lee, “Wristband-type wearable health devices
+to measure construction workers’ physical demands,” Automation
+in Construction, vol. 83, pp. 330–340, 2017. [Online]. Available:
+https://doi.org/10.1016/j.autcon.2017.06.003
+[9] C.-J.
+Liang,
+V.
+R.
+Kamat,
+and
+C.
+C.
+Menassa,
+“Teaching
+robots to perform quasi-repetitive construction tasks through human
+demonstration,” Automation in Construction, vol. 120, p. 103370,
+2020. [Online]. Available: https://doi.org/10.1016/j.autcon.2020.1033
+70
+[10] X. Wang,
+H. Yu,
+W. McGee,
+C. C. Menassa,
+and V. R.
+Kamat, “Enabling BIM-driven robotic construction workflows with
+closed-loop
+digital
+twins,”
+2023.
+[Online].
+Available:
+https:
+//doi.org/10.48550/arXiv.2306.09639
+[11] A. Adel, D. Ruan, W. McGee, and S. Mozaffari, “Feedback-
+driven adaptive multi-robot timber construction,” Automation in
+Construction,
+vol. 164,
+p. 105444,
+2024. [Online]. Available:
+https://doi.org/10.1016/j.autcon.2024.105444
+[12] Z. Chen and A. Adel,
+“Advancing robotic assembly in con-
+struction:
+Innovations, challenges, and opportunities,” Automation
+in Construction, vol. 178, p. 106370, 2025. [Online]. Available:
+https://doi.org/10.1016/j.autcon.2025.106370
+[13] M. Giftthaler, T. Sandy, K. D¨orfler, I. Brooks, M. Buckingham, G. Rey,
+M. Kohler, F. Gramazio, and J. Buchli, “Mobile robotic fabrication
+at 1: 1 scale: the in situ fabricator: system, experiences and current
+developments,” Construction Robotics, vol. 1, no. 1, pp. 3–14, 2017.
+[Online]. Available: https://doi.org/10.1007/s41693-017-0003-5
+[14] S. Mozaffari, D. Ruan, W. van den Bogert, N. Fazeli, S. Adriaenssens,
+and A. Adel, “Learning diffusion policies for robotic manipulation
+of timber joinery under fabrication uncertainty,” 2026. [Online].
+Available: https://doi.org/10.48550/arXiv.2511.17774
+[15] T. Bonwetsch, J. Willmann, F. Gramazio, and M. Kohler, “Robotic
+brickwork: Towards a new paradigm of the automatic,” Bricks/Systems,
+vol. 51, 2016. [Online]. Available: https://vbn.aau.dk/ws/files/24553
+2700/Bricks Systems online.pdf#page=52
+[16] J. Willmann,
+M. Knauss,
+T. Bonwetsch,
+A. A. Apolinarska,
+F. Gramazio, and M. Kohler, “Robotic timber construction—expanding
+additive fabrication to new dimensions,” Automation in construction,
+vol. 61, pp. 16–23, 2016. [Online]. Available: https://doi.org/10.1016/
+j.autcon.2015.09.011
+[17] A. A. Apolinarska, “Complex timber structures from simple elements:
+computational design of novel bar structures for robotic fabrication and
+assembly,” Ph.D. dissertation, ETH Zurich, 2018. [Online]. Available:
+https://doi.org/10.3929/ethz-b-000266723
+[18] A. Adel Ahmadian, “Computational design for cooperative robotic
+assembly of nonstandard timber frame buildings,” Ph.D. dissertation,
+ETH Z¨urich, 2020. [Online]. Available: http://hdl.handle.net/20.500.
+11850/439443
+[19] A. Adel, “Co-robotic assembly of nonstandard timber structures,” in
+Hybrids & Haecceities, Proceedings of the 42nd Annual Conference
+of the Association for Computer Aided Design in Architecture
+(ACADIA).
+CumInCAD, 2022, pp. 604–613. [Online]. Available:
+https://doi.org/10.7302/8675
+[20] D. Ruan, W. McGee, and A. Adel, “Reducing uncertainty in
+multi-robot construction through perception modelling and adaptive
+fabrication,”
+in
+Proceedings
+of
+40th
+International
+Symposium
+on Automation and Robotics in Construction (ISARC).
+IAARC
+Publications, 2023, pp. 25–31. [Online]. Available: https://doi.org/10
+.22260/ISARC2023/0006
+[21] N. Cote, D. Tish, M. Koehle, Y. Koga, and S. Chitta, “Adaptive robotic
+construction of wood frames,” Construction Robotics, vol. 8, no. 1,
+p. 8, 2024. [Online]. Available: https://doi.org/10.1007/s41693-024-0
+0122-0
+[22] A. Adel, D. Ruan, and R. Xie, “Computational design and co-robotic
+fabrication for material reuse in architecture,” in COMPUTING
+for RESILIENCE: Expanding Community Knowledge & Impact,
+Proceedings of the 45th Annual Conference of the Association for
+Computer Aided Design in Architecture (ACADIA), 2026. [Online].
+Available: https://arxiv.org/abs/2604.24648
+[23] J. Gao and A. Adel, “Adaptive human-robot collaboration for masonry
+construction under material and assembly uncertainty,” in Proceedings
+of the 43rd International Symposium on Automation and Robotics
+in Construction (ISARC).
+Singapore: International Association for
+Automation and Robotics in Construction (IAARC), 2026, pp. 618–
+625. [Online]. Available: https://doi.org/10.22260/ISARC2026/0080
+[24] A. A. Apolinarska, M. Pacher, H. Li, N. Cote, R. Pastrana, F. Gramazio,
+and M. Kohler, “Robotic assembly of timber joints using reinforcement
+learning,” Automation in Construction, vol. 125, p. 103569, 2021.
+[Online]. Available: https://doi.org/10.1016/j.autcon.2021.103569
+[25] C. Finn, T. Yu, T. Zhang, P. Abbeel, and S. Levine, “One-shot
+visual imitation learning via meta-learning,” in Proceedings of the
+Conference on Robot Learning CoRL.
+PMLR, 2017, pp. 357–368.
+[Online]. Available: https://proceedings.mlr.press/v78/finn17a.html
+[26] S. Levine, P. Pastor, A. Krizhevsky, J. Ibarz, and D. Quillen, “Learning
+hand-eye coordination for robotic grasping with deep learning and
+large-scale data collection,” The International journal of robotics
+research, vol. 37, no. 4-5, pp. 421–436, 2018. [Online]. Available:
+https://doi.org/10.1177/0278364917710318
+[27] D. Kalashnikov, A. Irpan, P. Pastor, J. Ibarz, A. Herzog, E. Jang,
+D. Quillen,
+E. Holly,
+M. Kalakrishnan,
+V. Vanhoucke et al.,
+“Scalable deep reinforcement learning for vision-based robotic
+manipulation,” in Proccedings of Conference on robot learning
+(CoRL), vol. 87.
+PMLR, 2018, pp. 651–673. [Online]. Available:
+https://proceedings.mlr.press/v87/kalashnikov18a.html
+[28] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, J. Dabis, C. Finn,
+K. Gopalakrishnan, K. Hausman, A. Herzog, J. Hsu, J. Ibarz,
+B. Ichter, A. Irpan, T. Jackson, S. Jesmonth, N. J. Joshi, R. Julian,
+D. Kalashnikov, Y. Kuang, I. Leal, K.-H. Lee, S. Levine et al., “RT-1:
+Robotics transformer for real-world control at scale,” 2023. [Online].
+Available: https://arxiv.org/abs/2212.06817
+[29] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake,
+and S. Song, “Diffusion policy:
+Visuomotor policy learning via
+action diffusion,” The International Journal of Robotics Research,
+vol. 44, no. 10-11, pp. 1684–1704, 2024. [Online]. Available:
+https://doi.org/10.1177/02783649241273668
+[30] C. Chi, Z. Xu, C. Pan, E. Cousineau, B. Burchfiel, S. Feng, R. Tedrake,
+and S. Song, “Universal manipulation interface: In-the-wild robot
+teaching without in-the-wild robots,”
+2024. [Online]. Available:
+https://arxiv.org/abs/2402.10329
+[31] Y. Hou, Z. Liu, C. Chi, E. Cousineau, N. Kuppuswamy, S. Feng,
+B. Burchfiel, and S. Song, “Adaptive compliance policy: Learning
+approximate compliance for diffusion guided control,” in 2025 IEEE
+International Conference on Robotics and Automation (ICRA).
+IEEE,
+2025, pp. 4829–4836. [Online]. Available: https://doi.org/10.1109/IC
+RA55743.2025.11128452
+19
+
+
+[32] L. Yang, H. J. T. Suh, T. Zhao, B. P. Graesdal, T. Kelestemur,
+J. Wang, T. Pang, and R. Tedrake, “Physics-driven data generation for
+contact-rich manipulation via trajectory optimization,” 2025. [Online].
+Available: https://arxiv.org/abs/2502.20382
+[33] H. Zhu,
+T. Zhao,
+X. Ni,
+J. Wang,
+K. Fang,
+L. Righetti,
+and T. Pang, “Should we learn contact-rich manipulation policies
+from sampling-based planners?”
+IEEE Robotics and Automation
+Letters, vol. 10, no. 6, pp. 6248–6255, 2025. [Online]. Available:
+https://doi.org/10.1109/LRA.2025.3564701
+[34] N. Hovakimyan and C. Cao, L1 adaptive control theory: Guaranteed
+robustness with fast adaptation.
+SIAM, 2010. [Online]. Available:
+https://doi.org/10.1137/1.9780898719376
+[35] T. Bonwetsch, “Robotically assembled brickwork:
+Manipulating
+assembly processes of discrete elements,” Ph.D. dissertation, ETH
+Zurich, 2015. [Online]. Available: https://doi.org/10.3929/ethz-a-010
+602028
+[36] S. Parascho, A. Gandia, A. Mirjan, F. Gramazio, and M. Kohler,
+“Cooperative fabrication of spatial metal structures,” Fabricate 2017,
+pp. 24–29, 2017. [Online]. Available: https://doi.org/10.2307/j.ctt1n7
+qkg7.7
+[37] A. Adel, A. Thoma, M. Helmreich, F. Gramazio, and M. Kohler,
+“Design of robotically fabricated timber frame structures,”
+in
+38th Annual Conference of the Association for Computer Aided
+Design in Architecture: Recalibration on Imprecision and Infidelity,
+ACADIA 2018.
+ACADIA, 2018, pp. 394–403. [Online]. Available:
+https://doi.org/10.52842/conf.acadia.2018.394
+[38] M. Helmreich, H. Mayer, M. Pacher, T. Nakajima, M. Kuroki,
+S. Tsubata, F. Gramazio, and M. Kohler, “Robotic assembly of
+modular multi-storey timber-only frame structures using traditional
+wood joinery,” in Proceedings of the 27th International Conference for
+the Association for Computer-Aided Architectural Design Research
+in Asia (CAADRIA).
+CumInCAD, 2022, pp. 111–120. [Online].
+Available: https://doi.org/10.52842/conf.caadria.2022.2.111
+[39] P. Y. Leung, A. A. Apolinarska, D. Tanadini, F. Gramazio, and
+M. Kohler, “Automatic assembly of jointed timber structure using
+distributed robotic clamps,” in PROJECTIONS, Proceedings of the
+26th International Conference of the Association for Computer-Aided
+Architectural Design (CAADRIA), vol. 1.
+CumInCAD, 2021, pp.
+583–592. [Online]. Available: https://doi.org/10.52842/conf.caadria.
+2021.1.583
+[40] A. Gandia, F. Gramazio, and M. Kohler, “Tolerance-aware design of
+robotically assembled spatial structures,” in Hybrids & Haecceities,
+Proceedings of the 42nd Annual Conference of the Association for
+Computer Aided Design in Architecture (ACADIA).
+CumInCAD,
+2022, pp. 4–23. [Online]. Available: https://papers.cumincad.org/cgi-b
+in/works/Show?acadia22 4
+[41] M. Liu, J. Guo, L. Deng, S. Wang, and H. Wang, “Enhanced vision-
+based 6-dof pose estimation for robotic rebar tying,” Automation
+in Construction, vol. 171, p. 105999, 2025. [Online]. Available:
+https://doi.org/10.1016/j.autcon.2025.105999
+[42] K. Duan, Z. Zou, and T. Yang, “Training of construction robots using
+imitation learning and environmental rewards,” Computer-Aided Civil
+and Infrastructure Engineering, vol. 40, no. 9, pp. 1150–1165, 2024.
+[Online]. Available: https://doi.org/10.1111/mice.13394
+[43] B. Duan, K. Qian, A. Liu, and S. Luo, “Visual–tactile learning of
+robotic cable-in-duct installation skills,” Automation in Construction,
+vol. 170, p. 105905, 2025. [Online]. Available: https://doi.org/10.101
+6/j.autcon.2024.105905
+[44] T. Sun, B. Han, J. Wu, S. Rusinkiewicz, and Y. Shao, “Mobile
+robotic rebar cage assembly via imitation learning,” Automation
+in Construction, vol. 181, p. 106671, 2026. [Online]. Available:
+https://doi.org/10.1016/j.autcon.2025.106671
+[45] M. H. Raibert and J. J. Craig,
+“Hybrid position/force control
+of manipulators,” Journal of dynamic systems, measurement, and
+control, vol. 103, no. 2, pp. 126–133, 1981. [Online]. Available:
+https://doi.org/10.1115/1.3139652
+[46] M.
+T.
+Mason,
+“Compliance
+and
+force
+control
+for
+computer
+controlled manipulators,” IEEE Transactions on Systems, Man, and
+Cybernetics, vol. 11, no. 6, pp. 418–432, 1981. [Online]. Available:
+https://doi.org/10.1109/tsmc.1981.4308708
+[47] N. Hogan, “Impedance control:
+An approach to manipulation:
+Part ii—implementation,” Journal of dynamic systems, measurement,
+and control, vol. 107, no. 1, pp. 8–16, 1985. [Online]. Available:
+https://doi.org/10.1115/1.3140713
+[48] Q. Yang, A. D¨urr, E. A. Topp, J. A. Stork, and T. Stoyanov, “Variable
+impedance skill learning for contact-rich manipulation,” IEEE robotics
+and automation letters, vol. 7, no. 3, pp. 8391–8398, 2022. [Online].
+Available: https://doi.org/10.1109/lra.2022.3187276
+[49] S. Levine,
+C. Finn,
+T. Darrell,
+and P. Abbeel,
+“End-to-end
+training of deep visuomotor policies,” Journal of Machine Learning
+Research, vol. 17, no. 39, pp. 1–40, 2016. [Online]. Available:
+https://www.jmlr.org/papers/volume17/15-522/15-522.pdf
+[50] M. A. Lee, Y. Zhu, P. Zachares, M. Tan, K. Srinivasan, S. Savarese,
+L. Fei-Fei, A. Garg, and J. Bohg, “Making sense of vision and touch:
+Learning multimodal representations for contact-rich tasks,” IEEE
+Transactions on Robotics, vol. 36, no. 3, pp. 582–596, 2020. [Online].
+Available: https://doi.org/10.1109/TRO.2019.2959445
+[51] R. Calandra, A. Owens, D. Jayaraman, J. Lin, W. Yuan, J. Malik,
+E. H. Adelson, and S. Levine, “More than a feeling: Learning to grasp
+and regrasp using vision and touch,” IEEE Robotics and Automation
+Letters, vol. 3, no. 4, pp. 3300–3307, 2018. [Online]. Available:
+https://doi.org/10.1109/lra.2018.2852779
+[52] X. Chen, J. Hu, C. Jin, L. Li, and L. Wang, “Understanding domain
+randomization for sim-to-real transfer,” 2022. [Online]. Available:
+https://arxiv.org/abs/2110.03239
+[53] M. Laskey, J. Lee, R. Fox, A. Dragan, and K. Goldberg, “Dart: Noise
+injection for robust imitation learning,” in Proceedings of the 1st
+Annual Conference on Robot Learning, ser. Proceedings of Machine
+Learning Research, S. Levine, V. Vanhoucke, and K. Goldberg, Eds.,
+vol. 78.
+PMLR, 13–15 Nov 2017, pp. 143–156. [Online]. Available:
+https://proceedings.mlr.press/v78/laskey17a.html
+[54] O. M. Andrychowicz, B. Baker, M. Chociej, R. Jozefowicz, B. Mc-
+Grew, J. Pachocki, A. Petron, M. Plappert, G. Powell, A. Ray et al.,
+“Learning dexterous in-hand manipulation,” The International Journal
+of Robotics Research, vol. 39, no. 1, pp. 3–20, 2020.
+[55] X. B. Peng,
+M. Andrychowicz,
+W. Zaremba,
+and P. Abbeel,
+“Sim-to-real transfer of robotic control with dynamics randomization,”
+in 2018 IEEE international conference on robotics and automation
+(ICRA).
+IEEE, 2018, pp. 3803–3810. [Online]. Available: https:
+//doi.org/10.1109/icra.2018.8460528
+[56] N.
+Fazeli,
+S.
+Zapolsky,
+E.
+Drumwright,
+and
+A.
+Rodriguez,
+“Fundamental limitations in performance and interpretability of
+common planar rigid-body contact models,” in Robotics Research: The
+18th International Symposium ISRR.
+Springer, 2019, pp. 555–571.
+[Online]. Available: https://doi.org/10.1007/978-3-030-28619-4 41
+[57] M. T. Mason, Mechanics of robotic manipulation.
+MIT press, 2001.
+[Online]. Available: https://doi.org/10.7551/mitpress/4527.001.0001
+[58] W. Zou, Y. Wang, T. Liu, B. Shuai, L. Xiao, Y. Ma, J. Duan,
+and S. E. Li,
+“Multimodal reinforcement learning with score-
+based policy,”
+IEEE Transactions on Automation Science and
+Engineering, vol. 22, pp. 24 105–24 119, 2025. [Online]. Available:
+https://doi.org/10.1109/tase.2025.3631883
+[59] D. Wang, C. Liu, F. Chang, and Y. Xu, “Hierarchical diffusion
+policy:
+manipulation trajectory generation via contact guidance,”
+IEEE Transactions on Robotics, 2025. [Online]. Available:
+https:
+//doi.org/10.1109/tro.2025.3547272
+[60] X. Li,
+T. Zhao,
+X. Zhu,
+J. Wang,
+T. Pang,
+and K. Fang,
+“Planning-guided diffusion policy learning for generalizable contact-
+rich bimanual manipulation,” arXiv preprint arXiv:2412.02676, 2024.
+[Online]. Available: https://arxiv.org/pdf/2412.02676?
+[61] H. Xue, J. Ren, W. Chen, G. Zhang, Y. Fang, G. Gu, H. Xu, and C. Lu,
+“Reactive diffusion policy: Slow-fast visual-tactile policy learning for
+contact-rich manipulation,” arXiv preprint arXiv:2503.02881, 2025.
+[62] S. Wang, G. Chen, H. Xu, and Z. Wang, “A robotic peg-in-
+hole assembly strategy based on variable compliance center,” IEEe
+Access, vol. 7, pp. 167 534–167 546, 2019. [Online]. Available:
+https://doi.org/10.1109/access.2019.2954459
+[63] X. Zhang, C. Wang, L. Sun, Z. Wu, X. Zhu, and M. Tomizuka,
+“Efficient sim-to-real transfer of contact-rich manipulation skills
+with online admittance residual learning,” in Conference on Robot
+Learning.
+PMLR, 2023,
+pp. 1621–1639. [Online]. Available:
+https://proceedings.mlr.press/v229/zhang23e.html
+20
+
+
+[64] M. Parmar, M. Halm, and M. Posa, “Fundamental challenges in deep
+learning for stiff contact dynamics,” in 2021 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS).
+IEEE, 2021,
+pp. 5181–5188. [Online]. Available: https://doi.org/10.1109/iros5116
+8.2021.9636383
+[65] C. C. Beltran-Hernandez, D. Petit, I. G. Ramirez-Alpizar, T. Nishi,
+S. Kikuchi, T. Matsubara, and K. Harada, “Learning force control for
+contact-rich manipulation tasks with rigid position-controlled robots,”
+IEEE Robotics and Automation Letters, vol. 5, no. 4, pp. 5709–5716,
+2020. [Online]. Available: https://doi.org/10.1109/lra.2020.3010739
+[66] S. A. Khader, H. Yin, P. Falco, and D. Kragic, “Stability-guaranteed
+reinforcement learning for contact-rich manipulation,” IEEE Robotics
+and Automation Letters, vol. 6, no. 1, pp. 1–8, 2020. [Online].
+Available: https://doi.org/10.1109/lra.2020.3028529
+[67] S. Shaw, B. Abbatematteo, and G. Konidaris, “Rmps for safe
+impedance control in contact-rich manipulation,” in 2022 International
+Conference on Robotics and Automation (ICRA).
+IEEE, 2022, pp.
+2707–2713. [Online]. Available: https://doi.org/10.1109/icra46639.20
+22.9811986
+[68] Teradyne Inc. UR20. https://www.universal-robots.com/products/ur2
+0/. Accessed: January 19, 2026.
+[69] Schunk Group. PSH Long-stroke gripper. https://schunk.com/us/en/gri
+pping-systems/parallel-gripper/psh/c/PGR 250?cspt0=tctc&cspc0=se
+riesTabComponent&csot0=variants. Accessed: January 19, 2026.
+[70] NVIDIA Corporation. NVIDIA Developer. https://developer.nvidia.c
+om/isaac/sim. Accessed: January 19, 2026.
+[71] Dell Inc. Alienware 16 Area-51 Gaming Laptop. https://www.dell.com
+/en-us/shop/dell-laptops/alienware-16-area-51-gaming-laptop/spd/
+alienware-area-51-aa16250-gaming-laptop. Accessed: January 19,
+2026.
+[72] A. Mandlekar, S. Nasiriany, B. Wen, I. Akinola, Y. Narang, L. Fan,
+Y. Zhu, and D. Fox, “Mimicgen:
+A data generation system for
+scalable robot learning using human demonstrations,” arXiv preprint
+arXiv:2310.17596, 2023.
+[73] H. Kasaei and M. Kasaei, “Vital:
+Interactive few-shot imitation
+learning via visual human-in-the-loop corrections,” 2025. [Online].
+Available: https://arxiv.org/abs/2407.21244
+[74] E. Zhu, M. Levy, M. Gwilliam, and A. Shrivastava, “Nerf-aug: Data
+augmentation for robotics with neural radiance fields,” 2025. [Online].
+Available: https://arxiv.org/abs/2411.02482
+[75] NVIDIA Corporation. Isaac Lab Documentation. https://isaac-sim.g
+ithub.io/IsaacLab/main/source/api/lab/isaaclab.controllers.html.
+Accessed: January 27, 2026.
+[76] A. Heins, M. Jakob, and A. P. Schoellig, “Mobile manipulation in
+unknown environments with differential inverse kinematics control,”
+in 2021 18th Conference on Robots and Vision (CRV).
+IEEE, 2021,
+pp. 64–71. [Online]. Available: https://doi.org/10.1109/CRV52889.2
+021.00017
+[77] H. Group et al., “Hierarchical data format, version 5,” Zenodo, 1997.
+[78] T. Leman, E. Xargay, G. Dullerud, N. Hovakimyan, and T. Wendel, “L1
+adaptive control augmentation system for the x-48b aircraft,” in AIAA
+guidance, navigation, and control conference, 2009, p. 5619.
+[79] Y. Ding, C. Liu, S. Lu, and Z. Zhu, “Hyperbolic sliding mode
+trajectory tracking control of mobile robot,” in 2018 3rd International
+Conference on Electrical, Automation and Mechanical Engineering
+(EAME 2018). Atlantis Press, 2018, pp. 234–238. [Online]. Available:
+https://doi.org/10.2991/eame-18.2018.49
+[80] G. B. Orr and K.-R. M¨uller, Neural networks: tricks of the trade.
+Springer, 2002.
+[81] R. Kikuuwe, N. Takesue, A. Sano, H. Mochiyama, and H. Fujimoto,
+“Admittance and impedance representations of friction based on
+implicit euler integration,” IEEE Transactions on Robotics, vol. 22,
+no. 6, pp. 1176–1188, 2006. [Online]. Available: https://doi.org/10.1
+109/TRO.2006.886262
+[82] T. K. Kim, “Understanding one-way anova using conceptual figures,”
+Korean journal of anesthesiology, vol. 70, no. 1, p. 22, 2017. [Online].
+Available: https://doi.org/10.4097/kjae.2017.70.1.22
+[83] ——, “T test as a parametric statistic,” Korean Journal of Anesthesiol-
+ogy, vol. 68, no. 6, pp. 540–546, 2015.
+[84] W. J. Conover, Practical nonparametric statistics.
+john wiley & sons,
+1999.
+[85] W. H. Kruskal and W. A. Wallis, “Use of ranks in one-criterion variance
+analysis,” Journal of the American statistical Association, vol. 47, no.
+260, pp. 583–621, 1952.
+[86] H. B. Mann and D. R. Whitney, “On a test of whether one of two ran-
+dom variables is stochastically larger than the other,” The annals of
+mathematical statistics, pp. 50–60, 1947.
+[87] O. J. Dunn, “Multiple comparisons among means,” Journal of the
+American statistical association, vol. 56, no. 293, pp. 52–64, 1961.
+[88] K. O. McGraw and S. P. Wong, “A common language effect size statis-
+tic.” Psychological bulletin, vol. 111, no. 2, p. 361, 1992.
+[89] J. Cohen, Statistical power analysis for the behavioral sciences,
+Rev.
+Lawrence Erlbaum Associates, Inc, 1977. [Online]. Available:
+https://doi.org/10.1016/c2013-0-10517-x
+[90] J.-C. Goulet-Pelletier and D. Cousineau, “A review of effect sizes
+and their confidence intervals, part i:
+The cohen’sd family,” The
+Quantitative Methods for Psychology, vol. 14, no. 4, pp. 242–265,
+2018. [Online]. Available: https://doi.org/10.20982/tqmp.14.4.p242
+[91] A. Vargha and H. D. Delaney,
+“A critique and improvement
+of the cl common language effect size statistics of mcgraw
+and wong,”
+Journal of Educational and Behavioral Statistics,
+vol. 25, no. 2, pp. 101–132, 2000. [Online]. Available:
+https:
+//doi.org/10.3102/10769986025002101
+[92] A. Brown, The Genius of Japanese Carpentry: Secrets of a Craft. Tut-
+tle Publishing, 1995.
+[93] T. Benson, Building the timber frame house: The revival of a forgotten
+craft.
+Simon and Schuster, 1981.
+[94] ABB Group,
+“IRB 4600 40kg/2,55m,”
+Accessed March 2026.
+[Online]. Available: https://new.abb.com/products/robotics/robots/art
+iculated-robots/irb-4600
+[95] Physical Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia,
+D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, M. Y. Galliker,
+D. Ghosh, L. Groom, K. Hausman, B. Ichter, S. Jakubczak, T. Jones,
+L. Ke, D. LeBlanc, S. Levine et al., “π0.5: a vision-language-action
+model with open-world generalization,” 2025. [Online]. Available:
+https://arxiv.org/abs/2504.16054
+[96] Gemini Robotics Team, A. Abdolmaleki, S. Abeyruwan, J. Ainslie,
+J.-B. Alayrac,
+M. G. Arenas,
+A. Balakrishna,
+N. Batchelor,
+A. Bewley, J. Bingham et al., “Gemini Robotics 1.5:
+Pushing
+the frontier of generalist robots with advanced embodied reasoning,
+thinking, and motion transfer,” 2025. [Online]. Available:
+https:
+//arxiv.org/abs/2510.03342
+[97] C. C. Beltran-Hernandez, D. Petit, I. G. Ramirez-Alpizar, and
+K.
+Harada,
+“Variable
+compliance
+control
+for
+robotic
+peg-in-
+hole assembly:
+A deep-reinforcement-learning approach,” Applied
+Sciences, vol. 10, no. 19, p. 6923, 2020. [Online]. Available:
+https://doi.org/10.3390/app10196923
+[98] L. Johannsmeier, M. Gerchow, and S. Haddadin, “A framework
+for
+robot
+manipulation:
+Skill
+formalism,
+meta
+learning
+and
+adaptive control,” in 2019 International Conference on Robotics and
+Automation (ICRA). IEEE, 2019, pp. 5844–5850. [Online]. Available:
+https://doi.org/10.1109/ICRA.2019.8793542
+21

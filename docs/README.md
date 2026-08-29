@@ -51,14 +51,14 @@
       <span class="dpr-home-dashboard-kicker">2026-08-29</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 29 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 39 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>18</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>24</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>15</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-29 01:14:01 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-29 19:46:22 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,43 +69,20 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise 3-line Chinese summary based on the given recommendation data.</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and produce a concise summary in Chinese, within 3 sentences, based on the given data. I need to follow the specified format:</p>
+<p>A headline-suitable one-sentence summary</p>
+<p>A sentence highlighting 1-2 most worthwhile directions/conclusions</p>
+<p>A sentence giving next-step advice for general readers</p>
 <p>Let me analyze the data:</p>
 <p>Date: 2026-08-29</p>
-<p>Status: Success</p>
-<p>Total: 29 papers</p>
-<p>Deep read: 18</p>
-<p>Quick read: 11</p>
-<p>Top deep reads: WorldToken (10.0), EXIMO (9.0) - both about robotic imitation learning and VLA (Vision-Language-Action)</p>
-<p>Quick reads focus on: latent actions in robot learning, demonstration unlearning, token compression in VLA models</p>
-<p>Theme: All papers are about robotics + VLA (Vision-Language-Action) models and imitation learning.</p>
-<p>Top picks:</p>
-<p>WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning (10.0)</p>
-<p>EXIMO: VLM Guided Exploration of VLA Policies (9.0)</p>
-<p>What Matters for Latent Actions in Robot Learning (8.0)</p>
-<p>Rethinking Demonstration Unlearning (8.0)</p>
-<p>Just Noticeable Difference Modeling for Token Compression in VLA (8.0)</p>
-<p>I need to write:</p>
-<p>A title-suitable one-line summary of what was done today</p>
-<p>A line pointing to 1-2 most worthwhile directions/conclusions</p>
-<p>A line giving next-step suggestion for general readers</p>
-<p>Let me draft:</p>
-<p>今日筛选29篇机器人与具身智能论文，精读18篇速读11篇，焦点集中在VLA策略与模仿学习。</p>
-<p>最值得关注：WorldToken以时间优先序列建模刷新模仿学习表现（10分），EXIMO利用VLM引导VLA策略探索（9分），提示&quot;时间结构+多模态引导&quot;成为具身智能新主线。</p>
-<p>对关注落地的读者，建议先看WorldToken的时间序列范式和JND token压缩思路，两者结合有助于兼顾性能与部署效率。</p>
-<p>Let me refine to be more concise and specific:</p>
-<p>今日共筛选29篇论文（精读18/速读11），主题集中在VLA策略与机器人模仿学习。</p>
-<p>最值得看：WorldToken以时间优先序列建模拿下满分（10分），EXIMO用VLM引导VLA策略探索（9分），&quot;时间结构+多模态探索&quot;成为新趋势。</p>
-<p>建议普通读者优先读WorldToken了解时间序列新范式，再速览JND token压缩，关注性能与效率的平衡。</p>
-<p>Let me check the constraint: 3 lines max, each line is one sentence (one 句). Let me adjust.</p>
-<p>Actually it says &quot;1-3 行文本&quot;, so 1-3 lines. Let me output exactly 3 lines, each one sentence.</p>
-<p>Line 1: Today we screened 29 papers on VLA/robotics imitation learning, 18 deep + 11 quick.</p>
-<p>Line 2: Most noteworthy: WorldToken (10/10) time-first sequence modeling for imitation, EXIMO (9/10) VLM-guided exploration of VLA policies.</p>
-<p>Line 3: For general readers, start with WorldToken&#x27;s paradigm and the JND token compression idea.</p>
-<p>Final version:&lt;/think&gt;</p>
-<p>今日共筛选29篇论文（精读18、速读11），全部围绕VLA策略与机器人模仿学习展开。</p>
-<p>最值得看：WorldToken以时间优先序列建模拿下10分满分，EXIMO用VLM引导VLA策略探索斩获9分，&quot;时间结构+多模态引导&quot;成为具身智能新主线。</p>
-<p>普通读者建议先精读WorldToken把握时间序列新范式，再速览JND token压缩论文，兼顾性能与部署效率。</p>
+<p>Total: 39 papers</p>
+<p>Deep read: 24</p>
+<p>Quick read: 15</p>
+<p>Top deep read: WorldToken (10.0) and ForeTime-VLA (9.0) - both about robotic imitation learning with time/future token approaches</p>
+<p>Quick reads include topics like demonstration unlearning, visual-tactile grasping, counterfactual supervision for VLA models</p>
+<p>Key themes: Robotics imitation learning, VLA models, time/future token prediction, physical property awareness, counterfactual supervision.</p>
+<p>Let me craft the summary:&lt;/think&gt;</p>
+<p>今日精选 39 篇机器人与具身智能论文，聚焦模仿学习与视觉-语言-动作模型的最新进展，重点围绕时间序列建模与未来 token 预测展开。最值得关注的两个方向：WorldToken 和 ForeTime-VLA 提出了以&quot;时间优先&quot;和&quot;因果未来 token&quot;为核心的新框架，在机器人模仿与传送带操控任务上效果突出；同时，ViTacPhys 与 CounterAlign 分别从视觉-触觉物理属性感知和反事实监督角度增强了 VLA 模型的鲁棒性。感兴趣的同学可优先精读 WorldToken，再结合 CounterAlign 思考如何把时间因果建模与反事实监督融合到自己的项目中。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -114,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">18 篇</strong>
+    <strong class="dpr-home-dashboard-count">24 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning">WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="EXIMO: VLM Guided Exploration of VLA Policies">EXIMO: VLM Guided Exploration of VLA Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="ForeTime-VLA: Causal Future-Token Distillation from a World Action Model for Conveyor-Belt Manipulation">ForeTime-VLA: Causal Future-Token Distillation from a World Action Model for Conveyor-Belt Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning">WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="ForeTime-VLA: Causal Future-Token Distillation from a World Action Model for Conveyor-Belt Manipulation">ForeTime-VLA: Causal Future-Token Distillation from a World Action Model for Conveyor-Belt Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Beyond Imitation: Self-Improving Robot Policies via Off-Policy Q-Planning">Beyond Imitation: Self-Improving Robot Policies via Off-Policy Q-Planning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>18</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>24</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -127,12 +104,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">15 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="What Matters for Latent Actions in Robot Learning">What Matters for Latent Actions in Robot Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Rethinking Demonstration Unlearning in Imitation Learning for Robotics">Rethinking Demonstration Unlearning in Imitation Learning for Robotics</span></li><li><span class="dpr-home-dashboard-paper-title" title="Just Noticeable Difference Modeling for Token Compression in Vision-Language-Action Models">Just Noticeable Difference Modeling for Token Compression in Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Rethinking Demonstration Unlearning in Imitation Learning for Robotics">Rethinking Demonstration Unlearning in Imitation Learning for Robotics</span></li><li><span class="dpr-home-dashboard-paper-title" title="ViTacPhys: Physical Property-Aware Grasping from Human Visual-Tactile Demonstrations">ViTacPhys: Physical Property-Aware Grasping from Human Visual-Tactile Demonstrations</span></li><li><span class="dpr-home-dashboard-paper-title" title="CounterAlign: Counterfactual Supervision for Vision-Language-Action Models">CounterAlign: Counterfactual Supervision for Vision-Language-Action Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>15</strong></span></div>
 </section>
 </div>
 
