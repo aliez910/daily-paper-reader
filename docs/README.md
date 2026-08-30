@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-29</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-30</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 39 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>24</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>15</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-29 19:46:22 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-30 19:36:42 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,20 +69,17 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and produce a concise summary in Chinese, within 3 sentences, based on the given data. I need to follow the specified format:</p>
-<p>A headline-suitable one-sentence summary</p>
-<p>A sentence highlighting 1-2 most worthwhile directions/conclusions</p>
-<p>A sentence giving next-step advice for general readers</p>
-<p>Let me analyze the data:</p>
-<p>Date: 2026-08-29</p>
-<p>Total: 39 papers</p>
-<p>Deep read: 24</p>
-<p>Quick read: 15</p>
-<p>Top deep read: WorldToken (10.0) and ForeTime-VLA (9.0) - both about robotic imitation learning with time/future token approaches</p>
-<p>Quick reads include topics like demonstration unlearning, visual-tactile grasping, counterfactual supervision for VLA models</p>
-<p>Key themes: Robotics imitation learning, VLA models, time/future token prediction, physical property awareness, counterfactual supervision.</p>
-<p>Let me craft the summary:&lt;/think&gt;</p>
-<p>今日精选 39 篇机器人与具身智能论文，聚焦模仿学习与视觉-语言-动作模型的最新进展，重点围绕时间序列建模与未来 token 预测展开。最值得关注的两个方向：WorldToken 和 ForeTime-VLA 提出了以&quot;时间优先&quot;和&quot;因果未来 token&quot;为核心的新框架，在机器人模仿与传送带操控任务上效果突出；同时，ViTacPhys 与 CounterAlign 分别从视觉-触觉物理属性感知和反事实监督角度增强了 VLA 模型的鲁棒性。感兴趣的同学可优先精读 WorldToken，再结合 CounterAlign 思考如何把时间因果建模与反事实监督融合到自己的项目中。</p>
+<p>&lt;think&gt;The user wants a daily digest in Chinese, 3 lines max, based on the provided data about robotics/imitation learning papers from 2026-08-30. Let me summarize concisely.</p>
+<p>Key points:</p>
+<p>28 papers total, 17 deep-read, 11 speed-read</p>
+<p>Top papers (9.0/10): &quot;The Imitator Game&quot; (robot imitation benchmarking) and &quot;WorldToken&quot; (time-first sequence modeling for robotic imitation)</p>
+<p>Other notable 8.0/10 papers relate to counterfactual supervision, action inference, world-model vs imitated world-action models</p>
+<p>I need to output 3 lines:</p>
+<p>Overview for title - engaging</p>
+<p>Most valuable 1-2 directions/conclusions</p>
+<p>Next step suggestion for general readers</p>
+<p>No markdown headers, no JSON, just plain text 1-3 lines.&lt;/think&gt;</p>
+<p>今天精选 28 篇机器人模仿与策略学习论文，其中 17 篇深入研读，整体聚焦&quot;机器人模仿能力如何突破纯动作预测&quot;这一核心问题。最值得关注的两条线索：一是《The Imitator Game》提出超越动作预测的机器人模仿能力基准，为衡量真&quot;理解式模仿&quot;提供了量化工具；二是《WorldToken》以时间优先的序列建模重塑机器人模仿学习路径，叠加 CounterAlign 的反事实监督与&quot;世界模型 vs 模仿世界-动作模型&quot;的能力分离研究，共同指向&quot;可评估、可解释、可泛化&quot;的新一代模仿学习框架。建议普通读者先读《The Imitator Game》的基准设计与《WorldToken》的时序思路，再用一两个 demo 任务跟踪后续工作，判断这些方法能否真正迁移到自家机器人或仿真环境。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +88,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">24 篇</strong>
+    <strong class="dpr-home-dashboard-count">17 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning">WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="ForeTime-VLA: Causal Future-Token Distillation from a World Action Model for Conveyor-Belt Manipulation">ForeTime-VLA: Causal Future-Token Distillation from a World Action Model for Conveyor-Belt Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Beyond Imitation: Self-Improving Robot Policies via Off-Policy Q-Planning">Beyond Imitation: Self-Improving Robot Policies via Off-Policy Q-Planning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction">The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction</span></li><li><span class="dpr-home-dashboard-paper-title" title="WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning">WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Triplet2Track: A Hierarchical System with Object-Centric Representations for Reliable Long-Horizon Manipulation">Triplet2Track: A Hierarchical System with Object-Centric Representations for Reliable Long-Horizon Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>24</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -104,12 +101,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">15 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Rethinking Demonstration Unlearning in Imitation Learning for Robotics">Rethinking Demonstration Unlearning in Imitation Learning for Robotics</span></li><li><span class="dpr-home-dashboard-paper-title" title="ViTacPhys: Physical Property-Aware Grasping from Human Visual-Tactile Demonstrations">ViTacPhys: Physical Property-Aware Grasping from Human Visual-Tactile Demonstrations</span></li><li><span class="dpr-home-dashboard-paper-title" title="CounterAlign: Counterfactual Supervision for Vision-Language-Action Models">CounterAlign: Counterfactual Supervision for Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CounterAlign: Counterfactual Supervision for Vision-Language-Action Models">CounterAlign: Counterfactual Supervision for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="DELE-w0.5: Inferring Action from Future Latent State for Robotic Manipulation">DELE-w0.5: Inferring Action from Future Latent State for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="On the Capability Separation Between World-Model Policy Learning and Imitated World-Action Models">On the Capability Separation Between World-Model Policy Learning and Imitated World-Action Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>15</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
 </div>
 
