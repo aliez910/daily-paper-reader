@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-30</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-31</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 29 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>18</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-30 19:36:42 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-31 22:06:07 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,17 +69,29 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a daily digest in Chinese, 3 lines max, based on the provided data about robotics/imitation learning papers from 2026-08-30. Let me summarize concisely.</p>
-<p>Key points:</p>
-<p>28 papers total, 17 deep-read, 11 speed-read</p>
-<p>Top papers (9.0/10): &quot;The Imitator Game&quot; (robot imitation benchmarking) and &quot;WorldToken&quot; (time-first sequence modeling for robotic imitation)</p>
-<p>Other notable 8.0/10 papers relate to counterfactual supervision, action inference, world-model vs imitated world-action models</p>
-<p>I need to output 3 lines:</p>
-<p>Overview for title - engaging</p>
-<p>Most valuable 1-2 directions/conclusions</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output 3 lines summarizing today&#x27;s recommended papers. Let me analyze the data:</p>
+<p>Date: 2026-08-31</p>
+<p>Total: 29 papers</p>
+<p>Deep read: 18 papers</p>
+<p>Quick read: 11 papers</p>
+<p>Top deep reads (9.0/10):</p>
+<p>&quot;DreamMimic: Learning Visuomotor Whole-Body Loco-Manipulation via World Model&quot;</p>
+<p>&quot;The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction&quot;</p>
+<p>Quick reads (8.0/10):</p>
+<p>&quot;InstructMove: A Text-Indispensable Benchmark for Instruction-Following Manipulation&quot;</p>
+<p>&quot;Act with Intent: Distilling Behavior Intent for Vision-Language-Action Models&quot;</p>
+<p>&quot;GlanceWAM: Sparse Test-Time Imagination for World-Action Models&quot;</p>
+<p>Key themes:</p>
+<p>Robot manipulation/whole-body control</p>
+<p>Imitation learning</p>
+<p>Vision-Language-Action (VLA) models</p>
+<p>World models for robotics</p>
+<p>The output should be:</p>
+<p>Title-style summary of what was done today</p>
+<p>1-2 most noteworthy directions/conclusions</p>
 <p>Next step suggestion for general readers</p>
-<p>No markdown headers, no JSON, just plain text 1-3 lines.&lt;/think&gt;</p>
-<p>今天精选 28 篇机器人模仿与策略学习论文，其中 17 篇深入研读，整体聚焦&quot;机器人模仿能力如何突破纯动作预测&quot;这一核心问题。最值得关注的两条线索：一是《The Imitator Game》提出超越动作预测的机器人模仿能力基准，为衡量真&quot;理解式模仿&quot;提供了量化工具；二是《WorldToken》以时间优先的序列建模重塑机器人模仿学习路径，叠加 CounterAlign 的反事实监督与&quot;世界模型 vs 模仿世界-动作模型&quot;的能力分离研究，共同指向&quot;可评估、可解释、可泛化&quot;的新一代模仿学习框架。建议普通读者先读《The Imitator Game》的基准设计与《WorldToken》的时序思路，再用一两个 demo 任务跟踪后续工作，判断这些方法能否真正迁移到自家机器人或仿真环境。</p>
+<p>Let me craft this concisely in Chinese, no markdown headers, no JSON, just 1-3 lines of text.&lt;/think&gt;</p>
+<p>今日精选 29 篇机器人学习前沿工作，精读 18 篇、速读 11 篇，重点聚焦&quot;全身运动操控 + 世界模型 + 视觉-语言-动作&quot;的融合路线。最值得关注的是 DreamMimic 通过世界模型实现全身视觉运动操控，以及《The Imitator Game》提出超越动作预测的机器人模仿能力新基准，共同推动机器人从&quot;会做动作&quot;走向&quot;理解行为意图&quot;。建议读者从 InstructMove 等文本驱动操控基准入手，关注 VLA 模型与具身智能体的落地进展。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -88,12 +100,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">17 篇</strong>
+    <strong class="dpr-home-dashboard-count">18 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction">The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction</span></li><li><span class="dpr-home-dashboard-paper-title" title="WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning">WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Triplet2Track: A Hierarchical System with Object-Centric Representations for Reliable Long-Horizon Manipulation">Triplet2Track: A Hierarchical System with Object-Centric Representations for Reliable Long-Horizon Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DreamMimic: Learning Visuomotor Whole-Body Loco-Manipulation via World Model">DreamMimic: Learning Visuomotor Whole-Body Loco-Manipulation via World Model</span></li><li><span class="dpr-home-dashboard-paper-title" title="The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction">The Imitator Game: Benchmarking Robot Imitative Ability Beyond Action Prediction</span></li><li><span class="dpr-home-dashboard-paper-title" title="Robust Bimanual Vision-Language-Action Models via Embarrassingly Simple Modality Masking">Robust Bimanual Vision-Language-Action Models via Embarrassingly Simple Modality Masking</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>18</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -104,7 +116,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="CounterAlign: Counterfactual Supervision for Vision-Language-Action Models">CounterAlign: Counterfactual Supervision for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="DELE-w0.5: Inferring Action from Future Latent State for Robotic Manipulation">DELE-w0.5: Inferring Action from Future Latent State for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="On the Capability Separation Between World-Model Policy Learning and Imitated World-Action Models">On the Capability Separation Between World-Model Policy Learning and Imitated World-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="InstructMove: A Text-Indispensable Benchmark for Instruction-Following Manipulation">InstructMove: A Text-Indispensable Benchmark for Instruction-Following Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Act with Intent: Distilling Behavior Intent for Vision-Language-Action Models">Act with Intent: Distilling Behavior Intent for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="GlanceWAM: Sparse Test-Time Imagination for World-Action Models">GlanceWAM: Sparse Test-Time Imagination for World-Action Models</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>

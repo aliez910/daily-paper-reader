@@ -1,0 +1,1278 @@
+InstructMove: A Text-Indispensable Benchmark
+for Instruction-Following Manipulation
+Mengao Zhao1,*
+Ziang Li1,*
+Chaodong Huang1,*
+Mengchen Ma3,1,*
+Haoyi Jiang4
+Yiwei Jin1
+Xinjie Wang1
+Yun Du1
+Xuewu Lin1
+Taojun Ding1
+Hongyu Xie1
+Jackson Jiang2
+Chunlei Yu2
+Kaihua Zhang3
+Lichao Huang1
+Liu Liu1
+Tianwei Lin1
+Zhizhong Su1,B
+1Horizon Robotics
+2WuwenAI
+3Southeast University
+4Huazhong University of Science and Technology
+*Equal contribution
+B Correspondence: Zhizhong Su at zhizhong.su@horizon.auto
+Abstract. Vision-language-action (VLA) models have made general-purpose robot manipulation increas-
+ingly plausible by conditioning robot actions on natural-language instructions. A key test of such generality is
+whether policies actually follow language instructions. Yet many manipulation benchmarks leave this ability
+underdetermined: the intended object or destination is often visually salient or uniquely feasible, allowing
+policies to succeed without grounding the instruction. We argue that instruction-following evaluation should
+be text-indispensable: multiple actions should be visually and physically plausible, while only one should
+be consistent with the language instruction. We introduce InstructMove, a text-indispensable benchmark
+for instruction-following manipulation. InstructMove instantiates this principle in pick-and-place scenes with
+semantic distractors, decomposing instruction following into category identification, attribute discrimination,
+spatial reasoning, and compositional pick-and-place. InstructMove supports a train-eval protocol with In-
+structMove training data and held-out evaluation tasks, with additional diagnostics for language dependence.
+Experiments with representative VLA policies show that InstructMove provides a controlled testbed for diag-
+nosing visual shortcuts and that InstructMove simulation data can improve real-world instruction-following
+manipulation performance.
+Code: https://github.com/HorizonRobotics/RoboOrchardSim
+Keywords: Robot Manipulation, Instruction Following, Simulation Benchmark
+Figure 1: InstructMove is a text-indispensable benchmark for instruction-following manipula-
+tion. When a scene makes the target obvious, the correct pick-and-place action can be inferred from vision
+alone, reducing the instruction to a task identifier. InstructMove instead introduces semantic distractors—
+objects and destinations that are visually plausible and physically feasible, yet are disambiguated by the
+instruction—making language necessary for action selection.
+1
+arXiv:2608.22990v1  [cs.RO]  24 Aug 2026
+
+
+1
+Introduction
+A central promise of vision-language-action (VLA) models is that natural-language instructions can deter-
+mine which action a robot selects in a given scene [1, 2, 3]. For this promise to hold, different instructions
+should lead to different action choices within the same visual context—language must be functionally nec-
+essary, not merely descriptive. Recent benchmarks have advanced evaluation across diverse settings such as
+bimanual coordination, long-horizon planning, and sim-to-real transfer [4, 5, 6, 7, 8]. However, many eval-
+uation scenes contain only one semantically plausible target object or placement destination. In such cases,
+the correct action can often be inferred from vision alone, and such visual shortcuts reduce the instruction
+to an auxiliary task identifier rather than a necessary grounding signal (Figure 1).
+We argue that instruction-following evaluation should be text-indispensable: an episode should contain
+multiple visually plausible and physically feasible candidate actions, while only one is uniquely consistent
+with the language instruction. This design makes text a necessary variable for action selection rather than
+optional context. It also makes visual shortcuts easier to expose: because multiple actions are physically
+plausible, a policy that ignores language can still accumulate non-trivial aggregate success by acting on visual
+saliency alone, yet stage-wise attribution keeps failures interpretable—e.g., reaching a distractor indicates
+an instruction-grounding error rather than merely a failed grasp or placement.
+We introduce InstructMove, a text-indispensable benchmark for instruction-following manipulation. In-
+structMove focuses on pick-and-place because this action family provides a controlled evaluation scope while
+retaining the core language-grounding problem: deciding what to pick and where to place it. The bench-
+mark makes text indispensable through semantic distractors—objects or destinations that are plausible and
+manipulable but inconsistent with the instruction. It decomposes instruction following into four complemen-
+tary capabilities: category identification among cross-category distractors, attribute discrimination among
+same-category objects, spatial reasoning with respect to a reference object, and compositional pick-and-place
+when both the picked object and the placement destination are ambiguous.
+To support controlled and reproducible evaluation, InstructMove is built on a dedicated data infrastruc-
+ture comprising curated open assets with verified attribute annotations, a constraint-based layout engine
+that enforces relation consistency and target uniqueness, and a scalable demonstration synthesis pipeline
+with stage labels for reach, lift, and place events. Policies are trained on demonstrations generated by this
+infrastructure and evaluated on held-out tasks that test generalization across layouts, object instances, at-
+tributes, and categories. The benchmark further includes language-dependence diagnostics for measuring
+whether policy behavior genuinely relies on the provided instruction.
+This paper makes the following contributions.
+• We propose a text-indispensable benchmark for instruction-following manipulation, in which semantic
+distractors make language-dependent action selection necessary.
+• We define a systematic task taxonomy covering category identification, attribute discrimination, spatial
+reasoning, and compositional pick-and-place.
+• We build a scalable data infrastructure with human-curated EmbodiedGen assets [9] verified for represen-
+tativeness, VLM-assisted attribute annotation, and constraint-based layout synthesis.
+• We provide a train-eval protocol with stage-wise metrics and language-dependence diagnostics for evalu-
+ating VLA policies.
+2
+Related Work
+Manipulation benchmarks and the missing axis.
+Language-conditioned manipulation benchmarks
+are now standard testbeds for robot policies. RLBench offers a large simulated suite with motion-planner
+demonstrations [10]; CALVIN emphasizes long-horizon language-conditioned control [5]; VIMA uses multi-
+modal prompts and large-scale procedural tabletop tasks [11]; and LIBERO studies knowledge transfer and
+lifelong learning across language-conditioned suites [4]. Recent benchmarks extend this scope: VLABench
+adds long-horizon tasks involving world knowledge, spatial relations, and vision-language-action evalua-
+tion [6]; SimplerEnv provides scalable simulated evaluation aligned with real-world policy performance [8];
+2
+
+
+Table 1: Comparison of representative manipulation and spatial vision-language benchmarks. ✓denotes
+an explicit design goal, ▲denotes partial or indirect support, and ✗denotes that the dimension is not
+a primary focus. “ZS eval.” denotes zero-shot policy evaluation and “Diag.” denotes diagnostic evaluation.
+Spatial VL summarizes non-closed-loop spatial vision-language resources such as EmbSpatial-Bench and Ro-
+boSpatial. Unlike prior benchmarks, InstructMove evaluates whether language is indispensable for selecting
+the correct executable action among multiple visually plausible alternatives.
+Dimension
+RLBench
+CALVIN
+VIMA
+LIBERO
+VLABench
+SimplerEnv
+SimplerEnv-
+Instruct
+RoboTwin
+LIBERO-CF
+Spatial
+VL
+InstructMove
+Visual & Policy Setting
+Visual realism
+✗
+✗
+✗
+✗
+▲
+▲
+▲
+▲
+✗
+▲
+▲
+Language-conditioned manipulation
+▲
+✓
+✓
+✓
+✓
+✓
+✓
+▲
+✓
+✗
+✓
+Protocol
+Train
+eval.
+Train
+eval.
+Train
+eval.
+Train
+eval.
+Train
+eval.
+ZS
+eval.
+ZS
+eval.
+Train
+eval.
+Diag.
+QA
+Train
+eval.
+Grounding & Distractor Design
+Semantic distractors
+✗
+✗
+▲
+▲
+▲
+▲
+▲
+▲
+▲
+✗
+✓
+Spatial distractors
+✗
+✗
+▲
+▲
+▲
+✗
+▲
+▲
+▲
+✓
+✓
+Pick-place disambiguation
+▲
+▲
+▲
+▲
+✓
+▲
+▲
+▲
+▲
+✗
+✓
+Feasible alternative actions
+✗
+✗
+▲
+▲
+▲
+▲
+▲
+▲
+▲
+✗
+✓
+Language-Indispensability
+Same-scene counterfactual instructions
+✗
+✗
+✗
+✗
+✗
+✗
+✗
+✗
+✓
+✗
+✓
+Text-indispensable episodes
+✗
+✗
+✗
+✗
+✗
+✗
+▲
+✗
+▲
+✗
+✓
+Language-dependent diagnostics
+✗
+✗
+✗
+✗
+▲
+▲
+▲
+▲
+✓
+✗
+✓
+SimplerEnv-Instruct targets instruction-level understanding and grounding [12]; and RoboTwin scales data
+generation and evaluation for bimanual manipulation [13]. These benchmarks support studies of task diver-
+sity, generalization, long-horizon execution, and sim-to-real transfer. However, as summarized in Table 1,
+they do not primarily construct episodes where language is indispensable for choosing among multiple visu-
+ally and physically plausible alternatives, even when scenes are populated with furniture and object distrac-
+tors [14]. LIBERO-CF highlights this gap by showing that strong vision-language-action policies may follow
+vision-induced priors under counterfactual instructions instead of grounding the provided language [15]. In
+contrast, InstructMove builds this axis into the benchmark: each episode contains multiple feasible candidate
+actions, and the instruction uniquely determines the correct object or destination.
+Vision-Language-Action grounding and diagnostics.
+Recent VLA policies increasingly frame in-
+struction following as grounding, not aggregate task success. Several methods preserve instruction content
+during action generation, add object-level supervision, or use explicit grounding intermediates such as boxes,
+points, masks, or spatial priors before action decoding [12, 16, 17, 18, 19]. Spatial reasoning resources such
+as EmbSpatial-Bench and RoboSpatial evaluate spatial understanding for large vision-language models, but
+they are not closed-loop manipulation benchmarks where spatial phrases directly determine robot behav-
+ior [20, 21].
+As a result, object semantics, spatial relations, and control failures are often conflated: a
+policy may succeed because the target is visually obvious, or fail because of grasping rather than language
+grounding. InstructMove turns this ambiguity into benchmark structure. It tests category grounding with
+cross-category distractors, attribute grounding within same-category sets, spatial grounding through relation-
+consistent layouts, and compositional pick-and-place through joint object and destination disambiguation.
+With same-scene counterfactual instructions and stage-wise metrics, InstructMove evaluates whether a policy
+relies on language and whether failures stem from grounding or low-level control.
+3
+InstructMove Benchmark Design
+InstructMove turns text-indispensable instruction following into a controlled semantic-spatial pick-and-place
+benchmark. Each episode contains multiple feasible candidate goals, while the language instruction uniquely
+specifies the correct object or destination. This section formalizes the episode objective, describes the pipeline
+for instantiating text-indispensable scenes and demonstrations, defines the capability suites, and introduces
+the train-eval protocol with stage-wise metrics.
+3
+
+
+(c) Expert Trajectory
+(a) Asset Library
+(b) Task and Layout
+Diverse objects with rich
+categories, attributes and geometries.
+Motion generation with consistent 
+Pick, Move, and Place stages.
+Four task types across diverse layouts and scenes
+Layout example
+Pick Attribute
+(e.g. Grasp the pink game controller.)
+Pick Category
+(e.g. Pick the coke can)
+Compositional Pick-Place
+(e.g. Put the hand soap into the blue bowl.)
+Spatial Pick
+(e.g. Pick the milk carton left of the carrot.)
+Compositional 
+Pick-Place
+PiperX
+Franka
+0
+20
+40
+60
+80
+100
+Number of Trajectories
+Pick Category
+100
+Pick Attribute
+100
+100
+Compositional 
+Pick-Place
+100
+Spatial Pick
+100
+PiperX
+Franka
+Data Synthesis Efficiency
+70%
+Robots:
+2
+Tasks:
+5
+Trajectories per Task:
+100
+Total Trajectories:
+500
+3,253
+ASSETS
+7
+DOMAINS
+18
+SUPER CAT.
+106
+CAT.
+DOMAIN
+25.7%
+23.7%
+16.4%
+13.3%
+Kitchen 836
+Desktop 770
+Bathroom 532
+Bedroom 434
+Tools 281
+Food 234
+Living Room 166
+SUPER-CATEGORY
+COLOR = DOMAIN · STACKED = CROSS-DOMAIN
+Storage
+527
+Personal Care
+360
+Office Stationery
+340
+Repair Tools
+281
+Tableware
+252
+Office Tools
+238
+Bath Products
+213
+Ware
+175
+Ornaments
+166
+Electronic Accessories
+162
+Cutting Tools
+110
+Utensils
+84
+Small Electronics
+81
+...
+...
+...
+Figure 2: Overview of the InstructMove benchmark instantiation pipeline. The benchmark is built through
+three aligned components: a validated asset library, task templates with constraint-based scene/layout gen-
+eration across four task families, and expert trajectory synthesis for generating training demonstrations.
+3.1
+Problem Formulation
+We formulate instruction-following manipulation as language-conditioned control. At each timestep, a policy
+πθ receives an instruction ℓand observations ot, and produces actions
+at ∼πθ(at | o≤t, ℓ)
+(1)
+over a finite horizon T. The episode succeeds only if the resulting trajectory completes the goal specified by
+ℓ. Each episode is defined by a tuple
+e = (s0, O, D, ℓ, g⋆, G),
+(2)
+where s0 denotes the initial state, O the manipulable objects, D the placement destinations when applicable,
+ℓthe instruction, g⋆the instruction-consistent goal, and G the set of plausible candidate goals. For pick-
+only tasks, goals specify the lifted object; for pick-and-place, they also specify the destination. Formally,
+text-indispensability requires
+|G| ≥2,
+g⋆∈G,
+only g⋆matches ℓ.
+(3)
+Thus, each scene contains multiple physically actionable candidate goals, but only one is instruction-
+consistent, so visual feasibility alone cannot identify the target.
+Semantic or spatial distractors expose
+grounding failures when the policy reaches an instruction-inconsistent candidate, while failed grasping, lift-
+ing, or placement after reaching the correct target indicates control failure.
+Accordingly, InstructMove
+reports both final success and instruction-conditioned stage-wise metrics.
+3.2
+Benchmark Instantiation Pipeline
+All simulated benchmark environments are developed using NVIDIA Isaac Lab [22] and NVIDIA Isaac
+Sim [23]. As shown in Figure 2, InstructMove instantiates text-indispensable instruction-following manip-
+ulation data through three aligned components: an asset library, a task-and-layout library, and an expert
+trajectory dataset. The asset library provides the semantic and physical basis for task construction, built
+4
+
+
+from a curated collection of 3,253 objects from which InstructMove selects 1,757 for benchmark instantiation;
+these objects span diverse household categories, attributes, and geometric variation, enabling instructions to
+refer to targets through category-, attribute-, and relation-relevant cues, and the library remains extensible
+for constructing new benchmark instances or expanding the object pool under the same semantic-spatial
+pipeline. Built on top of these assets, the task-and-layout library defines the benchmark episodes across
+four task families—category grounding, attribute grounding, spatial grounding, and compositional pick-
+and-place—instantiating scenes with diverse object layouts and environment variations such that multiple
+candidate objects or goals remain physically plausible, while only one is consistent with the instruction.
+From these instantiated scenes, InstructMove further constructs an expert trajectory dataset with con-
+sistent manipulation stages, connecting language instructions, scene configurations, and robot actions into
+executable pick-and-place trajectories that supervise policy training and provide a unified basis for eval-
+uation. Together, the three components align benchmark construction, data generation, and downstream
+evaluation within a shared semantic-spatial setting.
+3.3
+Capability Axes and Task Suites
+InstructMove evaluates semantic-spatial grounding under controlled ambiguity. Its four task families test
+category-level object selection, attribute discrimination, spatial relation understanding, and compositional
+pick-and-place reasoning. Each family uses a different instruction cue to refer to the target, such as category,
+attribute, spatial relation, or placement destination.
+Distractors are constructed around the same cue,
+making unrelated shortcuts unreliable.
+Pick Category evaluates whether a policy can identify the object category. Each scene contains one
+target object and five cross-category distractors, and the policy must reach, grasp, and lift the instructed
+category. Instructions follow templates such as “grasp the {object description}.” Evaluation spans three
+splits: seen, in which categories and assets appear during training but test seeds are held out; unseen-category,
+in which both target and distractor categories are held out; and unseen-instance, in which categories are
+seen but specific object instances are held out.
+Pick Attribute evaluates attribute grounding within an object category.
+Each scene contains one
+target and two same-category distractors that differ in attributes such as color, size, shape, or material.
+Instructions follow templates such as “lift the {object attribute} {object category}.” Because all candidates
+share a category, the policy must ground the attribute phrase rather than rely on object-type recognition.
+Pick Spatial evaluates relational grounding. Each scene contains a reference object, a target object,
+and a same-category distractor. The target and distractor belong to the same object category, preventing
+category identity from revealing the target and requiring the policy to resolve the spatial relation rather
+than exploit an object-type shortcut.
+The spatial-relation vocabulary includes left of, right of, in front
+of, behind, near, and far from, all defined with respect to the robot-centric reference frame (i.e., from the
+robot’s perspective). Instructions follow templates such as “pick the {object category} {spatial relation}
+the {reference category}.” Layouts are generated so that exactly one candidate satisfies the specified spatial
+relation.
+Compositional Pick-Place evaluates instruction grounding across a pick-and-place sequence. Each
+scene contains multiple plausible pick objects and placement goals, creating ambiguity over what to pick and
+where to place it. Instructions follow templates such as “pick up the {pick object description} and place
+it to {place object description}.” This setting tests whether a policy can compose object selection, spatial
+destination grounding, and multi-stage control into a single language-conditioned manipulation behavior.
+3.4
+Evaluation Protocol and Stage Metrics
+InstructMove supports a train-eval protocol over the four task families. In each instantiated robot setting,
+policies are trained on demonstrations generated by InstructMove and evaluated on held-out tasks covered
+by the corresponding training mixture. This protocol measures instruction-following manipulation under
+controlled generalization across unseen scene configurations, object instances, attributes, and categories.
+Final success can conflate language grounding with low-level control. InstructMove therefore reports stage
+metrics conditioned on instruction-consistent targets. For pick-only tasks, the score is
+Spick = 0.5 · I[Reach] + 0.5 · I[Lift],
+(4)
+5
+
+
+where Reach indicates that the end-effector comes within a predefined distance of the instruction-consistent
+target, primarily evaluating visual grounding, while Lift indicates that the target is successfully grasped and
+raised, primarily evaluating manipulation control. For compositional pick-and-place, the score is
+Spnp = 0.25 · I[ReachPick] + 0.25 · I[LiftPick] + 0.25 · I[ReachPlace] + 0.25 · I[Place].
+(5)
+ReachPick and LiftPick follow the Reach and Lift definitions for the instructed object, while ReachPlace and
+Place measure approaching and completing the instruction-consistent placement, respectively. These staged
+scores localize failures: reaching a distractor indicates an instruction-grounding failure, while reaching the
+correct target but failing to lift or place reveals a control failure.
+4
+Experiments
+4.1
+Experimental Setup
+Models and task coverage.
+We evaluate four representative policies, π0 [24], π0.5 [16], GR00T N1.7 [25],
+and Motus [26], under the train-eval protocol. Training is performed in a robot-specific multi-task setting:
+dual-arm PiperX policies are trained on pick category, pick attribute, and place a2b, whereas single-
+arm Franka policies are trained on pick spatial and place a2b. Additional training recipes and failure-case
+analyses are provided in the supplementary material.
+Training protocol.
+All models are fine-tuned for 5,000 steps on eight NVIDIA RTX 5090 GPUs. We
+follow the recommended settings of the corresponding official implementations, with embodiment-specific
+adaptations where necessary. Because the policies differ in model capacity and trainable parameter scope,
+we use model-specific batch sizes. Full optimization settings and batch-size configurations are provided in
+the supplementary material.
+Data scale and evaluation splits.
+Each task dataset contains 100 training episodes. We intentionally use
+compact training sets for limited post-training, enabling adaptation to the benchmark domain while retaining
+the capabilities of the original pretrained model. Training episodes are balanced within each task so that
+object instances appear approximately uniformly. Each reported metric in Table 2 and Table 3 is evaluated
+over 100 held-out episodes, with evaluation objects balanced in the same manner.
+For pick category,
+we report three splits: seen, which holds out layouts and distractors while reusing training categories;
+unseen-instance, which evaluates novel object instances from categories observed during training; and unseen-
+category, which evaluates target categories excluded from training.
+4.2
+Train-Eval Main Evaluation
+Table 2 reports the main train-eval results for the four policies, and Table 3 separately reports the held-out in-
+stance and held-out category splits for pick-category generalization. The qualitative examples in Figure 3(A)
+illustrate the corresponding outcomes. Benchmark stability tests show that repeated evaluations vary by
+no more than five percentage points, supporting the reliability of the model comparisons and performance
+trends reported below.
+Table 2 shows that π0.5 has the strongest target-localization ability in the semantic pick tasks. It achieves
+the highest Reach on both pick category and pick attribute, indicating better grounding of category and
+attribute instructions. GR00T N1.7 follows in Reach performance on these tasks, while π0.5 also performs
+most robustly on compositional place a2b. π0 and Motus show moderate Reach performance.
+The gap between Reach and Lift further reveals differences in converting correct target localization into
+successful manipulation.
+π0.5 maintains substantially higher Lift rates once the target is reached, while
+GR00T N1.7 reaches the instruction-consistent target relatively often but rarely completes the lift. In the
+Franka setting, π0.5, GR00T N1.7, and Motus obtain comparable Reach rates on pick spatial, highlighting
+spatial-relation grounding as a central bottleneck.
+Table 3 shows that π0.5 remains close to its seen-split performance on both the unseen-instance and
+unseen-category splits, indicating strong generalization in category grounding. GR00T N1.7 also maintains
+6
+
+
+Table 2:
+Main train-eval results after robot-specific multi-task training.
+The pick category and
+pick attribute tasks are evaluated on PiperX, and pick spatial and place a2b are evaluated on Franka.
+Pick-only entries are reported as Reach/Lift (Spick), and pick-and-place entries as ReachPick/LiftPick/Reach-
+Place/Place (Spnp); red values in parentheses denote the stage score.
+Model
+pick category
+Seen
+pick attribute
+pick spatial
+place a2b
+PiperX
+Franka
+π0
+0.34/0.04(0.19)
+0.44/0.05(0.24)
+0.36/0.02(0.19)
+0.64/0.07/0.05/0.03(0.19)
+π0.5
+0.82/0.57(0.69)
+0.81/0.62(0.71)
+0.46/0.15(0.30)
+0.88/0.48/0.37/0.36(0.52)
+GR00T N1.7
+0.76/0.17(0.47)
+0.76/0.07(0.41)
+0.50/0.01(0.25)
+0.60/0.06/0.05/0.05(0.19)
+Motus
+0.41/0.10(0.26)
+0.69/0.17(0.43)
+0.51/0.02(0.26)
+0.57/0.02/0.02/0.01(0.16)
+Table 3: Pick-category generalization results on PiperX for held-out instances and categories. Entries are
+reported as Reach/Lift (Spick); red values in parentheses denote the stage score.
+Model
+Unseen Inst.
+Unseen Cat.
+π0
+0.32/0.05(0.18)
+0.34/0.05(0.19)
+π0.5
+0.74/0.48(0.61)
+0.81/0.54(0.67)
+GR00T N1.7
+0.70/0.09(0.40)
+0.67/0.18(0.43)
+Motus
+0.45/0.06(0.26)
+0.63/0.09(0.36)
+relatively high Reach on both unseen splits, but its substantially lower Lift suggests weaker execution after
+correct target localization.
+These results suggest that policies can generalize beyond memorized object
+instances and categories, although reliably converting target localization into successful manipulation remains
+challenging.
+4.3
+Counterfactual Language-Dependence Diagnostic
+We conduct a counterfactual analysis by keeping the scene fixed and changing only the instruction. We
+use the π0.5 results on the pick category unseen-instance split as the baseline to examine how instruction
+changes affect target selection and grasp initiation. We consider five conditions. Normal uses the original
+instruction, while Alternative target replaces the target description with another visible object and treats
+that object as the instruction-consistent target. The remaining conditions do not provide a unique valid
+target: Generic object uses the underspecified description “object,” Empty removes the instruction, and
+Absent object names an object not present in the scene. For the first two conditions, we report target-
+conditioned Reach and Lift. For the other conditions, we report whether the policy reaches or lifts any
+object.
+Table 4: Counterfactual instruction-ablation results for π0.5 over 100 fixed pick category unseen-instance
+scenes, with each scene evaluated under every instruction condition. For target-specific instructions, entries
+are reported as Reach/Lift (Spick); red values in parentheses denote the stage score. For instructions without
+a unique valid target, we report whether the policy reaches or lifts any object.
+Instruction condition
+Target Reach/Lift (Spick)
+Any-object Reach
+Any-object Lift
+Normal
+0.74/0.48(0.61)
+–
+–
+Alternative target
+0.72/0.53(0.62)
+–
+–
+Generic object
+–
+1.00
+0.66
+Empty
+–
+1.00
+0.64
+Absent object
+–
+0.99
+0.66
+As shown in Table 4, replacing the original target with another visible object yields 0.72 Target Reach
+7
+
+
+Figure 3: Qualitative examples in simulated and real evaluation cases.
+and 0.53 Target Lift, compared with 0.74 and 0.48 under the normal instruction. This result shows that the
+policy can use a valid language description to locate a new instruction-consistent target. However, under
+the generic, empty, and absent-target conditions, the policy obtains Any-object Reach rates of 0.99–1.00
+and Any-object Lift rates of 0.64–0.66. These conditions run for the full evaluation horizon, whereas target-
+specific episodes may terminate after a successful target lift, so the any-object and target-conditioned lift
+rates are not directly comparable. Nevertheless, the policy frequently executes a generic grasp without a
+valid target, indicating that language can redirect target selection but does not fully gate whether a grasp
+is initiated and revealing a strong grasping prior consistent with a visual shortcut.
+These results also demonstrate why InstructMove requires text-indispensable scenes and instruction-
+conditioned metrics. When the intended object or destination is visually salient or uniquely feasible, the
+policy may select the same action regardless of whether it receives a target-specific, generic, empty, or absent-
+target instruction. Consequently, physically successful manipulation in such scenes does not reveal whether
+the policy actually responds to the instruction, and actions under instructions without a valid target should
+not count as success.
+4.4
+Real-World Transfer with Simulation Data
+Setup.
+We design this experiment to assess whether InstructMove simulation data transfers effectively and
+improves real-world manipulation performance. To isolate the effect of training data, the simulated setup
+mirrors the real system in robot embodiment, camera models, and mounting configuration: a dual-arm
+PiperX with one overhead Intel RealSense D455 and two wrist-mounted Intel RealSense D405 cameras.
+We select five real-world object instances as evaluation targets and collect 200 real-world demonstrations
+with these same instances through ALOHA-style homologous teleoperation [27]. Leveraging our large, cu-
+rated asset library and scalable data-synthesis pipeline, we synthesize demonstrations for the same five object
+categories using a broader range of virtual object instances, providing greater intra-category diversity. We
+additionally apply domain randomization over lighting, tabletop textures, and robot initial poses to mitigate
+the sim-to-real gap. We fine-tune the same pretrained π0.5 checkpoint using an identical training recipe and
+evaluate the resulting policies under the same real-world protocol. For the mixed-data configuration, each
+8
+
+
+Table 5: Real-world Pick Category transfer with π0.5 on the dual-arm PiperX. The evaluation contains 50
+trials across five target objects, with at least 5 visually or semantically similar distractors per trial.
+Training set
+Reach
+Lift
+200 real
+19/50
+11/50
+200 sim
+26/50
+11/50
+2,000 sim
+28/50
+15/50
+2,000 sim + 200 real
+34/50
+18/50
+training batch samples simulation and real-world demonstrations at a 9:1 ratio. Each target is evaluated
+in 10 trials, yielding 50 real-world episodes. Each trial includes several graspable distractors selected to be
+visually or semantically similar, preventing the target from being identified through visual saliency alone.
+Results.
+As shown in Table 5, at the same data scale, the 200-sim policy improves Reach from 19/50 to
+26/50 over the 200-real policy while matching its Lift at 11/50. This result suggests that the greater intra-
+category instance and appearance diversity of the simulation demonstrations benefits instruction-conditioned
+target grounding among similar distractors. Scaling the simulation data from 200 to 2,000 demonstrations
+yields further gains, increasing Reach from 26/50 to 28/50 and Lift from 11/50 to 15/50.
+Combining 2,000 simulation demonstrations with 200 real-world demonstrations achieves the best per-
+formance, reaching 34/50 in Reach and 18/50 in Lift. Compared with simulation-only training at the same
+simulation scale, the real-world demonstrations provide complementary signals for visual and physical varia-
+tions not fully captured in simulation. Overall, these results show that scalable simulation data can improve
+real-world manipulation performance, while a small amount of real-world data further strengthens trans-
+fer and reduces reliance on large-scale real-robot data collection. The qualitative examples in Figure 3(B)
+illustrate the corresponding real-world execution stages.
+5
+Limitations
+InstructMove deliberately focuses on language-grounded pick-and-place, which enables tight control over
+visual ambiguity, object attributes, spatial relations, and placement distractors. This focused scope does not
+cover longer-horizon tasks, articulated-object interaction, or manipulation in richer, less structured environ-
+ments. Results should therefore be interpreted as a diagnostic of language-grounded target selection and
+compositional pick-and-place, rather than as a comprehensive evaluation of general-purpose manipulation.
+Future versions will extend the benchmark to broader task families while preserving its core principle of
+controlled, text-indispensable evaluation.
+The benchmark also relies on synthetic assets and simulated layouts, which can introduce a domain
+gap relative to real deployment. We mitigate this through asset quality control, domain randomization,
+and real-data mixing, and our real-world experiments show that training on InstructMove simulation data
+can transfer to and improve real-world manipulation performance. However, the current experiments do
+not establish whether model rankings or absolute evaluation scores in simulation correlate with real-world
+performance. Future versions will expand paired simulation and real-world evaluations across models, tasks,
+and embodiments, with the goal of making the simulation metrics more predictive of real-world performance.
+These results demonstrate the utility of simulation training data but do not yet establish simulated evaluation
+as a reliable proxy for real-world performance.
+The current train-eval protocol fine-tunes and evaluates policies on the same task families, although
+the evaluation episodes use held-out layouts, object instances, and categories. While this protocol measures
+adaptation to the benchmark tasks, task-specific fine-tuning may encourage overfitting or degrade pretrained
+capabilities, making it difficult to separate general instruction-following ability from adaptation to the task
+templates. An alternative is to provide task-agnostic training data that exposes policies to the visual and
+physical characteristics of the simulator without using the benchmark task definitions. Future work will com-
+pare these protocols to determine whether domain-only adaptation can better preserve pretrained capabilities
+while still supporting reliable evaluation in simulation.
+9
+
+
+6
+Conclusion
+We presented InstructMove, a benchmark for evaluating language-grounded pick-and-place under semantic
+distractors. It constructs semantically dense scenes where the correct target cannot be inferred from vision
+alone, decomposes the problem into four complementary task families, and reports stage metrics separating
+semantic grounding from control execution. The benchmark helps the community diagnose visual shortcuts
+in VLA policies and develop models that act more reliably on language. Future versions can extend this
+design to longer-horizon tasks, articulated objects, and richer scenes while preserving the text-indispensability
+principle that behavior must be grounded in the instruction.
+10
+
+
+References
+[1] Brianna Zitkovich, Tianhe Yu, Sichun Xu, Peng Xu, Ted Xiao, Fei Xia, Jialin Wu, Paul Wohlhart,
+Stefan Welker, Ayzaan Wahid, Quan Vuong, Vincent Vanhoucke, Huong Tran, Radu Soricut, Anikait
+Singh, Jaspiar Singh, Pierre Sermanet, Pannag R. Sanketi, Grecia Salazar, Michael S. Ryoo, Krista Rey-
+mann, Kanishka Rao, Karl Pertsch, Igor Mordatch, Henryk Michalewski, Yao Lu, Sergey Levine, Lisa
+Lee, Tsang-Wei Edward Lee, Isabel Leal, Yuheng Kuang, Dmitry Kalashnikov, Ryan Julian, Nikhil J.
+Joshi, Alex Irpan, Brian Ichter, Jasmine Hsu, Alexander Herzog, Karol Hausman, Keerthana Gopalakr-
+ishnan, Chuyuan Fu, Pete Florence, Chelsea Finn, Kumar Avinava Dubey, Danny Driess, Tianli Ding,
+Krzysztof Marcin Choromanski, Xi Chen, Yevgen Chebotar, Justice Carbajal, Noah Brown, Anthony
+Brohan, Montserrat Gonzalez Arenas, and Kehang Han. RT-2: Vision-language-action models transfer
+web knowledge to robotic control. In Proceedings of The 7th Conference on Robot Learning, volume 229
+of Proceedings of Machine Learning Research, pages 2165–2183. PMLR, 2023.
+[2] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael
+Rafailov, Ethan P. Foster, Pannag R. Sanketi, Quan Vuong, Thomas Kollar, Benjamin Burchfiel, Russ
+Tedrake, Dorsa Sadigh, Sergey Levine, Percy Liang, and Chelsea Finn. OpenVLA: An open-source
+vision-language-action model. In Proceedings of The 8th Conference on Robot Learning, volume 270 of
+Proceedings of Machine Learning Research, pages 2679–2713. PMLR, 2025.
+[3] Octo Model Team, Dibya Ghosh, Homer Walke, Karl Pertsch, Kevin Black, Oier Mees, Sudeep Dasari,
+Joey Hejna, Tobias Kreiman, Charles Xu, Jianlan Luo, You Liang Tan, Lawrence Yunliang Chen,
+Pannag Sanketi, Quan Vuong, Ted Xiao, Dorsa Sadigh, Chelsea Finn, and Sergey Levine. Octo: An
+open-source generalist robot policy. arXiv preprint arXiv:2405.12213, 2024.
+[4] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu, Yuke Zhu, and Peter Stone. LIBERO:
+Benchmarking knowledge transfer for lifelong robot learning. In Advances in Neural Information Pro-
+cessing Systems, volume 36, 2023.
+[5] Oier Mees, Lukas Hermann, Erick Rosete-Beas, and Wolfram Burgard. CALVIN: A benchmark for
+language-conditioned policy learning for long-horizon robot manipulation tasks. IEEE Robotics and
+Automation Letters, 7(3):7327–7334, 2022.
+[6] Shiduo Zhang, Zhe Xu, Peiju Liu, Xiaopeng Yu, Yuan Li, Qinghui Gao, Zhaoye Fei, Zhangyue Yin,
+Zuxuan Wu, Yu-Gang Jiang, and Xipeng Qiu.
+VLABench: A large-scale benchmark for language-
+conditioned robotics manipulation with long-horizon reasoning tasks. arXiv preprint arXiv:2412.18194,
+2024.
+[7] Yao Mu, Tianxing Chen, Shijia Peng, Zanxin Chen, Zeyu Gao, Yude Zou, Lunkai Lin, Zhiqiang Xie,
+and Ping Luo. Robotwin: Dual-arm robot benchmark with generative digital twins. arXiv preprint
+arXiv:2409.02920, 2024.
+[8] Xuanlin Li, Kyle Hsu, Jiayuan Gu, Karl Pertsch, Oier Mees, Homer Rich Walke, Chuyuan Fu, Ishikaa
+Lunawat, Isabel Sieh, Sean Kirmani, Sergey Levine, Jiajun Wu, Chelsea Finn, Hao Su, Quan Vuong,
+and Ted Xiao. Simplerenv: Evaluating real-world robot manipulation policies in simulation. arXiv
+preprint arXiv:2405.05941, 2024.
+[9] Xinjie Wang, Liu Liu, Yu Cao, Ruiqi Wu, Wenkang Qin, Dehui Wang, Wei Sui, and Zhizhong Su.
+Embodiedgen: Towards a generative 3d world engine for embodied intelligence, 2025. URL https:
+//arxiv.org/abs/2506.10600.
+[10] Stephen James, Zicong Ma, David Rovick Arrojo, and Andrew J. Davison. RLBench: The robot learning
+benchmark & learning environment. IEEE Robotics and Automation Letters, 5(2):3019–3026, 2020.
+[11] Yunfan Jiang, Agrim Gupta, Zichen Zhang, Guanzhi Wang, Yongqiang Dou, Yanjun Chen, Li Fei-Fei,
+Anima Anandkumar, Yuke Zhu, and Linxi Fan. VIMA: Robot manipulation with multimodal prompts.
+In Proceedings of the 40th International Conference on Machine Learning, volume 202 of Proceedings of
+Machine Learning Research, pages 14975–15022. PMLR, 2023.
+11
+
+
+[12] Shuai Yang, Hao Li, Bin Wang, Yilun Chen, Yang Tian, Tai Wang, Hanqing Wang, Feng Zhao, Yiyi
+Liao, and Jiangmiao Pang. InstructVLA: Vision-language-action instruction tuning from understanding
+to manipulation. arXiv preprint arXiv:2507.17520, 2025.
+[13] Tianxing Chen, Zanxin Chen, Baijun Chen, Zijian Cai, Yibin Liu, Zixuan Li, Qiwei Liang, Xianliang
+Lin, Yiheng Ge, Zhenyu Gu, Weiliang Deng, Yubin Guo, Tian Nian, Xuanbing Xie, Qiangyu Chen,
+Kailun Su, Tianling Xu, Guodong Liu, Mengkang Hu, Huan-ang Gao, Kaixuan Wang, Zhixuan Liang,
+Yusen Qin, Xiaokang Yang, Ping Luo, and Yao Mu. RoboTwin 2.0: A scalable data generator and
+benchmark with strong domain randomization for robust bimanual robotic manipulation. arXiv preprint
+arXiv:2506.18088, 2025.
+[14] Boyu Mi, Mengchen Ma, Yifei Yao, Xing Gao, Junting Chen, Yangzi Li, Zihou Zhu, Guohao Li, Zhenfei
+Yin, Tai Wang, Yao Mu, Jiangmiao Pang, and Hanqing Wang.
+Exploratory, communicative, and
+deployable: Vision-driven embodied agents for open-world mobile manipulation, 2026. URL https:
+//arxiv.org/abs/2607.13653.
+[15] Yu Fang, Yuchun Feng, Dong Jing, Jiaqi Liu, Yue Yang, Zhenyu Wei, Daniel Szafir, and Mingyu Ding.
+When vision overrides language: Evaluating and mitigating counterfactual failures in VLAs. arXiv
+preprint arXiv:2602.17659, 2026.
+[16] Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail,
+Michael Robert Equi, Chelsea Finn, Niccolo Fusai, Manuel Y. Galliker, Dibya Ghosh, Lachy Groom,
+Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Devin LeBlanc, Sergey
+Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Allen Z. Ren, Lucy Xiaoyang Shi,
+Laura Smith, Jost Tobias Springenberg, Kyle Stachowicz, James Tanner, Quan Vuong, Homer Walke,
+Anna Walling, Haohuan Wang, Lili Yu, and Ury Zhilinsky. π0.5: A vision-language-action model with
+open-world generalization. In Proceedings of The 9th Conference on Robot Learning, volume 305 of
+Proceedings of Machine Learning Research, pages 17–40. PMLR, 2025.
+[17] Haifeng Huang, Xinyi Chen, Yilun Chen, Hao Li, Xiaoshen Han, Zehan Wang, Tai Wang, Jiangmiao
+Pang, and Zhou Zhao. RoboGround: Robotic manipulation with grounded vision-language priors. In
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2025.
+[18] Delin Qu, Haoming Song, Qizhi Chen, Yuanqi Yao, Xinyi Ye, Yan Ding, Zhigang Wang, JiaYuan Gu,
+Bin Zhao, Dong Wang, and Xuelong Li.
+SpatialVLA: Exploring spatial representations for visual-
+language-action model. In Robotics: Science and Systems, 2025.
+[19] Xinyi Chen, Yilun Chen, Yanwei Fu, Ning Gao, Jiaya Jia, Weiyang Jin, Hao Li, Yao Mu, Jiangmiao
+Pang, Yu Qiao, Yang Tian, Bin Wang, Bolun Wang, Fangjing Wang, Hanqing Wang, Tai Wang, Ziqin
+Wang, Xueyuan Wei, Chao Wu, Shuai Yang, Jinhui Ye, Junqiu Yu, Jia Zeng, Jingjing Zhang, Jinyu
+Zhang, Shi Zhang, Feng Zheng, Bowen Zhou, and Yangkun Zhu. InternVLA-M1: A spatially guided
+vision-language-action framework for generalist robot policy. arXiv preprint arXiv:2510.13778, 2025.
+[20] Mengfei Du, Binhao Wu, Zejun Li, Xuanjing Huang, and Zhongyu Wei. EmbSpatial-Bench: Bench-
+marking spatial understanding for embodied tasks with large vision-language models. In Proceedings of
+the 62nd Annual Meeting of the Association for Computational Linguistics, 2024.
+[21] Chan Hee Song, Valts Blukis, Jonathan Tremblay, Stephen Tyree, Yu Su, and Stan Birchfield. RoboSpa-
+tial: Teaching spatial understanding to 2d and 3d vision-language models for robotics. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2025. Oral presentation.
+[22] Mayank Mittal, Pascal Roth, James Tigue, et al. Isaac Lab: A gpu-accelerated simulation framework for
+multi-modal robot learning. arXiv preprint arXiv:2511.04831, 2025. doi: 10.48550/arXiv.2511.04831.
+URL https://arxiv.org/abs/2511.04831.
+[23] NVIDIA. Isaac Sim. Software, 2026. URL https://github.com/isaac-sim/IsaacSim.
+12
+
+
+[24] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai,
+Lachy Groom, Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Sergey
+Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Lucy Xiaoyang Shi, James Tanner,
+Quan Vuong, Anna Walling, Haohuan Wang, and Ury Zhilinsky. π0: A vision-language-action flow model
+for general robot control. In Robotics: Science and Systems, 2025.
+[25] NVIDIA, Johan Bjorck, Fernando Casta˜neda, Nikita Cherniadev, Xingye Da, Runyu Ding, Linxi Jim
+Fan, Yu Fang, Dieter Fox, Fengyuan Hu, Spencer Huang, Joel Jang, Zhenyu Jiang, Jan Kautz, Kaushil
+Kundalia, Lawrence Lao, Zhiqi Li, Zongyu Lin, Kevin Lin, Guilin Liu, Edith Llontop, Loic Magne, Ajay
+Mandlekar, Avnish Narayan, Soroush Nasiriany, Scott Reed, You Liang Tan, Guanzhi Wang, Zu Wang,
+Jing Wang, Qi Wang, Jiannan Xiang, Yuqi Xie, Yinzhen Xu, Zhenjia Xu, Seonghyeon Ye, Zhiding Yu,
+Ao Zhang, Hao Zhang, Yizhou Zhao, Ruijie Zheng, and Yuke Zhu. GR00T N1: An open foundation
+model for generalist humanoid robots. arXiv preprint arXiv:2503.14734, 2025.
+[26] Hongzhe Bi, Hengkai Tan, Shenghao Xie, Zeyuan Wang, Shuhe Huang, Haitian Liu, Ruowen Zhao, Yao
+Feng, Chendong Xiang, Yinze Rong, et al. Motus: A unified latent action world model. arXiv preprint
+arXiv:2512.13030, 2025.
+[27] Tony Z. Zhao, Vikash Kumar, Sergey Levine, and Chelsea Finn. Learning fine-grained bimanual ma-
+nipulation with low-cost hardware, 2023. URL https://arxiv.org/abs/2304.13705.
+13
+
+
+A
+Benchmark Infrastructure and Asset Pipeline
+A.1
+Benchmark Infrastructure Details
+This appendix expands the infrastructure summarized in the main paper.
+The main benchmark defini-
+tion only needs the high-level pipeline; Figure 4 describes how InstructMove keeps task construction, data
+generation, and evaluation tied to the same episode specification.
+Figure 4: Overview of the benchmark data generation pipeline, including Task Specification, Scene Genera-
+tion, Motion Generation, Validator-Based Post-Processing, and Recorded Data Output.
+Task Specification.
+A task specification defines what the robot should do and how success is measured.
+Each episode starts from a task specification, which serves as the shared source of truth for scene construction,
+motion generation, and evaluation. As shown in the first stage of Figure 4, the specification contains three
+parts: a scene configuration, a task library entry, and task components.
+The scene configuration defines the execution context, including the background environment, object
+set and attributes, and robot embodiment.
+In the current benchmark, InstructMove supports multiple
+background environments and six embodiment configurations, allowing the same task logic to be instantiated
+under different visual and kinematic conditions.
+The task library defines the reusable manipulation logic. We use two primitive templates, Pick and
+Pick-and-Place, and instantiate them into four benchmark task families: Pick Category, Pick Attribute,
+Pick Spatial, and Compositional Pick-Place. The first two emphasize semantic and attribute grounding,
+while the latter two emphasize spatial and compositional reasoning.
+The task components specify how each episode is interpreted and evaluated. They include concrete ob-
+jects, initial states, target conditions, natural-language instructions, and validator-based success criteria such
+as reachability, lifting, stability, collision freedom, and target-region placement. This organization separates
+reusable task logic from episode-specific objects and layouts, while keeping generation and evaluation aligned
+with the same specification.
+14
+
+
+Scene Generation.
+Scene generation instantiates a task specification into an executable simulation scene.
+Given the specified task family, object roles, success conditions, and robot embodiment, the pipeline con-
+structs a concrete manipulation scene with selected object instances, initial object poses, spatial layouts,
+and physical properties.
+Objects are sampled along several dimensions, including category, task purpose, object attributes, and
+spatial placement. This sampling strategy increases both visual and semantic diversity while ensuring that
+each generated episode remains consistent with the task specification and its validators. We provide the full
+asset curation and sampling procedure in Section A.2.
+The scene generator further randomizes layouts, object poses, physical properties, and object combina-
+tions. These variations expose policies to a broader set of valid task configurations, improving robustness
+and supporting generalization across different scenes and object arrangements.
+Motion Generation.
+The motion generation module converts high-level task specifications into physically
+executable robot trajectories. It first decomposes each manipulation task into a small set of reusable atomic
+actions, such as Pick, Move, and Place. These actions provide a structured representation of manipulation
+behavior. They also make trajectory synthesis reusable across tasks and embodiments.
+For grasp-related actions, a single grasp pose may not satisfy the robot’s kinematic constraints. Starting
+from an initial grasp pose, the module samples candidate poses by perturbing roll, pitch, and yaw within
+predefined ranges. It then filters these candidates by inverse-kinematics feasibility and joint-space cost. The
+first criterion ensures that the pose is reachable. The second favors solutions that require smaller changes
+from the current robot configuration. The selected pose is used as the final executable grasp target.
+After selecting valid end-effector targets, the module converts the pose sequence into joint-space trajec-
+tories. Motion planning is performed under kinematic and collision constraints. The resulting trajectories
+are smooth, executable, and suitable for simulation rollout.
+Post-Processing.
+Not all generated trajectories are suitable for the final dataset. We therefore apply an
+automatic validation stage after trajectory generation. Using the validators defined in the task specification,
+each rollout is checked against task-specific success criteria, such as correct grasping, object lifting, accurate
+placement, and overall task completion. Only trajectories that satisfy all required conditions are retained.
+Invalid rollouts are discarded, which improves the quality and reliability of the generated dataset. Across the
+four task instances, the valid synthesis rate is approximately 70% for both Franka and PiperX embodiments.
+Data Output.
+For each validated trajectory, the pipeline records multimodal observations and robot
+states in MCAP format.
+The exported data include RGB images, depth images aligned with the RGB
+frames, robot joint states, coordinate-frame transformations, and camera extrinsics. The joint states contain
+time-synchronized joint positions, velocities, and efforts. The TF records describe transformations among
+robot, camera, object, and scene frames, which supports geometry-aware analysis and reproducible playback.
+MCAP is a container format for synchronized robotics data streams. It stores sensor observations and
+robot states in a single episode file for efficient loading, replay, and analysis. Each episode also includes
+metadata such as the scene configuration, task definition, recording parameters, and system configuration.
+This metadata supports reproducible evaluation and downstream dataset management.
+A.2
+Asset Curation and Management Pipeline
+Figure 5 illustrates the four-stage pipeline.
+The entire pipeline is automated end-to-end—from raw 3D
+generation through annotation and quality checks to reproducible sampling—with human review applied
+only to assets flagged during quality curation.
+The resulting corpus contains 1,757 objects spanning 7
+domains, 18 super-categories, and 103 fine-grained categories (Figure 6).
+Asset generation.
+Raw 3D assets are produced by EmbodiedGen [9], which synthesizes meshes from
+text or image prompts and exports USD scene descriptions, OBJ/GLB meshes, URDF articulation stubs,
+and PBR textures at estimated metric scale. Each asset is normalized to a canonical coordinate frame and
+registered under a four-level taxonomy (domain / super-category / category / instance) that defines both
+15
+
+
+Figure 5: Automated asset curation and management pipeline: (a) asset generation, (b) VLM-based anno-
+tation, (c) quality curation with human-in-the-loop review, and (d) reproducible sampling.
+the semantic granularity of benchmark tasks and the axes for generalization splits. A persistent UUID is
+assigned at registration and remains fixed regardless of subsequent library reorganization.
+Asset annotation.
+Six canonical views (front, back, left, right, top, bottom) are rendered and submitted
+to a VLM (GPT-4o), which returns structured metadata in a single query: super-category, category, free-
+form name and description, dominant color, shape class, material class, and plausible height and mass ranges.
+Categorical attributes are drawn from controlled vocabularies to keep metadata machine-filterable. On top
+of VLM-predicted attributes, we annotate three additional layers: (i) manipulation affordances—feasible
+grasp poses enumerated over canonical approach directions and filtered by a gripper-aperture feasibility
+criterion, plus gravity-aligned stable placement orientations; (ii) capability tags such as is graspable and
+is container, used for coarse task-level filtering; and (iii) referring expressions—short, action-agnostic
+noun phrases (e.g., “the red ceramic mug”) partitioned into seen and unseen sets for language-generalization
+evaluation.
+These expressions serve both instruction generation and distractor sampling: they provide
+natural referring terms for targets and semantic cues for selecting plausible but instruction-inconsistent
+alternatives. All metadata is bundled into the asset’s URDF record, making each object a self-describing
+unit.
+Quality curation.
+We target two error modes that task success rate alone cannot detect. Scale errors:
+because the simulator loads meshes at face value, a mis-scaled object is indistinguishable from a correctly
+modeled object of a different size—a policy can still grasp and place it, leaving absolute scale unconstrained.
+We check each object’s metric size against both the VLM-predicted range and category-level commonsense
+priors, and repair flagged assets by uniformly rescaling geometry, bounding boxes, and affordance coordi-
+nates. Grasp-feasibility errors: for each asset, we run 100 trial grasps in an Isaac Sim environment, sweeping
+placement positions and randomized orientations on a tabletop workspace and executing grasps from an-
+notated affordance poses. Assets with low grasp success rates are flagged for review or excluded from the
+corpus.
+Semantic metadata is further cross-validated by two independent models (GPT-5.4 and Claude
+Sonnet 4.6); disagreements and consistency conflicts are routed to human annotators who confirm, reject, or
+correct each flagged item. Only assets that pass scale, grasp, and consistency checks enter the final corpus.
+16
+
+
+Reproducible asset sampling.
+The validated corpus is managed through two orthogonal controls. An
+immutable snapshot freezes the exact set of objects available to an experiment, while a split partitions that
+set into seen and unseen subsets for training and evaluation. Tasks declare only role-level semantic constraints
+(e.g., category, attribute, capability); a seeded sampler deterministically resolves these constraints under the
+active snapshot and split, so the same seed reproduces the same episode assignment even if the library is
+later expanded or reorganized.
+Figure 6: Distribution of the asset corpus used in the benchmark and experiments. Left: domain proportions.
+Right: asset count per super-category (18 in total).
+Asset corpus.
+Figure 6 summarizes the corpus composition: the left panel shows the proportion of asset
+instances across the 7 domains, while the right panel breaks down asset instances per super-category. Table 6
+provides the full fine-grained category listing. The corpus covers 7 domains, 18 super-categories, and 103
+fine-grained categories, with roughly 17 generated instances per category on average. In addition to graspable
+objects, the corpus includes 20 receptacle or destination categories for constructing pick-and-place tasks.
+Table 6: Detailed asset category inventory. The count column reports the number of
+fine-grained categories within each super-category; object instances are summarized
+separately in Figure 6.
+Domain
+Super-Category
+Fine-Grained Categories
+# Categories
+desktop supplies
+office stationery
+stapler, ballpoint pen, pen holder, glue stick, eraser,
+correction tape, marker, sharpener, notebook
+9
+desktop supplies
+office tools
+scissors, scotch tape, magnifier, cutter knife, stamp,
+staples box, sticky notes
+7
+desktop supplies
+electronic accessories
+mouse, tv remote, ac remote, presenter clicker, gamepad,
+earbud case, charging head, charging cable, usb drive
+9
+desktop supplies
+decorations
+mini sculpture, phone stand, vase
+3
+kitchen supplies
+cutting tools
+fruit knife, peeler, garlic press, wire cutters
+4
+kitchen supplies
+tableware
+bowl, chopsticks, coaster, fork, plate, spoon, tray
+7
+kitchen supplies
+ware
+wine glass, mug, coffee cup, thermos, baby bottle
+5
+kitchen supplies
+utensils
+spice jar, bottle opener, spatula
+3
+bedroom supplies
+storage
+storage box, jewelry box, glasses case, pill organizer,
+remote holder
+5
+bedroom supplies
+small electronics
+flashlight, alarm clock
+2
+bathroom supplies
+personal care
+toothbrush, toothpaste, mouthwash cup, comb, razor, nail clipper,
+dental floss, hair clip
+8
+bathroom supplies
+bath products
+shampoo bottle, soap dish, lotion, hand sanitizer, sponge,
+facial cleanser
+6
+livingroom supplies
+ornaments
+houseplant, watering can, diffuser bottle, photo frame,
+candle holder
+5
+tools
+repair tools
+screwdriver, wrench, hex key, measuring tape, pliers, mini hammer,
+glue gun
+7
+Continued on next page
+17
+
+
+Domain
+Super-Category
+Fine-Grained Categories
+# Categories
+food
+fruits
+apple, lemon, banana, pear, strawberry, peach
+6
+food
+ingredients
+potato, tomato, egg, bread, garlic, carrot, chili
+7
+food
+beverages
+juice, milk carton, canned coke, beverage bottle
+4
+food
+snack
+candy, chewing gum, biscuit, potato chips, chocolate,
+cheese sticks
+6
+Total
+103
+A.3
+Instruction Generation and Language Diversity
+InstructMove constructs natural-language instructions by composing task-level paraphrases with object-level
+referring expressions. This design varies the surface form of an instruction while preserving its underlying
+task semantics and instruction-consistent referents.
+Template-level paraphrases.
+Each task family registers a canonical instruction template together with
+a pool of semantically equivalent variants. The templates contain object-description slots that are instan-
+tiated when an episode is generated. For example, the Compositional Pick-Place task uses variants such
+as “Pick up {actor1.description} and place in {actor2.description},” “Grab {actor1.description} and place
+it in {actor2.description},” “Grasp {actor1.description} and set it inside {actor2.description},” and “Lift
+{actor1.description} and drop it into {actor2.description}.” The variant pool covers diverse manipulation
+verbs, placement verbs, and spatial prepositions while keeping the intended action unchanged.
+Object-level referring expressions.
+For each object asset, a large language model generates multiple
+caption candidates that describe discriminative visual and semantic properties such as category, color, shape,
+material, and geometry. During episode generation, a caption candidate is sampled for each object slot in
+the selected template.
+By combining template-level paraphrases with object-level caption candidates, the same underlying task
+instance can be expressed through many linguistically distinct instructions. This compositional generation
+process increases instruction diversity without changing the task goal or the identity of the referred objects.
+A.4
+Domain Randomization
+To improve visual robustness and facilitate sim-to-real transfer, InstructMove exposes domain randomization
+(DR) as a declaratively configured component of the task specification. Each task declares the randomization
+factors to activate in its configuration, and the corresponding stochastic transforms are applied at every
+environment reset as seeded event terms. Sharing the random seed across episodes fixes object placement
+and embodiment configuration, so that any individual factor can be isolated for controlled, reproducible
+comparison (Figure 7).
+We randomize two complementary modalities. Photometric randomization perturbs scene illumination:
+the correlated color temperature, tint, and intensity of each light source are resampled within configurable
+ranges. Because scenes are composed from referenced photorealistic indoor environments with embedded
+area, dome, and distant emitters, the randomizer recursively traverses the asset subtree and jointly perturbs
+all contained lights, producing globally coherent yet substantially varied lighting conditions. Appearance
+randomization alters surface materials. Every manipulable object, receptacle, and table is authored with a
+USD VariantSet enumerating physically plausible material realizations—from categorical finishes per object
+(e.g., ceramic, brushed metal, glazed) to procedurally generated surface textures per table. At reset, the
+randomizer samples a variant per asset; the same mechanism supports deterministic pinning of a named
+variant for controlled appearance sweeps and ablations.
+A.5
+Real-World Experimental Setup
+We conduct real-world experiments on a dual-arm AgileX PiperX robot (Figure 8) equipped with three
+RGB-D cameras: one Intel RealSense D455 mounted directly above the workspace as a global view, and two
+Intel RealSense D405 attached to the left and right wrists respectively. All tasks involve fixed-base tabletop
+18
+
+
+Figure 7: Domain randomization on a fixed manipulation scene.
+(a) Baseline with default lighting and
+textures. (b) Randomized illumination. (c) Randomized object surface textures. (d) Randomized table
+surface material. Scene layout and embodiment are held fixed so that each panel differs in a single factor.
+Figure 8: Real-world experimental setup. Left: dual-arm AgileX PiperX robot with one static camera and
+two wrist-mounted cameras. Right: ALOHA teleoperation setup for data collection.
+manipulation. Data collection uses homologous teleoperation following the ALOHA methodology [27], where
+an operator controls two 6-DoF slave arms to demonstrate each task.
+19
+
+
+B
+π0.5 Target Binding Analysis
+B.1
+Failure Case Analysis
+We analyze the 18 Reach-failed episodes of π0.5 on the pick category seen split.
+The Reach metric is
+instruction-conditioned, so acting on an incorrect object is counted as a failure even when the low-level
+motion succeeds. Under this criterion, most failed cases still complete a lift on a distractor object.
+Figure 9: Two representative Reach-failed π0.5 episodes on the pick category seen split. Blue boxes mark
+the instruction target; orange boxes mark the similar distractor selected by the policy. The right panels
+show the robot approaching the distractor.
+These failures are therefore not missing-action or low-level grasp failures. The policy executes a physically
+valid pick, but on an instruction-inconsistent object. Figure 9 shows two representative cases: the policy
+approaches a yellow lotion bottle for “yellow lemon” and a cube-shaped distractor for “stubby sharpener.”
+Across the 18 Reach failures, 15 lifted distractors share salient cues with the target, such as color, shape,
+geometry, or affordance.
+This pattern suggests partial grounding without reliable referent binding: π0.5 sometimes responds to
+one salient attribute in the instruction, such as color or shape, but does not reliably bind the full referring
+expression to the intended object category. This failure mode explains why text-indispensable distractors are
+20
+
+
+necessary. In simpler scenes, partial grounding may still succeed when the visually matching object is also
+the target. In InstructMove, multiple feasible candidates can share salient cues, so the policy must ground
+the full instruction rather than select a plausible partial match.
+C
+Training Recipes
+This section documents the training recipes of the four evaluated policies: π0, π0.5, GR00T N1.7, and Motus.
+Because the policies differ in architecture, pretraining, and embodiment adaptation, we first describe the
+shared protocol and then present model-specific settings. Unless stated otherwise, all models are trained for
+5,000 steps and evaluated at the final checkpoint; no checkpoint selection is performed.
+C.1
+Shared Training Protocol
+All models are trained under the benchmark protocol described in the main paper. For the dual-arm PiperX,
+training covers pick category, pick attribute, and place a2b. For the single-arm Franka, training covers
+pick spatial and place a2b. Each model uses its own observation preprocessing and action interface, as
+the underlying architectures do not share a common tokenization or control representation. All policies are
+fine-tuned on benchmark demonstrations using their native training pipelines; model-specific adaptations
+are detailed below.
+C.2
+Model-Specific Recipes
+Table 7 provides an at-a-glance summary; detailed descriptions follow.
+Table 7: Summary of model-specific training recipes. Unlogged details are qualified in the text below.
+Model
+Init checkpoint
+Trainable scope
+Batch / Steps
+π0
+OpenPI pi0 base
+LoRA only
+32/GPU, 5k
+π0.5
+OpenPI pi05 base
+LoRA only
+32/GPU, 5k
+GR00T N1.7
+GR00T-N1.7-3B
+Proj./diff./VL-norm
+24/GPU, 5k
+Motus
+motus-robotics/Motus
+Qwen3-VL frozen
+8/GPU, 5k
+π0 and π0.5.
+Both policies share the same LoRA-based fine-tuning recipe and differ only in their initial-
+ization checkpoint: π0 uses the OpenPI pi0 base checkpoint, while π0.5 uses pi05 base. The configuration
+employs gemma 2b lora for the PaliGemma vision-language backbone and gemma 300m lora for the action
+expert, with all non-LoRA parameters frozen. The model consumes RGB observations resized to 224 × 224,
+the current robot state, and a tokenized language instruction.
+The benchmark adapter exposes robot-
+specific action interfaces: PiperX uses a 14-dimensional dual-arm joint-action chunk, and Franka uses an
+8-dimensional single-arm interface. Both predict 50-step action chunks. Training uses AdamW with cosine
+learning-rate decay, 1,000 warmup steps, a peak learning rate of 2.5×10−5, gradient clipping at 1.0, no EMA,
+a per-GPU batch size of 32, and 5,000 steps on 8 NVIDIA RTX 5090 GPUs. Checkpoints are saved every
+1,000 steps, and the reported results use the final 5,000-step checkpoint. Training takes approximately 2.5
+hours. In the PiperX sim-to-real transfer setting, a 9:1 batch-sampling ratio is applied between simulation
+and real-world data.
+GR00T N1.7.
+GR00T N1.7 is fine-tuned via robot-specific AnyMove runs initialized from a local mirror
+of the official GR00T-N1.7-3B checkpoint, with the VLM backbone resolved to a local Cosmos-Reason2-2B
+path. The benchmark adaptation registers custom NEW EMBODIMENT modality configurations for both robot
+settings. Both use three RGB cameras, proprioceptive state, and language instructions. The Franka setting
+uses ext1 camera, ext2 camera, and wrist camera; PiperX uses static camera, left hand camera, and
+right hand camera. The action interface is joint-space: Franka uses relative joint actions with absolute
+gripper commands, and PiperX uses relative left/right arm-joint actions with absolute gripper commands.
+The embodiment exposes 30 valid action steps within a 40-step model horizon, with the unused tail masked.
+21
+
+
+Training freezes the LLM and visual backbone while updating the projector, diffusion, and VL-normalization
+modules. The optimizer is AdamW with cosine decay, a warmup ratio of 0.05, BF16, gradient clipping at
+1.0, DeepSpeed ZeRO-3, and gradient checkpointing. The completed artifacts correspond to 5,000-step runs
+at global batch size 192 on 8 GPUs. Training runs without an intermediate validation loop, and the reported
+results use the final 5,000-step checkpoint.
+Motus.
+Motus is fine-tuned through experiment-specific configurations under cluster/motus/, initialized
+from the motus-robotics/Motus checkpoint.
+When this checkpoint is present, the training entrypoint
+skips independent WAN and VLM pretrained loading and partially loads the Motus weights directly. The
+observation pipeline produces a three-camera T-shaped stitched RGB image resized to 384 × 320, together
+with the robot state, WAN T5 language embeddings (text length 512), and Qwen3-VL image-text inputs.
+The action head predicts continuous normalized action chunks of length 48, corresponding to 8 video frames
+with a video-to-action ratio of 6. The embodiment interface is robot-specific: PiperX uses 14-dimensional
+state/action vectors covering pick category, pick attribute, and place a2b; Franka uses 8-dimensional
+vectors covering pick spatial and place a2b. Motus does not use LoRA; Qwen3-VL remains frozen while
+the remaining modules are optimized with AdamW (β1=0.9, β2=0.95), a learning rate of 10−5, weight decay
+of 0.01, gradient clipping at 0.5, BF16, 200 warmup steps, and a linear scheduler over 5,000 steps. The
+per-process batch size is 8, yielding an effective batch size of 64 under the 8-GPU setup. The reported
+results use the 5,000-step checkpoint.
+22
