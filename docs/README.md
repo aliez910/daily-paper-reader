@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-01</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-02</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 37 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 22 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>26</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>11</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-01 19:53:03 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-02 19:45:01 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,20 +69,25 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 lines. Let me analyze the data:</p>
-<p>Date: 2026-09-01</p>
-<p>37 papers total, 26 deep-read, 11 quick-read</p>
-<p>Top deep-read: WorldToken (9.0) - Time-First Sequence Modeling for Robotic Imitation Learning; Triplet2Track (9.0) - Hierarchical System with Object-Centric Representations for Long-Horizon Manipulation</p>
-<p>Quick-read notable: GlanceWAM (8.0), TrAct (8.0), PonderPounce (8.0)</p>
-<p>All topics relate to robotics, imitation learning, world models, and robot control with visual/MLLM approaches.</p>
-<p>I need to write 3 lines:</p>
-<p>Catchy headline summary of today&#x27;s work</p>
-<p>Highlight 1-2 most notable directions/conclusions</p>
-<p>Next-step suggestion for general readers</p>
-<p>Let me make it concise, specific, and engaging, based only on the given data.&lt;/think&gt;</p>
-<p>今日精读 26 篇、速读 11 篇，机器人模仿学习与世界模型方向持续高产，WorldToken 与 Triplet2Track 同获 9.0 高分领跑。</p>
-<p>最值得关注的是&quot;时间优先的序列建模&quot;与&quot;以物体为中心的层次表征&quot;两条路径，分别在长程操作的可预测性与可靠性上取得突破。</p>
-<p>建议关注这两篇精读论文的实验视频与方法图，普通读者可先看 Triplet2Track 的物体表征可视化，直观感受当前机器人长程任务的前沿水平。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 lines or less. Let me analyze the data:</p>
+<p>Date: 2026-09-02</p>
+<p>Total: 22 papers</p>
+<p>Carefully read: 11 papers</p>
+<p>Skimmed: 11 papers</p>
+<p>Top papers (both 9.0/10):</p>
+<p>&quot;Gripper-aware Vision Language Action Models&quot;</p>
+<p>&quot;One-Shot Learning from Demonstration of Contact-Rich Robotic Manipulation by Identifying Physical Interactions&quot;</p>
+<p>Other notable (8.0/10):</p>
+<p>&quot;Hierarchical Skill Retrieval for Data-Efficient Adaptation of Vision-Language-Action Models&quot;</p>
+<p>&quot;TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks&quot;</p>
+<p>&quot;GaussianWAM: Distilling Geometry and Semantics from 3D Gaussian Fields into World-Action Models&quot;</p>
+<p>Theme: These are all about Vision-Language-Action (VLA) models, robotic manipulation, and world-action models for robotics. The common thread is improving robotic learning and control with vision-language models.</p>
+<p>Let me craft 3 sentences:</p>
+<p>Title-style summary: Today focused on VLA models and robotic manipulation</p>
+<p>Key direction: Gripper-aware VLA and one-shot learning from contact-rich demos</p>
+<p>Next step suggestion for general readers</p>
+<p>Let me write these in Chinese, concise and specific.&lt;/think&gt;</p>
+<p>今日共筛选 22 篇论文并完成精读 11 篇，整体聚焦视觉-语言-动作模型（VLA）在机器人操控中的数据高效学习与接触物理建模。最值得关注的两条主线是夹爪感知的 VLA 设计与基于物理交互识别的接触密集操控一次性示教学习，两者均直指真实部署中的数据稀缺与接触控制难题。建议关注具身智能方向的读者优先阅读这两篇精读，并尝试将层次化技能检索与 3D 高斯世界-动作模型作为数据增强与场景理解的补充参考。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +96,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">26 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning">WorldToken: Time-First Sequence Modeling for Robotic Imitation Learning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Triplet2Track: A Hierarchical System with Object-Centric Representations for Reliable Long-Horizon Manipulation">Triplet2Track: A Hierarchical System with Object-Centric Representations for Reliable Long-Horizon Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="InstructMove: A Text-Indispensable Benchmark for Instruction-Following Manipulation">InstructMove: A Text-Indispensable Benchmark for Instruction-Following Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Gripper-aware Vision Language Action Models">Gripper-aware Vision Language Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="One-Shot Learning from Demonstration of Contact-Rich Robotic Manipulation by Identifying Physical Interactions">One-Shot Learning from Demonstration of Contact-Rich Robotic Manipulation by Identifying Physical Interactions</span></li><li><span class="dpr-home-dashboard-paper-title" title="V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models">V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>26</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -107,7 +112,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="GlanceWAM: Sparse Test-Time Imagination for World-Action Models">GlanceWAM: Sparse Test-Time Imagination for World-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks">TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks</span></li><li><span class="dpr-home-dashboard-paper-title" title="PonderPounce: A Pretrained MLLM as an Episode Context Engine for Robot Control">PonderPounce: A Pretrained MLLM as an Episode Context Engine for Robot Control</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Hierarchical Skill Retrieval for Data-Efficient Adaptation of Vision-Language-Action Models">Hierarchical Skill Retrieval for Data-Efficient Adaptation of Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks">TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks</span></li><li><span class="dpr-home-dashboard-paper-title" title="GaussianWAM: Distilling Geometry and Semantics from 3D Gaussian Fields into World-Action Models">GaussianWAM: Distilling Geometry and Semantics from 3D Gaussian Fields into World-Action Models</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
