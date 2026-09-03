@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-02</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-03</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 22 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-02 19:45:01 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-03 19:50:59 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,25 +69,20 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 lines or less. Let me analyze the data:</p>
-<p>Date: 2026-09-02</p>
-<p>Total: 22 papers</p>
-<p>Carefully read: 11 papers</p>
-<p>Skimmed: 11 papers</p>
-<p>Top papers (both 9.0/10):</p>
-<p>&quot;Gripper-aware Vision Language Action Models&quot;</p>
-<p>&quot;One-Shot Learning from Demonstration of Contact-Rich Robotic Manipulation by Identifying Physical Interactions&quot;</p>
-<p>Other notable (8.0/10):</p>
-<p>&quot;Hierarchical Skill Retrieval for Data-Efficient Adaptation of Vision-Language-Action Models&quot;</p>
-<p>&quot;TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks&quot;</p>
-<p>&quot;GaussianWAM: Distilling Geometry and Semantics from 3D Gaussian Fields into World-Action Models&quot;</p>
-<p>Theme: These are all about Vision-Language-Action (VLA) models, robotic manipulation, and world-action models for robotics. The common thread is improving robotic learning and control with vision-language models.</p>
-<p>Let me craft 3 sentences:</p>
-<p>Title-style summary: Today focused on VLA models and robotic manipulation</p>
-<p>Key direction: Gripper-aware VLA and one-shot learning from contact-rich demos</p>
-<p>Next step suggestion for general readers</p>
-<p>Let me write these in Chinese, concise and specific.&lt;/think&gt;</p>
-<p>今日共筛选 22 篇论文并完成精读 11 篇，整体聚焦视觉-语言-动作模型（VLA）在机器人操控中的数据高效学习与接触物理建模。最值得关注的两条主线是夹爪感知的 VLA 设计与基于物理交互识别的接触密集操控一次性示教学习，两者均直指真实部署中的数据稀缺与接触控制难题。建议关注具身智能方向的读者优先阅读这两篇精读，并尝试将层次化技能检索与 3D 高斯世界-动作模型作为数据增强与场景理解的补充参考。</p>
+<p>&lt;think&gt;The user wants a Chinese daily report summary based on the given data. Let me analyze:</p>
+<p>Date: 2026-09-03</p>
+<p>Status: Success</p>
+<p>Total: 28 papers</p>
+<p>Deep reading: 17 papers</p>
+<p>Quick reading: 11 papers</p>
+<p>Top deep reads (9.0/10): LM-X (explainable robot manipulation with progress/event/uncertainty) and MA-VLA (multi-arm VLA for collaboration and compositional generalization)</p>
+<p>Notable quick reads (8.0/10): V-Link, RA-VLA (Retrieval-Augmented VLA for test-time adaptation), GaussianDream++</p>
+<p>I need to:</p>
+<p>One sentence headline-style summary of what was done today</p>
+<p>One sentence with the 1-2 most noteworthy directions/conclusions</p>
+<p>One sentence with next-step advice for general readers</p>
+<p>Keep it concise, specific, grounded in the data, no Markdown headers, no JSON.&lt;/think&gt;</p>
+<p>今日精筛 28 篇 VLA/具身相关论文，其中 17 篇进入精读，亮点集中在机器人操作可解释性与多臂协同两大方向。LM-X 把进度、事件和不确定性预测引入通用操作，让模型&quot;知道自己做到哪一步&quot;，而 MA-VLA 则证明多臂 VLA 在协作与组合泛化上具备可扩展潜力，配合 V-Link 的表征恢复和 RA-VLA 的检索增强，VLA 的实用鲁棒性正快速补齐。建议关注 LM-X 的不确定性估计模块与 MA-VLA 的多臂架构设计，这是近期把具身智能推向真实场景最值得追踪的两个支点。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -96,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">17 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Gripper-aware Vision Language Action Models">Gripper-aware Vision Language Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="One-Shot Learning from Demonstration of Contact-Rich Robotic Manipulation by Identifying Physical Interactions">One-Shot Learning from Demonstration of Contact-Rich Robotic Manipulation by Identifying Physical Interactions</span></li><li><span class="dpr-home-dashboard-paper-title" title="V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models">V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LM-X: Explainable Action Modeling with Progress, Event, and Uncertainty Prediction for Generalist Robot Manipulation">LM-X: Explainable Action Modeling with Progress, Event, and Uncertainty Prediction for Generalist Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MA-VLA: Multi-Arm Vision-Language-Action Model for Collaboration and Compositional Generalization">MA-VLA: Multi-Arm Vision-Language-Action Model for Collaboration and Compositional Generalization</span></li><li><span class="dpr-home-dashboard-paper-title" title="VISTA: Visually Inferred Spatial ConTact Attention for Contact-Rich Manipulation">VISTA: Visually Inferred Spatial ConTact Attention for Contact-Rich Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -112,7 +107,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Hierarchical Skill Retrieval for Data-Efficient Adaptation of Vision-Language-Action Models">Hierarchical Skill Retrieval for Data-Efficient Adaptation of Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks">TrAct: Bridging Robot Control and Visual Prediction with Visual Tracks</span></li><li><span class="dpr-home-dashboard-paper-title" title="GaussianWAM: Distilling Geometry and Semantics from 3D Gaussian Fields into World-Action Models">GaussianWAM: Distilling Geometry and Semantics from 3D Gaussian Fields into World-Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models">V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="RA-VLA: Retrieval-Augmented VLA for Test-Time Adaptation">RA-VLA: Retrieval-Augmented VLA for Test-Time Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="GaussianDream++: Efficient 3D Gaussian World Modeling for Robotic Manipulation">GaussianDream++: Efficient 3D Gaussian World Modeling for Robotic Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
