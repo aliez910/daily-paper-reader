@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-03</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-04</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 26 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>15</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-03 19:50:59 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-04 19:22:50 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,20 +69,21 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a Chinese daily report summary based on the given data. Let me analyze:</p>
-<p>Date: 2026-09-03</p>
-<p>Status: Success</p>
-<p>Total: 28 papers</p>
-<p>Deep reading: 17 papers</p>
-<p>Quick reading: 11 papers</p>
-<p>Top deep reads (9.0/10): LM-X (explainable robot manipulation with progress/event/uncertainty) and MA-VLA (multi-arm VLA for collaboration and compositional generalization)</p>
-<p>Notable quick reads (8.0/10): V-Link, RA-VLA (Retrieval-Augmented VLA for test-time adaptation), GaussianDream++</p>
-<p>I need to:</p>
-<p>One sentence headline-style summary of what was done today</p>
-<p>One sentence with the 1-2 most noteworthy directions/conclusions</p>
-<p>One sentence with next-step advice for general readers</p>
-<p>Keep it concise, specific, grounded in the data, no Markdown headers, no JSON.&lt;/think&gt;</p>
-<p>今日精筛 28 篇 VLA/具身相关论文，其中 17 篇进入精读，亮点集中在机器人操作可解释性与多臂协同两大方向。LM-X 把进度、事件和不确定性预测引入通用操作，让模型&quot;知道自己做到哪一步&quot;，而 MA-VLA 则证明多臂 VLA 在协作与组合泛化上具备可扩展潜力，配合 V-Link 的表征恢复和 RA-VLA 的检索增强，VLA 的实用鲁棒性正快速补齐。建议关注 LM-X 的不确定性估计模块与 MA-VLA 的多臂架构设计，这是近期把具身智能推向真实场景最值得追踪的两个支点。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output 3 concise Chinese sentences summarizing today&#x27;s paper recommendations. Let me analyze the data:</p>
+<p>Date: 2026-09-04</p>
+<p>Total: 26 papers</p>
+<p>Deep read: 15 papers</p>
+<p>Quick read: 11 papers</p>
+<p>Top papers are about robot manipulation with Vision-Language-Action (VLA) models, autonomous failure recovery, and predictive sensorimotor modeling</p>
+<p>Key themes:</p>
+<p>FLARE: Failure-aware framework for autonomous correction in visual-language robotic manipulation</p>
+<p>PredVLA: Predictive sensorimotor modeling for sub-million-parameter robot manipulation</p>
+<p>PHR-VLA: Planning Horizon Reasoning for VLA models</p>
+<p>DREAM: Real-to-Sim demonstration generation for policy adaptation</p>
+<p>AcrossWAM1.0: Modular latent world-action stack for compact robot policies</p>
+<p>All are related to robot manipulation, VLA models, efficiency, and robustness.</p>
+<p>Let me write 3 concise Chinese sentences.&lt;/think&gt;</p>
+<p>今日精选 26 篇聚焦机器人操控与视觉-语言-动作（VLA）模型的最新进展，其中 FLARE 强调失败感知自主恢复、PredVLA 以亚百万参数实现高效预测建模，两篇均获 9.0 分，是当天最值得深读的代表工作。最值得关注的方向：一是让机器人在出错时能自我检测并恢复，二是在极小模型规模下仍保持强大操控能力，二者共同指向&quot;更鲁棒且更轻量&quot;的具身智能路线。建议持续关注 VLA 模型的小型化与容错机制进展，前者关乎落地成本，后者决定实际可用性。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +92,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">17 篇</strong>
+    <strong class="dpr-home-dashboard-count">15 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="LM-X: Explainable Action Modeling with Progress, Event, and Uncertainty Prediction for Generalist Robot Manipulation">LM-X: Explainable Action Modeling with Progress, Event, and Uncertainty Prediction for Generalist Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="MA-VLA: Multi-Arm Vision-Language-Action Model for Collaboration and Compositional Generalization">MA-VLA: Multi-Arm Vision-Language-Action Model for Collaboration and Compositional Generalization</span></li><li><span class="dpr-home-dashboard-paper-title" title="VISTA: Visually Inferred Spatial ConTact Attention for Contact-Rich Manipulation">VISTA: Visually Inferred Spatial ConTact Attention for Contact-Rich Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="FLARE: A Failure-Aware Framework for Autonomous Correction and Recovery in Visual-Language Robotic Manipulation">FLARE: A Failure-Aware Framework for Autonomous Correction and Recovery in Visual-Language Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="PredVLA: Predictive Sensorimotor Modeling for Sub-Million-Parameter Robot Manipulation">PredVLA: Predictive Sensorimotor Modeling for Sub-Million-Parameter Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="TemporalFlow-VLA: Learning Physically Grounded Execution History for Long-Horizon Robot Manipulation">TemporalFlow-VLA: Learning Physically Grounded Execution History for Long-Horizon Robot Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>15</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -107,7 +108,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models">V-Link: Recovering Lost Visual Representations in Action DiT for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="RA-VLA: Retrieval-Augmented VLA for Test-Time Adaptation">RA-VLA: Retrieval-Augmented VLA for Test-Time Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="GaussianDream++: Efficient 3D Gaussian World Modeling for Robotic Manipulation">GaussianDream++: Efficient 3D Gaussian World Modeling for Robotic Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models">PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation">DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies">AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
