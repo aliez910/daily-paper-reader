@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-04</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-05</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 26 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 22 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>15</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>11</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-04 19:22:50 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-05 18:53:10 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,21 +69,20 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output 3 concise Chinese sentences summarizing today&#x27;s paper recommendations. Let me analyze the data:</p>
-<p>Date: 2026-09-04</p>
-<p>Total: 26 papers</p>
-<p>Deep read: 15 papers</p>
-<p>Quick read: 11 papers</p>
-<p>Top papers are about robot manipulation with Vision-Language-Action (VLA) models, autonomous failure recovery, and predictive sensorimotor modeling</p>
-<p>Key themes:</p>
-<p>FLARE: Failure-aware framework for autonomous correction in visual-language robotic manipulation</p>
-<p>PredVLA: Predictive sensorimotor modeling for sub-million-parameter robot manipulation</p>
-<p>PHR-VLA: Planning Horizon Reasoning for VLA models</p>
-<p>DREAM: Real-to-Sim demonstration generation for policy adaptation</p>
-<p>AcrossWAM1.0: Modular latent world-action stack for compact robot policies</p>
-<p>All are related to robot manipulation, VLA models, efficiency, and robustness.</p>
-<p>Let me write 3 concise Chinese sentences.&lt;/think&gt;</p>
-<p>今日精选 26 篇聚焦机器人操控与视觉-语言-动作（VLA）模型的最新进展，其中 FLARE 强调失败感知自主恢复、PredVLA 以亚百万参数实现高效预测建模，两篇均获 9.0 分，是当天最值得深读的代表工作。最值得关注的方向：一是让机器人在出错时能自我检测并恢复，二是在极小模型规模下仍保持强大操控能力，二者共同指向&quot;更鲁棒且更轻量&quot;的具身智能路线。建议持续关注 VLA 模型的小型化与容错机制进展，前者关乎落地成本，后者决定实际可用性。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 sentences based on the given recommendation data. Let me analyze the data:</p>
+<p>Date: 2026-09-05</p>
+<p>Status: Success</p>
+<p>Total: 22 papers</p>
+<p>Deep reading: 11 papers</p>
+<p>Quick reading: 11 papers</p>
+<p>Top deep reading papers (9.0/10): &quot;PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models&quot; and &quot;SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation&quot;</p>
+<p>Other notable quick reading papers (8.0/10): DeicticVLA, DREAM, AcrossWAM1.0</p>
+<p>Key themes: VLA (Vision-Language-Action) models, robot manipulation, policy adaptation, world models</p>
+<p>Let me craft 3 sentences:</p>
+<p>A catchy headline-style summary</p>
+<p>The most worth-watching 1-2 directions/conclusions</p>
+<p>A next-step suggestion for general readers&lt;/think&gt;</p>
+<p>今日共筛选 22 篇论文，精读 11 篇、速读 11 篇，主题集中在机器人操作领域的视觉-语言-动作（VLA）模型与策略适配方向。最值得关注的是 PHR-VLA 通过规划视野推理提升 VLA 长程决策能力，以及 SymVD 利用对称蒸馏压缩 VLA 模型，二者分别从推理深度和部署效率两端推动 VLA 走向实用。普通读者可优先关注 SymVD 这类蒸馏路线，预期未来几个月会出现更多&quot;小而强&quot;的可部署 VLA 方案。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -92,12 +91,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">15 篇</strong>
+    <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="FLARE: A Failure-Aware Framework for Autonomous Correction and Recovery in Visual-Language Robotic Manipulation">FLARE: A Failure-Aware Framework for Autonomous Correction and Recovery in Visual-Language Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="PredVLA: Predictive Sensorimotor Modeling for Sub-Million-Parameter Robot Manipulation">PredVLA: Predictive Sensorimotor Modeling for Sub-Million-Parameter Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="TemporalFlow-VLA: Learning Physically Grounded Execution History for Long-Horizon Robot Manipulation">TemporalFlow-VLA: Learning Physically Grounded Execution History for Long-Horizon Robot Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models">PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation">SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="PAVE: Predictive Alignment and Value-Guided Evolution for World-Action Policies">PAVE: Predictive Alignment and Value-Guided Evolution for World-Action Policies</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>15</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -108,7 +107,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models">PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation">DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies">AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DeicticVLA: Unifying Instruction Modes Based on Language and Deictic Gestures in a Single VLA">DeicticVLA: Unifying Instruction Modes Based on Language and Deictic Gestures in a Single VLA</span></li><li><span class="dpr-home-dashboard-paper-title" title="DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation">DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies">AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
