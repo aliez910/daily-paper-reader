@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-05</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-06</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 22 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 24 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>11</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>13</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-05 18:53:10 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-06 19:02:10 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,20 +69,31 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise Chinese summary in 3 sentences based on the given recommendation data. Let me analyze the data:</p>
-<p>Date: 2026-09-05</p>
-<p>Status: Success</p>
-<p>Total: 22 papers</p>
-<p>Deep reading: 11 papers</p>
-<p>Quick reading: 11 papers</p>
-<p>Top deep reading papers (9.0/10): &quot;PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models&quot; and &quot;SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation&quot;</p>
-<p>Other notable quick reading papers (8.0/10): DeicticVLA, DREAM, AcrossWAM1.0</p>
-<p>Key themes: VLA (Vision-Language-Action) models, robot manipulation, policy adaptation, world models</p>
-<p>Let me craft 3 sentences:</p>
-<p>A catchy headline-style summary</p>
-<p>The most worth-watching 1-2 directions/conclusions</p>
-<p>A next-step suggestion for general readers&lt;/think&gt;</p>
-<p>今日共筛选 22 篇论文，精读 11 篇、速读 11 篇，主题集中在机器人操作领域的视觉-语言-动作（VLA）模型与策略适配方向。最值得关注的是 PHR-VLA 通过规划视野推理提升 VLA 长程决策能力，以及 SymVD 利用对称蒸馏压缩 VLA 模型，二者分别从推理深度和部署效率两端推动 VLA 走向实用。普通读者可优先关注 SymVD 这类蒸馏路线，预期未来几个月会出现更多&quot;小而强&quot;的可部署 VLA 方案。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in Chinese based on the given data. Let me analyze the data:</p>
+<p>Date: 2026-09-06</p>
+<p>Status: Successful</p>
+<p>Total: 24 papers</p>
+<p>Deep reads: 13</p>
+<p>Quick reads: 11</p>
+<p>Top deep reads (9.0/10):</p>
+<p>&quot;AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies&quot;</p>
+<p>&quot;DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting&quot;</p>
+<p>Top quick reads (8.0/10):</p>
+<p>&quot;DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation&quot;</p>
+<p>&quot;Training-Free Action Correction for VLA Model Failures via Language Feedback&quot;</p>
+<p>&quot;Motus2: A Self-Evolving General World Model for Dexterous Manipulation&quot;</p>
+<p>The theme is clearly VLA (Vision-Language-Action) models for robotics agents. Key themes:</p>
+<p>Memory mechanisms for VLA agents</p>
+<p>One-step VLA generation</p>
+<p>Deployment-time demonstration/sim adaptation</p>
+<p>Training-free action correction</p>
+<p>World models for dexterous manipulation</p>
+<p>Let me craft 3 lines:</p>
+<p>Headline-style summary of what was done today</p>
+<p>Most noteworthy direction/conclusion (1-2)</p>
+<p>Next step suggestion for general readers</p>
+<p>Let me write this in concise Chinese.&lt;/think&gt;</p>
+<p>今日精选 24 篇 VLA 与具身智能前沿论文，精读 13 篇速读 11 篇，整体聚焦&quot;让大模型真正落地机器人&quot;这一核心命题。最值得关注的两个方向：一是 AGM 用&quot;成就驱动记忆&quot;让冻结的 VLA 策略也能在闭环中自我纠错，二是 DriftingVLA 通过逐维时间漂移实现原生单步视觉-语言-动作生成，大幅压低推理延迟。对普通读者的建议：关注&quot;免训练纠错&quot;与&quot;部署时数据自生成&quot;两条技术线，它们最快有望走出实验室、进入真实机器人产品。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -91,12 +102,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">11 篇</strong>
+    <strong class="dpr-home-dashboard-count">13 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models">PHR-VLA: Planning Horizon Reasoning for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation">SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="PAVE: Predictive Alignment and Value-Guided Evolution for World-Action Policies">PAVE: Predictive Alignment and Value-Guided Evolution for World-Action Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies">AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting">DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting</span></li><li><span class="dpr-home-dashboard-paper-title" title="SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation">SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>13</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -107,7 +118,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DeicticVLA: Unifying Instruction Modes Based on Language and Deictic Gestures in a Single VLA">DeicticVLA: Unifying Instruction Modes Based on Language and Deictic Gestures in a Single VLA</span></li><li><span class="dpr-home-dashboard-paper-title" title="DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation">DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies">AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation">DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Training-Free Action Correction for VLA Model Failures via Language Feedback">Training-Free Action Correction for VLA Model Failures via Language Feedback</span></li><li><span class="dpr-home-dashboard-paper-title" title="Motus2: A Self-Evolving General World Model for Dexterous Manipulation">Motus2: A Self-Evolving General World Model for Dexterous Manipulation</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
