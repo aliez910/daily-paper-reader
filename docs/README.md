@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-06</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 24 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 28 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>13</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>17</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-06 19:02:10 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-07 20:46:32 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,31 +69,23 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in Chinese based on the given data. Let me analyze the data:</p>
-<p>Date: 2026-09-06</p>
-<p>Status: Successful</p>
-<p>Total: 24 papers</p>
-<p>Deep reads: 13</p>
-<p>Quick reads: 11</p>
-<p>Top deep reads (9.0/10):</p>
-<p>&quot;AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies&quot;</p>
-<p>&quot;DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting&quot;</p>
-<p>Top quick reads (8.0/10):</p>
-<p>&quot;DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation&quot;</p>
-<p>&quot;Training-Free Action Correction for VLA Model Failures via Language Feedback&quot;</p>
-<p>&quot;Motus2: A Self-Evolving General World Model for Dexterous Manipulation&quot;</p>
-<p>The theme is clearly VLA (Vision-Language-Action) models for robotics agents. Key themes:</p>
-<p>Memory mechanisms for VLA agents</p>
-<p>One-step VLA generation</p>
-<p>Deployment-time demonstration/sim adaptation</p>
-<p>Training-free action correction</p>
-<p>World models for dexterous manipulation</p>
-<p>Let me craft 3 lines:</p>
-<p>Headline-style summary of what was done today</p>
-<p>Most noteworthy direction/conclusion (1-2)</p>
-<p>Next step suggestion for general readers</p>
-<p>Let me write this in concise Chinese.&lt;/think&gt;</p>
-<p>今日精选 24 篇 VLA 与具身智能前沿论文，精读 13 篇速读 11 篇，整体聚焦&quot;让大模型真正落地机器人&quot;这一核心命题。最值得关注的两个方向：一是 AGM 用&quot;成就驱动记忆&quot;让冻结的 VLA 策略也能在闭环中自我纠错，二是 DriftingVLA 通过逐维时间漂移实现原生单步视觉-语言-动作生成，大幅压低推理延迟。对普通读者的建议：关注&quot;免训练纠错&quot;与&quot;部署时数据自生成&quot;两条技术线，它们最快有望走出实验室、进入真实机器人产品。</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output a concise summary in Chinese based on the given recommendation data. Let me analyze the data:</p>
+<p>Date: 2026-09-07</p>
+<p>Status: Success</p>
+<p>Total: 28 papers</p>
+<p>Deep reading (精读): 17 papers</p>
+<p>Quick reading (速读): 11 papers</p>
+<p>Top deep reading papers: DriftingVLA (9.0/10) and CometVLA (9.0/10)</p>
+<p>Top quick reading papers: AGM (8.0/10), SymVD (8.0/10), AcrossWAM1.0 (8.0/10)</p>
+<p>All papers are about VLA (Vision-Language-Action) models for robotics/embodied AI. The theme is clearly about robot manipulation policies using VLA models.</p>
+<p>Let me write 3 lines:</p>
+<p>A catchy headline-like summary</p>
+<p>The most noteworthy directions/findings</p>
+<p>Next-step suggestion for general readers</p>
+<p>Let me make it concise, specific, and based only on the given data.&lt;/think&gt;</p>
+<p>今日聚焦机器人 VLA 模型：精读 17 篇中，DriftingVLA 与 CometVLA 并列 9.0 分，前者主打&quot;逐维度时间漂移&quot;实现原生一步生成，后者通过具身数据金字塔协同训练强化物理理解；速读 8 分档集中在记忆闭环、对称蒸馏与世界-动作栈三条互补路线。</p>
+<p>方向上值得优先关注的是&quot;原生一步 VLA 生成&quot;与&quot;多源数据协同训练提升物理理解&quot;，这两条路径都在试图降低延迟并拉近仿真与真实部署的差距。</p>
+<p>建议先精读 DriftingVLA 的方法图与 CometVLA 的数据分层结构，再结合 SymVD 看蒸馏如何压缩大模型，留意这套组合是否适合你自己的机器人或自动驾驶任务。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -102,12 +94,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">13 篇</strong>
+    <strong class="dpr-home-dashboard-count">17 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies">AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting">DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting</span></li><li><span class="dpr-home-dashboard-paper-title" title="SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation">SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting">DriftingVLA: Native One-Step Vision-Language-Action Generation via Per-Dimension Temporal Drifting</span></li><li><span class="dpr-home-dashboard-paper-title" title="CometVLA: Co-Training on an Embodied Data Pyramid towards Physical Understanding">CometVLA: Co-Training on an Embodied Data Pyramid towards Physical Understanding</span></li><li><span class="dpr-home-dashboard-paper-title" title="Behavior-Skill: A Fine-Grained Benchmark for Evaluating Vision-Language-Action Policies in Long-Horizon Tasks">Behavior-Skill: A Fine-Grained Benchmark for Evaluating Vision-Language-Action Policies in Long-Horizon Tasks</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>13</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>17</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -118,7 +110,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation">DREAM: Deployment-Time Demonstration Generation via Real-to-Sim for Scalable Policy Adaptation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Training-Free Action Correction for VLA Model Failures via Language Feedback">Training-Free Action Correction for VLA Model Failures via Language Feedback</span></li><li><span class="dpr-home-dashboard-paper-title" title="Motus2: A Self-Evolving General World Model for Dexterous Manipulation">Motus2: A Self-Evolving General World Model for Dexterous Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies">AGM: Achievement-Grounded Memory for Closed-Loop Agents with Frozen VLA Policies</span></li><li><span class="dpr-home-dashboard-paper-title" title="SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation">SymVD: Symmetric Vision Language Action Distillation for Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies">AcrossWAM1.0:A Modular Latent World-Action Stack for Compact Robot Policies</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
