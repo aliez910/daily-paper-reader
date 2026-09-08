@@ -1,0 +1,380 @@
+Title: Learning to Act Robustly with View-Invariant Latent Actions
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Jeong_Learning_to_Act_Robustly_with_View-Invariant_Latent_Actions_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:00 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Learning to Act Robustly with View-Invariant Latent Actions 
+
+# Youngjoon Jeong * Junha Chun * Taesup Kim †
+
+# Seoul National University View-invariant Latent Action Learning Policy Fine-tuning 
+
+> View Generalization Task Adaptation
+
+IDM FDM 
+
+> Latent Action Latent Action
+> Latent Policy
+
+Policy 
+
+> Contrastive Learning
+> …
+> View 1 View N
+
+Figure 1. VILA Overview. Our method learns view-invariant latent actions by aligning them using action-aware contrastive learning along with predicting the future. A latent policy that predicts these latent actions from the current observation is then used as a vision encoder to condition a downstream visuomotor policy, yielding robust view generalization and task adaptation in simulation and the real-world. 
+
+# Abstract 
+
+Vision-based robotic policies often struggle with even mi-nor viewpoint changes, underscoring the need for view-invariant visual representations. This challenge becomes more pronounced in real-world settings, where viewpoint variability is unavoidable and can significantly disrupt pol-icy performance. Existing methods typically learn invari-ance from multi-view observations at the scene level, but such approaches rely on visual appearance and fail to in-corporate the physical dynamics essential for robust gener-alization. We propose View-Invariant Latent Action (VILA), which models a latent action capturing transition patterns across trajectories to learn view-invariant representations grounded in physical dynamics. VILA aligns these latent actions across viewpoints using an action-guided objective based on ground-truth action sequences. Experiments in both simulation and the real world show that VILA-based policies generalize effectively to unseen viewpoints and trans-fer well to new tasks, establishing VILA as a strong pretrain-ing framework that improves resilience to viewpoint shifts and downstream learning performance. 
+
+> *These authors contributed equally to this work.
+> †Corresponding author.
+
+# 1. Introduction 
+
+Vision-based robotic policies are brittle to changes in camera viewpoint, posing a critical barrier to robust real-world de-ployment. While collecting large-scale, multi-view datasets is a straightforward way to expose policies to viewpoint vari-ation, it incurs prohibitive data acquisition costs and scales poorly. Prior approaches have largely focused on obtaining a 
+
+scene-level visual representation that is stable under view-point changes. This is often achieved either by modifying observations (e.g., via novel view synthesis (NVS) or ge-ometric inputs) [7, 18, 37] or by pre-training encoders to learn invariant features [23, 29, 33]. Despite these different strategies, the underlying goal remains the same: enforcing robustness at the image-level. In practice, this means that a single compact feature vector is asked to summarize the en-tire image, including static layout and background, and at the same time carry all information about task-relevant motion. Enforcing viewpoint robustness at this level can therefore be unnecessarily demanding: it asks for invariance over a representation that is much broader than what is actually needed for control, and it does not explicitly distinguish be-tween static context and the underlying dynamics that drive actions. This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 6781 In this paper, we propose a different, more targeted ap-proach. Our key insight is that invariance should be enforced not on a static scene-level visual representation ,but rather on the dynamics , the change in the scene that is relevant to the actions. Representations of change are naturally more compact and predominantly capture how the agent and objects move, rather than how the entire scene looks from a particular viewpoint. To this end, we introduce 
+
+View-Invariant Latent Action ( VILA ), a novel pre-training framework described in Figure 1. VILA builds on the notion of latent actions [2, 28, 32, 40], which model dynamics as a compact code explaining the observed change between consecutive observations, but with a key difference. VILA learns a latent action representation that encodes the change between observations. At the same time, we use ground-truth (GT) action sequences as action-guided alignment to shape this space; in our target setting of multi-view robot learning, such action logs are typically available and provide a practical supervision signal for cross-view alignment. We then apply a weighted contrastive loss and a global similarity-alignment term, enforcing view-invariance directly in this dynamics-centered latent space. 
+
+# 2. Related Works 
+
+## 2.1. Viewpoint Robustness in Visuomotor Policies 
+
+A key challenge in visuomotor policy learning is general-izing to camera poses that differ between training and de-ployment. Prior work mainly tackles this via modifying the observations or learning view-robust representations. The first family operates at the observation level . Large-scale datasets [13, 19, 22, 39] expose policies to multiple cameras, but typically with limited viewpoint diversity. Data augmentation methods instead synthesize or collect addi-tional views so that the policy sees a wider range of poses; several recent approaches [7, 12, 37] use NVS to augment la-beled datasets. Other methods explicitly condition the policy on camera geometry, as in [18], which provides intrinsics, extrinsics, or per-pixel ray embeddings as additional inputs. The second family operates at the representation level 
+
+by learning view-robust visual encoders [23, 25, 29, 33, 35]. These methods train scene-level features to remain stable under camera motion while summarizing the entire image, which can conflate task-relevant motion with static context or visual appearances. In contrast, VILA does not impose invariance on a scene-level representation. We enforce invariance only on the latent action, a compact representation of the system’s dynamics, so that model capacity is focused on how the agent and objects move rather than on full-scene appearance. 
+
+## 2.2. Latent Actions 
+
+Latent action models [2, 28, 32] learn compact dynamics representations by encoding the change between two ob-servations ot and ot+k into a latent action z. This is typi-cally done with an inverse dynamics model (IDM) inferring 
+
+z = IDM( ot, o t+k) and a forward dynamics model (FDM) reconstructing ˆot+k = FDM( ot, z ). To avoid trivial solu-tions, z is constrained by a low-dimensional bottleneck or vector quantization [32, 38, 40]. These dynamics representations have proved useful priors for world models [4, 15, 30] and policies [1, 2, 5, 8, 28, 32, 40]. However, existing work mainly optimizes latent actions to be predictive and useful for control, without explicitly targeting robustness to camera pose changes. Because la-tent actions are defined over changes between observations, they already emphasize motion rather than static appearance, which makes them a natural place to enforce additional view-point invariance. In VILA, we keep the standard latent action learning objective but add multi-view, action-guided regu-larization that forces latent actions for the same underlying motion to align across viewpoints, and then use this space as the interface for learning viewpoint-robust visuomotor policies. Unlike latent-action pretraining settings based on unlabeled internet videos, we focus on multi-view robot learning, where action logs are typically available and can be naturally leveraged as a supervision signal for cross-view alignment. 
+
+# 3. Methods 
+
+Our proposed framework consists of two stages: (i) latent action learning , where we learn a compact, action-guided and view-invariant dynamics representation, and (ii) latent behavior cloning , where we train a latent policy that takes the current observation as input and predicts latent actions, so that this latent policy serves as a view-invariant vision encoder that conditions a downstream visuomotor policy. In the latent action learning stage, we pursue two primary objectives: (i) learning a base latent action representation that captures the underlying dynamics in a compact latent space; and (ii) enforcing view-invariance on this latent ac-tion using an action-aware contrastive objective. We build our base latent action learner on top of the LAOM frame-work [32], and then introduce our action-aware contrastive loss and structural regularizer. The resulting IDM is then reused in the latent behavior cloning stage, where we train a latent policy as an encoder. 
+
+## 3.1. Base Latent Action Learning 
+
+We first learn a base latent action representation following the core design of LAOM [32], which relies on a temporal consistency loss LLA in a compact latent space. We index time by subscripts t and camera viewpoints by superscripts v, so ovt denotes the observation at time t
+
+from view v. A visual encoder E maps each observation ovt
+
+to a feature svt = E(ovt ), and we sample a temporal offset 
+
+k ∈ { 1, . . . , K } to obtain svt+k = E(ovt+k). The IDM infers 6782 a latent action zvt = IDM( svt , s vt+k), and the FDM predicts the future feature ˆsvt+k = FDM( svt , z vt ).The core temporal consistency loss LLA is defined as the mean squared error between this prediction ˆsvt+k and a stable target stgt ,v t+k . The target is obtained by passing ovt+k
+
+through a separate, non-backpropagated encoder Etgt , whose parameters are an EMA of the online encoder E. Let Dk
+
+denote the set of all pairs (ovt , o vt+k) for which the segment 
+
+(t, t + k) exists in the dataset. Our latent action loss is 
+
+LLA = Ek∼U (1 ,K ), (ovt ,o vt+k )∼D k
+
+∥FDM( svt , z vt ) − stgt ,v t+k ∥22
+
+,
+
+(1) where zvt = IDM( svt , s vt+k). This loss encourages 
+
+(E, IDM , FDM) to discover a compact latent action zvt that explains the change from ovt to ovt+k without reconstructing pixels. We use the same mini-batch construction described in Sec. 3.2 to obtain training samples for this objective. 
+
+## 3.2. Action-Guided Latent Action Invariance 
+
+To make the latent action invariant to camera viewpoint, we introduce an action-aware contrastive objective. The key idea is that latent actions inferred from different viewpoints should be close whenever their corresponding future GT action sequences are similar. We construct each training batch as follows. We first sam-ple a temporal offset k ∈ { 1, . . . , K } and then sample N
+
+base time indices {ti}Ni=1 such that the segment (ti, t i + k)
+
+and its GT action sequence AGT  
+
+> i
+
+= ( ati , . . . , a ti+k−1) are available. For each base index ti, we sample V random camera viewpoints and retrieve the corresponding observa-tion pairs {(ovti , o vti+k)}Vv=1 , yielding B = N V latent action samples per batch. We index these B transitions by a single index i ∈ { 1, . . . , B }, so each i implicitly corresponds to a particular (t, v ) pair, and denote the associated latent action by zi and GT action sequence by AGT  
+
+> i
+
+. Within each batch, 
+
+k is held fixed so that all samples share the same prediction horizon. We use the GT action sequences as supervision. For each sample i, let AGT  
+
+> i
+
+∈ Rk×D denote the sequence of k actions. We first define a normalized squared distance between two sequences 
+
+dij = ∥AGT  
+
+> i
+
+− AGT  
+
+> j
+
+∥2
+
+> F
+
+kD , (2) where ∥ · ∥ F is the Frobenius norm. We then convert these distances into soft weights 
+
+wij = exp( −dij /β )
+
+PBℓ=1 exp( −diℓ /β ) , (3) where β > 0 controls the sharpness of the distribution; larger 
+
+wij indicate more similar action sequences. Using these weights, we employ a weighted InfoNCE (supervised contrastive) loss [20, 21] that refines the local 
+
+structure of the latent action space: 
+
+LW-NCE = −
+
+> B
+
+X
+
+> i=1
+> B
+
+X 
+
+> j=1 ,j ̸=i
+
+wij log exp(sim( zi, z j )/τ )
+
+PBℓ=1 exp(sim( zi, z ℓ)/τ ) ,
+
+(4) where sim( zi, z j ) = z⊤   
+
+> izj
+> ∥zi∥ ∥ zj∥
+
+is cosine similarity and τ > 0
+
+is a temperature. To capture the global structure, we introduce an auxiliary structural loss based on pairwise similarities. We treat each GT action sequence AGT  
+
+> i
+
+∈ Rk×D as a single vector in 
+
+RkD by flattening it (we reuse the same notation for brevity). We then L2-normalize latent actions and GT action vectors, 
+
+ˆzi = zi/∥zi∥2 and ˆAGT  
+
+> i
+
+= AGT  
+
+> i
+
+/∥AGT  
+
+> i
+
+∥2, and form cosine-similarity matrices Sz = ˆZ ˆZ⊤ and SGT = ˆA ˆA⊤, where the 
+
+i-th rows of ˆZ and ˆA are ˆz⊤ 
+
+> i
+
+and ( ˆAGT  
+
+> i
+
+)⊤, respectively. We then align these global similarity structures via 
+
+Lstruct = ∥SGT − Sz ∥2 
+
+> F
+
+. (5) The total VILA representation loss is 
+
+LVILA = LLA + λ1LW-NCE + λ2Lstruct , (6) where λ1 and λ2 are weighting hyperparameters. 
+
+## 3.3. Latent Behavior Cloning 
+
+The latent behavior cloning stage learns a policy that predicts latent actions from the current observation so that no future frames are needed at test time. We train a latent policy πz
+
+via behavior cloning: 
+
+LBC = πz (svt ) − IDM( svt , s vt+k) 22. (7) Here, IDM is frozen after latent action pre-training. Since 
+
+πz operates in the pre-trained latent action space, it inherits its view-invariant, structured properties. During fine-tuning, 
+
+πz predicts latent actions from the current observation, and these are used as conditions for a downstream policy that outputs low-level actions. 
+
+# 4. Experimental Results 
+
+## 4.1. Viewpoint Setups 
+
+To train and evaluate view-invariant policies, we construct multi-view datasets by augmenting existing datasets with additional camera viewpoints. In simulation, we use five RoboSuite-based tasks [41]: (a) Lift : simple block lifting and (b) Square : pick-and-place with precision tasks from RoboMimic [26], (c) Stack Three : multiple block stacking, (d) Coffee : inserting pod in the coffee machine and closing, and (e) Mug Cleanup : opening the cabinet, placing mug in the cabinet, and closing tasks from MimicGen [27]. 6783 Table 1. Unseen View Generalization in Fine-tuned and Frozen Settings (Simulation). For each of the 25 views in Figure 4, we evaluate average success rates (%) over 20 episodes and report for 10 seen views, 15 unseen views, and their ratio denoted as Rel.                                                                                                                                                                                                        
+
+> Model Lift Square Stack Three Coffee Mug Cleanup
+> Seen Unseen Rel. Seen Unseen Rel. Seen Unseen Rel. Seen Unseen Rel. Seen Unseen Rel.
+> Fine-Tuned
+> VILA (Ours) 99.50 94.70 95.18 69.00 19.80 28.70 69.00 53.65 77.75 63.00 12.65 20.08 56.75 27.85 49.07
+> Vanilla 97.00 77.00 79.38 57.00 8.70 15.26 64.00 23.70 37.03 63.00 0.35 0.56 55.50 9.70 17.48 Vanilla + Crop 96.50 82.30 85.28 38.00 9.30 24.47 53.00 26.00 49.06 12.00 3.30 27.50 37.00 14.00 37.84 Vanilla + Aug-Str 94.00 86.70 92.23 33.00 9.30 28.18 55.00 28.00 50.91 12.00 1.30 10.83 34.00 10.00 29.41 Vanilla + Aug-Wk 99.00 74.70 75.45 51.00 11.30 22.16 63.00 20.00 31.75 37.00 1.30 3.51 44.00 16.00 36.36 CLASS 96.50 65.00 67.36 54.00 9.00 16.67 30.00 10.35 34.50 28.00 0.35 1.25 22.00 6.35 28.86 ReViWo 83.00 38.00 45.78 5.00 0.35 7.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 KYC 72.00 46.00 63.89 14.00 0.00 0.00 1.90 0.00 0.00 10.70 0.00 0.00 4.00 0.00 0.00
+> Frozen
+> VILA (Ours) 72.00 60.70 84.31 34.50 10.35 30.00 15.50 6.65 42.90 29.50 4.00 13.56 33.50 15.00 44.78
+> Vanilla 76.00 47.30 62.24 14.00 0.35 2.50 0.50 0.00 0.00 6.50 0.00 0.00 5.00 0.00 0.00 CLASS 93.90 65.00 69.22 25.00 0.35 1.40 0.50 0.00 0.00 6.00 0.00 0.00 4.00 0.00 0.00 ReViWo 78.00 40.70 52.18 1.50 0.00 0.00 0.00 0.00 0.00 0.50 0.00 0.00 0.00 0.00 0.00
+
+(a) Lift (b) Square (c) Stack Three 
+
+(d) Coffee (e) Mug Cleanup (f) Real-world 
+
+Figure 2. Dataset Overview. Examples from the training dataset for each task in simulation and real-world experiments. 
+
+(a) View 1 (b) View 2 (c) View 3 
+
+Figure 3. Real-world Unseen Views. Examples of unseen camera poses used to evaluate view generalization capability in the real-world pick-and-place experiments. 
+
+For each trajectory, we treat the original agentview 
+
+as a reference and define a 5 × 5 grid over azimuth off-sets in [−90 ◦, +90 ◦] and elevation offsets in [−15 ◦, +15 ◦],partitioning each range into five uniform bins. 
+
+Figure 4. Multi-View Camera Poses for Training and Evalua-tions. Green poses are used for training the encoder and policy (seen), and red poses are reserved for evaluation (unseen). An extrapolated viewpoint (beyond 5 × 5 grid) is generated starting from the blue pose. 
+
+We then sample one azimuth/elevation pair per grid cell as a relative offset from agentview , yielding 25 distinct camera poses and thus 25 view-augmented versions of every trajectory. The resulting offsets ensure that both training and testing occur under non-trivial deviations from the orig-inal camera. From these 25 views, we fix 10 for training encoders and policies and reserve the remaining 15 for eval-uation (Figure 4). We also evaluate extrapolated viewpoints by choosing a base pose whose azimuth and elevation lie outside this sampling range and then perturbing it by ±2◦
+
+along both axes, giving 8 additional test views. Exact az-imuth and elevation values for all views are provided in the Appendix. Compared to prior multi-view setups used by our baselines [18, 23, 29], our evaluation covers a wide range of azimuth and elevation with fewer training views, leading to 6784 (a) 
+
+(b)         
+
+> Figure 5. Unseen View Generalization vs. Viewpoint Difference. Success rates (%) (averaged over 20 episodes per view) of VILA and baseline methods for view generalization under (a) fine-tuned and (b) frozen encoder settings. The success rates are shown with respect to angular differences from the training viewpoints. We evaluate 15 unseen camera viewpoints and, for each unseen view, compute its view difference to the closest training view among the 10 seen cameras, measured as the Euclidean norm in the (azimuth, elevation) space. Based on this, the 15 unseen views are sorted and partitioned into four groups (of sizes 4, 4, 4, and 3). On the x-axis, we plot the average nearest-view difference within each group, and on the y-axis we report the corresponding average success rate for that group.
+
+sparser camera coverage and a more challenging viewpoint generalization setting. For real-world experiments, we use a self-collected single-view dataset of the SO-ARM101 robot [6] picking a block and placing inside the cup (Figure 2f). Since capturing iden-tical trajectories from many physical cameras is challenging, we follow prior work [7, 37] and apply ZeroNVS [31] to aug-ment the original videos with additional viewpoints. We vary the camera azimuth in {− 5◦, 0◦, +5 ◦}, the vertical transla-tion in {− 5cm , 0cm , +5 cm }, and the optical-axis translation in {− 5cm , 0cm , +5 cm }, producing 27 views including the original. We select 4 views for training and evaluate on 3 held-out views in Figure 3 that are disjoint from the training set. 
+
+## 4.2. Unseen View Generalization 
+
+Evaluation protocol. For each dataset and task, we first train an encoder and a visuomotor policy, and then evaluate generalization performance on seen and unseen viewpoints within the same task. All pretrained encoders are trained with the same image resolutions ( 64 × 64 ) and latent fea-ture dimensions ( 128 ), using the multi-view training setup described in Sec. 4.1. For downstream control, we train a Diffusion Policy [9] with identical hyperparameters across all baselines, and measure its success rate separately for each viewpoint. Success rates are computed over 20 episodes per view in simulation and 10 per view in the real world; addi-tional details are reported in the Appendix. We evaluate each representation in two downstream set-tings: (i) a frozen setting, where the encoder is fixed and only the policy parameters are trained, and (ii) a fine-tuned setting, where the encoder is updated jointly with the policy. The frozen setting highlights the inherent viewpoint generaliza-tion of the learned representation itself, while the fine-tuned setting measures its effectiveness as a strong initialization for task-specific policy learning. 
+
+Baselines. All baselines share the same downstream policy, observation preprocessing, and training schedule; only the encoder pre-training strategy and the presence of camera-conditioning (Know Your Camera [18] (KYC) only) differ. This setup allows us to isolate the impact of the learned representation on unseen-view generalization. • Vanilla: ImageNet-pretrained ResNet-18 encoder [11, 16] used directly for policy learning. • Vanilla + Augmentations: We also evaluate three augmentation-only Vanilla variants: Crop (random crop, 
+
+48 × 48 ), Aug-Str (random crop, 48 × 48 , with color jitter-ing: brightness/contrast/saturation = 0 .4 and hue = 0 .15 ), and Aug-Wk (random crop, 56 × 56 , with color jittering: brightness/contrast/saturation = 0 .3 and hue = 0 .1). • CLASS [23]: Scene-level encoder trained with a weighted InfoNCE loss based on GT action-sequence distances. • ReViWo [29]: View-invariant scene representation learned via decomposition of multi-view observations. • Know Your Camera [18]: Policy conditioned explicitly on camera parameters to aid cross-view generalization. 6785 Table 2. View Generalization in Extrapolated Views in the Fine-tuned Setting. Success rates (%) of fine-tuned policies on four simulation tasks evaluated under extrapolated camera poses (8 views). For each task, we run 20 episodes per view and report the average success rate across views. Note that the Coffee task is excluded because all methods failed under these extrapolated viewpoints.                                                      
+
+> Model Lift Square Stack Mug Three Cleanup
+> VILA (Ours) 93.10 3.10 35.00 11.85
+> Vanilla 28.10 0.60 6.25 2.50 CLASS 51.30 0.60 2.50 0.60 ReViWo 8.80 0.00 0.00 0.00 KYC 21.20 0.00 0.00 0.00
+> Table 3. Real-World View Generalization. Success rates (%) of policies on the real-world pick-and-place task, evaluated on three novel camera viewpoints that are distinct from NVS-generated views. For each viewpoint, we run 10 real-world episodes and report the success rate per view and their average (Avg.).
+> Policy Model V1 V2 V3 Avg.
+> DP VILA (Ours) 70.00 80.00 40.00 63.33
+> Vanilla 0.00 0.00 10.00 3.33 CLASS 10.00 30.00 0.00 13.33 VLA π0.530.00 50.00 30.00 36.67 SmolVLA 30.00 40.00 30.00 33.33
+
+• VLAs: For real-world experiments only, we additionally compare against π0.5 [17] and SmolVLA [36], fine-tuned from their official LeRobot [6] checkpoints on the same ZeroNVS-augmented real-world dataset without any addi-tional objective. 
+
+Simulation results. Table 1 reports seen/unseen success rates and unseen/seen performance ratios (Rel.) across five simulated tasks in both frozen and fine-tuned settings. With fine-tuning, VILA attains the best unseen-view success on all tasks, including the harder tasks, while in the frozen setting it is the only method that maintains non-trivial performance on tasks where other approaches often collapse to near-zero under unseen views. Figure 5 further breaks down unseen-view performances as a function of viewpoint difference from the nearest seen view: across both settings, VILA achieves the strongest relative generalization and its success degrades more gradually as the gap from the nearest training camera increases. Table 2 shows that these gaps widen under extrapolated camera poses, with VILA retaining meaningful success rates while baselines largely fail. 
+
+Real-world results. Table 3 summarizes unseen-view per-formance on the real-world SO-ARM pick-and-place task in the fine-tuned setting. VILA achieves the strongest per-formance across all three novel views, substantially outper-  
+
+> Figure 6. Unseen Task Adaptation. Success rates (%) of VILA and baseline methods when adapting from Stack Three to Coffee. For each data point, we report the average success over 40 episodes using the training view only, plotted as a function of the number of labeled trajectories and training epochs.
+
+forming all baselines. This supports our claim that enforcing view invariance on compact, action-guided dynamics repre-sentations improves resilience to camera placement changes in real-world scenes. Notably, VILA also surpasses recent VLA baselines, π0.5 and SmolVLA, consistent with recent findings that current VLAs remain brittle under camera vari-ation [14, 24]. These results further suggest that explicit invariance objectives such as VILA may provide a comple-mentary path to improving VLA robustness under camera changes. 
+
+## 4.3. Unseen Task Adaptation 
+
+Evaluation protocol. To investigate whether representa-tions learned on one task provide useful priors for other tasks, we transfer encoders trained on the Stack Three task to a Coffee task under a single-view setup (i.e., policy is trained and evaluated on the single identical view). Con-cretely, we take each encoder pre-trained on Stack Three in the multi-view setting (Sec. 4.1) and use it to initialize a visuomotor policy on the Coffee task, then fine-tune the encoder and policy jointly using only a small subset of the Coffee demonstrations. The full Coffee dataset contains the same 1,000 episodes as in Sec. 4.2. This setup allows us to assess both cross-task transfer and whether each encoder provides a viewpoint-generalized prior that carries over to a new task. 
+
+Baselines. The Vanilla baseline denotes training a policy directly on the Coffee task in the single-view setting, using only the chosen Coffee subset and an ImageNet-pretrained ResNet encoder, without any multi-view or cross-task pre-training. The Vanilla-Transfer baseline instead first fine-tunes the Vanilla encoder on the Stack Three multi-view task (as in our unseen-view generalization experiments), and then 6786 uses this fine-tuned encoder as initialization for subsequent single-view training on Coffee. All other methods follow the same protocol: we start from their respective encoders pre-trained on the Stack Three multi-view dataset and then fine-tune them on the single-view Coffee task. 
+
+Results. Figure 6 summarizes unseen task adaptation on Coffee under different labeled data budgets. Across all bud-gets, VILA provides a stronger prior than the Vanilla base-line, while other encoders often match or even underperform Vanilla trained from scratch. Thus, not all multi-view pre-training is helpful for cross-task adaptation: enforcing scene-level invariance can produce less transferable priors that might overfit to task-specific appearances, whereas VILA’s latent-action representation yields a viewpoint-generalized and dynamics-centered prior that remains useful even with limited Coffee data. 
+
+# 5. Discussion 
+
+## 5.1. Ablation Studies 
+
+We conduct a comprehensive ablation study to validate the key design choices of VILA. Unless otherwise noted, all ablations are performed on the Lift task in the fine-tuned setting, and we report success rates on unseen views. Our de-fault configuration uses an action-guided Weighted InfoNCE loss combined with a structural distance-alignment loss, L2 distance between action sequences for weight and cosine similarity for structural alignment, a latent action dimen-sion of 128, and a random offset sampling range of 10 steps (Sec. 3.2). The results are summarized in Table 4. 
+
+Loss function. Removing the action-aware weighting or omitting the structural loss both degrade unseen-view suc-cess compared to the full objective, indicating that the two components are complementary. Using the base latent-action loss alone performs even worse, confirming that neither component alone is sufficient. Alternative global regulariz-ers based on CKA-style alignment also underperform our distance-based structural loss. Adding an auxiliary action-regression head further harms unseen-view performance, suggesting that actions are more effective as soft similarity supervision than as direct regression targets. Notably, the unweighted alignment variant still performs strongly, indi-cating that actions are helpful as an alignment signal but not strictly required. 
+
+Offset sampling strategy. Sampling temporal offsets uniformly from {1, . . . , 10 } when constructing action se-quences yields the best unseen-view generalization. Smaller or larger maximum offsets, or a fixed offset, consistently de-grade performance, suggesting that a moderate offset range captures dynamics most effectively. 
+
+Distance metric. Replacing our L2 distance in weighted con-trastive learning and cosine similarity in structural alignment with Dynamic Time Warping (DTW) [3] lowers unseen-
+
+Table 4. Ablation study of VILA components. Seen and Unseen denote success rates (%) averaged over 20 episodes across the 10 training views and 15 held-out views on the Lift task in the fine-tuned setting. 
+
+Method Seen Unseen Rel. VILA (Ours) 99.50 94.70 95.18 
+
+Loss function (default: LLA & LW-NCE & Lstruct )
+
+LLA & LW-NCE & LCKA 98.50 92.00 93.40 
+
+LLA & LW-NCE 99.00 91.70 92.63 
+
+LLA & LNCE 95.50 90.00 94.24 
+
+LLA & Lstruct 99.50 84.30 84.72 
+
+LLA 93.00 79.50 85.48 
+
+LLA & LW-NCE & Lstruct & Lact 98.00 86.70 88.47 
+
+Action-sequence distance 
+
+Dynamic Time Warping (DTW) 96.40 89.20 92.53 
+
+Offset sampling strategy (default: random offset 1–10) 
+
+Random offset 1–16 99.50 93.70 94.17 Random offset 1–5 98.50 92.30 93.71 Fixed offset 10 97.50 90.00 92.31 
+
+Latent action dimension (default: 128) 
+
+32 dimensions 98.00 88.00 89.80 64 dimensions 97.00 84.70 87.32 256 dimensions 98.00 88.70 90.51 512 dimensions 96.00 90.00 93.75  
+
+> Loss term definitions. LNCE : standard InfoNCE with positives from the same transition and negatives from others;
+> LCKA : RBF-kernel CKA-based structural alignment of latent actions and GT-actions;
+> Lact : auxiliary action-prediction loss.
+
+view success. Unlike prior work that applies DTW to longer trajectories (e.g., 16 steps in CLASS [23]), our sequences of up to 10 steps already work well with L2. Since we resample sequence lengths (1–10) at every batch, precom-puting exact DTW distances is impractical, so we instead use Soft-DTW [10], whose approximation error and higher computational cost do not translate into better performance in our setting. 
+
+Latent action dimension. A latent dimension 128 gives the best unseen-view generalization. Both smaller and much larger latent spaces hurt performance, suggesting that 128 
+
+offers a good trade-off between expressivity and regulariza-tion. 
+
+## 5.2. Representation Quality Analysis 
+
+We evaluate the quality of the representation using entropy-based metrics that capture the viewpoint invariance and dynamics-aware semantics. For each encoder, we sam-ple 12 ,500 transitions (500 per view) from the multi-view dataset, extract features before and after policy fine-tuning, and for each feature compute its k = 50 nearest neighbors (L2) and the corresponding entropies. 6787 Table 5. View and Action Entropy. Entropy-based analysis of representation quality before and after policy fine-tuning in Lift dataset. “Seen” and “Unseen” denote view entropies (higher is better, ↑) computed over the 25 views, respectively, while “Action” denotes action entropy (lower is better, ↓) based on 10 clustered action classes. The upper-bound row corresponds to the entropy of a uniform distribution over 25 views (Seen/Unseen) and 10 action clusters (Action).                               
+
+> Model Seen ( ↑)Unseen ( ↑)Action ( ↓)
+> Upper Bound 3.219 3.219 2.303
+> Before Fine-tuning
+> VILA (Ours) 2.757 2.495 0.934
+> CLASS 2.641 2.159 1.041 ReViWo 2.479 1.830 1.132
+> Fine-Tuned
+> VILA (Ours) 2.803 2.548 0.829
+> Vanilla 2.707 2.121 1.445 CLASS 2.624 1.933 1.006 ReViWo 2.597 2.244 1.177 KYC 2.149 1.793 1.254
+
+View entropy. View entropy measures how mixed camera views are in each feature’s local neighborhood. For each feature, we take the distribution of view IDs among its k
+
+nearest neighbors, compute the Shannon entropy [34] of this categorical distribution, and average over all features. 
+
+Higher view entropy means neighbors are drawn more uni-formly from the 25 views, indicating a more view-invariant representation. 
+
+Action entropy. To check that invariance does not harm dynamics-aware semantics, we define an action entropy that measures how consistently features group similar fu-ture dynamics. We cluster all 10-step GT action sequences 
+
+{at, . . . , a t+9 } into K = 10 action classes using k-means and assign each observation ot the label ct of its associated sequence. For each feature, we look at the class labels of its k nearest neighbors, compute the entropy over this dis-tribution, and average across features. Here, lower action entropy is better, indicating that visual features tend to clus-ter according to similar action outcomes. 
+
+Results. Table 5 reports view and action entropy on the Lift dataset (results for other tasks are provided in the Appendix). VILA achieves the highest view entropy on both seen and unseen views, indicating the strongest view invariance, while also obtaining the lowest action entropy. This suggests that enforcing invariance on dynamics rather than entire scenes allows VILA to remain well mixed across views while pre-serving dynamics-aware structure.   
+
+> Figure 7. Stuck-Moving Pair Separation. Distribution of normal-ized L2 distances for 50 stuck/moving pairs with similar actions from the Square task. VILA shows larger latent separation than CLASS, consistent with better separation of action-outcome mis-matches.
+
+## 5.3. Action-Outcome Mismatches 
+
+VILA may be better suited to handling action-outcome mis-matches, where similar actions can induce different transi-tions, especially in contact-rich regimes such as stuck versus moving outcomes. Methods such as CLASS, which struc-ture scene-level representations by action similarity, may under-separate these cases. In contrast, VILA grounds la-tent actions in realized transitions through future prediction while using actions only as a soft alignment signal. Consis-tent with this intuition, VILA yields larger latent separation than CLASS on 50 such pairs from the Square task (normal-ized L2: 1.44 vs. 0.81; Figure 7). 
+
+# 6. Conclusion 
+
+We tackle viewpoint robustness in visuomotor control with VILA, a pre-training framework that enforces invariance on latent action instead of scene-level visual features. Building on latent action models with an action-guided contrastive loss and structure alignment, VILA learns a latent space that is both view-invariant and aligned with control dynamics, leading to consistent gains in unseen-view generalization and data-efficient unseen task adaptation across five simu-lated tasks and a real-world SO-ARM setup. This suggests that targeting invariance at the level of dynamics is a promis-ing direction for robust visuomotor policies under camera changes. 
+
+Limitations. Our experiments assume access to multi-view observations, which are easier to obtain in simulation than in the real world. In the real-robot setting, we rely on Ze-roNVS for view augmentation, so part of the performance may reflect the underlying NVS model. Also, we limit our study to camera pose changes rather than broader variations such as lighting, backgrounds, or object appearance, which we leave for future work. 6788 Acknowledgments. This work was supported by the Na-tional Research Foundation of Korea (NRF) grant funded by the Korea government (MSIT) (No. RS-2024-00345809, Research on AI Robustness Against Distribution Shift in Real-World Scenarios; and No. RS-2023-00222663, Center for Optimizing Hyperscale AI Models and Plat-forms) 
+
+# References 
+
+[1] AgiBot-World-Contributors, Qingwen Bu, Jisong Cai, Li Chen, Xiuqi Cui, Yan Ding, Siyuan Feng, Shenyuan Gao, Xindong He, Xuan Hu, Xu Huang, Shu Jiang, Yuxin Jiang, Cheng Jing, Hongyang Li, Jialu Li, Chiming Liu, Yi Liu, Yuxiang Lu, Jianlan Luo, Ping Luo, Yao Mu, Yuehan Niu, Yixuan Pan, Jiangmiao Pang, Yu Qiao, Guanghui Ren, Cheng Ruan, Jiaqi Shan, Yongjian Shen, Chengshi Shi, Mingkang Shi, Modi Shi, Chonghao Sima, Jianheng Song, Huijie Wang, Wenhao Wang, Dafeng Wei, Chengen Xie, Guo Xu, Junchi Yan, Cunbiao Yang, Lei Yang, Shukai Yang, Maoqing Yao, Jia Zeng, Chi Zhang, Qinglin Zhang, Bin Zhao, Chengyue Zhao, Jiaqi Zhao, and Jianchao Zhu. Agibot world colosseo: A large-scale manipulation platform for scalable and intelligent embodied systems, 2025. 2 [2] Erik Bauer, Elvis Nava, and Robert K. Katzschmann. Latent action diffusion for cross-embodiment manipulation, 2025. 2 [3] Donald J. Berndt and James Clifford. Using dynamic time warping to find patterns in time series. In Proceedings of the 3rd International Conference on Knowledge Discovery and Data Mining , page 359–370. AAAI Press, 1994. 7 [4] Jake Bruce, Michael Dennis, Ashley Edwards, Jack Parker-Holder, Yuge Shi, Edward Hughes, Matthew Lai, Aditi Mavalankar, Richie Steigerwald, Chris Apps, Yusuf Aytar, Sarah Bechtle, Feryal Behbahani, Stephanie Chan, Nicolas Heess, Lucy Gonzalez, Simon Osindero, Sherjil Ozair, Scott Reed, Jingwei Zhang, Konrad Zolna, Jeff Clune, Nando de Freitas, Satinder Singh, and Tim Rockt¨ aschel. Genie: Gener-ative interactive environments, 2024. 2 [5] Qingwen Bu, Yanting Yang, Jisong Cai, Shenyuan Gao, Guanghui Ren, Maoqing Yao, Ping Luo, and Hongyang Li. Univla: Learning to act anywhere with task-centric latent actions. arXiv preprint arXiv:2505.06111 , 2025. 2 [6] Remi Cadene, Simon Aliberts, Francesco Capuano, Michel Aractingi, Adil Zouitine, Pepijn Kooijmans, Jade Choghari, Martino Russi, Caroline Pascal, Steven Palma, Mustafa Shukor, Jess Moss, Alexander Soare, Dana Aubakirova, Quentin Lhoest, Quentin Gallou´ edec, and Thomas Wolf. Ler-obot: An open-source library for end-to-end robot learning, 2026. 5, 6 [7] Lawrence Yunliang Chen, Chenfeng Xu, Karthik Dharmara-jan, Muhammad Zubair Irshad, Richard Cheng, Kurt Keutzer, Masayoshi Tomizuka, Quan Vuong, and Ken Goldberg. Rovi-aug: Robot and viewpoint augmentation for cross-embodiment robot learning, 2024. 1, 2, 5 [8] Xiaoyu Chen, Hangxing Wei, Pushi Zhang, Chuheng Zhang, Kaixin Wang, Yanjiang Guo, Rushuai Yang, Yucen Wang, Xinquan Xiao, Li Zhao, Jianyu Chen, and Jiang Bian. villa-x: Enhancing latent action modeling in vision-language-action models, 2025. 2 [9] Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin Burchfiel, and Shuran Song. Diffu-sion policy: Visuomotor policy learning via action diffusion. In Proceedings of Robotics: Science and Systems (RSS) , 2023. 5[10] Marco Cuturi and Mathieu Blondel. Soft-dtw: a differentiable loss function for time-series, 2018. 7 [11] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In 2009 IEEE Conference on Computer Vision and Pattern Recognition , pages 248–255, 2009. 5 [12] Haoran Ding, Anqing Duan, Zezhou Sun, Dezhen Song, and Yoshihiko Nakamura. Imagination at inference: Synthesizing in-hand views for robust visuomotor policy inference. arXiv preprint arXiv:2509.15717 , 2025. 2 [13] Hao-Shu Fang, Hongjie Fang, Zhenyu Tang, Jirong Liu, Chenxi Wang, Junbo Wang, Haoyi Zhu, and Cewu Lu. Rh20t: A comprehensive robotic dataset for learning diverse skills in one-shot. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 653–660. IEEE, 2024. 2 [14] Senyu Fei, Siyin Wang, Junhao Shi, Zihao Dai, Jikun Cai, Pengfang Qian, Li Ji, Xinzhe He, Shiduo Zhang, Zhaoye Fei, Jinlan Fu, Jingjing Gong, and Xipeng Qiu. Libero-plus: In-depth robustness analysis of vision-language-action models, 2025. 6 [15] Shenyuan Gao, Siyuan Zhou, Yilun Du, Jun Zhang, and Chuang Gan. Adaworld: Learning adaptable world models with latent actions. In International Conference on Machine Learning (ICML) , 2025. 2 [16] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition, 2015. 5 [17] Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Manuel Y. Gal-liker, Dibya Ghosh, Lachy Groom, Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Devin LeBlanc, Sergey Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Allen Z. Ren, Lucy Xiaoyang Shi, Laura Smith, Jost Tobias Springenberg, Kyle Stachowicz, James Tanner, Quan Vuong, Homer Walke, Anna Walling, Haohuan Wang, Lili Yu, and Ury Zhilinsky. π0.5: a vision-language-action model with open-world generalization, 2025. 6[18] Tianchong Jiang, Jingtian Ji, Xiangshan Tan, Jiading Fang, Anand Bhattad, Vitor Guizilini, and Matthew R. Walter. Do you know where your camera is? view-invariant policy learn-ing with camera conditioning, 2025. 1, 2, 4, 5 [19] Alexander Khazatsky, Karl Pertsch, Suraj Nair, Ashwin Bal-akrishna, Sudeep Dasari, Siddharth Karamcheti, Soroush Nasiriany, Mohan Kumar Srirama, Lawrence Yunliang Chen, Kirsty Ellis, Peter David Fagan, Joey Hejna, Masha Itk-ina, Marion Lepert, Yecheng Jason Ma, Patrick Tree Miller, Jimmy Wu, Suneel Belkhale, Shivin Dass, Huy Ha, Arhan Jain, Abraham Lee, Youngwoon Lee, Marius Memmel, Sung-jae Park, Ilija Radosavovic, Kaiyuan Wang, Albert Zhan, 6789 Kevin Black, Cheng Chi, Kyle Beltran Hatch, Shan Lin, Jingpei Lu, Jean Mercat, Abdul Rehman, Pannag R Sanketi, Archit Sharma, Cody Simpson, Quan Vuong, Homer Rich Walke, Blake Wulfe, Ted Xiao, Jonathan Heewon Yang, Arefeh Yavary, Tony Z. Zhao, Christopher Agia, Rohan Bai-jal, Mateo Guaman Castro, Daphne Chen, Qiuyu Chen, Trin-ity Chung, Jaimyn Drake, Ethan Paul Foster, Jensen Gao, David Antonio Herrera, Minho Heo, Kyle Hsu, Jiaheng Hu, Donovon Jackson, Charlotte Le, Yunshuang Li, Roy Lin, Ze-han Ma, Abhiram Maddukuri, Suvir Mirchandani, Daniel Morton, Tony Nguyen, Abigail O’Neill, Rosario Scalise, De-rick Seale, Victor Son, Stephen Tian, Emi Tran, Andrew E. Wang, Yilin Wu, Annie Xie, Jingyun Yang, Patrick Yin, Yunchu Zhang, Osbert Bastani, Glen Berseth, Jeannette Bohg, Ken Goldberg, Abhinav Gupta, Abhishek Gupta, Dinesh Jayaraman, Joseph J Lim, Jitendra Malik, Roberto Mart´ ın-Mart´ ın, Subramanian Ramamoorthy, Dorsa Sadigh, Shuran Song, Jiajun Wu, Michael C. Yip, Yuke Zhu, Thomas Kollar, Sergey Levine, and Chelsea Finn. DROID: A Large-Scale In-The-Wild Robot Manipulation Dataset. In Proceedings of Robotics: Science and Systems , Delft, Netherlands, 2024. 2 [20] Prannay Khosla, Piotr Teterwak, Chen Wang, Aaron Sarna, Yonglong Tian, Phillip Isola, Aaron Maschinot, Ce Liu, and Dilip Krishnan. Supervised contrastive learning, 2021. 3 [21] Taeyoung Kim, Jimin Lee, Myungkyu Koo, Dongyoung Kim, Kyungmin Lee, Changyeon Kim, Younggyo Seo, and Jinwoo Shin. Contrastive representation regularization for vision-language-action models, 2025. 3 [22] Vikash Kumar, Rutav Shah, Gaoyue Zhou, Vincent Moens, Vittorio Caggiano, Jay Vakil, Abhishek Gupta, and Aravind Rajeswaran. Robohive: A unified framework for robot learn-ing, 2023. 2 [23] Sung-Wook Lee, Xuhui Kang, Brandon Yang, and Yen-Ling Kuo. Class: Contrastive learning via action sequence su-pervision for robot manipulation. In Conference on Robot Learning (CoRL) , 2025. 1, 2, 4, 5, 7 [24] Weiqi Li, Quande Zhang, Ruifeng Zhai, Liang Lin, and Guan-grun Wang. Vla models are more generalizable than you think: Revisiting physical and spatial modeling, 2025. 6 [25] Fanfan Liu, Feng Yan, Liming Zheng, Yiyang Huang, Chengjian Feng, and Lin Ma. Robouniview: Visual-language model with unified view representation for robotic manipula-tion. arXiv preprint 2406.18977 , 2024. 2 [26] Ajay Mandlekar, Danfei Xu, Josiah Wong, Soroush Nasiriany, Chen Wang, Rohun Kulkarni, Li Fei-Fei, Silvio Savarese, Yuke Zhu, and Roberto Mart´ ın-Mart´ ın. What matters in learn-ing from offline human demonstrations for robot manipula-tion. In arXiv preprint arXiv:2108.03298 , 2021. 3 [27] Ajay Mandlekar, Soroush Nasiriany, Bowen Wen, Iretiayo Akinola, Yashraj Narang, Linxi Fan, Yuke Zhu, and Dieter Fox. Mimicgen: A data generation system for scalable robot learning using human demonstrations. In 7th Annual Confer-ence on Robot Learning , 2023. 3 [28] Alexander Nikulin, Ilya Zisman, Denis Tarasov, Nikita Lyubaykin, Andrei Polubarov, Igor Kiselev, and Vladislav Kurenkov. Latent action learning requires supervision in the presence of distractors, 2025. 2 [29] Jing-Cheng Pang, Nan Tang, kaiyuan Li, Yuting Tang, Xin-Qiang Cai, Zhen-Yu Zhang, Gang Niu, Sugiyama Masashi, and Yang Yu. Learning view-invariant world models for visual robotic manipulation. In International Conference on Learning Representations (ICLR) , 2025. 1, 2, 4, 5 [30] Zhongwei Ren, Yunchao Wei, Xun Guo, Yao Zhao, Bingyi Kang, Jiashi Feng, and Xiaojie Jin. Videoworld: Exploring knowledge learning from unlabeled videos, 2025. 2 [31] Kyle Sargent, Zizhang Li, Tanmay Shah, Charles Herrmann, Hong-Xing Yu, Yunzhi Zhang, Eric Ryan Chan, Dmitry La-gun, Li Fei-Fei, Deqing Sun, and Jiajun Wu. ZeroNVS: Zero-shot 360-degree view synthesis from a single real image. 
+
+arXiv preprint arXiv:2310.17994 , 2023. 5 [32] Dominik Schmidt and Minqi Jiang. Learning to act without actions, 2024. 2 [33] Younggyo Seo, Junsu Kim, Stephen James, Kimin Lee, Jin-woo Shin, and Pieter Abbeel. Multi-view masked world models for visual robotic manipulation, 2023. 1, 2 [34] Claude Elwood Shannon. A mathematical theory of commu-nication. The Bell System Technical Journal , 27:379–423, 1948. 8 [35] Le Shi, Yifei Shi, Xin Xu, Tenglong Liu, Junhua Xi, and Chengyuan Chen. Nvspolicy: Adaptive novel-view synthe-sis for generalizable language-conditioned policy learning. 
+
+ArXiv , abs/2505.10359, 2025. 2 [36] Mustafa Shukor, Dana Aubakirova, Francesco Capuano, Pepijn Kooijmans, Steven Palma, Adil Zouitine, Michel Ar-actingi, Caroline Pascal, Martino Russi, Andres Marafioti, Si-mon Alibert, Matthieu Cord, Thomas Wolf, and Remi Cadene. Smolvla: A vision-language-action model for affordable and efficient robotics, 2025. 6 [37] Stephen Tian, Blake Wulfe, Kyle Sargent, Katherine Liu, Sergey Zakharov, Vitor Guizilini, and Jiajun Wu. View-invariant policy learning via zero-shot novel view synthesis, 2025. 1, 2, 5 [38] Aaron van den Oord, Oriol Vinyals, and Koray Kavukcuoglu. Neural discrete representation learning, 2018. 2 [39] Homer Walke, Kevin Black, Abraham Lee, Moo Jin Kim, Max Du, Chongyi Zheng, Tony Zhao, Philippe Hansen-Estruch, Quan Vuong, Andre He, Vivek Myers, Kuan Fang, Chelsea Finn, and Sergey Levine. Bridgedata v2: A dataset for robot learning at scale. In Conference on Robot Learning (CoRL) , 2023. 2 [40] Seonghyeon Ye, Joel Jang, Byeongguk Jeon, Sejune Joo, Jianwei Yang, Baolin Peng, Ajay Mandlekar, Reuben Tan, Yu-Wei Chao, Bill Yuchen Lin, Lars Liden, Kimin Lee, Jianfeng Gao, Luke Zettlemoyer, Dieter Fox, and Minjoon Seo. Latent action pretraining from videos, 2025. 2 [41] Yuke Zhu, Josiah Wong, Ajay Mandlekar, Roberto Mart´ ın-Mart´ ın, Abhishek Joshi, Kevin Lin, Soroush Nasiriany, and Yifeng Zhu. robosuite: A modular simulation frame-work and benchmark for robot learning. In arXiv preprint arXiv:2009.12293 , 2020. 3 6790

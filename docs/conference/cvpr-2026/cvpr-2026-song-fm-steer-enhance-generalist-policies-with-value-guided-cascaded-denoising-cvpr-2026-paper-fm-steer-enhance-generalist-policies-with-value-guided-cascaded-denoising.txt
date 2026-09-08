@@ -1,0 +1,473 @@
+Title: FM-Steer: Enhance Generalist Policies with Value-Guided Cascaded Denoising
+
+URL Source: https://openaccess.thecvf.com/content/CVPR2026/papers/Song_FM-Steer_Enhance_Generalist_Policies_with_Value-Guided_Cascaded_Denoising_CVPR_2026_paper.pdf
+
+Published Time: Sat, 16 May 2026 16:47:58 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# FM-Steer: Enhance Generalist Policies with Value-Guided Cascaded Denoising 
+
+# Haoming Song 1,2,* Delin Qu 2,3,* Yuanqi Yao 5 Qizhi Chen 2,6 Jiarui Li 1,2 Qi Lv 2
+
+# Yiwen Tang 2 Li Kang 1,2 Heng Zhou 2,8 Xianqiang Gao 2,8 Yuhang Tang 2,7 Xiaofan Li 6
+
+# Modi Shi 4 Guanghui Ren 4 Maoqing Yao 4 Bin Zhao 2,7 Dong Wang 2,† Xuelong Li 2,7,† 
+
+> 1
+
+Shanghai Jiao Tong University 2Shanghai AI Laboratory 3Fudan University 4AgiBot 
+
+> 5
+
+INSAIT, Sofia University “St. Kliment Ohridski” 6Zhejiang University 
+
+> 7
+
+Northwestern Polytechnical University 8University of Science and Technology of China Flow-Based VLA 
+
+Lite-Flow
+Denoiser V-GPS Robo
+Monkey Pi0 FM-Steer
+(T=0.9) FM-Steer
+(T=0.7) OpenVLA Control Frequency (Hz) Performance (%) 2.5 5.0 10.0 15.0 20.0 0.6 0.7 0.8 0.9 Number of Samples Control Frequency (Hz) 2.5 5.0 10.0 15.0 20.0 510 15 20 FM-Steer (T=0.7) FM-Steer (T=0.9) V-GPS RoboMonkey 
+
+Flow-Based VLA 
+
+> 4Hz Flow Verifier 90Hz
+
+Stage 1 Stage 2 
+
+Figure 1. We present FM-Steer, a test-time computing framework exploring human-like thinking capabilities for dexterous robot control. Equipped with value-guided test-time sampling and cascaded action denoising, FM-Steer enhances flow-based Vision-Language-Action models with stronger reasoning and control capabilities. It achieves state-of-the-art performance across diverse evaluation benchmarks and substantially improves performance on complex robot control tasks. 
+
+# Abstract 
+
+Humans naturally allocate more time before acting when handling complex tasks in the physical world. This paradigm has recently led to remarkable advances in boost-ing Large Language Models (LLMs) on complex tasks in digital domains. However, the potential of test-time comput-ing remains largely unexplored for robotic foundation mod-els that interact with the physical world. In this work, we propose FM-Steer , a test-time computing framework that augments flow-based Vision-Language-Action (VLA) gen-eralist policies with value-guided sampling and cascaded 
+
+> *Authors contributed equally: haomingsong@sjtu.edu.cn.
+> †Corresponding author: dongwang.dw93@gmail.com.
+
+action denoising, enabling stronger control performance and real-time action rates for dexterous robot manipula-tion. FM-Steer first introduces an intermediate flow ver-ifier to estimate state-action values for candidate actions. At test time, the policy iteratively samples multiple noisy action proposals and retains the one with the highest pre-dicted value, yielding value-aligned, high-quality actions without retraining. To satisfy the stringent frequency de-mands of robot control, FM-Steer further introduces cas-caded action denoising, decoupling expensive value-guided sampling from fast action refinement. A lightweight Lite-Flow denoiser asynchronously takes the selected high-value noisy action and rapidly denoises it to produce the final con-trol signal, enabling fluid, high-rate execution. During de-ployment, the intermediate verifier operates at a low fre-This CVPR paper is the Open Access version, provided by the Computer Vision Foundation. Except for this watermark, it is identical to the accepted version; the final published version of the proceedings is available on IEEE Xplore. 13407 quency to provide value-guided sampling, while the Lite-Flow denoiser continually processes selected candidates to maintain real-time control. Extensive experiments demon-strate that FM-Steer scales flow-based VLA models effec-tively at test time and achieves state-of-the-art performance across diverse simulation benchmarks and real-world dex-terous robotic tasks. The source code is available on the project page: https://hume-vla.github.io .
+
+# 1. Introduction 
+
+Creating generalist robots to perform various tasks in the physical world has been a long-standing goal [4, 5, 30, 52, 54, 59, 65]. Cognitive psychologists have revealed that hu-mans allocate more time when tackling complex problems, such as mathematical proofs or decision-making. Inspired by this paradigm, Large Language Models (LLMs) have shifted from purely train-time scale-up to test-time scal-ing, where allocating extra compute at evaluation. [17, 18, 28, 86] Specifically, repeated sampling and selection yield notable improvements across multiple domains, including chat, mathematics, and coding, suggesting that analogous test-time scaling in VLAs could deliver similar gains. How-ever, robot control has stricter real-time requirements than text generation: extra inference computation can introduce delays, causing jitter or even task failure. [2, 21, 22, 25, 60– 62, 69] Therefore, an essential question is: How can we enhance existing VLAs in test time while preserving the efficiency required for real-time robotic control? 
+
+Some efforts have integrated text-based chain-of-thought or reasoning [43, 73, 78, 87, 88] into VLA models [7, 36, 71, 77], aiming to guide action generation with the world knowledge encoded in pretrained VLMs. [35, 38, 70] More-over, V-GPS [50] and RoboMonkey [33] have shown that “repeat-sampling and verification” can be an effective test-time scaling strategy for vision-language-action models: the model proposes multiple candidate actions, and an indepen-dent verifier chooses the best one. However, these attempts all focus on autoregressive VLA models and do not exploit flow-based VLA models, which show impressive dexterous robot control by leveraging the strong generative capacity of flow matching. [37, 45, 64, 67, 72] Additionally, autore-gressive text decoding and repeat-sampling significantly in-crease inference time, which in turn reduces the control fre-quency, making the policy unable to perform dexterous and dynamic tasks. [68, 76, 79, 80] Therefore, two key questions arise: how can we perform effective test-time computing for flow-based VLA models, and how can we maintain or even improve the efficiency required for real-time robot control? To address these challenges, we introduce FM-Steer, a framework that enhances flow-based VLA models at test time with value-guided test-time sampling and cascaded ac-tion denoising. Value-guided test-time sampling follows the “repeat-sampling and verification” paradigm. We first in-troduce noise forcing to mitigate the determinism of flow matching and repeatedly sample diverse intermediate noisy action candidates, and then attach an intermediate flow ver-ifier to the original VLA for verification. The intermedi-ate flow verifier is trained with offline reinforcement learn-ing and serves as a state-action value estimator, which is used to select the candidates with the highest value. Sim-ply applying repeated sampling at test time results in a low control frequency, which is impractical for dexterous robot control. To address this issue, we propose a cascaded action denoising mechanism that distributes the denoising compu-tation across the original VLA and a separate Lite-Flow de-noiser, a lightweight transformer designed to complete the remaining flow-matching process asynchronously. Through asynchronous inference, the original VLA performs value-guided test-time sampling at a low frequency (4 Hz), while the Lite-Flow denoiser continuously denoises the selected noisy action and predicts fluid actions in real time (90 Hz). In summary, the main contributions of this work are: • We propose FM-Steer, a test-time computing framework that enhances flow-based Vision-Language-Action mod-els while improving the robot control frequency. • We introduce value-guided test-time sampling and cas-caded action denoising for flow-matching action ex-perts. By iteratively sampling intermediate noisy ac-tions rather than fully denoised actions, part of the flow-matching computation in the original action expert is asynchronously offloaded to the Lite-Flow denoiser. • FM-Steer improves flow-based VLA models on multiple benchmarks and real-robot tests, achieving state-of-the-art performance. Powered by FM-Steer, π0 gains +4.4% on the LIBERO [44] benchmark, +25.9% on the Simpler benchmark [39], and +12.9% in real-world deployments. 
+
+# 2. Related Work 
+
+Flow-based Vision-Language-Action Models. Recently, several studies [5, 30, 48, 53, 56, 58, 84] have extended VLMs for robot control. RT-2 [5] fine-tunes PaLI-X [8] with discretized action tokens, while OpenVLA [30] adapts Prismatic VLM [29] on the OXE dataset [9]. These au-toregressive models generate actions by adding discretized action tokens into the VLM vocabulary. However, their dis-crete nature limits the model’s ability to perform dexterous motions. To model more refined physical behaviors, flow matching (a variant of diffusion) was introduced into ac-tion generation. As representative flow-based VLA models, 
+
+π0 [4] and GR00T N1 [3] employ flow matching to predict action chunks in future time, achieving better performance on robot control than previous autoregressive models. 
+
+Test-Time Scaling via Repeated Sampling. Numerous studies [20, 23, 47, 57, 66, 74, 81] have achieved remark-able success by applying additional computation at test time 13408 across various domains [13, 14, 51]. Through repeated sampling, large language models have achieved remark-able improvements in various tasks, including mathemat-ics, programming, and text summarization. For robotics, V-GPS [50] trains a separate action verifier to rank candi-date actions, preliminarily proving that repeated sampling can effectively enhance the generation of low-level robot actions. RoboMonkey [33] introduces a scalable data cura-tion pipeline and model architecture for training the action verifier. However, they do not explore stronger flow-based VLAs, which cannot generate diverse candidates through naive repeated sampling. Moreover, these models suffer from severe efficiency issues, making it difficult to perform highly dynamic and dexterous robot control tasks. 
+
+Cascaded Denoising. Cascaded Denoising [24, 82, 83] was first proposed as a diffusion model [11, 12, 63] that generates higher-resolution images [15, 16, 75, 85] through a cascading approach. Starting with a diffusion model at low resolution, it continuously upsamples the gener-ated images to obtain high-resolution results. f-DM [19] applies inter-stage transformations for progressive signal restoration through function learning. Cas-DM [1] cascades noise-prediction and image-prediction modules to integrate perceptual losses in diffusion models. SCDM [6] cas-cades generation across spectral dimensions, reconstruct-ing hyperspectral bands progressively. HiFI [26] cascades consistent-resolution patches for memory-efficient high-resolution frame interpolation. CDM-VTON [34] employs two-stage cascading for virtual try-on applications. While these approaches have advanced capabilities in image do-mains, [40–42, 46, 55] the application of cascaded denois-ing for action generation remains largely unexplored. 
+
+# 3. Preliminaries 
+
+A flow-based VLA aims to model the data distribution 
+
+p(At|ot), mapping the observation ot, which consists of images it, language instructions ℓt, and robot state in-formation st, to a sequence of H future actions At =[at, at+1 , ..., at+H−1]. The model typically consists of a VLM backbone and a flow matching expert. The VLM is re-sponsible for extracting visual and language features, while the flow matching expert handles action generation. Specifi-cally, the model learns a conditional vector field vθ (Aτt , ot)
+
+by minimizing the flow matching loss: 
+
+LFM = E ∥vθ (Aτt , ot) − u (Aτt | At)∥2 (1) where u(Aτt |At) = ϵ − At is the ground-truth vector field, 
+
+At is the target action to be generated, and Aτt = τ At +(1 − τ )ϵ is the noisy action sampled from the conditional probability path, where ϵ ∼ N (0, I) and τ ∈ [0 , 1] is the flow-matching time step representing the noise level of the action. During inference, the flow matching expert starts from a random noise A0 
+
+> t
+
+∼ N (0, I) and generates actions by gradually removing the noise from A0 
+
+> t
+
+to A1 
+
+> t
+
+using the forward Euler method Aτ +δt = Aτt + δvθ (Aτt , ot), where 
+
+δ is the integration step size of denoising process. 
+
+# 4. Methodology 
+
+In this section, we describe FM-Steer’s working pipeline in detail. As shown in Fig. 2, we take a flow-based VLA as the base model and augment it with two modules: an intermediate flow verifier φ and a Lite-Flow denoiser ϕ.
+
+4.1. Value-Guided Test-Time Sampling 
+
+Due to the multiple Euler forward iterations required by flow-based VLA during inference, repeated action sampling leads to a significant increase in computational cost. To ad-dress this, we introduce value-guided test-time sampling. Instead of sampling the final actions as in previous meth-ods [48, 50], value-guided test-time sampling samples the flow points Aτn 
+
+> t
+
+(i.e., intermediate noisy actions) along the Euler forward trajectory. After identifying the most valu-able flow point, it is passed to the Lite-Flow denoiser (a light-weight action expert detailed in Sec. 4.2) to complete the remaining Euler forward steps. By discovering promis-ing flow points earlier in the flow matching process, value-guided test-time sampling substantially reduces the test-time computational overhead of the original VLA. 
+
+Candidate Flow Point Generation. To acquire diverse candidate flow points, we need to overcome the determinis-tic nature of flow matching during the ODE sampling. First, we enforce varying noise levels across all N can-didate flow points by adjusting the flow-matching integra-tion endpoint. Specifically, for the n-th candidate flow point 
+
+Aτn 
+
+> t
+
+∈ { Aτ1 
+
+> t
+
+, Aτ2 
+
+> t
+
+, . . . , AτN 
+
+> t
+
+}, its noise level is designated as τn = T − (n − 1) ξ:
+
+Aτn 
+
+> t
+
+=
+
+Z T −(n−1) ξ
+
+> 0
+
+vθ (Aτt , ot) dτ + ϵn, (2) where T ∈ (0 , 1) is the noise level bound in candidates, which is used to control the denoising computational load of original VLA. ξ is used to control the noise gap between ad-jacent candidates. For each candidate, ϵn is independently sampled from a normal distribution, i.e., ϵn ∼ N (0, I).Second, we inject stochasticity into the Euler forward process. During the forward Euler process used to com-pute the integral in Eq. (2), each forward step is mod-eled as an isotropic Gaussian distribution p  Aτ +δt | Aτt
+
+ ∼N (μτ , Στ ), where the variance Στ is a hyperparameter used to control the diversity of the candidates and the mean 
+
+μτ is determined by forward Euler update of original ODE: 
+
+μτ = Aτt + vθ (Aτt , ot) · δ (3) 13409 Lite-Flow
+Denoiser 
+
+## Flow-Based VLA 
+
+Flow Matching Head Intermediate Flow Verifier    
+
+> visual token text token action token special query token state token 90Hz 4Hz
+
+Stochasticity Sampling 
+
+> Cascaded Action Denoising
+> Pick up the blue small bag wavy potato chips from the replenishment box with the right arm Candidate
+> Flow Points High-frequency and precision actions Asynchronous Action Queue Rapid and Reactive Robot Control
+
+Figure 2. Overview of FM-Steer. FM-Steer augments a flow-based VLA with two modules: the intermediate flow verifier and the Lite-Flow denoiser. Given an observation, FM-Steer first samples N candidate flow points with different noise levels from the original VLA. The candidate with the highest predicted Q value is selected as the optimal flow point Aτ ∗ 
+
+> t
+
+, which is then segmented and passed to the Lite-Flow denoiser for continuous action denoising. 
+
+Flow Point Selection. As described in Fig. 2, to verify the value of sampled flow points, the intermediate flow verifier 
+
+φ is introduced and tightly integrated with the original VLA through a special query token qt. Specifically, qt is at-tached at the end of the original VLA input sequence, which is a learnable token with the same embedding dimension as the language tokens from the VLM backbone. Due to its last position, qt attends to all previous tokens from the VLM in-puts at time step t. After the original VLA completes its for-ward pass, qt aggregates the current observations. Then, qt
+
+is combined with the candidate flow points Aτn 
+
+> t
+
+and fed into the intermediate flow verifier. In this way, the intermediate flow verifier estimates the state-action value Qφ(qt, Aτn 
+
+> t
+
+)
+
+of the candidate flow point Aτn 
+
+> t
+
+conditioned on the input query token qt. With a simple Best-of-N strategy, the candi-date with the highest state-action value is selected as the op-timal flow point and transferred to the Lite-Flow denoiser: 
+
+Aτ ∗ 
+
+> t
+
+= arg max 
+
+> Aτn t
+
+Qφ(qt, Aτn 
+
+> t
+
+). (4) The intermediate flow verifier is trained on a pre-collected robot demonstration dataset D, which is built from the same dataset used to train the original VLA. Since the intermediate flow verifier is trained to estimate the Q-values of flow points (i.e., intermediate noisy actions) rather than the final robot actions, we set the ground-truth actions in dataset D to be these intermediate noisy actions, which can be constructed from the original actions At in the robot demonstration dataset with the candidate noise bound T
+
+defined in Eq. (2): ATt = T · At + (1 − T ) · ϵ, where 
+
+ϵ ∼ N (0, I). As for the reward, we construct D using the sparse binary reward function following [32], where the re-wards of the last 3 transitions in each robot episode are de-fined as +1 to indicate completion of the task specified by the language instruction, and the remaining rewards are set to 0. During training, we use the calibrated Q-learning [49] to optimize the intermediate flow verifier φ.
+
+4.2. Cascaded Action Denoising 
+
+In order to achieve rapid, reactive robot control, original VLA described in Sec. 4.1 partially denoises the noisy ac-tion to reduce computational cost of repeated sampling. We therefore introduce the Lite-Flow denoiser ϕ that continues to remove remaining noise based on real-time observation. Specifically, at timestep t, the optimal flow point selected by the intermediate flow verifier is a noisy action chunk 
+
+Aτ ∗ 
+
+> t
+
+, whose noise level is τ ∗ and horizon is H. Then, Aτ ∗
+
+> t
+
+is evenly segmented to K sub-action chunks with a horizon of h. For the k-th sub-action chunk Aτ ∗
+
+> t,k
+
+, it contains the noisy action from time step t + kh to t + ( k + 1) h − 1,and its corresponding observation is ot,k (including image 
+
+it,k , robot state st,k ). Taking the noisy sub-action chunk 
+
+Aτ ∗ 
+
+> t,k
+
+and its corresponding observation ot,k as input, the Lite-Flow denoiser produces refined robot actions At,k by continuously denoising the sub-action chunk Aτ ∗
+
+> t,k
+
+:
+
+At,k =
+
+Z 1 
+
+> τ∗
+
+vϕ
+
+ Aτt,k , ot,k 
+
+ dτ + Aτ ∗
+
+> t,k
+
+, (5) where vϕ
+
+ Aτt,k , ot,k 
+
+ is the vector field predicted by the 13410 3rd person camera  
+
+> WidowX 250 Robot Arm
+> Gripper
+> AgiBot G-1 Humanoid Robot
+> Head camera Left hand camera right hand camera effector
+> Franka Panda Emika Robot Arm
+> 3rd person camera Effector
+> 6-DOF Servo Robot Control 10 Tasks with 15 objects Whole Upper Body Control 4 Robot Learning Scenarios 7-DOF Collaborative Arm Control 4 Robot Learning Scenarios
+> SimplerEnv Evaluation of Google Robot and WidowX LIBERO Spatial / Object / Goal / Long Evaluation on Franka
+> Simpler Env Benchmark Libero Benchmark
+
+Figure 3. Experimental setups on WidowX, AgiBot G-1, and Franka. We evaluate FM-Steer across 3 simulation environments and 3 different real-world robotic platforms, covering 15 robot learning scenarios and 21 real-world manipulation tasks. 
+
+Lite-Flow denoiser. As shown in Eq. (2) and Eq. (5), the denoising process is distributed across the original VLA and the Lite-Flow denoiser. The original VLA only needs to complete the denoising process from 0 to τ ∗, while the Lite-Flow denoiser finishes the denoising process from τ ∗ to 1.During training, the Lite-Flow denoiser is optimized with the same flow matching loss in Eq. (1), i.e., by mak-ing the vector field vϕ
+
+ Aτt,k , ot,k 
+
+ predicted by the Lite-Flow denoiser as close as possible to the ground-truth vector field u(Aτt,k |At,k ). However, since the denoising process handled by the Lite-Flow denoiser starts from τ ∗ instead of 0, the input to the Lite-Flow denoiser is the noisy ac-tion Aτ ∗
+
+with a noise level of τ ∗ rather than random noise 
+
+ϵ ∼ N (0, I). Therefore, we build the ground-truth vector field as u(Aτt,k |At,k ) = Aτn 
+
+> t,k
+
+− At,k . Note that the noisy action used here is Aτn 
+
+> t,k
+
+rather than Aτ ∗
+
+. This is because 
+
+Aτ ∗
+
+is selected at test time from Aτn 
+
+> t,k
+
+according to Eq. (4). Therefore, during training, we only need to sample noisy actions from the original VLA using Eq. (2) and construct the ground-truth vector field based on them. 
+
+4.3. Training and Deployment Strategy 
+
+Although FM-Steer contains two separate modules, the in-termediate flow verifier and the Lite-Flow denoiser, they can be trained simultaneously to improve training efficiency because their datasets can be built from the same robot demonstration dataset. The dataset for the intermediate flow verifier is constructed using the reward function described in Sec. 4.1. The action of the dataset used to train the Lite-Flow denoiser is obtained by sampling from the frozen orig-inal VLA, and the observation is obtained from the same robot demonstration dataset, as described in Sec. 4.2. During inference, the intermediate flow verifier and the Lite-Flow denoiser cooperate asynchronously to boost the overall control frequency. For example, at the ini-tial timestep t, the original VLA generates N = 5 candi-date action chunks {Aτ1 
+
+> t
+
+, Aτ2 
+
+> t
+
+, . . . , Aτ5 
+
+> t
+
+} with a horizon of 
+
+H = 30 at a low frequency. The intermediate flow verifier then selects the optimal action candidate Aτ ∗ 
+
+> t
+
+and stores it in a shared queue. Next, Aτ ∗
+
+> t, 1
+
+, a sub-action chunk with hori-zon h = 15 , is segmented from the first h steps of Aτ ∗
+
+> t
+
+and passed to the Lite-Flow denoiser. The Lite-Flow de-noiser removes the remaining noise from Aτ ∗
+
+> t, 1
+
+, produces the fully denoised action At, 1 at high frequency, and ex-ecutes all h = 15 actions on the real robot immediately. Af-ter the robot executes both sub-action chunks {Aτ ∗
+
+> t, 1
+
+, Aτ ∗
+
+> t, 2
+
+}
+
+segmented from Aτ ∗ 
+
+> t
+
+, the Lite-Flow denoiser repeatedly re-trieves the newest selected action chunk from shared queue for subsequent denoising. Since the intermediate flow veri-fier and the Lite-Flow denoiser operate at different frequen-cies, they cooperate asynchronously, combining slow test-time computation with fast and reactive robot control. 
+
+# 5. Experiments 
+
+Our experiments evaluate whether FM-Steer can effectively enhance existing flow-based VLAs at test time while pre-serving the efficiency required for real-time robotic control. We study FM-Steer across diverse simulated and real-world robotic platforms, including humanoid robots, and compare it with previous state-of-the-art generalist policies, includ-ing prior test-time computing frameworks. Specifically, our experiments aim to answer the following questions: 1. How effectively can FM-Steer improve the performance of flow-based VLAs on diverse manipulation tasks? 2. To what extent does FM-Steer improve the efficiency of flow-based VLAs when performing test-time computing? 3. How do value-guided test-time sampling and cascaded action denoising contribute to the improvements in per-formance and efficiency? (Ablation studies) To answer these questions, as shown in Fig. 3, we evalu-ate FM-Steer across a diverse range of representative robot learning scenarios, including 3 simulation benchmarks and 3 different real-world robotic platforms, covering 15 robot learning scenarios and 21 real-world manipulation tasks. 
+
+5.1. Implementation Details 
+
+FM-Steer is trained on 8 A100 GPUs with a batch size rang-ing from 8 to 32 across different datasets. During deploy-ment, we use a single RTX 4090 GPU for inference. FM-Steer sets the noise-level bound T in the range of 0.7 to 0.9
+
+and selects N = 5 candidates from the original VLA at each inference step. More details including value function training and inference hyperparameters are provided in ?? .13411 Model LIBERO-Spatial LIBERO-Object LIBERO-Goal LIBERO-Long Overall 
+
+SR Rank SR Rank SR Rank SR Rank SR Rank OpenVLA-OFT [31] 97.6 ± 0.9% 3 98.4 ± 0.8% 5 97.9 ± 1.0% 3 94.5 ± 1.3% 3 97.1 ± 0.6% 3OpenHelix [10] 88.9 ± 0.9% 9 91.7 ± 0.4% 9 74.6 ± 0.5% 9 69.1 ± 0.8% 8 81.1 ± 0.5% 9GR00T N1 [3] 94.4 ± 0.9% 8 97.6 ± 1.0% 7 93.0 ± 1.2% 7 90.6 ± 1.0% 5 93.9 ± 1.1% 7
+
+π0 [4] 96.8 ± 0.8% 6 98.8 ± 0.9% 4 95.8 ± 1.1% 5 85.2 ± 1.2% 6 94.2 ± 0.9% 5
+
+π0.5 [27] 98.8 ± 0.2% 1 98.2 ± 0.3% 6 98.0 ± 0.9% 2 92.4 ± 0.6% 4 96.8 ± 0.7% 4FM-Steer (GR00T N1) 97.5 ± 0.1% 4 99.1 ± 0.4% 2 97.4 ± 1.3% 4 95.4 ± 0.2% 2 97.3 ± 0.2% 2FM-Steer ( π0) 98.6 ± 0.2% 2 99.8 ± 0.1% 1 99.4 ± 0.3% 1 96.7 ± 0.9% 1 98.6 ± 0.7% 1
+
+Table 1. LIBERO Benchmark Results. We present the success rate (SR) and standard error for each method across four task suites. FM-Steer ( π0) achieves the highest average success rate and ranking, followed by OpenVLA-OFT and π0.                                                                                             
+
+> WidowX Benchmark Put Spoon on Towel Put Carrot on Plate Stack Blocks Put Eggplant in Basket Overall
+> OpenVLA [30] 40.2% 20.4% 35.5% 54.6% 37.7% V-GPS [50] 45.5% 20.4% 24.3% 57.7% 37.0% RoboMonkey [33] 47.3% 25.6% 45.2% 73.1% 47.8%
+> π0[4] 83.8% 52.5% 52.5% 87.9% 69.2% FM-Steer ( π0)89.6% 59.7% 75.8% 92.9% 79.5% Google Robot Benchmark (Matching) Pick Coke Can Move Near Open ·Close Drawer Drawer Apple Average
+> OpenVLA [30] 59.7% 46.2% 35.6% 0% 35.4% V-GPS [50] 62.2% 49.5% 32.7% 0% 36.1% RoboMonkey [33] 63.1% 51.4% 34.6% 0% 37.3%
+> π0[4] 97.9% 78.7% 62.2% 46.6% 71.4% FM-Steer ( π0)98.1% 85.8% 69.1% 53.3% 76.6% Google Robot Benchmark (Aggregation) Pick Coke Can Move Near Open ·Close Drawer Drawer Apple Average
+> OpenVLA [30] 54.5% 47.7% 17.7% 0% 30.0% V-GPS [50] 53.6% 47.7% 19.6% 0% 30.2% RoboMonkey [33] 54.5% 46.8% 20.5% 0% 30.5%
+> π0[4] 90.1% 80.7% 27.6% 20.5% 54.7% FM-Steer ( π0)92.2% 81.7% 43.0% 24.2% 60.3%
+
+Table 2. SimplerEnv Results. We compare FM-Steer with two prior test-time computing methods, V-GPS [50] and RoboMonkey [33], on four WidowX tasks and Google Robot tasks in SimplerEnv. FM-Steer achieves the best overall performance in both the matching and aggregation settings, demonstrating strong visual generalization. 
+
+5.2. Performance Enhancement Evaluation Setups and Baselines. To assess FM-Steer’s ability to enhance the performance of flow-based VLAs on diverse manipulation tasks, we employ three evaluation se-tups (two simulated and one real-robot), each probing a dif-ferent aspect of FM-Steer. First, to evaluate the absolute performance that FM-Steer can achieve, we build FM-Steer on two flow-based VLAs in LIBERO: π0 [4] and GR00T N1 [3], and compare them with the latest state-of-the-art generalist manipulation policies, including OpenVLA-OFT [31], OpenHelix [10], π0.5 [27], and π0 [4]. Sec-ond, to evaluate how much improvement FM-Steer brings to flow-based VLAs, we compare FM-Steer with two previous test-time computing methods, V-GPS [50] and RoboMon-key [33], alongside their base model OpenVLA [30] in SimplerEnv. Third, to evaluate whether FM-Steer can help flow-based VLAs generalize to real-world robots, we com-pare FM-Steer with both existing state-of-the-art general-ist manipulation policies and previous test-time computing methods on the real-world WidowX 250s robot platform. 
+
+LIBERO Benchmark Results. Tab. 1 presents the results on the LIBERO [44] benchmark. Built on top of π0, FM-Steer obtains the highest average success rate of 98.6% across all policies, showing that FM-Steer effectively im-proves the absolute performance of flow-based VLAs. 
+
+SimplerEnv Benchmark Results. Tab. 2 presents the Sim-plerEnv results on WidowX and Google Robot tasks. On WidowX tasks, FM-Steer achieves state-of-the-art perfor-mance with an average success rate of 79.5%, represent-ing a significant improvement compared to existing test-time computing methods (+42.5% over V-GPS, and +31.7% over RoboMonkey). On Google Robot tasks, FM-Steer also achieves state-of-the-art performance with an average suc-cess rate of 76.6% on the visual matching tasks and 60.3% on the visual aggregation tasks, demonstrating its strong ca-pability in handling the out-of-distribution settings. 
+
+5.3. Efficiency Improvement Real-world WidowX Evaluation. Fig. 4 presents the re-sults of the real-world evaluation on the WidowX platform. 13412 ALL  10  Tasks     
+
+> WidowX Robot Zero -shot Setup Agibot G-1 Experiment Setup Franka Robot Setup
+
+Figure 4. Real-world evaluation on WidowX, Franka, and AgiBot G-1 tasks. We evaluate FM-Steer across 3 real-robot platforms with varying backgrounds, poses, and motion distractors. FM-Steer achieves the highest average success rate, surpassing π0 and all other generalist manipulation policies in comparative evaluations. 
+
+We compare FM-Steer with both state-of-the-art general-ist manipulation policies and previous test-time computing methods on 10 manipulation tasks. We observed that in complex tasks such as putting a green cup on a pink cloth, policies such as GR00T, π0-FAST, and OpenVLA strug-gled with object manipulation, frequently failing to grasp or place the target objects accurately. Even when these poli-cies attempt to recover, they are often trapped in error states that prevent successful execution. In contrast, FM-Steer leverages value-guided test-time sampling to recover from failures effectively, demonstrating superior performance on various complex tasks. In other words, when FM-Steer en-ters an erroneous state, it can evaluate multiple candidate actions and select a better forward trajectory. As a result, even if failures occur during initial attempts, FM-Steer can adjust its trajectory and successfully complete the task on subsequent attempts (see ?? ), achieving strong robustness across complex unseen tasks with a 91% average success rate, outperforming π0 by 12% and OpenVLA by 33%. 
+
+Control Frequency Analysis. To assess the impact of test-time computing methods on performance and control fre-quency, we compare three test-time computing methods, V-GPS, RoboMonkey, and FM-Steer, on the real-world Wid-owX platform. To ensure a fair comparison, we first ad-just the hyperparameters of each method (e.g., chunk size and number of candidates) to achieve its best performance and then record the resulting control frequency. As shown in Fig. 1, previous methods such as V-GPS and RoboMon-key do improve VLA performance to some extent, but they do so at a significant cost in control frequency. In contrast, FM-Steer combines value-guided test-time sampling with cascaded action denoising: the Lite-Flow denoiser works asynchronously with VLA, enabling fast action generation and improving both performance and control frequency. 
+
+High-Frequency Real-World Evaluation. Fig. 4 presents the results of the real-world evaluation on the Franka (20 Hz) and AgiBot G-1 (30 Hz) platforms. This evaluation mainly includes long-horizon and dexterous tasks that re-quire high control frequency. Benefiting from value-guided test-time sampling and cascaded action denoising, FM-Steer performs well on tasks that require both long-term planning and high control frequency, such as making tea. On AgiBot G-1, FM-Steer achieves a success rate of 82%, while on Franka, FM-Steer achieves an average success rate of 87%, outperforming π0 by 20% and 14.75% respectively. Optimal  Noisy  Candidate   
+
+> Sampled Noisy Candidates
+> a) Value Map of Candidate Actions
+> PCA 1
+> PCA 2
+> state-action values
+> b) Cascaded Action Denoising Visualization
+> Refined Action
+
+Figure 5. Visualization of value-guided test-time sampling and cascaded action denoising. Panel (a) shows value maps of can-didate actions, where the ground-truth actions lie in high-value re-gions estimated by the intermediate flow verifier. Panel (b) visu-alizes the cascaded action denoising process: blue points are can-didate actions sampled from the original VLA, red points denote the optimal candidate selected by the verifier, and orange points denote the final actions refined by the Lite-Flow denoiser. 
+
+5.4. Visualization and Ablations Visualization. We visualize the process of value-guided test-time sampling and cascaded action denoising in Fig. 5. 13413 In panel (a), we project ground-truth actions AGT  
+
+> t
+
+and can-didate actions Aτn 
+
+> t
+
+, together with their corresponding state-action values Q(qt, Aτn 
+
+> t
+
+), into the same space to generate the value map. The ground-truth actions are consistently located in high-value regions, showing that the value-query head can estimate reasonable state-action values. In panel (b), we project the three types of actions in the cascaded ac-tion denoising process onto the x-y and x-z planes. The blue points are candidate actions Aτn 
+
+> t
+
+sampled from the original VLA, the red points are the optimal candidate Aτ ∗ 
+
+> t
+
+selected by the intermediate flow verifier, and the orange points rep-resent the final actions ˜A1 
+
+> t+kh
+
+refined by the Lite-Flow de-noiser. The red points and orange points are generally dis-tributed within the region covered by the blue points, while the distribution of the orange points shows slight differences from that of the red points. This demonstrates that cascaded action denoising refines the actions sampled from original VLA, achieving accurate, fluid, and dexterous robot control. Ablation Results in AgiBot 4 Tasks Ablation Results in Franka 10 Tasks Ablation Results in WidowX 10 Tasks            
+
+> 0.0 0.2 0.4 0.6 0.8
+> Success Rate
+> 0.92 0.91 0.86 0.10 0.19 0.15 0.78 0.65 0.55 0.62 0.35 0.40 0.30 0.27 0.18
+> FM-Steer (Ours) w/o Flow Verifier w/o Cascaded Denoising w/o Repeat Sampling w/o Lite-Flow Denoiser
+
+Figure 6. Real-world ablations on WidowX, Franka, and Agi-Bot G-1. We conduct ablation studies of FM-Steer across 3 differ-ent real-world robotic platforms, covering 15 robot learning sce-narios and 21 real-world manipulation tasks. 
+
+Ablation Settings. To effectively validate the role of each module in FM-Steer’s framework, we set up four ablation settings. In setting [1]. w/o Cascaded Denoising, the noise level bound T is set to 1, meaning the original VLA will complete the entire denoising process, leading to all candi-dates being sampled from the same distribution and conse-quently reduces the range of candidates that the intermedi-ate flow verifier can choose from. In setting [2]. w/o Repeat Sampling, we sample only one flow point from the original VLA to test whether our candidate flow point generation effectively improves the model’s performance during infer-ence. In setting [3]. w/o Lite-Flow Denoiser, the Lite-Flow Denoiser is removed, and noisy actions selected from the original VLA are directly used to control the robot. In set-ting [4]. w/o Flow Verifier, we replace the flow verifier with a random strategy that randomly selects a flow point sam-pled from the original VLA, which tests whether the flow verifier can effectively choose the most valuable flow point. 
+
+Effect of Cascaded Action Denoising. According to the ablation results (#5 v.s. #1), models without cascaded denois-ing rely on the original VLA to complete the entire denois-ing process, causing all candidates to be sampled from the same distribution. This reduces the candidate range avail-able to the model, resulting in suboptimal selection. Con-sequently, the model suffers a significant performance drop, 
+
+Settings Libero SimplerEnv Overall 
+
+[1] . w/o Cascaded Denoising 95.9 72.1 78.1 
+
+[2] . w/o Repeat Sampling 93.8 69.1 75.3 
+
+[3] . w/o Lite-Flow Denoiser 89.8 65.8 71.8 
+
+[4] . w/o Flow Verifier 84.9 61.4 67.3 
+
+[5] . FM-Steer ( π0) 98.6 75.1 81.0 
+
+Table 3. Ablations on LIBERO and SimplerEnv. We conduct ablation studies across LIBERO [44] and SimplerEnv [39] on Wid-owX and Google Robot tasks. In the SimplerEnv experiments, models are trained with mixtures from the OXE dataset [9]. 
+
+with an average decline of -3.2% across variant-aggregation tasks in SimplerEnv, -2.7% across LIBERO tasks, and -19% in real-world robot tasks. Furthermore, we compare FM-Steer with the model that directly executes the opti-mal candidate generated by the original VLA (#5 v.s. #3). Without the Lite-Flow denoiser to complete the remaining flow-matching process, the model cannot perform precise and dexterous movements, ultimately leading to an average decrease of -9.8% across SimplerEnv tasks, -8.8% across LIBERO tasks, and -63% in real-world robot tasks. 
+
+Effect of Value-Guided Test-Time Sampling. Accord-ing to the ablation results (#5 v.s. #4), value-guided test-time sampling enables the intermediate flow verifier to select the most valuable candidate from multiple flow points. Models without a flow verifier randomly select 1 out of 5 candidate actions generated by the original VLA to pass to the Lite-Flow denoiser. Since the candidates have different noise levels, this random strategy may choose harmful candidates, ultimately leading to a significant drop in success rate, with an average decline of -14.95% on SimplerEnv and -13.7% on LIBERO. Notably, this degradation is even more pro-nounced in complex real-world robot scenarios, with an av-erage decrease of -78% in real robot tasks. Additionally, ac-cording to the ablation results (#5 v.s. #2), models w/o repeat sampling, due to having no additional candidates to choose, cannot leverage the estimated value to select helpful actions, which also led to performance degradation, with an average decrease of -6.2% on the SimplerEnv tasks, -4.8% on the LIBERO tasks, and -37% in real-world robot tasks. 
+
+# 6. Conclusion 
+
+In this paper, we present FM-Steer, a test-time comput-ing framework that enhances flow-based Vision-Language-Action models at test time. FM-Steer combines value-guided test-time sampling with effective best-of-N selec-tion and cascaded action denoising, integrating the original VLA with a lightweight denoiser to achieve rapid and fluid control. Through extensive experiments in both simulation and real-world robots, we show that FM-Steer outperforms current state-of-the-art models. The gains are especially clear on complex tasks that require failure recovery, high-lighting a promising direction for generalist robot policies. 13414 Acknowledgments 
+
+This work is supported by Shanghai Artificial Intelligence Laboratory. 
+
+# References 
+
+[1] Jie An, Zhengyuan Yang, Jianfeng Wang, Linjie Li, Zicheng Liu, Lijuan Wang, and Jiebo Luo. Bring metric functions into diffusion models. arXiv preprint arXiv:2401.02414 , 2024. 3 [2] Jiacheng Bao, Haoran Yang, Yucheng Xin, Junhong Liu, Yuecheng Xu, Han Liang, Pengfei Han, Xiaoguang Ma, Dong Wang, and Bin Zhao. Phygile: Physics-prefix guided motion generation for agile general humanoid motion track-ing. arXiv preprint arXiv:2603.19305 , 2026. 2 [3] Johan Bjorck, Fernando Casta˜ neda, Nikita Cherniadev, Xingye Da, Runyu Ding, Linxi Fan, Yu Fang, Dieter Fox, Fengyuan Hu, Spencer Huang, et al. Gr00t n1: An open foundation model for generalist humanoid robots. arXiv preprint arXiv:2503.14734 , 2025. 2, 6 [4] Kevin Black, Noah Brown, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Lachy Groom, Karol Hausman, Brian Ichter, et al. A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. 2, 6 [5] Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Xi Chen, Krzysztof Choromanski, Tianli Ding, Danny Driess, Avinava Dubey, Chelsea Finn, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. arXiv preprint arXiv:2307.15818 , 2023. 2 [6] Bowen Chen, Liqin Liu, Chenyang Liu, Zhengxia Zou, and Zhenwei Shi. Spectral-cascaded diffusion model for remote sensing image spectral super-resolution. IEEE Transactions on Geoscience and Remote Sensing , 2024. 3 [7] William Chen, Suneel Belkhale, Suvir Mirchandani, Oier Mees, Danny Driess, Karl Pertsch, and Sergey Levine. Training strategies for efficient embodied reasoning. arXiv preprint arXiv:2505.08243 , 2025. 2 [8] Xi Chen, Josip Djolonga, Piotr Padlewski, Basil Mustafa, Soravit Changpinyo, Jialin Wu, Carlos Riquelme Ruiz, Se-bastian Goodman, Xiao Wang, Yi Tay, et al. Pali-x: On scaling up a multilingual vision and language model. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024. 2 [9] Open X-Embodiment Collaboration, Abby O’Neill, Ab-dul Rehman, Abhiram Maddukuri, Abhishek Gupta, Ab-hishek Padalkar, Abraham Lee, Acorn Pooley, Agrim Gupta, Ajay Mandlekar, Ajinkya Jain, et al. Open x-embodiment: Robotic learning datasets and rt-x models. In Proceedings of the IEEE International Conference on Robotics and Au-tomation (ICRA) , 2024. 2, 8 [10] Can Cui, Pengxiang Ding, Wenxuan Song, Shuanghao Bai, Xinyang Tong, Zirui Ge, Runze Suo, Wanqi Zhou, Yang Liu, Bofang Jia, et al. Openhelix: A short survey, empirical anal-ysis, and open-source dual-system vla model for robotic ma-nipulation. arXiv preprint arXiv:2505.03912 , 2025. 6 [11] Yusheng Dai, Zehua Chen, Yuxuan Jiang, Baolong Gao, Qi-uhong Ke, Jun Zhu, and Jianfei Cai. Omni2sound: To-wards unified video-text-to-audio generation. arXiv preprint arXiv:2601.02731 , 2026. 3 [12] Yusheng Dai, Chenxi Wang, Chang Li, Chen Wang, Jun Du, Kewei Li, Ruoyu Wang, Jiefeng Ma, Lei Sun, and Jianqing Gao. Latent swap joint diffusion for 2d long-form latent gen-eration. arXiv preprint arXiv:2502.05130 , 2026. 3 [13] Tianchen Deng, Xuefeng Chen, Yi Chen, Qu Chen, Yuyao Xu, Lijin Yang, Le Xu, Yu Zhang, Bo Zhang, Wuxiong Huang, and Hesheng Wang. Gaussiandwm: 3d gaussian driving world model for unified scene understanding and multi-modal generation. arXiv preprint arXiv:2512.23180 ,2025. 3 [14] Tianchen Deng, Yue Pan, Shenghai Yuan, Dong Li, Chen Wang, Mingrui Li, Long Chen, Lihua Xie, Danwei Wang, Jingchuan Wang, Javier Civera, Hesheng Wang, and Wei-dong Chen. What is the best 3d scene representation for robotics? from geometric to foundation models. arXiv preprint arXiv:2512.03422 , 2025. 3 [15] Songcheng Du, Yang Zou, Jiaxin Li, Mingxuan Liu, Ying Li, Changjing Shang, and Qiang Shen. Pansharpening for thin-cloud contaminated remote sensing images: a uni-fied framework and benchmark dataset. arXiv preprint arXiv:2603.14952 , 2026. 3 [16] Songcheng Du, Yang Zou, Zixu Wang, Xingyuan Li, Ying Li, Changjing Shang, and Qiang Shen. Unsupervised hyper-spectral image super-resolution via self-supervised modality decoupling. International Journal of Computer Vision , 134: 152, 2026. 3 [17] Zehui Feng, Tian Qiu, Tong Wu, Junxuan Li, Huayuan Xu, and Ting Han. Preresq-r1: Towards fine-grained rank-and-score reinforcement learning for visual quality assessment via preference-response disentangled policy optimization. 
+
+arXiv preprint arXiv:2511.05393 , 2025. 2 [18] Zehui Feng, Chenqi Zhang, Mingru Wang, Minuo Wei, Shiwei Cheng, Cuntai Guan, and Ting Han. Unveil-ing deep semantic uncertainty perception for language-anchored multi-modal vision-brain alignment. arXiv preprint arXiv:2511.04078 , 2025. 2 [19] Jiatao Gu, Shuangfei Zhai, Yizhe Zhang, Miguel Angel Bautista, and Josh Susskind. f-dm: A multi-stage diffusion model via progressive signal transformation. arXiv preprint arXiv:2210.04955 , 2022. 3 [20] Tianle Gu, Zeyang Zhou, Kexin Huang, Dandan Liang, Yixu Wang, Haiquan Zhao, Yuanqi Yao, Xingge Qiao, Keqing Wang, Yujiu Yang, Yan Teng, Yu Qiao, and Yingchun Wang. Mllmguard: A multi-dimensional safety evaluation suite for multimodal large language models. In Advances in Neural Information Processing Systems , pages 7256–7295. Curran Associates, Inc., 2024. 2 [21] Jinrui Han, Weiji Xie, Jiakun Zheng, Jiyuan Shi, Weinan Zhang, Ting Xiao, and Chenjia Bai. Kungfubot2: Learn-ing versatile motion skills for humanoid whole-body control. 
+
+arXiv preprint arXiv:2509.16638 , 2025. 2 [22] Jinrui Han, Dewei Wang, Chenyun Zhang, Xinzhe Liu, Ping Luo, Chenjia Bai, and Xuelong Li. Husky: Humanoid skateboarding system via physics-aware whole-body control. 
+
+arXiv preprint arXiv:2602.03205 , 2026. 2 13415 [23] Shibo Hao, Yi Gu, Haodi Ma, Joshua Jiahua Hong, Zhen Wang, Daisy Zhe Wang, and Zhiting Hu. Reasoning with language model is planning with world model. arXiv preprint arXiv:2305.14992 , 2023. 2 [24] Jonathan Ho, Chitwan Saharia, William Chan, David J Fleet, Mohammad Norouzi, and Tim Salimans. Cascaded diffusion models for high fidelity image generation. arXiv preprint arXiv:2106.15282 , 2021. 3 [25] Wei-Jin Huang, Yue-Yi Zhang, Yi-Lin Wei, Zhi-Wei Xia, Juantao Tan, Yuan-Ming Li, Zhilin Zhao, and Wei-Shi Zheng. Learning whole-body human-humanoid interac-tion from human-human demonstrations. arXiv preprint arXiv:2601.09518 , 2026. 2 [26] Junhwa Hur, Charles Herrmann, Saurabh Saxena, Janne Kontkanen, Wei-Sheng Lai, Yichang Shih, Michael Rubin-stein, David J Fleet, and Deqing Sun. High-resolution frame interpolation with patch-based cascaded diffusion. In Pro-ceedings of the AAAI Conference on Artificial Intelligence ,pages 3868–3876, 2025. 3 [27] Physical Intelligence, Kevin Black, Noah Brown, James Darpinian, Karan Dhabalia, Danny Driess, Adnan Esmail, Michael Equi, Chelsea Finn, Niccolo Fusai, Manuel Y. Gal-liker, Dibya Ghosh, Lachy Groom, Karol Hausman, Brian Ichter, Szymon Jakubczak, Tim Jones, Liyiming Ke, Devin LeBlanc, Sergey Levine, Adrian Li-Bell, Mohith Mothukuri, Suraj Nair, Karl Pertsch, Allen Z. Ren, Lucy Xiaoyang Shi, Laura Smith, Jost Tobias Springenberg, Kyle Stachowicz, James Tanner, Quan Vuong, Homer Walke, Anna Walling, Haohuan Wang, Lili Yu, and Ury Zhilinsky. π0.5: avision-language-action model with open-world generaliza-tion. arXiv preprint arXiv:2504.16054 , 2025. 6 [28] Li Kang, Xiufeng Song, Heng Zhou, Yiran Qin, Jie Yang, Xiaohong Liu, Philip Torr, LEI BAI, and Zhenfei Yin. Viki-r: Coordinating embodied multi-agent cooperation via re-inforcement learning. In The Thirty-ninth Annual Confer-ence on Neural Information Processing Systems Datasets and Benchmarks Track , 2025. 2 [29] Siddharth Karamcheti, Suraj Nair, Ashwin Balakrishna, Percy Liang, Thomas Kollar, and Dorsa Sadigh. Prismatic vlms: Investigating the design space of visually-conditioned language models. In Proceedings of the International Con-ference on Machine Learning (ICML) , 2024. 2 [30] Moo Jin Kim, Karl Pertsch, Siddharth Karamcheti, Ted Xiao, Ashwin Balakrishna, Suraj Nair, Rafael Rafailov, Ethan Foster, Grace Lam, Pannag Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. 2, 6 [31] Moo Jin Kim, Chelsea Finn, and Percy Liang. Fine-tuning vision-language-action models: Optimizing speed and suc-cess. arXiv preprint arXiv:2502.19645 , 2025. 6 [32] Aviral Kumar, Anikait Singh, Frederik Ebert, Mitsuhiko Nakamoto, Yanlai Yang, Chelsea Finn, and Sergey Levine. Pre-training for robots: Offline rl enables learning new tasks from a handful of trials. In Proceedings of Robotics: Science and Systems , Daegu, Republic of Korea, 2023. 4 [33] Jacky Kwok, Christopher Agia, Rohan Sinha, Matt Fout-ter, Shulu Li, Ion Stoica, Azalia Mirhoseini, and Marco Pavone. Robomonkey: Scaling test-time sampling and ver-ification for vision-language-action models. In Proceedings of The 9th Conference on Robot Learning , pages 3200–3217. PMLR, 2025. 2, 3, 6 [34] Guangyuan Li, Yongkang Wang, Junsheng Luan, Lei Zhao, Wei Xing, Huaizhong Lin, and Binkai Ou. Cascaded diffu-sion models for virtual try-on: Improving control and reso-lution. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 4689–4697, 2025. 3 [35] Hao Li, Ziqin Wang, Zi-han Ding, Shuai Yang, Yilun Chen, Yang Tian, Xiaolin Hu, Tai Wang, Dahua Lin, Feng Zhao, et al. Robointer: A holistic intermediate represen-tation suite towards robotic manipulation. arXiv preprint arXiv:2602.09973 , 2026. 2 [36] Hao Li, Shuai Yang, Yilun Chen, Xinyi Chen, Xiaoda Yang, Yang Tian, Hanqing Wang, Tai Wang, Dahua Lin, Feng Zhao, et al. Towards efficient and robust manipulation via multi-frame vision-language-action modeling. In Proceed-ings of the AAAI Conference on Artificial Intelligence , pages 18388–18396, 2026. 2 [37] Lin Li, Qihang Zhang, Yiming Luo, Shuai Yang, Ruilin Wang, Fei Han, Mingrui Yu, Zelin Gao, Nan Xue, Xing Zhu, et al. Causal world modeling for robot control. arXiv preprint arXiv:2601.21998 , 2026. 2 [38] Peizheng Li, Zhenghao Zhang, David Holtz, Hang Yu, Yutong Yang, Yuzhi Lai, Rui Song, Andreas Geiger, and Andreas Zell. Spacedrive: Infusing spatial aware-ness into vlm-based autonomous driving. arXiv preprint arXiv:2512.10719 , 2, 2025. 2 [39] Xuanlin Li, Kyle Hsu, Jiayuan Gu, Karl Pertsch, Oier Mees, Homer Rich Walke, Chuyuan Fu, Ishikaa Lunawat, Isabel Sieh, Sean Kirmani, Sergey Levine, Jiajun Wu, Chelsea Finn, Hao Su, Quan Vuong, and Ted Xiao. Evaluating real-world robot manipulation policies in simulation. In Proceed-ings of the Conference on Robot Learning (CoRL) , 2024. 2, 8[40] Xiaofan Li, Yifu Zhang, and Xiaoqing Ye. Drivingdiffusion: Layout-guided multi-view driving scenarios video genera-tion with latent diffusion model. In European Conference on Computer Vision , pages 469–485. Springer, 2024. 3 [41] Xiaofan Li, Yanpeng Sun, Chenming Wu, Fan Duan, YuAn Wang, Weihao Bo, Yumeng Zhang, and Dingkang Liang. Video4edit: Viewing image editing as a degenerate tempo-ral process. arXiv preprint arXiv:2511.18131 , 2025. [42] Xiaofan Li, Chenming Wu, Yanpeng Sun, Jiaming Zhou, Delin Qu, Yansong Qu, Weihao Bo, Haibao Yu, and Dingkang Liang. Fvar: Visual autoregressive modeling via next focus prediction. arXiv preprint arXiv:2511.18838 ,2025. 3 [43] Zhexi Lian, Haoran Wang, Xuerun Yan, Weimeng Lin, Xi-anhong Zhang, Yongyu Chen, and Jia Hu. Fine-tuning is not enough: A parallel framework for collaborative imita-tion and reinforcement learning in end-to-end autonomous driving. arXiv preprint arXiv:2603.13842 , 2026. 2 [44] Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu, Yuke Zhu, and Peter Stone. Libero: Benchmarking knowl-edge transfer for lifelong robot learning. arXiv preprint arXiv:2306.03310 , 2023. 2, 6, 8 13416 [45] Tianran Liu, Shengwen Zhao, and Nicholas Rhinehart. To-wards foundational lidar world models with efficient latent flow matching. arXiv preprint arXiv:2506.23434 , 2025. 2 [46] Wuyang Luo, Chengkai Tan, Chang Ge, Binye Hong, Su Yang, and Yongjiu Ma. Fontcrafter: High-fidelity element-driven artistic font creation with visual in-context generation. 
+
+arXiv preprint arXiv:2603.22054 , 2026. 3 [47] Yuechen Luo, Qimao Chen, Fang Li, Shaoqing Xu, Jaxin Liu, Ziying Song, Zhi-xin Yang, and Fuxi Wen. Unleash-ing vla potentials in autonomous driving via explicit learning from failures. arXiv preprint arXiv:2603.01063 , 2026. 2 [48] Qi Lv, Hao Li, Xiang Deng, Rui Shao, Michael Y Wang, and Liqiang Nie. RoboMP 2: A robotic multimodal perception-planning framework with multimodal large language mod-els. In Proceedings of the 41st International Conference on Machine Learning , pages 33558–33574. PMLR, 2024. 2, 3 [49] Mitsuhiko Nakamoto, Simon Zhai, Anikait Singh, Max Sobol Mark, Yi Ma, Chelsea Finn, Aviral Kumar, and Sergey Levine. Cal-ql: Calibrated offline rl pre-training for efficient online fine-tuning. Advances in Neural Information Process-ing Systems , 36:62244–62269, 2023. 4 [50] Mitsuhiko Nakamoto, Oier Mees, Aviral Kumar, and Sergey Levine. Steering your generalists: Improving robotic foun-dation models via value guidance. Conference on Robot Learning (CoRL) , 2024. 2, 3, 6 [51] Shijie Pan, Aoran Cheng, Yiqi Sun, Kai Kang, Cristobal Pais, Yulun Zhou, and Zuo-Jun Max Shen. Using drone swarm to stop wildfire: A predict-then-optimize approach. 
+
+arXiv preprint arXiv:2411.16144 , 2024. 3 [52] Shuaibang Peng, Juelin Zhu, Xia Li, Kun Yang, Maojun Zhang, Yu Liu, and Shen Yan. Lod-loc v3: Generalized aerial localization in dense cities using instance silhouette alignment. arXiv preprint arXiv:2603.19609 , 2026. 2 [53] Karl Pertsch, Kyle Stachowicz, Brian Ichter, Danny Driess, Suraj Nair, Quan Vuong, Oier Mees, Chelsea Finn, and Sergey Levine. Fast: Efficient action tokenization for vision-language-action models. arXiv preprint arXiv:2501.09747 ,2025. 2 [54] Yiran Qin, Li Kang, Xiufeng Song, Zhenfei Yin, Xiaohong Liu, Xihui Liu, Ruimao Zhang, and Lei Bai. Robofactory: Exploring embodied agent collaboration with compositional constraints. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 10075–10085, 2025. 2[55] Delin Qu, Chi Yan, Dong Wang, Jie Yin, Qizhi Chen, Dan Xu, Yiting Zhang, Bin Zhao, and Xuelong Li. Implicit event-rgbd neural slam. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pages 19584–19594, 2024. 3 [56] Delin Qu, Haoming Song, Qizhi Chen, Zhaoqing Chen, Xianqiang Gao, Xinyi Ye, Qi Lv, Modi Shi, Guanghui Ren, Cheng Ruan, et al. Eo-1: Interleaved vision-text-action pretraining for general robot control. arXiv preprint arXiv:2508.21112 , 2025. 2 [57] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Y Wu, et al. Deepseekmath: Pushing the limits of mathe-matical reasoning in open language models. arXiv preprint arXiv:2402.03300 , 2024. 2 [58] YuHang Tang, Yixuan Lou, Pengfei Han, Haoming Song, Xinyi Ye, Dong Wang, and Bin Zhao. Trajectory con-ditioned cross-embodiment skill transfer. arXiv preprint arXiv:2510.07773 , 2025. 2 [59] Gemini Robotics Team, Saminda Abeyruwan, Joshua Ainslie, Jean-Baptiste Alayrac, Montserrat Gonzalez Are-nas, Travis Armstrong, Ashwin Balakrishna, Robert Baruch, Maria Bauza, Michiel Blokzijl, et al. Gemini robotics: Bringing ai into the physical world. arXiv preprint arXiv:2503.20020 , 2025. 2 [60] Dewei Wang, Chenjia Bai, Chenhui Li, Jiyuan Shi, Yan Ding, Chi Zhang, and Bin Zhao. Skill-nav: Enhanced nav-igation with versatile quadrupedal locomotion via waypoint interface. arXiv preprint arXiv:2506.21853 , 2025. 2 [61] Dewei Wang, Xinmiao Wang, Xinzhe Liu, Jiyuan Shi, Ying-nan Zhao, Chenjia Bai, and Xuelong Li. More: Mixture of residual experts for humanoid lifelike gaits learning on com-plex terrains. arXiv preprint arXiv:2506.08840 , 2025. [62] Dewei Wang, Xinmiao Wang, Chenyun Zhang, Jiyuan Shi, Yingnan Zhao, Chenjia Bai, and Xuelong Li. X-loco: To-wards generalist humanoid locomotion control via synergetic policy distillation. arXiv preprint arXiv:2603.03733 , 2026. 2[63] Xuqin Wang, Tao Wu, Yanfeng Zhang, Lu Liu, Dong Wang, Mingwei Sun, Yongliang Wang, Niclas Zeller, and Daniel Cremers. Ladb: Latent aligned diffusion bridges for semi-supervised domain translation. In DAGM German Confer-ence on Pattern Recognition , pages 221–236. Springer, 2025. 3[64] Xuqin Wang, Tao Wu, Yanfeng Zhang, Lu Liu, Mingwei Sun, Yongliang Wang, Niclas Zeller, and Daniel Cremers. Geodesicnvs: Probability density geodesic flow matching for novel view synthesis. arXiv preprint arXiv:2603.01010 ,2026. 2 [65] Ziye Wang, Li Kang, Yiran Qin, Jiahua Ma, LEI BAI, Ruimao Zhang, et al. Gaudp: Reinventing multi-agent col-laboration through gaussian-image synergy in diffusion poli-cies. In The Thirty-ninth Annual Conference on Neural In-formation Processing Systems , 2025. 2 [66] Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al. Chain-of-thought prompting elicits reasoning in large lan-guage models. In Advances in Neural Information Process-ing Systems , pages 24824–24837, 2022. 2 [67] Wei Wu, Fan Lu, Yunnan Wang, Shuai Yang, Shi Liu, Fangjing Wang, Qian Zhu, He Sun, Yong Wang, Shuailei Ma, et al. A pragmatic vla foundation model. arXiv preprint arXiv:2601.18692 , 2026. 2 [68] Wenlong Xia, Jinhao Zhang, Ce Zhang, Yaojia Wang, Youmin Gong, and Jie Mei. Iss policy: Scalable diffu-sion policy with implicit scene supervision. arXiv preprint arXiv:2512.15020 , 2025. 2 [69] Haoran Yang, Jiacheng Bao, Yucheng Xin, Haoming Song, Yuyang Tian, Bin Zhao, Dong Wang, and Xuelong Li. Zerowbc: Learning natural visuomotor humanoid control 13417 directly from human egocentric video. arXiv preprint arXiv:2603.09170 , 2026. 2 [70] Shuo Yang, Caren Han, Siwen Luo, and Eduard Hovy. MAGIC-VQA: Multimodal and grounded inference with commonsense knowledge for visual question answering. In 
+
+Findings of the Association for Computational Linguistics: ACL 2025 , pages 16967–16986, Vienna, Austria, 2025. As-sociation for Computational Linguistics. 2 [71] Shuai Yang, Hao Li, Yilun Chen, Bin Wang, Yang Tian, Tai Wang, Hanqing Wang, Feng Zhao, Yiyi Liao, and Jiang-miao Pang. Instructvla: Vision-language-action instruction tuning from understanding to manipulation. arXiv preprint arXiv:2507.17520 , 2025. 2 [72] Siyuan Yang, Yang Zhang, Haoran He, Ling Pan, Xiu Li, Chenjia Bai, and Xuelong Li. Steering vision-language-action models as anti-exploration: A test-time scaling ap-proach. arXiv preprint arXiv:2512.02834 , 2025. 2 [73] Shuo Yang, Soyeon Caren Han, Yihao Ding, Shuhe Wang, and Eduard Hoy. Tooltree: Efficient llm agent tool planning via dual-feedback monte carlo tree search and bidirectional pruning. arXiv preprint arXiv:2603.12740 , 2026. 2 [74] Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Tom Griffiths, Yuan Cao, and Karthik Narasimhan. Tree of thoughts: Deliberate problem solving with large language models. Advances in neural information processing systems ,36:11809–11822, 2023. 2 [75] Yuanqi Yao, Gang Wu, Kui Jiang, Siao Liu, Jian Kuai, Xi-anming Liu, and Junjun Jiang. Improving domain gener-alization in self-supervised monocular depth estimation via stabilized adversarial training. In European Conference on Computer Vision , pages 183–201. Springer, 2024. 3 [76] Yuanqi Yao, Siao Liu, Haoming Song, Delin Qu, Qizhi Chen, Yan Ding, Bin Zhao, Zhigang Wang, Xuelong Li, and Dong Wang. Think small, act big: Primitive prompt learn-ing for lifelong robot manipulation. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22573–22583, 2025. 2 [77] Michał Zawalski, William Chen, Karl Pertsch, Oier Mees, Chelsea Finn, and Sergey Levine. Robotic control via embodied chain-of-thought reasoning. arXiv preprint arXiv:2407.08693 , 2024. 2 [78] Shuang Zeng, Xinyuan Chang, Mengwei Xie, Xinran Liu, Yifan Bai, Zheng Pan, Mu Xu, and Xing Wei. Futuresight-drive: Thinking visually with spatio-temporal cot for au-tonomous driving. arXiv preprint arXiv:2505.17685 , 2025. 2[79] Jinhao Zhang, Wenlong Xia, Yaojia Wang, Zhexuan Zhou, Huizhe Li, Yichen Lai, Haoming Song, Youmin Gong, and Jie Mei. Information filtering via variational regularization for robot manipulation. arXiv preprint arXiv:2601.21926 ,2026. 2 [80] Jinhao Zhang, Zhexuan Zhou, Huizhe Li, Yichen Lai, Wen-long Xia, Haoming Song, Youmin Gong, and Jie Mei. Pock-etdp3: Efficient pocket-scale 3d visuomotor policy. arXiv preprint arXiv:2601.22018 , 2026. 2 [81] Pingrui Zhang, Yifei Su, Pengyuan Wu, Dong An, Li Zhang, Zhigang Wang, Dong Wang, Yan Ding, Bin Zhao, and Xue-long Li. Cross from left to right brain: Adaptive text dreamer for vision-and-language navigation. arXiv preprint arXiv:2505.20897 , 2025. 2 [82] Ruilin Zhang, Haiyang Zheng, and Hongpeng Wang. Cn-mbi: Determining the number of clusters using center pair-wise matching and boundary filtering. In Proceedings of the International Conference on Advanced Data Mining and Ap-plications , pages 262–277, 2023. 3 [83] Ruilin Zhang, Haiyang Zheng, and Hongpeng Wang. Tdec: Deep embedded image clustering with transformer and dis-tribution information. In Proceedings of the 2023 ACM In-ternational Conference on Multimedia Retrieval , 2023. 3 [84] Ruijie Zheng, Yongyuan Liang, Shuaiyi Huang, Jianfeng Gao, Hal Daum´ e III, Andrey Kolobov, Furong Huang, and Jianwei Yang. Tracevla: Visual trace prompting enhances spatial-temporal awareness for generalist robotic policies. 
+
+arXiv preprint arXiv:2412.10345 , 2024. 2 [85] Zhiwei Zhong, Xianming Liu, Junjun Jiang, Debin Zhao, and Shiqi Wang. Dual-level cross-modality neural architecture search for guided image super-resolution. IEEE Transactions on Pattern Analysis and Machine Intelligence , 47(9):8249– 8267, 2025. 3 [86] Heng Zhou, Li Kang, Yiran Qin, Xiufeng Song, Ao Yu, Zilu Zhang, Haoming Song, Kaixin Xu, Yuchen Fan, Dongzhan Zhou, Xiaohong Liu, Ruimao Zhang, Philip Torr, Lei Bai, and Zhenfei Yin. Ego to world: Collaborative spatial reason-ing in embodied systems via reinforcement learning. arXiv preprint arXiv:2603.14811 , 2026. 2 [87] Chunzheng Zhu, Yangfang Lin, Jialin Shao, Jianxin Lin, and Yijun Wang. Pathology-aware prototype evolution via llm-driven semantic disambiguation for multicenter diabetic retinopathy diagnosis. In Proceedings of the 33rd ACM In-ternational Conference on Multimedia , pages 9196–9205, 2025. 2 [88] Chunzheng Zhu, Yangfang Lin, Shen Chen, Yijun Wang, and Jianxin Lin. Medeyes: Learning dynamic visual focus for medical progressive diagnosis. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 13916–13924, 2026. 2 13418
