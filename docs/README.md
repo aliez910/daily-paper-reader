@@ -48,17 +48,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-09-09</span>
+      <span class="dpr-home-dashboard-kicker">2026-09-10</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 24 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 27 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
     <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>13</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>16</dd></div>
     <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>11</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-09-09 19:58:44 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-09-10 19:50:49 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -69,21 +69,40 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>&lt;think&gt;The user wants a daily report summary in Chinese, 3 sentences max, based on the provided recommendation data. Let me analyze:</p>
-<p>Date: 2026-09-09</p>
+<p>&lt;think&gt;The user wants me to act as a daily report editor and output 3 sentences (within 3 lines) in Chinese that are attractive, concise but specific. The content must be based on the given recommendation data.</p>
+<p>Let me analyze the data:</p>
+<p>Date: 2026-09-10</p>
 <p>Status: Success</p>
-<p>Total: 24 papers</p>
-<p>Deep read: 13</p>
-<p>Quick read: 11</p>
-<p>Top deep read papers (high scores): ICI-VLA (10.0/10), One Demonstration Many Objects (9.0/10)</p>
-<p>Quick read highlights: REFACTOR-VLA (8.0), EmbodiedSkills (8.0), Imitation Learning temporal robustness (8.0)</p>
-<p>Theme: VLA (Vision-Language-Action) models, robot manipulation, imitation learning</p>
-<p>Let me write 3 sentences:</p>
-<p>Summary/title - today&#x27;s focus on VLA models and robot manipulation</p>
-<p>Most notable directions - in-context imitation, generalization from few demonstrations</p>
-<p>Next step suggestion for general readers</p>
-<p>Let me make it concise, specific, and engaging.&lt;/think&gt;</p>
-<p>今天精选 24 篇论文，精读 13 篇，焦点集中在视觉-语言-动作（VLA）模型与机器人操作泛化方向，整体质量较高。值得重点关注的是&quot;上下文模仿 + 时空对齐演示&quot;能让 VLA 模型更高效地学新技能，以及仅凭一次演示就能借助局部接触几何泛化到多种物体的操作思路。建议普通读者先从精读列表中 ICI-VLA 这篇入手，理解 VLA 如何&quot;看一段视频就能照做&quot;，再延伸到速读里的程序化动作库与时序鲁棒性分析，构建完整的 VLA 技术地图。</p>
+<p>Total: 27 papers</p>
+<p>Deep reading: 16</p>
+<p>Quick reading: 11</p>
+<p>Deep reading list:</p>
+<p>&quot;One Demonstration, Many Objects: Generalizing Manipulation via Local Contact Geometry&quot; (9.0/10)</p>
+<p>&quot;HINT: Human-Intent Inception for Long-Horizon Robot Manipulation&quot; (9.0/10)</p>
+<p>Quick reading list:</p>
+<p>&quot;ZETA: A Controlled Study of Zero-Shot Cross-Embodiment VLA Transfer for Tabletop Manipulation&quot; (8.0/10)</p>
+<p>&quot;GIFT: Guided Intermediate Feature Training via Action-Oriented Structural Supervision for Robotic Manipulation&quot; (8.0/10)</p>
+<p>&quot;LIBERO-RECOVER: Beyond Task Success Towards Failure Recovery in Robotic Manipulation Models&quot; (8.0/10)</p>
+<p>All papers are about robot manipulation. Key themes:</p>
+<p>Generalization from few demonstrations (One Demonstration, Many Objects)</p>
+<p>Human intent for long-horizon tasks (HINT)</p>
+<p>Cross-embodiment transfer (ZETA)</p>
+<p>Feature training for manipulation (GIFT)</p>
+<p>Failure recovery (LIBERO-RECOVER)</p>
+<p>Now I need to output:</p>
+<p>One sentence summarizing what was done today, suitable for a title feel</p>
+<p>One sentence giving the most worth-seeing 1-2 directions/conclusions</p>
+<p>One sentence giving next-step suggestions (for general readers)</p>
+<p>Let me draft in Chinese:</p>
+<p>今日精选 27 篇机器人操控论文，精读 16 篇，围绕&quot;少样本泛化、长时序任务与失败恢复&quot;三大主线展开。</p>
+<p>最值得关注的方向：一是&quot;一次演示即泛化到多物体&quot;（接触几何）与&quot;HINT 人类意图驱动长时序操控&quot;两项高分工作，二是 ZETA 的跨具身零样本迁移和 LIBERO-RECOVER 的失败恢复正在补齐 VLA 模型的实用闭环。</p>
+<p>建议读者优先精读两篇 9 分代表作，再用速读篇横向对比方法路径，关注从&quot;任务成功&quot;走向&quot;可恢复、可持续&quot;这一趋势。</p>
+<p>Let me refine to make it more attractive and concise:</p>
+<p>今日 27 篇日报聚焦机器人操控前线，精读 16 篇，以&quot;一次演示即泛化&quot;和&quot;人类意图驱长程任务&quot;两篇 9 分力作领衔。</p>
+<p>三条主线最值得跟进：接触几何驱动的小样本泛化、人类意图引发的长时序操控，以及 VLA 跨具身迁移与失败恢复正让&quot;会做&quot;走向&quot;做对&quot;。</p>
+<p>普通读者建议先读两篇 9 分代表作理解方法核心，再用 ZETA、GIFT、LIBERO-RECOVER 串起&quot;从演示到部署&quot;的完整链路。</p>
+<p>This is good. Let me tighten it up a bit more to be punchy.&lt;/think&gt;</p>
+<p>今日 27 篇日报聚焦机器人操控前线，精读 16 篇，以&quot;一次演示即泛化&quot;与&quot;人类意图驱动长程任务&quot;两篇 9 分力作领衔。三条主线最值得关注：接触几何驱动的小样本泛化、人类意图引导的长时序操控，以及 VLA 跨具身迁移与失败回收正让机器人从&quot;会做&quot;走向&quot;做对&quot;。建议普通读者先精读两篇 9 分代表作，再用 ZETA、GIFT、LIBERO-RECOVER 串起&quot;从演示到部署&quot;的完整</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -92,12 +111,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">13 篇</strong>
+    <strong class="dpr-home-dashboard-count">16 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="ICI-VLA: In-Context Imitation with Spatiotemporally Aligned Demonstrations for Vision-Language-Action Models">ICI-VLA: In-Context Imitation with Spatiotemporally Aligned Demonstrations for Vision-Language-Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="One Demonstration, Many Objects: Generalizing Manipulation via Local Contact Geometry">One Demonstration, Many Objects: Generalizing Manipulation via Local Contact Geometry</span></li><li><span class="dpr-home-dashboard-paper-title" title="HINT: Human-Intent Inception for Long-Horizon Robot Manipulation">HINT: Human-Intent Inception for Long-Horizon Robot Manipulation</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="One Demonstration, Many Objects: Generalizing Manipulation via Local Contact Geometry">One Demonstration, Many Objects: Generalizing Manipulation via Local Contact Geometry</span></li><li><span class="dpr-home-dashboard-paper-title" title="HINT: Human-Intent Inception for Long-Horizon Robot Manipulation">HINT: Human-Intent Inception for Long-Horizon Robot Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Scaling Bimanual Household Manipulation from 1,500 hours of Demonstrations to On-Policy Corrections">Scaling Bimanual Household Manipulation from 1,500 hours of Demonstrations to On-Policy Corrections</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>13</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>16</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -108,7 +127,7 @@
     <strong class="dpr-home-dashboard-count">11 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="REFACTOR-VLA: Unsupervised Library Learning of Typed Motor Programs">REFACTOR-VLA: Unsupervised Library Learning of Typed Motor Programs</span></li><li><span class="dpr-home-dashboard-paper-title" title="EmbodiedSkills: A Unified Framework for Orchestrating, Training, and Deploying VLA Agents">EmbodiedSkills: A Unified Framework for Orchestrating, Training, and Deploying VLA Agents</span></li><li><span class="dpr-home-dashboard-paper-title" title="Does Imitation Learning Preserve Temporal Robustness in Dexterous Manipulation? An Expert-Learner Comparison Across Task Execution Speeds">Does Imitation Learning Preserve Temporal Robustness in Dexterous Manipulation? An Expert-Learner Comparison Across Task Execution Speeds</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="ZETA: A Controlled Study of Zero-Shot Cross-Embodiment VLA Transfer for Tabletop Manipulation">ZETA: A Controlled Study of Zero-Shot Cross-Embodiment VLA Transfer for Tabletop Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="GIFT: Guided Intermediate Feature Training via Action-Oriented Structural Supervision for Robotic Manipulation">GIFT: Guided Intermediate Feature Training via Action-Oriented Structural Supervision for Robotic Manipulation</span></li><li><span class="dpr-home-dashboard-paper-title" title="LIBERO-RECOVER: Beyond Task Success Towards Failure Recovery in Robotic Manipulation Models">LIBERO-RECOVER: Beyond Task Success Towards Failure Recovery in Robotic Manipulation Models</span></li></ul>
   </div>
   <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">rob-il <strong>11</strong></span></div>
 </section>
