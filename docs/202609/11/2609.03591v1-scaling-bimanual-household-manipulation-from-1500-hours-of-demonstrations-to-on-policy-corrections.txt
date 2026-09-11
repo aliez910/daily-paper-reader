@@ -1,0 +1,558 @@
+Scaling Bimanual Household Manipulation from
+1,500 hours of Demonstrations to On-Policy
+Corrections
+Jiafeng Xu2, Qi Li1, Yan Shen2, Yiyu Ren1, Travis Davies1, Shaowen He1,
+Ze Wang3, Yifan Yang1, Ran Cheng1, Hao Dong1,2
+1PrimeBot Research Institute, Swancor Advanced Materials Co., Ltd.
+2School of Computer Science, Peking University.
+3Crobotia.
+Project website: https://huggingface.co/datasets/challenge-2026/challenge data
+Fig. 1: Introducing PrimeBot Household Manipulation Dataset. The data encompasses core skills required for everyday
+housework: deformable-object manipulation, articulated-object interaction, appliance operation, and general tidying and object
+rearrangement. It integrates two complementary sources, bimanual real-robot teleoperation and UMI collection in diverse home
+scenes.
+Abstract—Learning generalist policies for robust bimanual
+manipulation is bottlenecked by the scarcity of high quality
+large scale human demonstration data. In this work, we release
+1,500 hours of diverse bimanual manipulation demonstrations
+covering everyday household tasks, and use this comprehensive
+corpus to train XR-2, a powerful vision-language-action (VLA)
+model. Enabled by a purpose built high throughput data pipeline
+and a carefully designed multi stage training paradigm, XR-
+2 attains strong manipulation performance in our systematic
+experiments while retaining favorable training efficiency and high
+data utilization. We further study two critical scaling axes: varying
+the amount of expert demonstration data, and post training on
+DAgger correction data from real time human interventions. In
+both settings, task success rate improves steadily over the data
+ranges we probe, exhibiting a clear consistent scaling trend at
+our current data scale. These results validate both the learning
+capacity of XR-2 and the promising scaling properties of the
+released dataset, which we open source to support reproducible
+research on bimanual robot manipulation learning.
+Index Terms—bimanual, manipulation, data scaling, UMI,
+household data
+Real-robot data and UMI data are sponsored by PrimeBot and crobotia
+respectively.
+I. INTRODUCTION
+Bimanual manipulation is essential for tasks requiring
+two-arm coordination, long-horizon execution, and complex
+interactions [1]–[5]. Recent advances in VLA models [6]–
+[9] and large-scale robot datasets [10]–[14] have made data
+scaling central to generalist manipulation policies [15]–[17].
+As datasets grow, however, the question shifts from how much
+data to collect to which data are most valuable: offline expert
+demonstrations provide successful behaviors, while corrective
+on-policy data captures deployment-time states and failures.
+This motivates studying how these complementary data sources
+scale bimanual policy learning.
+In this work, we first assemble a large-scale offline corpus
+of 1,500 hours of real-world bimanual household manipulation
+data, combining real-robot teleoperation and Universal Manip-
+ulation Interface (UMI) handheld-gripper demonstrations [18].
+The real-robot subset contains 32,518 trajectories, 57.4 million
+frames, and 531.7 hours of interaction collected using homo-
+geneous mobile dual-arm robots. Spanning multiple household
+settings, the dataset covers both complete long-horizon tasks
+arXiv:2609.03591v1  [cs.RO]  3 Sep 2026
+
+
+Fig. 2: X2W hardware configuration. The robot has 25 degrees
+of freedom. It is equipped with a variety of sensors, including
+the RealSense D435i, ZED X Mini and ZED-XONE GS
+cameras, as well as an inertial measurement unit (IMU) and
+heterogeneous computing units, supporting the performance of
+household bimanual manipulation tasks.
+and fine-grained manipulation primitives, including garment
+folding, washer interaction, object transfer, and laundry-basket
+handling. To support learning across temporal scales, long-
+horizon demonstrations are aligned with sub-task-level language
+annotations, with semantically related instructions organized
+into 11 atomic skills.
+Building on this corpus, we first train a VLA model from
+large-scale expert demonstrations, and we then use Dataset
+Aggregation (DAgger) [19] to collect human corrections during
+on-policy rollouts, extending supervision to policy-visited states
+and deployment-time failures. We aggregate these corrective
+trajectories with expert data for post-training, preserving skill
+coverage while allocating more corrective data to sub-tasks
+with lower success rates.
+Our experiments further examine the scaling behavior of
+expert and corrective data. On clothes folding, performance
+improves as expert data increases from 10 to 120 hours, but
+shows little further gain at 160 hours. In contrast, DAgger
+targets policy-induced failure states and raises the success rate
+from 58% to 93% over three rounds. Together, these results
+show that expert demonstrations and corrective on-policy data
+play complementary roles in scaling bimanual policy learning,
+with corrective data providing continued gains as returns from
+additional expert data diminish.
+II. ROBOT AND DATASET
+A. Robot System
+We employ the X2W, a mobile bimanual robotic platform
+designed specifically for whole-body manipulation tasks. As
+show in Fig. 2, the robot consists of two 7-DoF arms, each
+terminated by a 1-DoF gripper, together with a 4-DoF waist and
+a 2-DoF head, amounting to 22 controllable joints, all mounted
+on a three-wheel omnidirectional mobile base. The main
+body joints are driven by quasi-direct-drive (QDD) actuators,
+providing responsive and compliant motion for contact-rich
+bimanual manipulation, while the three independently driven
+wheels enable omnidirectional motion of the base within the
+workspace.
+The proprioceptive state is a unified 89-D vector,
+st =
+
+qt, ˙qt, τ t, pL
+t , pR
+t , qw
+t , ˙qw
+t , τ w
+t
+
+∈R89,
+(1)
+which concatenates the positions qt, velocities ˙qt, and torques
+τ t of the 22 controllable joints, the poses of the two end-
+effectors pL,R
+t
+, and the positions qw
+t , velocities ˙qw
+t , and torques
+τ w
+t of the three drive wheels.
+The robot’s motion is governed by 25 control variables: 22
+target joint positions and 3 target wheel velocities.
+at =
+h
+qcmd
+t
+, ˙qw,cmd
+t
+i
+∈R25.
+(2)
+For visual perception, the robot carries one head-mounted
+camera providing global scene context and two wrist-mounted
+cameras capturing close-range manipulation details, together
+forming complementary multi-view observations.
+All proprioceptive states, action sequences, and visual
+observations are temporally synchronized and recorded at a
+uniform frequency of 30 Hz.
+B. Data Collection Pipeline
+Our data collection system consists of two complementary
+pipelines: offline expert demonstration collection and online
+DAgger corrective data collection. The former builds large-
+scale, high-quality real-robot demonstrations through stan-
+dardized teleoperation, while the latter continuously collects
+corrective demonstrations from human interventions during
+real-world policy deployment.
+Expert Demonstration Collection. For offline real-robot data
+collection, long-horizon tasks are decomposed into sub-tasks
+guided by their inherent structure and interaction contexts.
+Considering the robot’s reachable workspace and physical
+limitations, we design a Standard Operating Procedure (SOP)
+for every sub-task to standardize scene setup, object arrange-
+ment, robot initialization, and manipulation workflows. Remote
+human operators use VR devices to tele-operate the robot
+and record demonstration trajectories while adhering to the
+predefined SOPs.
+Before being uploaded to the cloud, the raw multimodal
+trajectory data undergo automatic post-processing and format
+conversion. Once stored in the cloud, the data pass through
+automated quality validation, VLM-powered task and language
+annotation, and a final manual review stage. This end-to-end
+standardized pipeline produces consistent, high-quality demon-
+strations across varying robots, scenes, and operators.
+Online DAgger Collection. In addition to offline expert
+demonstrations, we collect online corrective data during real-
+world policy deployment. Multiple robots execute complete
+long-horizon tasks using a shared policy. Whenever the policy
+reaches a failure state or requires correction, a human operator
+temporarily takes control, corrects or completes the current sub-
+task, and immediately returns control to the policy. As a result,
+
+
+Fig. 3: Dataset statistics. (a) Scene coverage. Real-robot trajectories span four household interaction settings: folding station,
+laundry washer, sofa, and laundry basket. (b) Long-horizon distribution. The duration distribution exhibits broad coverage of
+long-horizon episodes, with a long tail reaching around 150 s. (c) Atomic skill coverage. Distribution of 11 atomic skills,
+covering high-frequency garment manipulation as well as less frequent but task-critical object-transfer primitives.
+a single long-horizon rollout may contain multiple alternating
+policy- and human-controlled segments without restarting the
+task after each failure.
+The system automatically records all human intervention
+segments as corrective demonstrations, associates them with the
+corresponding sub-task prompts, and explicitly distinguishes
+policy-generated and human-controlled segments within the
+same trajectory. Thus, DAgger data requires no additional
+re-annotation on the cloud. As the number of deployed robots
+increases, failures encountered during actual execution are
+continuously transformed into new corrective demonstrations,
+forming a scalable closed-loop data pipeline for improving
+long-horizon manipulation policies.
+C. Real-robot Dataset Overview
+Our real-robot consists of 32,518 teleoperated controlled real
+robot trajectories, covering more than 12 everyday household
+tasks, totaling approximately 57.4 million frames and 531.7
+hours of interaction data, all with frame-level language anno-
+tations. Representative trajectories are visualized in Fig. 6 of
+the appendix.
+Scene coverage. As shown in Fig. 3(a), the real-robot
+dataset spans four household settings: Folding Station, Laundry
+(Washer), Living Room (Sofa), and Laundry (Basket), con-
+taining approximately 14.6k, 8.4k, 6.1k, and 3.4k trajectories,
+respectively. These settings cover garment manipulation, washer
+interaction, object transfer, and laundry-basket handling.
+Long-horizon manipulation. The dataset contains both com-
+plete long-horizon tasks and skill-level demonstrations. As
+illustrated in Fig. 3(b), trajectory durations range from short
+atomic primitives to long sequences exceeding 100 s, with
+some beyond 150 s. For multi-stage tasks, we provide language-
+aligned sub-step annotations, enabling supervision at both the
+task and skill levels.
+Atomic skill coverage. After merging semantically equivalent
+instructions, we obtain 11 atomic skills, as summarized in
+Fig. 3(c). The dataset includes both high-frequency skills, such
+as Fold clothes (14.6k), and less frequent but task-critical
+primitives, such as Load clothes into washer (1.2k) and Put
+plush into washer (0.8k). Since a long-horizon trajectory may
+contain multiple skills, skill counts are not mutually exclusive.
+Overall, the dataset provides unified multi-scene coverage,
+long-horizon supervision, and fine-grained skill annotations for
+household manipulation.
+D. UMI Dataset Overview
+Complementing the teleoperated corpus, we collect approx-
+imately 1,000 hours of in-the-wild bimanual UMI demon-
+strations of household garment manipulation (folding and
+organizing clothes), matching the task distribution of the
+Folding Station setting. Each demonstration provides synchro-
+nized dual egocentric video (960 × 960 at 30 Hz), metric
+6-DoF end-effector trajectories recovered by visual-inertial
+SLAM, continuous gripper aperture, and frame-level language
+annotations at two granularities: item-level segments (e.g., fold
+the red shirt) and fine-grained action steps within each segment
+(e.g., grasp, lay flat, fold one side over).
+In-the-wild diversity. Freed from a fixed workcell, the data are
+collected in more than 200 households by over 100 collectors,
+spanning 5,000 distinct garments that vary in category, fabric,
+color, and print. Demonstrations take place on beds, tabletops,
+and drying racks, and are recorded at all hours, from morning
+to late night, so lighting ranges from bright daylight to dusk and
+artificial illumination. Folding strategies vary across collectors
+as well. The resulting coverage of scenes, objects, illumination,
+and manipulation styles exceeds what a fixed robot cell can
+afford, representative trajectories are shown in the appendix
+(see Fig. 7).
+Bimanual, encoder-free capture. Both grippers are recorded si-
+multaneously, yielding synchronized dual-view, dual-trajectory
+demonstrations of intrinsically two-handed garment manipu-
+lation; in-the-wild bimanual data at this scale remains scarce.
+Each gripper is fully mechanical and self-contained, following a
+vision-only design: the wrist-mounted camera is its sole sensor,
+
+
+Fig. 4: Two-stage full-parameter training of XR-2. Both stages use the same VLM + action-expert architecture with all
+parameters trainable (flames); dashed tokens are model outputs. (a) Stage 1 fits offline teleoperated demonstrations Ddemo on
+expert-visited states. (b) Stage 2 initializes from Stage 1, rolls out the policy, collects expert corrections aexpert on the visited
+states, and retrains on the aggregated data—aligning training with the policy’s own state distribution.
+the aperture is recovered visually rather than from encoders, and
+no head-mounted or third-person camera is involved. Extensive
+policy-learning experiments validate this design choice: wrist-
+view-only observation is sufficient for bimanual coordination
+in manipulation tasks [18], hand-centric views improve training
+efficiency and out-of-distribution generalization over third-
+person views [20], and recent in-the-wild systems with hand-
+centric-only sensing achieve zero-shot deployment in unseen
+homes [21]; head-mounted views are instead primarily useful
+for navigation and mobile-base control rather than tabletop
+manipulation.
+The gripper is also built for endurance. Free of encoders,
+motors, and actuation electronics, it is markedly lighter than
+instrumented alternatives, allowing operators to comfortably
+collect data for hours at a time. Its low-power design supports
+full-day standby and ultra-long task capture, enabling reset-free
+sessions of up to 90 minutes of continuous recording. Mean-
+while, the directly hand-driven jaws deliver strong yet finely
+modulated grasp forces, sufficient to tension and pin fabric
+during folding.
+III. MODEL AND TRAINING RECIPE
+A. Main Architecture
+XR-2 is a VLA model built upon a Mixture-of-Transformer
+architecture with a total of 5B parameters (Fig. 4), consisting
+of a pre-trained vision-language backbone, i.e., Qwen3-VL-
+4B-Instruct [22] for multimodal perception, and an action
+diffusion transformer trained by flow matching [23] objectives
+as an action expert. For the control task, XR-2 generates a
+K-length action chunk at = at:t+K conditioned on the vision
+observations ot, language l and proprioceptive state st, i.e.,
+at = πθ(ot, st, l).
+Specifically, the action expert is constructed from a stack of
+18 transformer blocks with hidden dimension Dhidden = 1024
+with 8 attention heads, which employ the grouped key-value
+attention [24] mechanism with 4 grouped KV heads. Within
+each block, the noisy action tokens first undergo bidirectional
+self-attention, then cross-attend to the backbone’s hidden states,
+and finally pass through a SwiGLU feed-forward layer. The
+cross-attention is depth-aligned: block i attends to the i-th of
+the 18 exposed backbone layers, so the expert progressively
+grounds its predictions in increasingly abstract VL features
+rather than collapsing all conditioning onto the final layer.
+The action expert is further conditioned on denoising-timestep
+information supplied through adaLN-zero modulation.
+To facilitate seamless asynchronous execution, we further
+train the expert module with action prefix conditioning (on the
+right of Fig. 4). The delay d defines a leading action segment
+regarded as previously committed; the corresponding tokens
+are anchored to their ground-truth values with their timesteps
+fixed to t = 1, while only the subsequent suffix sequence
+undergoes noise injection, denoising, and loss supervision.
+During inference, the delay d is dynamically computed as
+the average execution duration of the most recent R inference
+rounds. Full action sequences are synthesized through five steps
+of Euler forward integration, supporting low-latency, smooth
+real-time robotic control.
+B. Post-training on Expert Data
+After collecting expert demonstrations, we train XR-2 using
+the conditional flow matching objective [25], enabling a single
+policy to learn multiple sub-tasks jointly:
+LCFM(θ) = E{a,o,s,l}∼D,ϵ,t ∥πθ(at, o, s, l) −(a −ϵ)∥2 , (3)
+where ϵ ∼N(0, I) and t ∼Beta(1.0, 1.5). The noisy action
+chunk is constructed as at = (1 −t)ϵ + ta. The policy πθ
+predicts the target flow (a−ϵ) conditioned on the noisy action,
+visual observations o, robot state s, and language instruction l.
+C. Post-training on DAgger Data
+The collected DAgger trajectories are streamed to the cloud,
+where the policy is further optimized for failure cases in test
+environment. This stage poses two challenges: the policy must
+acquire failure recovery from the online corrections without
+forgetting the skills it already has, and sub-tasks with different
+learning dynamics must be trained in a balanced manner. We
+address both through data allocation.
+
+
+Fig. 5: Data scaling in the folding-clothes task. (a) Success
+rate versus the duration of effective expert data. (b) Success
+rate over three rounds of DAgger training initialized from a
+checkpoint with a 58% success rate.
+First, we mix DAgger and expert data at a 1:1 ratio in the
+number of trajectories rather than frames. Because trajectory
+lengths differ across sub-tasks, frame-level mixing allows
+random sampling to distort skill coverage, whereas matching
+trajectory counts preserves the expert skill distribution.
+Second, we bias the DAgger budget toward sub-tasks the
+policy handles poorly. Let N denote the number of sub-tasks
+and let si ∈[0, 1] be the success rate of the current policy on
+sub-task i, measured on a held-out evaluation set. The fraction
+wi of DAgger trajectories allocated to sub-task i is
+wi = wmin +
+ 1 −Nwmin
+
+ 1 −si + ϵ
+α
+PN
+j=1
+ 1 −sj + ϵ
+α ,
+(4)
+where 1−si is the demand signal, α ≥0 controls how sharply
+the budget concentrates on weak sub-tasks (α = 0 recovers a
+uniform allocation), ϵ > 0 keeps wi positive once a sub-task
+is solved, and wmin floors every share; we set wmin = 0.05,
+ϵ = 0.05, and α = 1. Reserving Nwmin before the proportional
+split keeps the allocation closed-form, with PN
+i=1 wi = 1 and
+wi ≥wmin. The floor also guards against forgetting: strong
+sub-tasks retain data as the budget shifts toward the weak ones.
+IV. EXPERIMENT
+A. Experiment Settings
+We deploy the learned policy on an NVIDIA GeForce RTX
+4090 GPU. The policy performs asynchronous inference at a
+frequency of 10 Hz, and generates an action chunk at ∈R50×25.
+After temporal ensembling, the whole-body joint commands
+are synchronously issued at a fixed frequency of 30 Hz.
+The commands are then optimized in real-time by a whole-
+body motion controller derived from the teleoperation phase,
+controlling the robot to perform movements at a frequency of
+1000 Hz.
+The test environments in this experiment all incorporated
+slight generalizations, including variations in material size,
+material color, and initial robot position. After detailed testing,
+we found that a model achieving an 85% success rate under
+generalized conditions can achieve a success rate exceeding
+95% under in-distribution conditions.
+B. Scaling of Expert Data
+To assess data scalability, we study folding clothes, and scale
+the training set from 10 hours to 160 hours (8,000 trajectories).
+As shown in Fig. 5(a), the success rate monotonically increases
+from 34% at 30 hours to 84% at 120 hours, then tends to
+saturate, and the last 40 hours do not bring further improvement
+(it is 82% at 160 hours). The scale of the released dataset is
+what makes this transition measurable: it locates the point at
+which expert demonstrations already cover the task distribution
+densely. Beyond it, the residual failures come from states
+the policy reaches only at test time, which lie outside the
+expert distribution and cannot be supplied by more expert data.
+Closing this gap requires human-in-the-loop intervention data.
+C. DAgger Experiment
+Given the time overhead associated with data collection and
+constraints on computational and experimental resources, we
+initialize our DAgger experiments using a checkpoint trained
+on 18,695 expert trajectories spanning 10 sub-tasks. For the
+clothes-folding task, the DAgger trajectories for each round
+are calculated according to Eq. 4. Each iteration conducts 2.5
+epochs of post-training, and performance improves steadily,
+as shown in Fig. 5(b): the success rises from 58% to 74%,
+82%, and 93% following the first, second, and third iterations,
+respectively, representing a 35-point gain compared with the
+expert-only baseline.
+V. CONCLUSION
+We release 1,500 hours of bimanual household manipulation
+data, 531.7 hours of real-robot teleoperation across 32,518
+trajectories together with roughly 1,000 hours of UMI demon-
+strations, and train XR-2, a 5B VLA model, on it. On clothes
+folding, the success rate rises monotonically with the amount
+of expert data across the range we probe, from 34% at 30 hours
+to 84% at 120 hours, showing that the released corpus supports
+sustained scaling; past that point, three rounds of DAgger
+post-training with a failure-weighted budget raise the success
+rate from 58% to 93%. Scaling data and structuring it around
+on-policy failures are therefore complementary levers rather
+than competing ones. The complete corpus, together with its
+temporally aligned sub-task language annotations, is released
+to the community as a shared basis for studying data-centric
+scaling in bimanual manipulation.
+ACKNOWLEDGMENT
+We thank the data team for building the data pipeline
+system, which enables efficient and rapid data accumulation
+and supports agile iteration; we also thank the data acquisition
+team for demonstrating outstanding operational skills. We thank
+crobotia for providing a large amount of UMI data; and we
+also thank the open source community for its valuable feedback
+and active participation throughout this project.
+
+
+REFERENCES
+[1] T. Z. Zhao, V. Kumar, S. Levine, and C. Finn, “Learning fine-
+grained bimanual manipulation with low-cost hardware,” arXiv preprint
+arXiv:2304.13705, 2023.
+[2] Z. Fu, T. Z. Zhao, and C. Finn, “Mobile aloha: Learning bimanual mobile
+manipulation with low-cost whole-body teleoperation,” arXiv preprint
+arXiv:2401.02117, 2024.
+[3] S. Liu, L. Wu, B. Li, H. Tan, H. Chen, Z. Wang, K. Xu, H. Su, and J. Zhu,
+“Rdt-1b: a diffusion foundation model for bimanual manipulation,” in
+International Conference on Learning Representations, vol. 2025, 2025,
+pp. 29 982–30 009.
+[4] N. Gkanatsios, J. Xu, M. Bronars, A. Mousavian, T.-W. Ke, and
+K. Fragkiadaki, “3d flowmatch actor: Unified 3d policy for single-and
+dual-arm manipulation,” arXiv preprint arXiv:2508.11002, 2025.
+[5] Y. Shen, F. Jiang, Z. He, X. Li, Y. Liu, Z. Li, R. Wu, and H. Dong, “Bipre-
+manip: Learning affordance-based bimanual preparatory manipulation
+through anticipatory collaboration,” arXiv preprint arXiv:2603.21679,
+2026.
+[6] A. Brohan, N. Brown, J. Carbajal, Y. Chebotar, X. Chen, K. Choromanski,
+T. Ding, D. Driess, A. Dubey, C. Finn et al., “Rt-2: Vision-language-
+action models transfer web knowledge to robotic control,” arXiv preprint
+arXiv:2307.15818, 2023.
+[7] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai,
+L. Groom, K. Hausman, B. Ichter et al., “π0: A vision-language-action
+flow model for general robot control,” arXiv preprint arXiv:2410.24164,
+2024.
+[8] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess,
+A. Esmail, M. Equi, C. Finn, N. Fusai et al., “π0.5: A vision-
+language-action model with open-world generalization,” arXiv preprint
+arXiv:2504.16054, 2025.
+[9] Y. Li, X. Ma, J. Xu, Y. Cui, Z. Cui, Z. Han, L. Huang, T. Kong, Y. Liu,
+H. Niu et al., “Gr-rl: Going dexterous and precise for long-horizon
+robotic manipulation,” arXiv preprint arXiv:2512.01801, 2025.
+[10] A. O’Neill, A. Rehman, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee,
+A. Pooley, A. Gupta, A. Mandlekar, A. Jain et al., “Open x-embodiment:
+Robotic learning datasets and rt-x models: Open x-embodiment collab-
+oration 0,” in 2024 IEEE International Conference on Robotics and
+Automation (ICRA).
+IEEE, 2024, pp. 6892–6903.
+[11] Q. Bu, J. Cai, L. Chen, X. Cui, Y. Ding, S. Feng, S. Gao, X. He, X. Hu,
+X. Huang et al., “Agibot world colosseo: A large-scale manipulation
+platform for scalable and intelligent embodied systems,” arXiv preprint
+arXiv:2503.06669, 2025.
+[12] A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karam-
+cheti, S. Nasiriany, M. K. Srirama, L. Y. Chen, K. Ellis et al., “Droid:
+A large-scale in-the-wild robot manipulation dataset,” arXiv preprint
+arXiv:2403.12945, 2024.
+[13] C. Hou, K. Wu, J. Liu, Z. Che, D. Wu, F. Liao, G. Li, J. He,
+Q. Feng, Z. Jin et al., “Robomind 2.0: A multimodal, bimanual mobile
+manipulation dataset for generalizable embodied intelligence,” arXiv
+preprint arXiv:2512.24653, 2025.
+[14] C. Cheang, S. Chen, Z. Cui, Y. Hu, L. Huang, T. Kong, H. Li, Y. Li, Y. Liu,
+X. Ma et al., “Gr-3 technical report,” arXiv preprint arXiv:2507.15493,
+2025.
+[15] M. Shi, L. Chen, J. Chen, Y. Lu, C. Liu, G. Ren, P. Luo, D. Huang, M. Yao,
+and H. Li, “Is diversity all you need for scalable robotic manipulation?”
+IEEE Transactions on Robotics, 2026.
+[16] F. Lin, Y. Hu, P. Sheng, C. Wen, J. You, and Y. Gao, “Data scaling laws in
+imitation learning for robotic manipulation,” in International Conference
+on Learning Representations, vol. 2025, 2025, pp. 54 877–54 910.
+[17] Y. Wang, S. Zheng, H. Luo, W. Zhang, H. Yuan, C. Xu, H. Xu, Y. Feng,
+M. Yu, Z. Kang et al., “Rethinking visual-language-action model scaling:
+Alignment, mixture, and regularization,” arXiv preprint arXiv:2602.09722,
+2026.
+[18] C. Chi, Z. Xu, C. Pan, E. Cousineau, B. Burchfiel, S. Feng, R. Tedrake,
+and S. Song, “Universal manipulation interface: In-the-wild robot teaching
+without in-the-wild robots,” arXiv preprint arXiv:2402.10329, 2024.
+[19] S. Ross, G. Gordon, and D. Bagnell, “A reduction of imitation learning
+and structured prediction to no-regret online learning,” in Proceedings
+of the fourteenth international conference on artificial intelligence and
+statistics.
+JMLR Workshop and Conference Proceedings, 2011, pp.
+627–635.
+[20] K. Hsu, M. J. Kim, R. Rafailov, J. Wu, and C. Finn, “Vision-based
+manipulators need to also see from their hands.” in ICLR, 2022.
+[21] H. Etukuru, N. Naka, Z. Hu, S. Lee, J. Mehu, A. Edsinger, C. Paxton,
+S. Chintala, L. Pinto, and N. M. M. Shafiullah, “Robot utility models:
+General policies for zero-shot deployment in new environments,” in 2025
+IEEE International Conference on Robotics and Automation (ICRA).
+IEEE, 2025, pp. 8275–8283.
+[22] S. Bai, Y. Cai, R. Chen, K. Chen, X. Chen, Z. Cheng, L. Deng, W. Ding,
+C. Gao, C. Ge et al., “Qwen3-vl technical report,” arXiv preprint
+arXiv:2511.21631, 2025.
+[23] Y. Lipman, R. T. Chen, H. Ben-Hamu, M. Nickel, and M. Le, “Flow
+matching for generative modeling,” arXiv preprint arXiv:2210.02747,
+2022.
+[24] J. Ainslie, J. Lee-Thorp, M. de Jong, Y. Zemlyanskiy, F. Lebr´on,
+and S. Sanghai, “Gqa: Training generalized multi-query transformer
+models from multi-head checkpoints,” 2023. [Online]. Available:
+https://arxiv.org/abs/2305.13245
+[25] Y. Lipman, M. Havasi, P. Holderrieth, N. Shaul, M. Le, B. Karrer, R. T. Q.
+Chen, D. Lopez-Paz, H. Ben-Hamu, and I. Gat, “Flow matching guide
+and code,” 2024. [Online]. Available: https://arxiv.org/abs/2412.06264
+
+
+APPENDIX
+REPRESENTATIVE TRAJECTORIES
+Fig. 6 and 7 show representative trajectories from the released
+real-robot and UMI datasets, respectively. Each row is a single
+episode sampled at a fixed interval, with the sub-task instruction
+active at that time step shown above the frames.
+ROBOT DESCRIPTION
+We make the robot hardware description publicly available
+to facilitate non-commercial projects for teaching, experimental
+work, and academic research. The corresponding URDF files
+can be found in the challenge data repository.
+CHANGE LOG
+September 2026: The challenge is in full swing, welcome to
+join now!
+August 2026: Submit an workshop article to IROS.
+July 2026: Release full data and launch the IROS-2026
+Household Bimanual Manipulation Challenge.
+
+
+Fig. 6: Representative real-robot demonstrations from the robot-mounted head camera. Each row shows a single trajectory:
+the heading above each image strip denotes the corresponding subtask instruction, and several frames are sampled along the
+trajectory to illustrate the progression of task execution. The examples cover a diverse set of household manipulation tasks,
+including washing-machine interaction, garment loading and unloading, object placement, bimanual laundry-basket manipulation,
+garment transfer, and long-horizon garment unfolding and folding.
+
+
+Fig. 7: Representative UMI demonstrations from the egocentric wrist-mounted view. Each row shows one trajectory: the heading
+above each strip is the item-level task instruction, frames are sampled at the midpoints of the annotated fine-grained action
+steps, and the caption under each frame is the corresponding action-step annotation. Rows span four distinct households and
+five garment types, covering flat folding, sleeve-first folding, bimanual coordination, rack retrieval, and stacking onto a pile.
