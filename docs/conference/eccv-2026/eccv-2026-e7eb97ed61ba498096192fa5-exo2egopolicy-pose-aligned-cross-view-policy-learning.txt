@@ -1,0 +1,1739 @@
+Exo2EgoPolicy: Geometry-Aware Policy Transfer
+from Exocentric Human Demonstrations
+Hritam Basak1,2, Hadi Tabatabaee1, Xin Yang1, Shreekant Gayaka1, Nan
+Qiao1, Yuyin Sun1, Cheng-Hao Kuo1, Zhaozheng Yin2, Min Sun1
+1Amazon.com; 2Stony Brook University, USA
+Fig. 1: We propose Exo2EgoPolicy that learns robot policies by translating exocentric
+(third-person) human video into egocentric (first-person) hand-object pose, enabling
+egocentric human-robot co-training for diverse manipulation tasks.
+Abstract. Learning robot manipulation policies from large-scale hu-
+man videos is challenging due to the viewpoint mismatch between third-
+person observations and egocentric robot control. To this end, we intro-
+duce Exo2EgoPolicy, a geometry-aware framework that learns egocentric
+manipulation policies from monocular exocentric video via viewpoint-
+aligned pose translation. Unlike prior Exo→Ego approaches that rely on
+diffusion-based pixel synthesis and often produce temporally inconsistent
+predictions, our method operates directly on a structured pose mani-
+fold and explicitly models the geometric ambiguity inherent in monoc-
+ular observation. We formulate exocentric-to-egocentric translation as a
+viewpoint-conditioned latent variable model on the SE(3) manifold that
+disentangles pose from camera transformation and captures the ambi-
+guity induced by unknown camera extrinsics. Under bounded viewpoint
+motion, the formulation yields pose trajectories that are identifiable up
+to a global rigid transformation and supports stable sequential infer-
+ence through temporal regularization. Beyond representation alignment,
+we show that for quasi-static manipulation tasks whose rewards de-
+pend primarily on relative hand–object geometry, pose captures the key
+task-relevant information required for policy learning. This enables pol-
+icy co-training on pose-translated human demonstrations alongside lim-
+ited robot teleoperation data within a unified human–robot state space.
+Empirically, Exo2EgoPolicy improves temporal consistency, cross-view
+alignment, and out-of-distribution policy transfer compared to pixel-
+based translation and other cross-view co-training baselines, achieving
+
+
+2
+H. Basak et al.
+20–30% higher task success on manipulation benchmarks. These results
+suggest that geometry-aligned pose representations provide a scalable
+foundation for cross-view policy learning from human video. Website
+Keywords: Exo2Ego · Diffusion Model · Co-training
+1
+Introduction
+From early developmental stages, humans observe external actions and seam-
+lessly internalize them into their own motor repertoire. Driven by mirror-neuron
+mechanisms, we can effortlessly infer the spatial relationships and hand–object
+interactions that would be perceived from a first-person perspective simply by
+watching someone else act. This actor–observer translation ability underpins
+human imitation learning [22] and has profound implications for robotics [15],
+augmented/virtual reality [23], and embodied intelligence [55]. In robot learning,
+projecting a human instructor’s hand–object interactions into the robot’s own
+viewpoint enables direct policy alignment with demonstrations [19,80].
+Despite the well-established utility of egocentric (first person) data for ma-
+nipulation learning [20,79], the overwhelming majority of human demonstrations
+are recorded in exocentric (third-person) formats. Bridging this viewpoint gap
+is fundamentally challenging. Unlike standard novel view synthesis, exocentric-
+to-egocentric (Exo-to-Ego) translation involves extreme viewpoint shifts where
+critical regions are fully occluded [28]. For example, the inner pages of a book or
+the fine-grained contact geometry between fingers and objects may be invisible in
+the exocentric recording but must be inferred in the egocentric perspective. The
+problem is therefore inherently underdetermined. Existing approaches attempt
+to resolve this challenge through either geometry-aware regression or generative
+modeling. Geometry-based methods such as NeRF-style approaches [65,72] are
+fundamentally regressive: they require dense multi-view supervision and struggle
+under single-view input with heavy occlusion. Conversely, generative diffusion
+models [11,34,44] can hallucinate unseen regions, but they operate in pixel space
+and often exhibit geometric drift and temporal instability. While such generative
+models may achieve strong perceptual metrics (e.g., FID or LPIPS), they lack the
+structural guarantees required for downstream robotic control. Frame-wise pixel
+hallucination further introduces high-frequency jitter and spatial inconsistencies
+that corrupt continuous kinematic trajectories, rendering them unsuitable for
+derivative-based manipulation policies.
+We argue that this reflects a deeper misalignment in problem formulation.
+Prior works treat Exo-to-Ego translation purely as a visual synthesis task. How-
+ever, for robotic manipulation, the objective is not photorealistic rendering, but
+recovery of action-relevant geometric structure. Manipulation rewards depend
+primarily on relative hand–object pose, rather than on background texture fi-
+delity. Pixel-level hallucination, therefore, introduces unnecessary variance while
+failing to enforce temporal and geometric consistency.
+To address this, we propose a paradigm shift from pixel synthesis to struc-
+tured geometric alignment. We introduce Exo2EgoPolicy (shown in Figure 1),
+
+
+Exo2EgoPolicy
+3
+a framework that operates entirely in a structured pose manifold and bypasses
+raw pixel ambiguities. Instead of generating egocentric images, we obtain explicit
+3D hand–object pose from monocular exocentric input and formulate Exo-to-Ego
+translation as a viewpoint-conditioned latent variable model. This model disen-
+tangles intrinsic pose from camera transformation and explicitly characterizes
+the ambiguity induced by unknown extrinsics. By constraining view translation
+to the SE(3) manifold, we reduce the underdetermined appearance problem to
+a geometry-consistent inference problem. We further introduce a temporal reg-
+ularization that enforces cross-frame smoothness directly in pose space. Under
+bounded viewpoint motion, the formulation yields trajectories that are identi-
+fiable up to a global rigid transformation. We further derive a stability bound
+indicating that pose prediction errors remain bounded over time, promoting tem-
+porally consistent pose trajectories. By operating directly in pose space rather
+than pixel space, the approach also helps mitigate the trajectory jitter that can
+arise when diffusion-based view synthesis generates frames independently, while
+preserving task-relevant geometric structure.
+Crucially, this perspective suggests that pose-level abstraction is not merely
+a practical simplification but a representation aligned with the structure of
+many manipulation tasks. Modeling manipulation as a Markov Decision Process
+(MDP), we show that for quasi-static tasks whose reward depends primarily on
+relative hand–object geometry, pose captures the key task-relevant information
+required for policy learning. This provides a principled motivation for avoiding
+pixel reconstruction in favor of geometry-aligned representations. By co-training
+policies on pose-translated human demonstrations alongside limited real-robot
+teleoperation data, we help bridge the embodiment gap and enable leveraging
+third-person human videos as a scalable supervision source for robot learning. By
+reframing Exo-to-Ego translation as structured geometric inference rather than
+pixel synthesis, Exo2EgoPolicy shifts cross-view generation from visual appear-
+ance modeling toward recovering task-relevant geometric structure for embodied
+policy learning. Our contributions are as follows:
+– Exo-to-Ego Policy Co-Training Framework. We introduce a framework
+that leverages viewpoint translation for embodied control, converting third-
+person human videos into egocentric pose demonstrations that can be co-
+trained with robot teleoperation data for manipulation policy learning.
+– Geometry-Aware Pose Translation. We formalize Exo-to-Ego transla-
+tion as a viewpoint-conditioned latent variable model on the SE(3) manifold,
+resulting in trajectories that are identifiable up to a global rigid transforma-
+tion under bounded viewpoint motion.
+– Temporal Stability. We introduce temporal regularization in pose space
+and derive a stability bound indicating that pose prediction errors remain
+bounded over time, promoting temporally consistent pose trajectories.
+– Pose Sufficiency for Policy Learning. We provide an MDP-based anal-
+ysis showing that for quasi-static manipulation tasks whose rewards depend
+primarily on relative hand–object geometry, pose captures the task-relevant
+information required for policy learning. Empirically, this pose-centric for-
+
+
+4
+H. Basak et al.
+mulation improves out-of-distribution task success by 20–30% compared to
+pixel-based translation baselines.
+2
+Related Works
+2.1
+Exo-to-Ego View Generation
+Exo-to-ego view generation addresses the substantial geometric and appearance
+gap between third- and first-person perspectives. Early approaches [34,44] con-
+dition egocentric synthesis via channel-wise concatenation of exocentric features.
+However, the lack of pixel-level correspondence across viewpoints introduces sig-
+nificant spatial misalignment, limiting geometric reasoning and often degrading
+synthesis fidelity. 4Diff [11] improves cross-view fusion through cross-attention,
+yet departs from fully pretrained diffusion backbones, which may limit general-
+ization and scalability. Subsequent methods reduce ambiguity through additional
+supervision or multi-view constraints. EgoExo-Gen [64] conditions generation
+on the first egocentric frame, effectively narrowing the viewpoint gap but lim-
+iting applicability when egocentric initialization is unavailable. Exo2Ego-V [29]
+performs full video translation using multiple exocentric inputs and decoupled
+spatial–temporal modules, which constrains scalability and weakens unified spa-
+tio–temporal modeling. More broadly, recent video diffusion models [9,18,57,71]
+have enabled high-quality conditional synthesis, including depth-, image-, and
+camera-controlled generation [35, 66, 73]. Camera-control approaches typically
+condition directly on camera extrinsics or leverage intermediate 3D representa-
+tions [3,4,37,49]. However, these techniques are primarily designed for moderate
+viewpoint perturbations and struggle under the extreme pose shifts inherent in
+exocentric-to-egocentric translation.
+In contrast, we move beyond pixel-level synthesis and formulate Exo-to-Ego
+generation as geometry-aware pose inference on the SE(3) manifold. By explic-
+itly disentangling viewpoint from intrinsic hand–object geometry and enforcing
+temporal stability, our framework directly produces control-ready pose trajecto-
+ries rather than appearance-only video synthesis.
+2.2
+Imitation Learning and Learning from Human Videos
+Robot imitation learning has demonstrated substantial improvements in dexter-
+ity and robustness using large-scale robot-collected datasets [12,33,60,74,78], fa-
+cilitated by advances in scalable data collection [1,13,69]. Despite these advances,
+robotics still lacks internet-scale embodied datasets comparable to vision [47]
+and language [41], limiting open-world generalization across tasks and environ-
+ments. To leverage abundant human videos [8, 39, 51, 70], prior work typically
+aligns either observations or actions. Observation-alignment methods rely on in-
+termediate representations such as affordances [2], object keypoints [6,14,63], or
+structured object embeddings [36, 38]. While effective, these modular pipelines
+can introduce compounding perceptual errors and complicate end-to-end credit
+assignment.
+
+
+Exo2EgoPolicy
+5
+Action-alignment approaches address embodiment mismatch via trajectory
+or flow matching [48], object-centric abstractions [21], masking strategies [25],
+hardware-based hand tracking [59], or teleoperation-based pose remapping such
+as HumanPlus [16]. In contrast, our method does not require hardware in-
+strumentation and explicit retargeting, directly co-training robot policies on
+geometry-consistent poses obtained through Exo-to-Ego translation.
+2.3
+Cross-Embodiment
+Cross-embodiment pre-training improves adaptability and generalization across
+heterogeneous robotic platforms [10,17,53,67,76]. Recent end-to-end approaches
+using cross-robot data [31,56] reduce compounding perceptual errors and exhibit
+emergent corrective behaviors such as automatic retrying [7]. Other methods
+enforce viewpoint constraints between human demonstrations and deployment
+environments [27], trading scalability for a reduced domain gap.
+Concurrent work explores learning directly from egocentric human demon-
+strations [58]. DexCap [59] employs glove-based 3D tracking with RGBD cap-
+ture, while EgoMimic [25] relies on closely matched egocentric camera view-
+points. In contrast, our approach scales across diverse camera configurations
+without alignment constraints or specialized hardware. By coupling geometry-
+aware Exo-to-Ego pose translation with policy co-training, our approach enables
+scalable cross-embodiment learning from heterogeneous human data.
+3
+Proposed Method
+We present Exo2EgoPolicy, a geometry-aware framework for transferring manip-
+ulation skills from third-person (exocentric) human demonstrations to egocentric
+robot control. Rather than synthesizing novel-view pixels, which are computa-
+tionally expensive and may introduce task-irrelevant visual artifacts, our key in-
+sight is to translate only the hand-object kinematic state. The framework consists
+of four tightly coupled components. First, we formulate Exo-to-Ego translation as
+a viewpoint-conditioned latent diffusion model over the SE(3) manifold, resolv-
+ing the geometric ambiguity inherent to single-view projection (subsection 3.1).
+Second, to prevent the frame-to-frame jitter that arises from independent per-
+frame generation, we augment the model with a temporal regularization using a
+motion prior which ensures bounded cumulative trajectory error (subsection 3.2).
+Third, we provide a formal Markov Decision Process (MDP) argument showing
+that this viewpoint-aligned pose is a sufficient statistic for optimal policy learn-
+ing in manipulation tasks (subsection 3.3). Finally, we describe a co-training
+scheme that combines large-scale translated human demonstrations with limited
+robot teleoperation data in a unified state-action space (subsection 3.4). The
+overall workflow is shown in Figure 2.
+
+
+6
+H. Basak et al.
+Fig. 2: Overview of the Exo2EgoPolicy framework. (Top left) Given an exocen-
+tric RGB observation iexo
+t
+and the corresponding exocentric pose pexo
+t
+, the geometric
+encoders E{i,p} produces a dense latent representation that conditions the Exo2Ego
+Pose Translation Diffusion Model (subsection 3.1). The score network sψ is trained via
+a continuous-time score-matching objective Ldiff on the SE(3) manifold, running a for-
+ward noising process p(0)
+t
+→p(1)
+t
+and learning to reverse it to synthesize the egocentric
+pose pego
+t
+, as shown in (bottom left). (Top right) The translated pose pego
+t
+is passed to
+the Temporal Regularization module (subsection 3.2), where a motion prior Φ(pt−1, zt)
+enables temporally regularized autoregressive conditioning across frames, supervised by
+the temporal consistency loss Ltemp (Eq. 4). We formally establish that the generated
+pose is sufficient for cross-domain policy learning (subsection 3.3). (Bottom right) The
+resulting temporally smooth egocentric pose, together with limited teleoperation data,
+are projected into a unified state-action space and co-train the policy network πθ (sub-
+section 3.4) via the joint behavioral cloning objective Lpolicy (Eq. 7).
+3.1
+Geometry-Aware Viewpoint-Conditioned Pose Translation
+Problem setup. Let Iexo
+1:T = {iexo
+1
+, . . . , iexo
+T } be a sequence of T exocentric RGB
+frames captured from an uncalibrated, potentially moving camera. Our goal
+is to recover the corresponding egocentric hand-object pose trajectory Pego
+1:T =
+{p1, . . . , pT }, where each state pt = (phand
+t
+, pobj
+t
+) lives on the joint hand-object
+kinematic manifold Mpose
+≜
+Mhand × Mobj. Here, Mhand = SE(3) × RK
+captures the 6-DoF wrist pose and K-dimensional finger articulation, while
+Mobj = SE(3) captures the 6-DoF pose of the manipulated object. We drop
+“ego” superscript on pt for brevity; poses are egocentric unless otherwise stated.
+Why not pixel-space translation. Recovering an egocentric image from a monoc-
+ular exocentric view is an ill-posed inverse problem: a single 2D projection is
+geometrically consistent with infinitely many 3D scenes. Prior pixel-space ap-
+proaches [34,44] resolve this ambiguity by hallucinating unobservable scene re-
+gions, inevitably producing high-frequency spatial artifacts and structural incon-
+sistencies [11]. These background nuisance variables are irrelevant and possibly
+detrimental to embodied control. We therefore bypass pixel space entirely and
+formulate exo-to-ego view translation directly on Mpose.
+Geometric latent encoding. We first compress each exocentric frame and pose
+into a dense, geometry-focused latent: zt = {Ei(iexo
+t
+); Ep(pexo
+t
+)}
+∈
+Rd, where
+
+
+Exo2EgoPolicy
+7
+E{i,p} are image and pose encoders, respectively, and pexo
+t
+is corresponding exo-
+centric hand-object pose (extracted from the frame using [45], if not provided).
+Because the exocentric camera extrinsics could be uncalibrated, multiple valid
+mappings zt 7→pt may be consistent with the same observation. We alleviate
+this with a diffusion model below.
+Diffusion model on Mpose. Let τ ∈[0, 1] denote the diffusion pseudo-time. We
+define a forward noising process that smoothly perturbs the true egocentric pose
+p(τ=0)
+t
+≡pt into a tractable Gaussian prior on the tangent space of Mpose:
+  \ma
+t
+h r
+m
+ {d}
+p
+_ t
+^
+{( \ tau )} = f\!\left (p_t^{(\tau )},\tau \right )\mathrm {d}\tau + g(\tau )\,\mathrm {d}\mathbf {w}, \label {eq:forward_sde} 
+(1)
+where w is a standard Wiener process, f(·, ·) is a linear drift function, and
+g(·) is the scalar diffusion coefficient. Since the relative camera transform is
+unknown at both training and inference, we condition the score network only
+on the observable geometric latent zt and the previously inferred pose pt−1. The
+reverse-time stochastic differential equation for pose synthesis is:
+  \ma
+t
+h
+r
+m
+ 
+{d}p
+_
+t ^
+{
+( \tau )} = \ Bi
+g
+ [f\
+!
+\ le
+f t
+ ( p _t^{ ( \tau )},\tau \right ) - g(\tau )^2\, \nabla _{p_t}\log q_\tau \!\left (p_t^{(\tau )} \mid z_t\right )\Big ]\mathrm {d}\tau + g(\tau )\,\mathrm {d}\bar {\mathbf {w}}, \label {eq:reverse_sde} 
+(2)
+where ¯w is a reverse-time Wiener process. The conditional score function
+∇pt log qτ(p(τ)
+t
+| zt) guides the reverse process toward poses that are both kine-
+matically plausible and consistent with the observed frame. We approximate it
+with a neural network sψ(p(τ)
+t
+, τ, zt), trained via the continuous-time conditional
+score-matching:
+  \mathc a l { L}_{
+\
+t e
+x
+t {d
+iff}}
+(
+\psi
+ 
+) = \
+m
+a thbb 
+{
+E}_ {\ta
+u
+ ,\,
+ 
+p _t^{
+(
+0)},
+\
+,
+ 
+\mathbf {w}} \!\left [\lambda (\tau )\left \|s_\psi \!\left (p_t^{(\tau )},\tau ,z_t\right ) - \nabla _{p_t^{(\tau )}}\log q_{0\to \tau }\!\left (p_t^{(\tau )} \mid p_t^{(0)} \right )\right \|_2^2\right ], \label {eq:score_matching} (3)
+where λ(τ) > 0 is a positive weighting function and the expectation is over
+τ ∼U(0, 1), the ground-truth pose p(0)
+t , and the Wiener noise.
+Pose Identifiability up to Rigid Transformation Although the exocentric
+camera pose ct is unknown, the generated trajectory is not arbitrary. Rather
+than predicting absolute coordinates, we set the generative target as the hand
+pose relative to the manipulated object, i.e., (pobj
+t
+)−1 · phand
+t
+. Because the object
+provides a locally static reference frame, this formulation naturally marginalizes
+out the dynamic camera. We formalize the pose identifiability as follows.
+Proposition 1 (Identifiability up to SE(3)). Suppose sψ converges to the
+true conditional score. Let the relative inter-frame camera motion satisfy
+logSE(3)(∆ct,t+1)
+ ≤ϵ for sufficiently small ϵ > 0, and assume the manip-
+ulated object defines a locally static reference frame. Then the support of the
+generated egocentric trajectory ˆPego
+1:T collapses to a single manifold, identifiable
+up to a time-invariant rigid transformation Tglobal ∈SE(3).
+
+
+8
+H. Basak et al.
+Intuition. Under slow camera motion (ϵ →0), the temporal variation of ct is
+negligible relative to intrinsic hand-object kinematics. Conditioning on the object
+reference frame reduces the conditional distribution to a Dirac measure at the
+true relative pose sequence, leaving only the arbitrary initial global alignment
+Tglobal as an unknown. This proposition ensures spatial validity for each frame
+independently, thus generating frames without temporal coupling might produce
+high-frequency kinematic jitter across the sequence, which is addressed below.
+3.2
+Temporally Regularized Pose Generation
+We observe that frame-wise independent diffusion produces trajectories that are
+individually plausible but collectively discontinuous, also supported by findings
+in [11, 34, 44]. In novel-view synthesis this manifests as flickering; in manipula-
+tion, it produces kinematic jitter that corrupts velocity and acceleration signals
+required by robot controllers. We therefore augment the generative model with
+a temporally regularized dynamics prior.
+Instead of sampling pt from zt in isolation, we condition the score network
+on the previously inferred state pt−1: sψ
+
+p(τ)
+t
+, τ, zt, pt−1
+
+. This makes the gen-
+eration autoregressive, propagating temporal context across frames.
+Temporal consistency loss. We introduce a forward kinematic motion prior Φ :
+Mpose × Rd →Mpose that predicts the expected next state given the current
+state and visual features. Denoting a ⊟b ≜logSE(3)(a · b−1) as the Lie group
+difference operator following [5,54], the temporal consistency loss is:
+  \be g
+i
+n
+ {a
+ligned} 
+\
+l abel {eq:te mpo
+ral _ l
+oss} \ma
+t
+h cal {L}_{\ tex
+t {
+t
+emp}} = \sum _{t=2}^{T} \left \|\hat {p}_t^{\text {hand}} \boxminus \Phi _{\text {hand}}(p_{t-1}, z_t)\right \|^2 + \beta \left \|\hat {p}_t^{\text {obj}} \boxminus \Phi _{\text {obj}}(p_{t-1}, z_t)\right \|^2. \end {aligned} 
+(4)
+where ˆpt = (ˆphand
+t
+, ˆpobj
+t
+) is the pose output by the diffusion model, logSE(3)(·)
+maps SE(3) elements to their tangent-space Lie algebra vectors, and β > 0 bal-
+ances hand versus object regularization. This loss acts as a geodesic low-pass
+filter, suppressing physically implausible jumps while preserving genuine inter-
+action dynamics. The total training objective for the view translation module is
+Ldiff + α Ltemp, where α > 0 is a fixed weight.
+Proposition 2 (Non-divergence bound). Let dM(ˆpt, p∗
+t ) denote the geodesic
+distance between the generated pose ˆpt and the ground-truth p∗
+t on Mpose. Sup-
+pose the single-step prediction error satisfies dM(ˆpt, p∗
+t ) ≤ϵ, and the transition
+operator Φ is L-Lipschitz with L < 1. Then the cumulative trajectory error is
+uniformly bounded:
+  \
+sup _{ t
+ 
+\
+in [1,T ]}
+ \
+m
+a
+t
+h b b {E}\big [d_{\mathcal {M}}(\hat {p}_t, p_t^*)\big ] \;\le \; \frac {\epsilon }{1 - L}. \label {eq:nondivergence} 
+(5)
+Intuition. The L < 1 (contraction) condition ensures that errors decay rather
+than compound over time, yielding a finite and controllable error ceiling.
+
+
+Exo2EgoPolicy
+9
+3.3
+Pose Sufficiency for Cross-Domain Policy Learning
+The preceding modules produce a temporally smooth, viewpoint-aligned pose
+sequence ˆPego
+1:T . We now argue that this sequence contains all the information
+needed for optimal manipulation policy learning, without requiring any pixel-
+level information.
+MDP formulation. We model the manipulation task as a Markov Decision Pro-
+cess (MDP) {ST, A, T , R, γ}, where ST is the state space of joint hand-object
+poses, A is the continuous action space of end-effector displacements and fin-
+ger articulations, T : ST × A →∆(ST) is the stochastic transition operator,
+R : ST × A →R is the task reward function, and γ ∈[0, 1) is the discount fac-
+tor. We define the pose-based state as stpose
+t
+= ˆpt = (ˆphand
+t
+, ˆpobj
+t
+) ∈Mpose, and
+optimize the policy πpose(at | stpose
+t
+) to maximize expected cumulative reward:
+  \vspac e {-3mm
+} 
+J
+(\p
+i _{\text 
+{
+p ose
+}
+}) = \mathbb {E}_{ \pi _{\text {pose}}} \!\left [\sum _{t=0}^{T} \gamma ^t R\!\left (st_t^{\text {pose}}, a_t\right )\right ]. \vspace {-2mm} \label {eq:policy_objective} 
+(6)
+Sufficiency argument. For quasi-static manipulation tasks, the reward R de-
+pends only on relative hand-object geometry. The relative transformation δt =
+
+ˆpobj
+t
+−1
+· ˆphand
+t
+∈SE(3)×RK deterministically encodes this geometry, render-
+ing background appearance entirely redundant. A policy conditioned on stpose
+t
+thus achieves the same optimal value as one conditioned on raw egocentric RGB,
+while being fully invariant to domain-specific visual factors (lighting, scene clut-
+ter, camera intrinsics). This invariance is key for cross-domain generalization.
+3.4
+Unified Exo-to-Ego Policy Co-Training
+The scarcity of robot teleoperation data is a fundamental bottleneck for scaling
+manipulation policies. Our viewpoint-aligned pose representation unlocks a sim-
+ple solution: treat the human hand as a distinct embodiment operating in the
+same kinematic space as the robot end-effector, and co-train on both.
+Unified state-action space. We project two datasets into a shared representation:
+– Robot data: Drobot = {(probot
+1:T
+, arobot
+1:T
+)}, collected via teleoperation, where
+arobot
+t
+is the target 6-DoF end-effector displacement and finger articulation
+command.
+– Translated human data: Dtrans
+human = {(ˆphuman
+1:T
+, ˆahuman
+1:T
+)}, produced by our
+view translation pipeline, with ˆahuman
+t
+defined analogously as the hand dis-
+placement in the egocentric frame.
+Policy architecture and co-training objective. We parameterize πθ as an Action
+Transformer [46] that predicts a future action trajectory given a short history of
+H joint poses: πθ(at | pt−H:t). The policy is trained via joint behavioral cloning:
+  \mathcal {L}_{\text {policy}}(\ the t a ) \;=\; \mathb
+b {E}_{(p,a)\si m \m athcal {D}_{\text {robot}}}\!\left [\ell \!\left (\pi _\theta (p),\, a\right )\right ] \;+\; \mu \, \mathbb {E}_{(\hat {p},\hat {a})\sim \mathcal {D}_{\text {human}}^{\text {trans}}} \!\left [\ell \!\left (\pi _\theta (\hat {p}),\, \hat {a}\right )\right ], \label {eq:cotrain_loss} 
+(7)
+where ℓis the action regression loss and µ > 0 is a hyperparameter that balances
+the relative dataset sizes.
+
+
+10
+H. Basak et al.
+4
+Experiments and Results
+4.1
+Dataset and Implementation Details
+The encoder Ei is a pretrained DINOv2-ViT-L/14 [42] projecting to d=512. The
+pose encoder Ep is a three-layer MLP with hidden dimension 256 and ReLU
+activations. Hand and object poses are extracted via HAMER [45] and Founda-
+tionPose [62], respectively, yielding zt ∈R563. The score network sψ is a 12-layer
+Transformer (8 heads, hidden dim 512) taking as input the embedded noisy pose,
+a sinusoidal diffusion-time encoding, the flattened context ct, and the previous
+pose pt−1, with a linear head. We adopt a VP-SDE with cosine noise sched-
+ule (N=1000 training steps, N=50 DDIM steps at inference) and weighting
+λ(τ) = 1 −cos(πτ/2). The motion prior Φ is a two-layer GRU (hidden size 256)
+pretrained for 20 epochs on ground-truth sequences, with spectral normaliza-
+tion enforcing L=0.95. The full translation module is trained on training splits
+of OakInk V2 [75], H2O [26], AssemblyHands [40], and Assembly101 [52] for
+200 epochs, batch size 128, AdamW (lr=3×10−4, cosine annealing, 5K warmup,
+weight decay 10−4) on 8 A100 GPUs, with temporal consistency weight β=0.5.
+For policy co-training, we follow the dataset composition and training protocol
+of [68], including the robot teleoperation data, task suite, action representa-
+tion, and all associated hyperparameters. The only modification is the addition
+of Dtrans
+human, consisting of exo-to-ego translated clips from TACO [32] and Mim-
+icplay [58] spanning the same task categories. These samples are incorporated
+through the co-training objective with balance weight µ=0.3, selected by match-
+ing the gradient norms from the two data sources at the start of training.
+To provide dense geometric grounding, we augment our pose representation
+by attaching a lightweight mesh reconstruction head that recovers 3D hand and
+object meshes from the predicted hand joint parameters via the differentiable
+MANO layer [50] and object-specific shape priors. For comparability with prior
+work, we follow standard evaluation protocols [43,45] and report both 3D joint
+and mesh accuracy: PA-MPJPE and AUCJ for joint accuracy, and PA-MPVPE,
+AUCV , F@5mm, and F@15mm for mesh accuracy. Policy evaluation is conducted
+on the Ego Humanoid Manipulation Benchmark [68], built in NVIDIA Isaac Lab
+with a Unitree H1 humanoid robot, following the exact evaluation protocol, task
+definitions, and success criteria defined therein. Additional details are in the
+supplementary file.
+4.2
+Evaluation of Pose Translation
+Since no prior work directly addresses exocentric-to-egocentric pose translation,
+we compare against the closest available baselines: pixel-space exo-to-ego view
+synthesis methods (Pix2PixHD [61], Exo2Ego-V [30], EgoWorld [44], 4Diff [11],
+EgoX [24]), from whose generated egocentric videos we extract poses using
+HAMER [45] and FoundationPose [62] to obtain pose estimates for evalua-
+tion in a unified pose space. Following the four generalization splits defined in
+EgoWorld [44], Table 1 reports pose and mesh accuracy across unseen objects,
+
+
+Exo2EgoPolicy
+11
+Table 1: Exo-to-Ego hand pose translation across four generalization splits on H20 [26].
+Best in bold, second best underlined.
+Unseen Objects
+Unseen Actions
+Method
+PA-MPJPE↓AUCJ↑PA-MPVPE↓AUCV ↑F@5mm↑F@15mm↑
+Method
+PA-MPJPE↓AUCJ↑PA-MPVPE↓AUCV ↑F@5mm↑F@15mm↑
+Pix2PixHD [61]
+42.6
+0.312
+48.4
+0.284
+0.142
+0.412
+Pix2PixHD [61]
+46.3
+0.274
+52.1
+0.251
+0.118
+0.374
+Exo2Ego-V [30]
+24.1
+0.518
+26.3
+0.474
+0.312
+0.645
+Exo2Ego-V [30]
+28.4
+0.471
+31.2
+0.432
+0.274
+0.601
+EgoWorld [44]
+19.4
+0.612
+22.5
+0.581
+0.421
+0.762
+EgoWorld [44]
+23.1
+0.564
+26.8
+0.531
+0.378
+0.714
+4Diff [11]
+18.2
+0.635
+20.1
+0.592
+0.448
+0.782
+4Diff [11]
+21.7
+0.588
+24.3
+0.551
+0.401
+0.738
+EgoX [24]
+15.7
+0.684
+17.5
+0.645
+0.521
+0.844
+EgoX [24]
+18.9
+0.631
+21.2
+0.597
+0.468
+0.798
+Ours
+11.4
+0.772
+12.8
+0.741
+0.685
+0.912
+Ours
+14.2
+0.718
+16.1
+0.683
+0.624
+0.874
+Unseen Scenes
+Unseen Subjects
+Method
+PA-MPJPE↓AUCJ↑PA-MPVPE↓AUCV ↑F@5mm↑F@15mm↑
+Method
+PA-MPJPE↓AUCJ↑PA-MPVPE↓AUCV ↑F@5mm↑F@15mm↑
+Pix2PixHD [61]
+44.1
+0.298
+50.2
+0.271
+0.131
+0.394
+Pix2PixHD [61]
+43.8
+0.304
+49.6
+0.278
+0.137
+0.403
+Exo2Ego-V [30]
+25.8
+0.497
+28.4
+0.458
+0.291
+0.624
+Exo2Ego-V [30]
+25.2
+0.508
+27.4
+0.466
+0.301
+0.634
+EgoWorld [44]
+20.6
+0.594
+23.9
+0.562
+0.398
+0.741
+EgoWorld [44]
+20.1
+0.603
+23.2
+0.571
+0.410
+0.752
+4Diff [11]
+19.3
+0.618
+21.8
+0.574
+0.424
+0.762
+4Diff [11]
+18.8
+0.627
+21.1
+0.583
+0.436
+0.772
+EgoX [24]
+16.8
+0.661
+18.9
+0.624
+0.498
+0.824
+EgoX [24]
+16.2
+0.673
+18.2
+0.635
+0.511
+0.834
+Ours
+12.3
+0.751
+13.9
+0.718
+0.658
+0.891
+Ours
+11.8
+0.762
+13.3
+0.729
+0.671
+0.902
+Table 2: Exo-to-Ego hand pose translation on Assembly101 [52].
+Method
+PA-MPJPE↓AUCJ↑PA-MPVPE↓AUCV ↑F@5mm↑F@15mm↑
+Pix2PixHD [61]
+44.8
+0.298
+51.3
+0.271
+0.128
+0.398
+Exo2Ego-V [30]
+26.4
+0.504
+29.1
+0.461
+0.284
+0.618
+EgoWorld [44]
+21.2
+0.598
+24.4
+0.554
+0.392
+0.731
+4Diff [11]
+19.8
+0.621
+22.6
+0.578
+0.418
+0.754
+EgoX [24]
+17.1
+0.668
+19.3
+0.629
+0.504
+0.831
+Ours
+12.6
+0.758
+14.2
+0.724
+0.661
+0.897
+Fig. 3: Visualization of Exo2Ego hand-object pose generation.
+actions, scenes, and subjects on H2O [26] benchmark. Our method consistently
+outperforms all baselines across every split and metric, reducing PA-MPJPE by
+27% over the strongest baseline EgoX and improving F@5mm by over 30% in the
+most challenging Unseen Actions split. The comparatively weaker performance of
+pixel-space methods like [30,44,61] supports our central argument: synthesizing
+unobserved background regions introduces structural artifacts that propagate
+into extracted poses, whereas our pose formulation avoids this. We further vali-
+date generalization on Assembly101 [52]. As shown in Table 2, our method again
+achieves the best performance across all metrics, reducing PA-MPJPE from 17.1
+(EgoX) to 12.6 and improving F@15mm by 6.6 points. Qualitative examples of
+exo-to-ego pose translation are shown in Figure 3.
+4.3
+Policy Co-Training Evaluation
+Simulation setup. We evaluate policy performance under co-training using the
+Ego Humanoid Manipulation Benchmark [68], built on NVIDIA Isaac Lab with a
+Unitree H1 humanoid robot equipped with two Inspire dexterous robotic hands.
+The benchmark comprises 12 manipulation tasks categorized as either Short-
+
+
+12
+H. Basak et al.
+Fig. 4: Visualization of policy rollout after co-training.
+Horizon atomic actions: Stack-Can, Push-Box, Open-Drawer, Close-Drawer, Flip-
+Mug, Pour-Balls, and Open-Laptop; or Long-Horizon multi-stage skills: Sort-
+Cans, Insert-Cans, Unload-Cans, Insert-And-Unload-Cans, and Stack-Can-Into-
+Drawer. Following [68], we evaluate under two visual settings: Seen, where back-
+grounds match training, and Unseen, where all 22 background combinations are
+previously unseen, with object positions randomized at the beginning of each
+rollout. We report Success Rate (SR) and Progress Rate (PSR), following [68].
+Policy rollout visualizations in simulation setting are shown in Figure 4.
+Baselines. We compare against four categories of methods, each probing a dif-
+ferent aspect of the proposed pipeline. Robot-only (ACT [77] and EgoVLA-
+NoPretrain [68]) train solely on Drobot without any human data, establishing
+the data-scarce baseline. Exo-only co-training injects exocentric poses directly
+into co-training without any viewpoint translation, isolating whether the benefit
+comes from more data alone or from the viewpoint translation step itself. Pixel-
+space co-training methods (EgoWorld [44], 4Diff [11], EgoX [24]) first synthesize
+egocentric videos from exocentric input, extract poses via HAMER [45] and
+FoundationPose [62], and co-train the same policy, directly measuring whether
+pose quality of the translated poses affect policy learning. EgoVLA [68] pretrains
+on egocentric human videos, representing the strongest prior method that uses
+human data but avoids the exo-to-ego problem entirely. Ours (Exo2EgoPolicy)
+uses the full pipeline with all contributions.
+Analysis. The row groupings in Table 3 and Table 4 reveal a clear and consis-
+tent performance hierarchy. First, Exo-only co-training provides negligible im-
+provement over robot-only baselines (+1.1% mean SR on short-horizon Seen),
+confirming that raw exocentric poses are too geometrically misaligned with the
+egocentric robot frame to provide useful training signal; additional exocentric
+data alone does not solve the domain gap. Second, pixel-space view transla-
+tion methods (EgoWorld, 4Diff, EgoX) improve substantially over robot-only,
+indicating that view translation is necessary; however, their gains are bottle-
+necked by pose extraction errors from newly synthesized video regions, with
+EgoX achieving 75.5% and 66.6% mean SR on short-horizon Seen and Unseen,
+respectively. Third, EgoVLA demonstrates that egocentric human pretraining is
+
+
+Exo2EgoPolicy
+13
+Table 3: Evaluation on Short-Horizon Tasks (Seen / Unseen visual configurations).
+SR: Success Rate (%). PSR: Progress Rate (%). Best in bold, second best underlined.
+Stack-Can
+Push-Box Open-Drawer Close-Drawer
+Flip-Mug
+Pour-Balls Open-Laptop
+Mean
+Method
+SR↑PSR↑SR↑PSR↑SR↑PSR↑
+SR↑
+PSR↑
+SR↑PSR↑SR↑PSR↑
+SR↑
+PSR↑
+SR↑PSR↑
+Seen Configuration
+Without human data
+ACT [77]
+22.2
+22.2
+11.1
+85.2
+18.5
+66.7
+48.1
+96.3
+7.4
+7.4
+3.7
+77.8
+63.0
+63.0
+24.9
+59.8
+EgoVLA-NoPretrain [68] 55.6
+55.6
+51.9
+75.9
+59.3
+77.8
+100.0 100.0
+3.7
+3.7
+85.2
+93.8
+96.3
+96.3
+64.6
+71.9
+With human data — no view translation
+Exo-only
+57.4
+57.4
+53.7
+77.8
+61.1
+79.6
+100.0 100.0
+5.6
+5.6
+86.1
+94.4
+96.3
+96.3
+65.7
+72.9
+With human data — pixel-space view translation
+EgoWorld [44]
+63.0
+63.0
+59.3
+80.2
+64.8
+81.5
+100.0 100.0
+22.2
+22.2
+87.0
+94.9
+97.2
+97.2
+70.5
+77.0
+4Diff [11]
+66.7
+66.7
+62.0
+81.5
+66.7
+82.4
+100.0 100.0
+29.6
+29.6
+87.9
+95.4
+98.1
+98.1
+72.9
+79.1
+EgoX [24]
+70.4
+70.4
+66.7
+82.4
+66.7
+83.3
+100.0 100.0
+37.0
+37.0
+88.9
+95.8
+99.1
+99.1
+75.5
+81.1
+With human data — egocentric pretraining
+EgoVLA [68]
+77.8
+77.8
+70.4
+83.3
+59.3
+81.5
+100.0 100.0
+59.3
+59.3
+77.8
+92.6
+100.0 100.0
+77.8
+84.9
+With human data — pose-space exo2ego view translation
+Ours
+82.4 82.4
+75.9 87.0
+66.7
+85.2
+100.0 100.0 63.0 63.0
+85.2 94.4
+100.0 100.0 81.9 87.4
+Unseen Configuration
+Without human data
+ACT [77]
+9.1
+10.6
+18.2
+87.9
+24.2
+72.0
+63.6
+97.0
+0.0
+0.0
+6.1
+59.1
+53.0
+53.0
+24.9
+54.2
+EgoVLA-NoPretrain [68] 57.6
+57.6
+69.7
+82.6
+46.2
+71.3
+86.4
+89.9
+4.7
+4.7
+46.0
+79.4
+48.5
+53.0
+51.3
+62.6
+With human data — no view translation
+Exo-only
+59.1
+59.1
+71.2
+83.8
+47.4
+72.6
+87.9
+91.4
+5.8
+5.8
+47.4
+80.6
+50.0
+54.5
+52.7
+63.9
+With human data — pixel-space view translation
+EgoWorld [44]
+62.1
+62.1
+73.1
+84.9
+50.5
+74.8
+90.4
+93.2
+16.7
+16.7
+56.1
+83.4
+60.6
+65.2
+58.5
+68.6
+4Diff [11]
+63.6
+63.6
+74.2
+85.6
+51.3
+75.8
+93.2
+95.5
+21.8
+21.8
+65.2
+87.9
+68.2
+72.7
+62.5
+71.8
+EgoX [24]
+65.2
+65.2
+75.8
+86.4
+52.6
+77.3
+95.5
+97.0
+27.4
+27.4
+74.2
+91.7
+75.8
+80.3
+66.6
+75.0
+With human data — egocentric pretraining
+EgoVLA [68]
+62.1
+62.1
+75.8
+84.9
+50.0
+75.3
+98.5
+98.5
+30.8
+30.8
+83.3
+94.4
+83.3
+87.9
+69.1
+76.3
+With human data — pose-space exo2ego view translation
+Ours
+68.2 68.2
+80.3 88.6
+56.4
+79.5
+100.0 100.0 35.9 35.9
+87.5 96.5
+87.9
+91.7
+73.7 80.1
+a strong source of diverse priors, outperforming all pixel-space methods on most
+tasks. Crucially, our method surpasses EgoVLA on both short- and long-horizon
+tasks under both visual settings, demonstrating that exo-to-ego pose translation
+extracts higher-quality and more spatially diverse training signal than egocentric
+video alone. The advantage is largest on long-horizon Seen tasks (+7.4% SR),
+where temporally consistent pose sequences from our dynamics prior directly
+reduce compounding errors across subtask boundaries, and on Unseen configu-
+rations (+7.3% SR), confirming that our geometry-aligned pose representation
+generalizes more robustly. Additional findings are in the supplementary material.
+4.4
+Ablation Study
+To isolate the contribution of each design choice in Exo2EgoPolicy, we ablate
+four design decisions on both pose translation quality (PA-MPJPE↓, F@15mm↑)
+and downstream policy performance (mean SR↑on short- and long-horizon tasks
+under the Unseen configuration), as shown in Table 5.
+Object-relative formulation: Removing the object-relative coordinate frame
+(row a) and predicting poses in absolute world coordinates causes a substan-
+tial drop in both PA-MPJPE (11.4→18.4) and short-horizon SR (73.7→58.3%).
+Without the object as a locally stable reference, the model must implicitly dis-
+entangle camera motion from hand-object kinematics, which is ill-posed under
+uncalibrated exocentric cameras and leads to systematically misaligned poses.
+Geometric latent encoding: Replacing the geometry-aware latent representa-
+tion zt with direct regression (row b) produces the lowest pose accuracy overall
+(PA-MPJPE: 21.6), confirming that the explicit geometric encoding is essential
+for resolving viewpoint ambiguity rather than memorizing appearance-to-pose
+mappings. Autoregressive conditioning: Removing pt−1 from the score net-
+work (row c) eliminates temporal context entirely, degrading both pose quality
+and policy performance. This confirms that conditioning on the previous state is
+
+
+14
+H. Basak et al.
+Table 4: Evaluation on Long-Horizon Tasks (Seen / Unseen visual configurations).
+SR: Success Rate (%). PSR: Progress Rate (%). Best in bold, second best underlined.
+Insert-&-Unload Stack-Into-Drawer Sort-Cans Unload-Cans Insert-Cans
+Mean
+Method
+SR↑
+PSR↑
+SR↑
+PSR↑
+SR↑PSR↑SR↑PSR↑
+SR↑PSR↑SR↑PSR↑
+Seen Configuration
+Without human data
+ACT [77]
+0.0
+11.1
+11.1
+37.0
+0.0
+28.6
+0.0
+35.8
+0.0
+19.8
+2.2
+26.5
+EgoVLA-NoPretrain [68] 7.4
+45.9
+0.0
+18.5
+51.9
+79.6
+63.0
+75.0
+11.1
+55.6
+26.7
+54.9
+With human data - no view translation
+Exo-only
+8.6
+47.2
+0.0
+20.4
+53.1
+80.2
+64.2
+76.4
+12.3
+57.4
+27.6
+56.3
+With human data - pixel-space exo2ego view translation
+EgoWorld [44]
+18.5
+54.3
+14.8
+48.1
+55.6
+82.4
+66.7
+78.2
+14.8
+62.3
+34.1
+65.1
+4Diff [11]
+22.2
+58.6
+22.2
+55.6
+57.4
+84.7
+68.5
+80.1
+16.7
+65.8
+37.4
+68.9
+EgoX [24]
+29.6
+64.2
+29.6
+62.4
+59.3
+86.8
+70.4
+81.9
+18.5
+70.2
+41.5
+73.1
+With human data - egocentric pretraining
+EgoVLA [68]
+44.4
+77.0
+40.7
+75.9
+55.6
+88.9
+66.7
+83.3
+22.2
+78.7
+45.9
+80.8
+With human data - pose-space exo2ego view translation (ours)
+Ours
+51.9
+81.5
+48.1
+79.6
+63.0 91.2
+74.1 87.0
+29.6 82.4
+53.3 84.3
+Unseen Configuration
+Without human data
+ACT [77]
+0.0
+7.9
+1.5
+33.8
+0.0
+20.7
+1.5
+33.8
+0.0
+21.2
+0.6
+23.5
+EgoVLA-NoPretrain [68] 0.0
+29.1
+0.0
+20.1
+15.2
+45.8
+34.9
+55.7
+6.1
+30.3
+11.2
+36.2
+With human data - no view translation
+Exo-only
+0.0
+30.3
+0.0
+21.6
+16.7
+47.2
+36.4
+57.2
+7.6
+31.8
+12.1
+37.6
+With human data - pixel-space exo2ego view translation
+EgoWorld [44]
+6.1
+38.6
+6.1
+38.6
+18.2
+55.3
+40.9
+62.1
+9.1
+40.2
+16.1
+46.9
+4Diff [11]
+12.1
+48.5
+12.1
+45.5
+19.7
+60.6
+43.9
+66.7
+10.6
+48.5
+19.7
+53.9
+EgoX [24]
+21.2
+62.1
+18.2
+54.5
+21.2
+65.9
+47.0
+71.2
+12.1
+56.1
+23.9
+61.9
+With human data - egocentric pretraining
+EgoVLA [68]
+31.8
+77.0
+28.8
+61.0
+18.2
+68.9
+50.0
+75.8
+15.2
+62.9
+28.8
+69.1
+With human data - pose-space exo2ego view translation (ours)
+Ours
+39.4
+82.6
+36.4
+67.4
+25.8 74.2
+57.6 80.3
+21.2 68.2
+36.1 74.5
+Table 5: Ablation study on H2O [26] (pose translation, unseen objects) and the Ego
+Humanoid Manipulation Benchmark [68] (policy, Unseen).
+Pose Translation
+Policy (Unseen)
+Method
+PA-MPJPE↓F@15mm↑Short SR↑Long SR↑
+Representation ablations
+(a) w/o object-relative formulation
+18.4
+0.712
+58.3
+20.1
+(b) w/o geometric latent zt (direct regression)
+21.6
+0.671
+54.7
+17.4
+Temporal ablations
+(c) w/o autoregressive conditioning (pt−1 removed from sψ)
+17.1
+0.783
+62.4
+24.8
+(d) w/o Ltemp (full temporal module)
+19.3
+0.748
+57.9
+19.8
+Ours (full)
+11.4
+0.912
+73.7
+36.1
+necessary even before any explicit smoothness supervision is applied. Temporal
+consistency loss: Removing the full temporal module (row e) collapses perfor-
+mance to near the representation-only baseline, confirming that Ltemp suppresses
+high-frequency jitter, which is necessary for stable long-horizon execution.
+5
+Conclusion
+We present Exo2EgoPolicy, a framework that translates exocentric human demon-
+strations into egocentric robot actions directly in pose space, avoiding arti-
+facts introduced by pixel-space view synthesis. A viewpoint-conditioned diffusion
+model on SE(3), coupled with a temporally regularized dynamics prior, produces
+smooth, geometrically consistent pose trajectories that serve as a sufficient rep-
+resentation for policy learning. Experiments on pose translation benchmarks and
+the Ego Humanoid Manipulation Benchmark demonstrate that exocentric hu-
+man video is a scalable and effective source of manipulation knowledge, with
+consistent gains over all baselines especially on long-horizon tasks.
+Acknowledgments
+Zhaozheng Yin was supported by NSF grants IIS-2331769, CMMI-2246673, and
+ECCS-2025929.
+
+
+Exo2EgoPolicy
+15
+References
+1. Arunachalam, S.P., Silwal, S., Evans, B., Pinto, L.: Dexterous imitation made
+easy: A learning-based framework for efficient dexterous manipulation. In: 2023
+ieee international conference on robotics and automation (icra). pp. 5954–5961.
+IEEE (2023)
+2. Bahl, S., Mendonca, R., Chen, L., Jain, U., Pathak, D.: Affordances from human
+videos as a versatile representation for robotics. In: Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition. pp. 13778–13790 (2023)
+3. Bahmani, S., Skorokhodov, I., Qian, G., Siarohin, A., Menapace, W., Tagliasacchi,
+A., Lindell, D.B., Tulyakov, S.: Ac3d: Analyzing and improving 3d camera con-
+trol in video diffusion transformers. In: Proceedings of the Computer Vision and
+Pattern Recognition Conference. pp. 22875–22889 (2025)
+4. Bai, J., Xia, M., Fu, X., Wang, X., Mu, L., Cao, J., Liu, Z., Hu, H., Bai, X., Wan, P.,
+et al.: Recammaster: Camera-controlled generative rendering from a single video.
+In: Proceedings of the IEEE/CVF International Conference on Computer Vision.
+pp. 14834–14844 (2025)
+5. Barfoot, T.D.: State estimation for robotics. Cambridge University Press (2024)
+6. Bharadhwaj, H., Mottaghi, R., Gupta, A., Tulsiani, S.: Track2act: Predicting point
+tracks from internet videos enables diverse zero-shot robot manipulation. arXiv
+preprint arXiv:2405.01527 2 (2024)
+7. Black, K., Brown, N., Driess, D., Esmail, A., Equi, M., Finn, C., Fusai, N., Groom,
+L., Hausman, K., Ichter, B., et al.: pi_0: A vision-language-action flow model for
+general robot control. arXiv preprint arXiv:2410.24164 (2024)
+8. Chen, A.S., Nair, S., Finn, C.: Learning generalizable robotic reward functions
+from" in-the-wild" human videos. arXiv preprint arXiv:2103.16817 (2021)
+9. Chen, J., Zhao, Y., Yu, J., Chu, R., Chen, J., Yang, S., Wang, X., Pan, Y., Zhou,
+D., Ling, H., et al.: Sana-video: Efficient video generation with block linear diffusion
+transformer. arXiv preprint arXiv:2509.24695 (2025)
+10. Chen, L.Y., Hari, K., Dharmarajan, K., Xu, C., Vuong, Q., Goldberg, K.: Mirage:
+Cross-embodiment zero-shot policy transfer with cross-painting. arXiv preprint
+arXiv:2402.19249 (2024)
+11. Cheng, F., Luo, M., Wang, H., Dimakis, A., Torresani, L., Bertasius, G., Grau-
+man, K.: 4diff: 3d-aware diffusion model for third-to-first viewpoint translation. In:
+European Conference on Computer Vision. pp. 409–427. Springer (2024)
+12. Chi, C., Xu, Z., Feng, S., Cousineau, E., Du, Y., Burchfiel, B., Tedrake, R., Song, S.:
+Diffusion policy: Visuomotor policy learning via action diffusion. The International
+Journal of Robotics Research 44(10-11), 1684–1704 (2025)
+13. Chi, C., Xu, Z., Pan, C., Cousineau, E., Burchfiel, B., Feng, S., Tedrake, R., Song,
+S.: Universal manipulation interface: In-the-wild robot teaching without in-the-wild
+robots. arXiv preprint arXiv:2402.10329 (2024)
+14. Das, N., Bechtle, S., Davchev, T., Jayaraman, D., Rai, A., Meier, F.: Model-
+based inverse reinforcement learning from visual demonstrations. In: Conference
+on Robot Learning. pp. 1930–1942. PMLR (2021)
+15. Fang, B., Jia, S., Guo, D., Xu, M., Wen, S., Sun, F.: Survey of imitation learning for
+robotic manipulation: B. fang et al. International Journal of Intelligent Robotics
+and Applications 3(4), 362–369 (2019)
+16. Fu, Z., Zhao, Q., Wu, Q., Wetzstein, G., Finn, C.: Humanplus: Humanoid shad-
+owing and imitation from humans. arXiv preprint arXiv:2406.10454 (2024)
+
+
+16
+H. Basak et al.
+17. Ghadirzadeh, A., Chen, X., Poklukar, P., Finn, C., Björkman, M., Kragic, D.:
+Bayesian meta-learning for few-shot policy adaptation across robotic platforms.
+In: 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems
+(IROS). pp. 1274–1280. IEEE (2021)
+18. HaCohen, Y., Chiprut, N., Brazowski, B., Shalem, D., Moshe, D., Richardson, E.,
+Levin, E., Shiran, G., Zabari, N., Gordon, O., et al.: Ltx-video: Realtime video
+latent diffusion. arXiv preprint arXiv:2501.00103 (2024)
+19. Handa, A., Van Wyk, K., Yang, W., Liang, J., Chao, Y.W., Wan, Q., Birchfield, S.,
+Ratliff, N., Fox, D.: Dexpilot: Vision-based teleoperation of dexterous robotic hand-
+arm system. In: 2020 IEEE International Conference on Robotics and Automation
+(ICRA). pp. 9164–9170. IEEE (2020)
+20. Hoque, R., Huang, P., Yoon, D.J., Sivapurapu, M., Zhang, J.: Egodex: Learn-
+ing dexterous manipulation from large-scale egocentric video. arXiv preprint
+arXiv:2505.11709 (2025)
+21. Hsu, C.C., Wen, B., Xu, J., Narang, Y., Wang, X., Zhu, Y., Biswas, J., Birchfield,
+S.: Spot: Se (3) pose trajectory diffusion for object-centric manipulation. In: 2025
+IEEE International Conference on Robotics and Automation (ICRA). pp. 4853–
+4860. IEEE (2025)
+22. Hussein, A., Gaber, M.M., Elyan, E., Jayne, C.: Imitation learning: A survey of
+learning methods. ACM Computing Surveys (CSUR) 50(2), 1–35 (2017)
+23. Jung, B., Amor, H.B., Heumer, G., Weber, M.: From motion capture to action
+capture: A review of imitation learning techniques and their application to vr-
+based character animation. In: Proceedings of the ACM symposium on Virtual
+reality software and technology. pp. 145–154 (2006)
+24. Kang, T., Kim, K., Kim, D., Park, M., Hyung, J., Choo, J.: Egox: Egocentric video
+generation from a single exocentric video. arXiv preprint arXiv:2512.08269 (2025)
+25. Kareer, S., Patel, D., Punamiya, R., Mathur, P., Cheng, S., Wang, C., Hoffman, J.,
+Xu, D.: Egomimic: Scaling imitation learning via egocentric video. In: 2025 IEEE
+International Conference on Robotics and Automation (ICRA). pp. 13226–13233.
+IEEE (2025)
+26. Kwon, T., Tekin, B., Stühmer, J., Bogo, F., Pollefeys, M.: H2o: Two hands ma-
+nipulating objects for first person interaction recognition. In: Proceedings of the
+IEEE/CVF international conference on computer vision. pp. 10138–10148 (2021)
+27. Li, J., Zhu, Y., Xie, Y., Jiang, Z., Seo, M., Pavlakos, G., Zhu, Y.: Okami: Teaching
+humanoid robots manipulation skills through single video imitation. arXiv preprint
+arXiv:2410.11792 (2024)
+28. Liu, J.W., Mao, W., Xu, Z., Keppo, J., Shou, M.Z.: Exocentric-to-egocentric video
+generation. Advances in Neural Information Processing Systems 37, 136149–136172
+(2024)
+29. Liu, J.W., Mao, W., Xu, Z., Keppo, J., Shou, M.Z.: Exocentric-to-egocentric video
+generation. Advances in Neural Information Processing Systems 37, 136149–136172
+(2024)
+30. Liu, J.W., Mao, W., Xu, Z., Keppo, J., Shou, M.Z.: Exocentric-to-egocentric video
+generation. Advances in Neural Information Processing Systems 37, 136149–136172
+(2024)
+31. Liu, S., Wu, L., Li, B., Tan, H., Chen, H., Wang, Z., Xu, K., Su, H., Zhu, J.:
+Rdt-1b: a diffusion foundation model for bimanual manipulation. arXiv preprint
+arXiv:2410.07864 (2024)
+32. Liu, Y., Yang, H., Si, X., Liu, L., Li, Z., Zhang, Y., Liu, Y., Yi, L.: Taco: Bench-
+marking generalizable bimanual tool-action-object understanding. In: Proceedings
+
+
+Exo2EgoPolicy
+17
+of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp.
+21740–21751 (2024)
+33. Lu, C., Cheng, X., Li, J., Yang, S., Ji, M., Yuan, C., Yang, G., Yi, S., Wang, X.:
+Mobile-television: Predictive motion priors for humanoid whole-body control. In:
+2025 IEEE International Conference on Robotics and Automation (ICRA). pp.
+5364–5371. IEEE (2025)
+34. Luo, M., Xue, Z., Dimakis, A., Grauman, K.: Put myself in your shoes: Lifting
+the egocentric perspective from exocentric videos. In: European Conference on
+Computer Vision. pp. 407–425. Springer (2024)
+35. Luo, Y., Shi, X., Bai, J., Xia, M., Xue, T., Wang, X., Wan, P., Zhang, D., Gai, K.:
+Camclonemaster: Enabling reference-based camera control for video generation.
+In: Proceedings of the SIGGRAPH Asia 2025 Conference Papers. pp. 1–10 (2025)
+36. Ma, Y.J., Sodhani, S., Jayaraman, D., Bastani, O., Kumar, V., Zhang, A.: Vip:
+Towards universal visual reward and representation via value-implicit pre-training.
+arXiv preprint arXiv:2210.00030 (2022)
+37. Mao, X., Lin, S., Li, Z., Li, C., Peng, W., He, T., Pang, J., Chi, M., Qiao, Y., Zhang,
+K.: Yume: An interactive world generation model. arXiv preprint arXiv:2507.17744
+(2025)
+38. Nair, S., Rajeswaran, A., Kumar, V., Finn, C., Gupta, A.: R3m: A universal visual
+representation for robot manipulation. arXiv preprint arXiv:2203.12601 (2022)
+39. Nguyen, A., Kanoulas, D., Muratore, L., Caldwell, D.G., Tsagarakis, N.G.: Trans-
+lating videos to commands for robotic manipulation with deep recurrent neural
+networks. In: 2018 IEEE International Conference on Robotics and Automation
+(ICRA). pp. 3782–3788. IEEE (2018)
+40. Ohkawa, T., He, K., Sener, F., Hodan, T., Tran, L., Keskin, C.: Assemblyhands:
+Towards egocentric activity understanding via 3d hand pose estimation. In: Pro-
+ceedings of the IEEE/CVF conference on computer vision and pattern recognition.
+pp. 12999–13008 (2023)
+41. OpenAI, R.: Gpt-4 technical report. arxiv 2303.08774. View in Article 2(5),
+1
+(2023)
+42. Oquab, M., Darcet, T., Moutakanni, T., Vo, H., Szafraniec, M., Khalidov, V.,
+Fernandez, P., Haziza, D., Massa, F., El-Nouby, A., et al.: Dinov2: Learning robust
+visual features without supervision. arXiv preprint arXiv:2304.07193 (2023)
+43. Park, J., Oh, Y., Moon, G., Choi, H., Lee, K.M.: Handoccnet: Occlusion-robust
+3d hand mesh estimation network. In: 2022 IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR). p. 1486–1495. IEEE (2022)
+44. Park, J., Ye, A.S., Kwon, T.: Egoworld: Translating exocentric view to egocentric
+view using rich exocentric observations. arXiv preprint arXiv:2506.17896 (2025)
+45. Pavlakos, G., Shan, D., Radosavovic, I., Kanazawa, A., Fouhey, D., Malik, J.:
+Reconstructing hands in 3D with transformers. In: CVPR (2024)
+46. Qiu, R.Z., Yang, S., Cheng, X., Chawla, C., Li, J., He, T., Yan, G., Yoon, D.J.,
+Hoque, R., Paulsen, L., et al.: Humanoid policy˜ human policy. arXiv preprint
+arXiv:2503.13441 (2025)
+47. Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G.,
+Askell, A., Mishkin, P., Clark, J., et al.: Learning transferable visual models from
+natural language supervision. In: International conference on machine learning. pp.
+8748–8763. PmLR (2021)
+48. Ren, J., Sundaresan, P., Sadigh, D., Choudhury, S., Bohg, J.: Motion tracks: A
+unified representation for human-robot transfer in few-shot imitation learning. In:
+2025 IEEE International Conference on Robotics and Automation (ICRA). pp.
+8802–8810. IEEE (2025)
+
+
+18
+H. Basak et al.
+49. Ren, X., Shen, T., Huang, J., Ling, H., Lu, Y., Nimier-David, M., Müller, T., Keller,
+A., Fidler, S., Gao, J.: Gen3c: 3d-informed world-consistent video generation with
+precise camera control. In: Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition. pp. 6121–6132 (2025)
+50. Romero, J., Tzionas, D., Black, M.J.: Embodied hands: Modeling and capturing
+hands and bodies together. ACM Transactions on Graphics, (Proc. SIGGRAPH
+Asia) 36(6) (Nov 2017)
+51. Rothfuss, J., Ferreira, F., Aksoy, E.E., Zhou, Y., Asfour, T.: Deep episodic memory:
+Encoding, recalling, and predicting episodic experiences for robot action execution.
+IEEE Robotics and Automation Letters 3(4), 4007–4014 (2018)
+52. Sener, F., Chatterjee, D., Shelepov, D., He, K., Singhania, D., Wang, R., Yao, A.:
+Assembly101: A large-scale multi-view video dataset for understanding procedural
+activities. In: Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition. pp. 21096–21106 (2022)
+53. Shankar, T., Lin, Y., Rajeswaran, A., Kumar, V., Anderson, S., Oh, J.: Trans-
+lating robot skills: Learning unsupervised skill correspondences across robots. In:
+International Conference on Machine Learning. pp. 19626–19644. PMLR (2022)
+54. Sola, J., Deray, J., Atchuthan, D.: A micro lie theory for state estimation in
+robotics. arXiv preprint arXiv:1812.01537 (2018)
+55. Sullivan, J.V.: Learning and embodied cognition: A review and proposal. Psychol-
+ogy Learning & Teaching 17(2), 128–143 (2018)
+56. Team, O.M., Ghosh, D., Walke, H., Pertsch, K., Black, K., Mees, O., Dasari, S.,
+Hejna, J., Kreiman, T., Xu, C., et al.: Octo: An open-source generalist robot policy.
+arXiv preprint arXiv:2405.12213 (2024)
+57. Wan, T., Wang, A., Ai, B., Wen, B., Mao, C., Xie, C.W., Chen, D., Yu, F., Zhao,
+H., Yang, J., et al.: Wan: Open and advanced large-scale video generative models.
+arXiv preprint arXiv:2503.20314 (2025)
+58. Wang, C., Fan, L., Sun, J., Zhang, R., Fei-Fei, L., Xu, D., Zhu, Y., Anandkumar,
+A.: Mimicplay: Long-horizon imitation learning by watching human play. arXiv
+preprint arXiv:2302.12422 (2023)
+59. Wang, C., Shi, H., Wang, W., Zhang, R., Fei-Fei, L., Liu, C.K.: Dexcap: Scal-
+able and portable mocap data collection system for dexterous manipulation. arXiv
+preprint arXiv:2403.07788 (2024)
+60. Wang, L., Chen, X., Zhao, J., He, K.: Scaling proprioceptive-visual learning with
+heterogeneous pre-trained transformers. Advances in neural information processing
+systems 37, 124420–124450 (2024)
+61. Wang, T.C., Liu, M.Y., Zhu, J.Y., Tao, A., Kautz, J., Catanzaro, B.: High-
+resolution image synthesis and semantic manipulation with conditional gans. In:
+Proceedings of the IEEE conference on computer vision and pattern recognition.
+pp. 8798–8807 (2018)
+62. Wen, B., Yang, W., Kautz, J., Birchfield, S.: Foundationpose: Unified 6d pose esti-
+mation and tracking of novel objects. In: 2024 IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR). p. 17868–17879. IEEE (2024)
+63. Xiong, H., Li, Q., Chen, Y.C., Bharadhwaj, H., Sinha, S., Garg, A.: Learning by
+watching: Physical imitation of manipulation skills from human videos. In: 2021
+IEEE/RSJ international conference on intelligent robots and systems (iros). pp.
+7827–7834. IEEE (2021)
+64. Xu, J., Huang, Y., Pei, B., Hou, J., Li, Q., Chen, G., Zhang, Y., Feng, R., Xie, W.:
+Egoexo-gen: Ego-centric video prediction by watching exo-centric videos. arXiv
+preprint arXiv:2504.11732 (2025)
+
+
+Exo2EgoPolicy
+19
+65. Xu, Q., Xu, Z., Philip, J., Bi, S., Shu, Z., Sunkavalli, K., Neumann, U.: Point-nerf:
+Point-based neural radiance fields. In: Proceedings of the IEEE/CVF conference
+on computer vision and pattern recognition. pp. 5438–5448 (2022)
+66. Xue, B., Duan, Z.P., Yan, Q., Wang, W., Liu, H., Guo, C.L., Li, C., Li, C., Lyu,
+J.: Stand-in: A lightweight and plug-and-play identity control for video generation.
+arXiv preprint arXiv:2508.07901 (2025)
+67. Yang, J., Glossop, C., Bhorkar, A., Shah, D., Vuong, Q., Finn, C., Sadigh, D.,
+Levine, S.: Pushing the limits of cross-embodiment learning for manipulation and
+navigation. arXiv preprint arXiv:2402.19432 (2024)
+68. Yang, R., Yu, Q., Wu, Y., Yan, R., Li, B., Cheng, A.C., Zou, X., Fang, Y., Cheng,
+X., Qiu, R.Z., et al.: Egovla: Learning vision-language-action models from egocen-
+tric human videos. arXiv preprint arXiv:2507.12440 (2025)
+69. Yang, S., Liu, M., Qin, Y., Ding, R., Li, J., Cheng, X., Yang, R., Yi, S., Wang, X.:
+Ace: A cross-platform visual-exoskeletons system for low-cost dexterous teleoper-
+ation. arXiv preprint arXiv:2408.11805 (2024)
+70. Yang, Y., Li, Y., Fermuller, C., Aloimonos, Y.: Robot learning manipulation action
+plans by" watching" unconstrained videos from the world wide web. In: Proceedings
+of the AAAI conference on artificial intelligence. vol. 29 (2015)
+71. Yang, Z., Teng, J., Zheng, W., Ding, M., Huang, S., Xu, J., Yang, Y., Hong, W.,
+Zhang, X., Feng, G., et al.: Cogvideox: Text-to-video diffusion models with an
+expert transformer. arXiv preprint arXiv:2408.06072 (2024)
+72. Yu, A., Ye, V., Tancik, M., Kanazawa, A.: pixelnerf: Neural radiance fields from one
+or few images. In: Proceedings of the IEEE/CVF conference on computer vision
+and pattern recognition. pp. 4578–4587 (2021)
+73. Yu, M., Hu, W., Xing, J., Shan, Y.: Trajectorycrafter: Redirecting camera trajec-
+tory for monocular videos via diffusion models. In: Proceedings of the IEEE/CVF
+international conference on computer vision. pp. 100–111 (2025)
+74. Ze, Y., Chen, Z., Wang, W., Chen, T., He, X., Yuan, Y., Peng, X.B., Wu, J.: Gen-
+eralizable humanoid manipulation with 3d diffusion policies. In: 2025 IEEE/RSJ
+International Conference on Intelligent Robots and Systems (IROS). pp. 2873–
+2880. IEEE (2025)
+75. Zhan, X., Yang, L., Zhao, Y., Mao, K., Xu, H., Lin, Z., Li, K., Lu, C.: Oakink2:
+A dataset of bimanual hands-object manipulation in complex task completion.
+In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition. pp. 445–456 (2024)
+76. Zhang, G., Zhong, L., Lee, Y., Lim, J.J.: Policy transfer across visual and dynamics
+domain gaps via iterative grounding. arXiv preprint arXiv:2107.00339 (2021)
+77. Zhao, T.Z., Kumar, V., Levine, S., Finn, C.: Learning fine-grained bimanual ma-
+nipulation with low-cost hardware. arXiv preprint arXiv:2304.13705 (2023)
+78. Zhao, T.Z., Tompson, J., Driess, D., Florence, P., Ghasemipour, K., Finn, C.,
+Wahid, A.: Aloha unleashed: A simple recipe for robot dexterity. arXiv preprint
+arXiv:2410.13126 (2024)
+79. Zhu, Y., Feng, F.: Let me show you: Learning by retrieving from egocentric video for
+robotic manipulation. In: 2025 IEEE/RSJ International Conference on Intelligent
+Robots and Systems (IROS). pp. 9824–9829. IEEE (2025)
+80. Zhu, Y., Joshi, A., Stone, P., Zhu, Y.: Viola: Imitation learning for vision-based
+manipulation with object proposal priors. In: Conference on Robot Learning. pp.
+1199–1210. PMLR (2023)
